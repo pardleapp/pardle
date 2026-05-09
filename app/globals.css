@@ -1,0 +1,243 @@
+:root {
+  --green: #7BAE3F;
+  --yellow: #E8C547;
+  --grey: #787C7E;
+  --bg: #FFFFFF;
+  --text: #121213;
+  --border: #D3D6DA;
+  --empty: #F4F4F5;
+  --muted: #6b7280;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI",
+    system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 16px 12px 40px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.brand {
+  text-align: center;
+  margin-bottom: 20px;
+  padding-top: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 16px;
+}
+
+h1 {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1.4fr 0.7fr 0.7fr 0.9fr 0.7fr 0.7fr 0.9fr;
+  gap: 4px;
+}
+
+.header-row {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+  padding: 4px 0;
+}
+
+.header-row span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 4px;
+  text-align: center;
+  color: white;
+  padding: 0 4px;
+}
+
+.cell-empty {
+  background: var(--empty);
+  border: 2px solid var(--border);
+}
+
+.cell-green { background: var(--green); }
+.cell-yellow { background: var(--yellow); color: #1f1f1f; }
+.cell-grey { background: var(--grey); }
+
+.name-cell {
+  background: #f0f0f0;
+  color: var(--text);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+}
+
+.input-area {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+input[type=text] {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 16px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  background: white;
+  color: var(--text);
+}
+
+input[type=text]:focus {
+  outline: none;
+  border-color: var(--green);
+}
+
+.suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  list-style: none;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 10;
+}
+
+.suggestions li {
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.suggestions li:last-child {
+  border-bottom: none;
+}
+
+.suggestions li:hover,
+.suggestions li:active {
+  background: #f6f7f8;
+}
+
+.suggestion-country {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.result {
+  text-align: center;
+  padding: 20px;
+  font-size: 18px;
+  font-weight: 600;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.result.win {
+  background: rgba(123, 174, 63, 0.12);
+  color: var(--green);
+}
+
+.result.lose {
+  background: rgba(198, 40, 40, 0.08);
+  color: #c62828;
+}
+
+footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 16px 0;
+  margin-top: auto;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121213;
+    --text: #FFFFFF;
+    --border: #3a3a3c;
+    --empty: #1f1f20;
+    --muted: #9ca3af;
+  }
+
+  .name-cell {
+    background: #1f1f20;
+    color: white;
+  }
+
+  input[type=text] {
+    background: #1f1f20;
+    color: white;
+  }
+
+  .suggestions {
+    background: #1f1f20;
+    border-color: #3a3a3c;
+  }
+
+  .suggestions li {
+    border-bottom-color: #2a2a2a;
+  }
+
+  .suggestions li:hover,
+  .suggestions li:active {
+    background: #2a2a2a;
+  }
+}
