@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { BRAND } from "@/lib/brand";
-import { SAMPLE_GOLFERS } from "@/lib/data/sampleGolfers";
+import { GOLFERS } from "@/lib/data/golfers";
 import { revealGuess } from "@/lib/game/reveal";
 import {
   type AttributeReveal,
@@ -24,9 +24,9 @@ function pickMysteryGolfer(): Golfer {
     (todayUTC - LAUNCH_DATE_UTC) / (1000 * 60 * 60 * 24),
   );
   const safeIndex =
-    ((dayIndex % SAMPLE_GOLFERS.length) + SAMPLE_GOLFERS.length) %
-    SAMPLE_GOLFERS.length;
-  return SAMPLE_GOLFERS[safeIndex];
+    ((dayIndex % GOLFERS.length) + GOLFERS.length) %
+    GOLFERS.length;
+  return GOLFERS[safeIndex];
 }
 
 function flagFor(countryCode: string): string {
@@ -66,7 +66,7 @@ export default function Page() {
   const matches = useMemo(() => {
     const q = input.trim().toLowerCase();
     if (!q) return [];
-    return SAMPLE_GOLFERS.filter((g) => g.name.toLowerCase().includes(q))
+    return GOLFERS.filter((g) => g.name.toLowerCase().includes(q))
       .filter((g) => !guesses.some((gu) => gu.golfer.id === g.id))
       .slice(0, 6);
   }, [input, guesses]);
@@ -175,7 +175,7 @@ export default function Page() {
 
       <footer>
         <p>
-          {BRAND.domain} · {SAMPLE_GOLFERS.length} sample players · full DB
+          {BRAND.domain} · {GOLFERS.length} sample players · full DB
           coming
         </p>
       </footer>

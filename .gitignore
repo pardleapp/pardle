@@ -42,3 +42,7 @@ yarn-error.log*
 # IDE
 .vscode/
 .idea/
+
+# Python
+__pycache__/
+*.pyc
