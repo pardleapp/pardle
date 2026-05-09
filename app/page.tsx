@@ -85,8 +85,7 @@ export default function Page() {
       </header>
 
       <div className="grid">
-        <div className="row header-row">
-          <span>Player</span>
+        <div className="header-row">
           <span>Flag</span>
           <span>Age</span>
           <span>Height</span>
@@ -96,41 +95,46 @@ export default function Page() {
         </div>
 
         {guesses.map((g, i) => (
-          <div key={i} className="row">
-            <span className="cell name-cell" title={g.golfer.name}>
-              {g.golfer.name}
-            </span>
-            <span className={`cell cell-${g.country.state}`}>
-              {flagFor(g.golfer.countryCode)}
-            </span>
-            <span className={`cell cell-${g.age.state}`}>
-              {g.golfer.age}
-              {arrowSymbol(g.age.arrow)}
-            </span>
-            <span className={`cell cell-${g.height.state}`} title={heightDisplay(g.golfer.heightCm)}>
-              {g.golfer.heightCm}
-              {arrowSymbol(g.height.arrow)}
-            </span>
-            <span className={`cell cell-${g.majors.state}`}>
-              {g.golfer.majors}
-              {arrowSymbol(g.majors.arrow)}
-            </span>
-            <span className={`cell cell-${g.pgaTourWins.state}`}>
-              {g.golfer.pgaTourWins}
-              {arrowSymbol(g.pgaTourWins.arrow)}
-            </span>
-            <span className={`cell cell-${g.turnedProYear.state}`}>
-              {g.golfer.turnedProYear}
-              {arrowSymbol(g.turnedProYear.arrow)}
-            </span>
+          <div key={i} className="guess">
+            <div className="guess-name">{g.golfer.name}</div>
+            <div className="guess-cells">
+              <span className={`cell cell-${g.country.state}`}>
+                {flagFor(g.golfer.countryCode)}
+              </span>
+              <span className={`cell cell-${g.age.state}`}>
+                {g.golfer.age}
+                {arrowSymbol(g.age.arrow)}
+              </span>
+              <span
+                className={`cell cell-${g.height.state}`}
+                title={heightDisplay(g.golfer.heightCm)}
+              >
+                {g.golfer.heightCm}
+                {arrowSymbol(g.height.arrow)}
+              </span>
+              <span className={`cell cell-${g.majors.state}`}>
+                {g.golfer.majors}
+                {arrowSymbol(g.majors.arrow)}
+              </span>
+              <span className={`cell cell-${g.pgaTourWins.state}`}>
+                {g.golfer.pgaTourWins}
+                {arrowSymbol(g.pgaTourWins.arrow)}
+              </span>
+              <span className={`cell cell-${g.turnedProYear.state}`}>
+                {g.golfer.turnedProYear}
+                {arrowSymbol(g.turnedProYear.arrow)}
+              </span>
+            </div>
           </div>
         ))}
 
         {Array.from({ length: MAX_GUESSES - guesses.length }).map((_, i) => (
-          <div key={`empty-${i}`} className="row">
-            {Array.from({ length: 7 }).map((_, j) => (
-              <span key={j} className="cell cell-empty" />
-            ))}
+          <div key={`empty-${i}`} className="guess empty-guess">
+            <div className="guess-cells">
+              {Array.from({ length: 6 }).map((_, j) => (
+                <span key={j} className="cell cell-empty" />
+              ))}
+            </div>
           </div>
         ))}
       </div>

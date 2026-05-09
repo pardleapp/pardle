@@ -61,24 +61,21 @@ h1 {
 .grid {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
   margin-bottom: 20px;
 }
 
-.row {
-  display: grid;
-  grid-template-columns: 1.4fr 0.7fr 0.7fr 0.9fr 0.7fr 0.7fr 0.9fr;
-  gap: 4px;
-}
-
 .header-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
   font-size: 11px;
   font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   text-align: center;
-  padding: 4px 0;
+  padding: 0 0 4px;
 }
 
 .header-row span {
@@ -87,17 +84,44 @@ h1 {
   justify-content: center;
 }
 
+.guess {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.guess-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  padding: 6px 8px;
+  background: #f0f0f0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.empty-guess .guess-name {
+  visibility: hidden;
+}
+
+.guess-cells {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
 .cell {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 44px;
-  font-size: 13px;
+  height: 48px;
+  font-size: 14px;
   font-weight: 600;
   border-radius: 4px;
   text-align: center;
   color: white;
-  padding: 0 4px;
+  padding: 0 2px;
 }
 
 .cell-empty {
@@ -108,17 +132,6 @@ h1 {
 .cell-green { background: var(--green); }
 .cell-yellow { background: var(--yellow); color: #1f1f1f; }
 .cell-grey { background: var(--grey); }
-
-.name-cell {
-  background: #f0f0f0;
-  color: var(--text);
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0 6px;
-  border: 1px solid var(--border);
-}
 
 .input-area {
   position: relative;
@@ -217,7 +230,7 @@ footer {
     --muted: #9ca3af;
   }
 
-  .name-cell {
+  .guess-name {
     background: #1f1f20;
     color: white;
   }
