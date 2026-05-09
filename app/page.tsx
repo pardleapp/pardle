@@ -137,16 +137,15 @@ function PlayerCard({ golfer }: { golfer: Golfer }) {
 function Confetti() {
   return (
     <div className="confetti" aria-hidden="true">
-      {Array.from({ length: 36 }).map((_, i) => (
+      {Array.from({ length: 60 }).map((_, i) => (
         <span
           key={i}
           className="confetto"
           style={{
-            left: `${(i * 100) / 36 + (Math.sin(i) * 4)}%`,
+            left: `${(i * 100) / 60 + (Math.sin(i * 1.7) * 6)}%`,
             backgroundColor: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-            animationDelay: `${(i % 8) * 0.05}s`,
-            animationDuration: `${1.4 + (i % 4) * 0.2}s`,
-            transform: `rotate(${(i * 47) % 360}deg)`,
+            animationDelay: `${1.2 + (i % 10) * 0.05}s`,
+            animationDuration: `${2 + (i % 5) * 0.3}s`,
           }}
         />
       ))}
