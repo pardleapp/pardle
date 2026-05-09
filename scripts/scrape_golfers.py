@@ -85,6 +85,21 @@ PLAYERS: list[tuple[str, str]] = [
     ("Jason Day", "A"),
     ("Brian Harman", "A"),
     ("Cameron Davis (golfer)", "A"),
+    # Additional active pros to round out OWGR top 100 coverage
+    ("Tom Hoge", "A"),
+    ("Harris English", "A"),
+    ("Keith Mitchell (golfer)", "A"),
+    ("Kurt Kitayama", "A"),
+    ("Nicolai Højgaard", "A"),
+    ("Rasmus Højgaard", "A"),
+    ("Thomas Detry", "A"),
+    ("Ryan Fox (golfer)", "A"),
+    ("Alex Norén", "A"),
+    ("Erik van Rooyen", "A"),
+    ("Talor Gooch", "A"),
+    ("Marc Leishman", "A"),
+    ("Stewart Cink", "A"),
+
     # A tier retired greats / veterans
     ("Bernhard Langer", "A"),
     ("Vijay Singh", "A"),
@@ -98,6 +113,17 @@ PLAYERS: list[tuple[str, str]] = [
     ("José María Olazábal", "A"),
     ("Lee Westwood", "A"),
     ("Henrik Stenson", "A"),
+    ("John Daly (golfer)", "A"),
+    ("Tom Lehman", "A"),
+    ("Justin Leonard", "A"),
+    ("Steve Stricker", "A"),
+    ("Mark O'Meara", "A"),
+    ("Hale Irwin", "A"),
+    ("Curtis Strange", "A"),
+    ("Mark Calcavecchia", "A"),
+    ("Paul Azinger", "A"),
+    ("Jim Furyk", "A"),
+    ("David Duval", "A"),
 
     # B tier — tour regulars, ryder/presidents cup level
     ("Si Woo Kim", "B"),
@@ -207,6 +233,7 @@ COUNTRY_MAP: dict[str, tuple[str, str]] = {
     "Colombia": ("CO", "SA"),
     "Venezuela": ("VE", "SA"),
     "Brazil": ("BR", "SA"),
+    "Fiji": ("FJ", "OC"),
 }
 
 WIKI_API = "https://en.wikipedia.org/w/api.php"
@@ -352,14 +379,18 @@ def parse_height_cm(value: str) -> Optional[int]:
             inches += int(frac_match.group(1)) / int(frac_match.group(2))
         return round((ft * 12 + inches) * 2.54)
 
-    # {{height|cm=185}}
-    m = re.search(r"\{\{\s*height\s*\|\s*cm\s*=\s*(\d+)\s*\}\}", cleaned, re.IGNORECASE)
+    # {{height|cm=185}} or {{height|cm=185|precision=0}}
+    m = re.search(
+        r"\{\{\s*height\s*\|[^}]*?\bcm\s*=\s*(\d+)\b",
+        cleaned,
+        re.IGNORECASE,
+    )
     if m:
         return int(m.group(1))
 
-    # {{height|m=1.85}}
+    # {{height|m=1.85}} or {{height|m=1.86|precision=0|abbr=yes}}
     m = re.search(
-        r"\{\{\s*height\s*\|\s*m\s*=\s*(\d)\.(\d{1,2})\s*\}\}",
+        r"\{\{\s*height\s*\|[^}]*?\bm\s*=\s*(\d)\.(\d{1,2})\b",
         cleaned,
         re.IGNORECASE,
     )
