@@ -91,7 +91,7 @@ export default function Page() {
           <span>Height</span>
           <span>Majors</span>
           <span>Wins</span>
-          <span title="Ryder Cup appearances">RC</span>
+          <span title="Ryder Cup appearances">Ryder</span>
         </div>
 
         {guesses.map((g, i) => (
