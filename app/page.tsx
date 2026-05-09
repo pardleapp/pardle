@@ -84,6 +84,56 @@ function Arrow({ arrow }: { arrow: AttributeReveal["arrow"] }) {
 
 const CONFETTI_COLORS = ["#7BAE3F", "#B5D332", "#E8C547", "#5BA0E0", "#E07B5B"];
 
+function PlayerCard({ golfer }: { golfer: Golfer }) {
+  const ryderDisplay =
+    golfer.ryderCup === null ? "—" : String(golfer.ryderCup);
+  return (
+    <div className={`tcard tcard-tier-${golfer.tier}`}>
+      <div className="tcard-inner">
+        <div className="tcard-back">
+          <div className="tcard-back-logo">PARDLE</div>
+          <div className="tcard-back-pattern" aria-hidden="true" />
+        </div>
+        <div className="tcard-front">
+          <div className="tcard-shimmer" aria-hidden="true" />
+          <div className="tcard-rating">{golfer.tier}</div>
+          <div className="tcard-flag">{flagFor(golfer.countryCode)}</div>
+          <div className="tcard-photo">
+            {golfer.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={golfer.imageUrl} alt={golfer.name} />
+            ) : (
+              <div className="tcard-photo-placeholder">
+                {flagFor(golfer.countryCode)}
+              </div>
+            )}
+          </div>
+          <div className="tcard-name">{golfer.name.toUpperCase()}</div>
+          <div className="tcard-divider" />
+          <div className="tcard-stats">
+            <div>
+              <span>{golfer.majors}</span>
+              <em>MAJ</em>
+            </div>
+            <div>
+              <span>{golfer.pgaTourWins}</span>
+              <em>WIN</em>
+            </div>
+            <div>
+              <span>{ryderDisplay}</span>
+              <em>RC</em>
+            </div>
+            <div>
+              <span>{golfer.age}</span>
+              <em>AGE</em>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Confetti() {
   return (
     <div className="confetti" aria-hidden="true">
@@ -158,32 +208,10 @@ function ResultModal({
         >
           ×
         </button>
-        <div className="modal-photo-wrap">
-          {mystery.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={mystery.imageUrl}
-              alt={mystery.name}
-              className="modal-photo"
-            />
-          ) : (
-            <div className="modal-photo-placeholder">
-              {flagFor(mystery.countryCode)}
-            </div>
-          )}
-        </div>
         <h2 className="modal-title">
-          {isWin ? "Birdie! 🏌️" : "Out of guesses"}
+          {isWin ? "Birdie!" : "Out of guesses"}
         </h2>
-        <p className="modal-name">
-          {flagFor(mystery.countryCode)} {mystery.name}
-        </p>
-        <p className="modal-stats">
-          Age {mystery.age} ·{" "}
-          {mystery.majors > 0 && `${mystery.majors} majors · `}
-          {mystery.pgaTourWins} PGA wins
-          {mystery.ryderCup !== null && ` · ${mystery.ryderCup} Ryder Cups`}
-        </p>
+        <PlayerCard golfer={mystery} />
         <p className="modal-guess-count">
           {isWin
             ? `Solved in ${guesses.length}/${MAX_GUESSES}`
