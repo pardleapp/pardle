@@ -137,15 +137,14 @@ h1 {
 
 .arrow {
   display: inline-block;
-  margin-left: 3px;
-  font-size: 0.95em;
+  margin-left: 4px;
+  font-size: 0.85em;
   line-height: 1;
 }
 
 .cell-warm .arrow {
   font-size: 0.7em;
-  margin-left: 2px;
-  opacity: 0.75;
+  margin-left: 3px;
 }
 
 .input-area {

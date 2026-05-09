@@ -50,7 +50,7 @@ function heightDisplay(cm: number): string {
 
 function Arrow({ arrow }: { arrow: AttributeReveal["arrow"] }) {
   if (!arrow) return null;
-  return <span className="arrow">{arrow === "up" ? "↑" : "↓"}</span>;
+  return <span className="arrow">{arrow === "up" ? "▲" : "▼"}</span>;
 }
 
 export default function Page() {
