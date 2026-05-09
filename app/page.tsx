@@ -86,7 +86,7 @@ export default function Page() {
 
       <div className="grid">
         <div className="header-row">
-          <span>Flag</span>
+          <span>Country</span>
           <span>Age</span>
           <span>Height</span>
           <span>Majors</span>
