@@ -15,7 +15,7 @@ export interface Golfer {
   tier: "S" | "A" | "B" | "C";
 }
 
-export type CellState = "green" | "yellow" | "grey";
+export type CellState = "green" | "warm" | "yellow" | "grey";
 export type Arrow = "up" | "down" | null;
 
 export interface AttributeReveal {

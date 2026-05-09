@@ -48,10 +48,9 @@ function heightDisplay(cm: number): string {
   return `${ft}'${inches}" / ${cm}cm`;
 }
 
-function arrowSymbol(arrow: AttributeReveal["arrow"]): string {
-  if (arrow === "up") return "↑";
-  if (arrow === "down") return "↓";
-  return "";
+function Arrow({ arrow }: { arrow: AttributeReveal["arrow"] }) {
+  if (!arrow) return null;
+  return <span className="arrow">{arrow === "up" ? "↑" : "↓"}</span>;
 }
 
 export default function Page() {
@@ -107,22 +106,22 @@ export default function Page() {
               </span>
               <span className={`cell cell-${g.age.state}`}>
                 {g.golfer.age}
-                {arrowSymbol(g.age.arrow)}
+                <Arrow arrow={g.age.arrow} />
               </span>
               <span
                 className={`cell cell-${g.height.state}`}
                 title={heightDisplay(g.golfer.heightCm)}
               >
                 {g.golfer.heightCm}
-                {arrowSymbol(g.height.arrow)}
+                <Arrow arrow={g.height.arrow} />
               </span>
               <span className={`cell cell-${g.majors.state}`}>
                 {g.golfer.majors}
-                {arrowSymbol(g.majors.arrow)}
+                <Arrow arrow={g.majors.arrow} />
               </span>
               <span className={`cell cell-${g.pgaTourWins.state}`}>
                 {g.golfer.pgaTourWins}
-                {arrowSymbol(g.pgaTourWins.arrow)}
+                <Arrow arrow={g.pgaTourWins.arrow} />
               </span>
               <span
                 className={`cell cell-${g.ryderCup.state}`}
@@ -133,7 +132,7 @@ export default function Page() {
                 }
               >
                 {g.golfer.ryderCup === null ? "—" : g.golfer.ryderCup}
-                {arrowSymbol(g.ryderCup.arrow)}
+                <Arrow arrow={g.ryderCup.arrow} />
               </span>
             </div>
           </div>

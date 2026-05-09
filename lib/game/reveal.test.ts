@@ -90,14 +90,14 @@ describe("revealGuess", () => {
     expect(result.age).toEqual({ state: "green", arrow: null });
   });
 
-  it("age: yellow + up-arrow when mystery older within 3 years", () => {
+  it("age: warm + up-arrow when mystery older within 2 years", () => {
     const guess = { ...SCOTTIE, age: 27 };
     const result = revealGuess(guess, SCOTTIE);
-    expect(result.age).toEqual({ state: "yellow", arrow: "up" });
+    expect(result.age).toEqual({ state: "warm", arrow: "up" });
   });
 
-  it("age: yellow + down-arrow when mystery younger within 3 years", () => {
-    const guess = { ...SCOTTIE, age: 31 };
+  it("age: yellow when off by 4 years", () => {
+    const guess = { ...SCOTTIE, age: 33 };
     const result = revealGuess(guess, SCOTTIE);
     expect(result.age).toEqual({ state: "yellow", arrow: "down" });
   });
@@ -108,27 +108,34 @@ describe("revealGuess", () => {
     expect(result.age).toEqual({ state: "grey", arrow: "down" });
   });
 
-  it("height: green within 2cm", () => {
+  it("height: green within 1cm", () => {
     const guess = { ...SCOTTIE, heightCm: 190 };
     const result = revealGuess(guess, SCOTTIE);
     expect(result.height).toEqual({ state: "green", arrow: "up" });
   });
 
-  it("height: yellow within 6cm", () => {
-    const guess = { ...SCOTTIE, heightCm: 186 };
+  it("height: warm within 4cm", () => {
+    const guess = { ...SCOTTIE, heightCm: 188 };
+    const result = revealGuess(guess, SCOTTIE);
+    expect(result.height).toEqual({ state: "warm", arrow: "up" });
+  });
+
+  it("height: yellow when 7cm off", () => {
+    const guess = { ...SCOTTIE, heightCm: 184 };
     const result = revealGuess(guess, SCOTTIE);
     expect(result.height).toEqual({ state: "yellow", arrow: "up" });
   });
 
-  it("majors: yellow + up-arrow when mystery has 1 more", () => {
-    const guess = { ...SCOTTIE, majors: 2 };
+  it("majors: warm + up-arrow when mystery has 1 more", () => {
+    const guess = { ...SCOTTIE, majors: 3 };
     const result = revealGuess(guess, SCOTTIE);
-    expect(result.majors).toEqual({ state: "yellow", arrow: "up" });
+    expect(result.majors).toEqual({ state: "warm", arrow: "up" });
   });
 
-  it("majors: grey when off by 2+", () => {
-    const result = revealGuess(RORY, SCOTTIE);
-    expect(result.majors).toEqual({ state: "grey", arrow: "down" });
+  it("majors: grey when off by 3+", () => {
+    const guess = { ...SCOTTIE, majors: 0 };
+    const result = revealGuess(guess, SCOTTIE);
+    expect(result.majors).toEqual({ state: "grey", arrow: "up" });
   });
 
   it("ryderCup: green when both ineligible (both null)", () => {
@@ -146,10 +153,10 @@ describe("revealGuess", () => {
     expect(result.ryderCup).toEqual({ state: "green", arrow: null });
   });
 
-  it("ryderCup: yellow + arrow when off by 1", () => {
+  it("ryderCup: warm + arrow when off by 1", () => {
     const guess = { ...SCOTTIE, ryderCup: 1 };
     const result = revealGuess(guess, SCOTTIE);
-    expect(result.ryderCup).toEqual({ state: "yellow", arrow: "up" });
+    expect(result.ryderCup).toEqual({ state: "warm", arrow: "up" });
   });
 
   it("ryderCup: grey when both eligible but off by many", () => {

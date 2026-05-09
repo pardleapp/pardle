@@ -1,5 +1,6 @@
 :root {
   --green: #7BAE3F;
+  --warm: #B5D332;
   --yellow: #E8C547;
   --grey: #787C7E;
   --bg: #FFFFFF;
@@ -130,8 +131,22 @@ h1 {
 }
 
 .cell-green { background: var(--green); }
+.cell-warm { background: var(--warm); color: #1f1f1f; }
 .cell-yellow { background: var(--yellow); color: #1f1f1f; }
 .cell-grey { background: var(--grey); }
+
+.arrow {
+  display: inline-block;
+  margin-left: 3px;
+  font-size: 0.95em;
+  line-height: 1;
+}
+
+.cell-warm .arrow {
+  font-size: 0.7em;
+  margin-left: 2px;
+  opacity: 0.75;
+}
 
 .input-area {
   position: relative;
