@@ -158,18 +158,20 @@ function ResultModal({
         >
           ×
         </button>
-        {mystery.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={mystery.imageUrl}
-            alt={mystery.name}
-            className="modal-photo"
-          />
-        ) : (
-          <div className="modal-photo modal-photo-placeholder">
-            {flagFor(mystery.countryCode)}
-          </div>
-        )}
+        <div className="modal-photo-wrap">
+          {mystery.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={mystery.imageUrl}
+              alt={mystery.name}
+              className="modal-photo"
+            />
+          ) : (
+            <div className="modal-photo-placeholder">
+              {flagFor(mystery.countryCode)}
+            </div>
+          )}
+        </div>
         <h2 className="modal-title">
           {isWin ? "Birdie! 🏌️" : "Out of guesses"}
         </h2>
