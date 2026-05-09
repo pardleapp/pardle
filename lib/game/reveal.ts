@@ -33,6 +33,22 @@ function countryReveal(guess: Golfer, mystery: Golfer): AttributeReveal {
   return { state: "grey", arrow: null };
 }
 
+function ryderCupReveal(
+  guess: Golfer,
+  mystery: Golfer,
+): AttributeReveal {
+  // null = ineligible (player from a non-USA, non-European country).
+  // Two ineligible players match exactly (both N/A).
+  // One ineligible + one eligible never matches.
+  if (guess.ryderCup === null && mystery.ryderCup === null) {
+    return { state: "green", arrow: null };
+  }
+  if (guess.ryderCup === null || mystery.ryderCup === null) {
+    return { state: "grey", arrow: null };
+  }
+  return numericReveal(guess.ryderCup, mystery.ryderCup, 0, 1);
+}
+
 export function revealGuess(guess: Golfer, mystery: Golfer): GuessReveal {
   const isWin = guess.id === mystery.id;
   return {
@@ -42,12 +58,7 @@ export function revealGuess(guess: Golfer, mystery: Golfer): GuessReveal {
     height: numericReveal(guess.heightCm, mystery.heightCm, 2, 6),
     majors: numericReveal(guess.majors, mystery.majors, 0, 1),
     pgaTourWins: numericReveal(guess.pgaTourWins, mystery.pgaTourWins, 0, 3),
-    turnedProYear: numericReveal(
-      guess.turnedProYear,
-      mystery.turnedProYear,
-      0,
-      3,
-    ),
+    ryderCup: ryderCupReveal(guess, mystery),
     isWin,
   };
 }

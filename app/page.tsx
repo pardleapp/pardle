@@ -91,7 +91,7 @@ export default function Page() {
           <span>Height</span>
           <span>Majors</span>
           <span>Wins</span>
-          <span>Pro</span>
+          <span title="Ryder Cup appearances">RC</span>
         </div>
 
         {guesses.map((g, i) => (
@@ -120,9 +120,16 @@ export default function Page() {
                 {g.golfer.pgaTourWins}
                 {arrowSymbol(g.pgaTourWins.arrow)}
               </span>
-              <span className={`cell cell-${g.turnedProYear.state}`}>
-                {g.golfer.turnedProYear}
-                {arrowSymbol(g.turnedProYear.arrow)}
+              <span
+                className={`cell cell-${g.ryderCup.state}`}
+                title={
+                  g.golfer.ryderCup === null
+                    ? "Not eligible for Ryder Cup"
+                    : `${g.golfer.ryderCup} Ryder Cup appearances`
+                }
+              >
+                {g.golfer.ryderCup === null ? "—" : g.golfer.ryderCup}
+                {arrowSymbol(g.ryderCup.arrow)}
               </span>
             </div>
           </div>

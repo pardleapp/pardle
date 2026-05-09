@@ -10,9 +10,9 @@ const SCOTTIE: Golfer = {
   continent: "NA",
   age: 29,
   heightCm: 191,
-  majors: 3,
-  pgaTourWins: 14,
-  turnedProYear: 2018,
+  majors: 4,
+  pgaTourWins: 20,
+  ryderCup: 2,
   tier: "S",
 };
 
@@ -22,11 +22,11 @@ const RORY: Golfer = {
   country: "Northern Ireland",
   countryCode: "GB-NIR",
   continent: "EU",
-  age: 36,
+  age: 37,
   heightCm: 175,
-  majors: 5,
-  pgaTourWins: 27,
-  turnedProYear: 2007,
+  majors: 6,
+  pgaTourWins: 30,
+  ryderCup: 8,
   tier: "S",
 };
 
@@ -40,8 +40,22 @@ const CAM_SMITH: Golfer = {
   heightCm: 180,
   majors: 1,
   pgaTourWins: 6,
-  turnedProYear: 2013,
+  ryderCup: null,
   tier: "A",
+};
+
+const HIDEKI: Golfer = {
+  id: "hideki-matsuyama",
+  name: "Hideki Matsuyama",
+  country: "Japan",
+  countryCode: "JP",
+  continent: "AS",
+  age: 34,
+  heightCm: 180,
+  majors: 1,
+  pgaTourWins: 11,
+  ryderCup: null,
+  tier: "S",
 };
 
 describe("revealGuess", () => {
@@ -117,10 +131,30 @@ describe("revealGuess", () => {
     expect(result.majors).toEqual({ state: "grey", arrow: "down" });
   });
 
-  it("turnedProYear: yellow within 3 years", () => {
-    const guess = { ...SCOTTIE, turnedProYear: 2020 };
+  it("ryderCup: green when both ineligible (both null)", () => {
+    const result = revealGuess(CAM_SMITH, HIDEKI);
+    expect(result.ryderCup).toEqual({ state: "green", arrow: null });
+  });
+
+  it("ryderCup: grey when one eligible, one ineligible", () => {
+    const result = revealGuess(SCOTTIE, CAM_SMITH);
+    expect(result.ryderCup).toEqual({ state: "grey", arrow: null });
+  });
+
+  it("ryderCup: green + no arrow on exact match", () => {
+    const result = revealGuess(SCOTTIE, SCOTTIE);
+    expect(result.ryderCup).toEqual({ state: "green", arrow: null });
+  });
+
+  it("ryderCup: yellow + arrow when off by 1", () => {
+    const guess = { ...SCOTTIE, ryderCup: 1 };
     const result = revealGuess(guess, SCOTTIE);
-    expect(result.turnedProYear).toEqual({ state: "yellow", arrow: "down" });
+    expect(result.ryderCup).toEqual({ state: "yellow", arrow: "up" });
+  });
+
+  it("ryderCup: grey when both eligible but off by many", () => {
+    const result = revealGuess(SCOTTIE, RORY);
+    expect(result.ryderCup).toEqual({ state: "grey", arrow: "up" });
   });
 
   it("pgaTourWins: arrow direction is from guess to mystery", () => {

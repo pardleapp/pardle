@@ -28,7 +28,7 @@ from typing import Optional
 #   C = lesser-known tour pro (Sat/Sun)
 # ---------------------------------------------------------------------------
 PLAYERS: list[tuple[str, str]] = [
-    # S tier — most recognizable men's golfers globally
+    # S tier — most recognizable men's golfers globally (active + retired legends)
     ("Scottie Scheffler", "S"),
     ("Rory McIlroy", "S"),
     ("Jon Rahm", "S"),
@@ -43,6 +43,14 @@ PLAYERS: list[tuple[str, str]] = [
     ("Tiger Woods", "S"),
     ("Phil Mickelson", "S"),
     ("Patrick Cantlay", "S"),
+    ("Jack Nicklaus", "S"),
+    ("Arnold Palmer", "S"),
+    ("Seve Ballesteros", "S"),
+    ("Greg Norman", "S"),
+    ("Nick Faldo", "S"),
+    ("Tom Watson (golfer)", "S"),
+    ("Gary Player", "S"),
+    ("Lee Trevino", "S"),
 
     # A tier — top 50 or recent major winners
     ("Viktor Hovland", "A"),
@@ -77,6 +85,19 @@ PLAYERS: list[tuple[str, str]] = [
     ("Jason Day", "A"),
     ("Brian Harman", "A"),
     ("Cameron Davis (golfer)", "A"),
+    # A tier retired greats / veterans
+    ("Bernhard Langer", "A"),
+    ("Vijay Singh", "A"),
+    ("Ernie Els", "A"),
+    ("Padraig Harrington", "A"),
+    ("Davis Love III", "A"),
+    ("Fred Couples", "A"),
+    ("Sandy Lyle", "A"),
+    ("Ian Woosnam", "A"),
+    ("Colin Montgomerie", "A"),
+    ("José María Olazábal", "A"),
+    ("Lee Westwood", "A"),
+    ("Henrik Stenson", "A"),
 
     # B tier — tour regulars, ryder/presidents cup level
     ("Si Woo Kim", "B"),
@@ -87,8 +108,6 @@ PLAYERS: list[tuple[str, str]] = [
     ("Mackenzie Hughes", "B"),
     ("Stephan Jaeger", "B"),
     ("Lucas Glover", "B"),
-    ("Lee Westwood", "B"),
-    ("Henrik Stenson", "B"),
     ("Kevin Kisner", "B"),
     ("Maverick McNealy", "B"),
     ("Taylor Pendrith", "B"),
@@ -122,6 +141,30 @@ PLAYERS: list[tuple[str, str]] = [
     ("Ben Griffin (golfer)", "C"),
     ("Nick Dunlap", "C"),
 ]
+
+# Country codes whose players are eligible for the Ryder Cup (USA team or
+# European team). Everyone else gets ryderCup = null in the output.
+RYDER_CUP_ELIGIBLE = {
+    "US",
+    "GB-ENG", "GB-NIR", "GB-SCT", "GB-WLS",
+    "IE", "ES", "NO", "SE", "DE", "FR", "IT", "DK", "AT",
+    "PL", "BE", "NL", "FI", "PT", "CH",
+}
+
+# Verified Ryder Cup appearance counts for retired legends whose Wikipedia
+# articles describe their team appearances narratively rather than in the
+# structured `*[[Ryder Cup]]: [[YYYY Ryder Cup|YYYY]], ...` bullet form the
+# scraper relies on. These values come from widely-published Ryder Cup records.
+# When the auto-parser returns 0 or an obviously low count for one of these
+# names, this override wins. Keep this list small; most active pros parse fine.
+RYDER_CUP_OVERRIDES: dict[str, int] = {
+    "Tiger Woods": 8,
+    "Jack Nicklaus": 6,
+    "Arnold Palmer": 6,
+    "Lee Trevino": 6,
+    "Tom Watson": 4,
+    "Seve Ballesteros": 8,
+}
 
 # Country -> (ISO code, continent)
 COUNTRY_MAP: dict[str, tuple[str, str]] = {
@@ -353,6 +396,55 @@ def parse_int(value: str) -> Optional[int]:
     return int(m.group(0)) if m else None
 
 
+# Matches per-event year links inside the Ryder Cup line, e.g. [[2010 Ryder Cup|2010]].
+RYDER_YEAR_LINK = re.compile(r"\[\[\s*(\d{4})\s+Ryder Cup", re.IGNORECASE)
+
+
+def count_ryder_cup_appearances(wikitext: str, country_code: str) -> Optional[int]:
+    """
+    Returns the number of distinct Ryder Cup years a player appears in, parsed
+    from the Wikipedia article body. Returns None for players whose country
+    is not eligible for Ryder Cup selection (USA team or European team).
+    """
+    if country_code not in RYDER_CUP_ELIGIBLE:
+        return None
+
+    # Find the Team appearances section (level-2 header).
+    section_match = re.search(
+        r"==\s*Team appearances\s*==", wikitext, re.IGNORECASE,
+    )
+    if not section_match:
+        # Some articles use "U.S. national team appearances" or similar.
+        section_match = re.search(
+            r"==\s*[A-Za-z\.\s]*team appearances\s*==", wikitext, re.IGNORECASE,
+        )
+    if not section_match:
+        return 0
+
+    # Slice from the section header to the next level-2 header (or end).
+    start = section_match.end()
+    next_section = re.search(r"\n==[^=]", wikitext[start:])
+    end = start + next_section.start() if next_section else len(wikitext)
+    section = wikitext[start:end]
+
+    # Find the Ryder Cup line specifically — usually a bullet starting with
+    # *[[Ryder Cup]] or *[[Ryder Cup (golf)|Ryder Cup]]. Restrict matching to
+    # the line so we don't pick up Junior Ryder Cup or stray references.
+    for line in section.splitlines():
+        line_strip = line.strip()
+        if not line_strip.startswith("*"):
+            continue
+        if not re.search(r"\[\[\s*Ryder Cup", line_strip, re.IGNORECASE):
+            continue
+        # Skip Junior Ryder Cup
+        if re.search(r"Junior Ryder Cup", line_strip, re.IGNORECASE):
+            continue
+        years = set(RYDER_YEAR_LINK.findall(line_strip))
+        return len(years)
+
+    return 0
+
+
 def parse_country(fields: dict[str, str]) -> Optional[tuple[str, str, str]]:
     """Return (country_display, country_code, continent)."""
     raw = fields.get("sporting_nationality") or fields.get("nationality") or ""
@@ -418,10 +510,10 @@ def scrape_one(page_title: str, tier: str) -> Optional[dict]:
 
     pga_wins = parse_int(fields.get("pgawins", "")) or 0
     majors = parse_int(fields.get("majorwins", "")) or 0
-    yearpro = parse_int(fields.get("yearpro", ""))
-    if not yearpro:
-        print("  could not parse yearpro", file=sys.stderr)
-        return None
+    ryder_cup = count_ryder_cup_appearances(wikitext, country_code)
+    # Override for retired legends whose articles lack structured RC data.
+    if name in RYDER_CUP_OVERRIDES:
+        ryder_cup = RYDER_CUP_OVERRIDES[name]
 
     return {
         "id": slugify(name),
@@ -433,7 +525,7 @@ def scrape_one(page_title: str, tier: str) -> Optional[dict]:
         "heightCm": height_cm,
         "majors": majors,
         "pgaTourWins": pga_wins,
-        "turnedProYear": yearpro,
+        "ryderCup": ryder_cup,
         "tier": tier,
     }
 

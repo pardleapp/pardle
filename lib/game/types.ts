@@ -10,7 +10,8 @@ export interface Golfer {
   heightCm: number;
   majors: number;
   pgaTourWins: number;
-  turnedProYear: number;
+  /** Ryder Cup appearances. null = ineligible (not from USA or Europe). */
+  ryderCup: number | null;
   tier: "S" | "A" | "B" | "C";
 }
 
@@ -29,7 +30,7 @@ export interface GuessReveal {
   height: AttributeReveal;
   majors: AttributeReveal;
   pgaTourWins: AttributeReveal;
-  turnedProYear: AttributeReveal;
+  ryderCup: AttributeReveal;
   isWin: boolean;
 }
 

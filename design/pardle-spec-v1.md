@@ -19,7 +19,7 @@ In display order, left to right:
 | 3 | **Height** | 6'1" / 185 cm | 🟩 within 2 cm · 🟨 within 6 cm · ⬛ otherwise. ⬆️/⬇️ if not exact. |
 | 4 | **Majors won** | 2 | 🟩 exact · 🟨 within 1 · ⬛ otherwise. ⬆️/⬇️ if not exact. |
 | 5 | **PGA Tour wins** | 12 | 🟩 exact · 🟨 within 3 · ⬛ otherwise. ⬆️/⬇️ if not exact. |
-| 6 | **Turn-pro year** | 2014 | 🟩 same year · 🟨 within 3 years · ⬛ otherwise. ⬆️/⬇️ if not exact. |
+| 6 | **Ryder Cup appearances** | 8 (or "—" if ineligible) | 🟩 same count, OR both ineligible (both `—`) · 🟨 both eligible within ±1 · ⬛ otherwise (mismatched eligibility, or off by 2+). ⬆️/⬇️ if not exact. **Ineligible** = country is not USA or Europe (Japan, Australia, Korea, etc. show `—`). |
 
 **Why these six:**
 - Country is a strong narrowing filter casual fans always know.

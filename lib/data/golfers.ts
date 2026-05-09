@@ -14,7 +14,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 190,
     "majors": 4,
     "pgaTourWins": 20,
-    "turnedProYear": 2018,
+    "ryderCup": 3,
     "tier": "S"
   },
   {
@@ -27,7 +27,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 175,
     "majors": 6,
     "pgaTourWins": 30,
-    "turnedProYear": 2007,
+    "ryderCup": 8,
     "tier": "S"
   },
   {
@@ -40,7 +40,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 188,
     "majors": 2,
     "pgaTourWins": 11,
-    "turnedProYear": 2016,
+    "ryderCup": 4,
     "tier": "S"
   },
   {
@@ -53,7 +53,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 178,
     "majors": 2,
     "pgaTourWins": 10,
-    "turnedProYear": 2015,
+    "ryderCup": 3,
     "tier": "S"
   },
   {
@@ -66,7 +66,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 185,
     "majors": 2,
     "pgaTourWins": 9,
-    "turnedProYear": 2016,
+    "ryderCup": 3,
     "tier": "S"
   },
   {
@@ -79,7 +79,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 178,
     "majors": 2,
     "pgaTourWins": 16,
-    "turnedProYear": 2013,
+    "ryderCup": 4,
     "tier": "S"
   },
   {
@@ -92,7 +92,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 185,
     "majors": 3,
     "pgaTourWins": 13,
-    "turnedProYear": 2012,
+    "ryderCup": 5,
     "tier": "S"
   },
   {
@@ -105,7 +105,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 183,
     "majors": 5,
     "pgaTourWins": 9,
-    "turnedProYear": 2012,
+    "ryderCup": 4,
     "tier": "S"
   },
   {
@@ -118,7 +118,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 193,
     "majors": 2,
     "pgaTourWins": 24,
-    "turnedProYear": 2007,
+    "ryderCup": 5,
     "tier": "S"
   },
   {
@@ -131,7 +131,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 180,
     "majors": 1,
     "pgaTourWins": 11,
-    "turnedProYear": 2013,
+    "ryderCup": null,
     "tier": "S"
   },
   {
@@ -144,7 +144,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 175,
     "majors": 2,
     "pgaTourWins": 7,
-    "turnedProYear": 2019,
+    "ryderCup": 3,
     "tier": "S"
   },
   {
@@ -157,7 +157,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 185,
     "majors": 15,
     "pgaTourWins": 82,
-    "turnedProYear": 1996,
+    "ryderCup": 8,
     "tier": "S"
   },
   {
@@ -170,7 +170,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 190,
     "majors": 6,
     "pgaTourWins": 45,
-    "turnedProYear": 1992,
+    "ryderCup": 12,
     "tier": "S"
   },
   {
@@ -183,7 +183,111 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 183,
     "majors": 0,
     "pgaTourWins": 8,
-    "turnedProYear": 2012,
+    "ryderCup": 3,
+    "tier": "S"
+  },
+  {
+    "id": "jack-nicklaus",
+    "name": "Jack Nicklaus",
+    "country": "United States",
+    "countryCode": "US",
+    "continent": "NA",
+    "age": 86,
+    "heightCm": 178,
+    "majors": 18,
+    "pgaTourWins": 73,
+    "ryderCup": 6,
+    "tier": "S"
+  },
+  {
+    "id": "arnold-palmer",
+    "name": "Arnold Palmer",
+    "country": "United States",
+    "countryCode": "US",
+    "continent": "NA",
+    "age": 96,
+    "heightCm": 178,
+    "majors": 7,
+    "pgaTourWins": 62,
+    "ryderCup": 6,
+    "tier": "S"
+  },
+  {
+    "id": "seve-ballesteros",
+    "name": "Seve Ballesteros",
+    "country": "Spain",
+    "countryCode": "ES",
+    "continent": "EU",
+    "age": 69,
+    "heightCm": 183,
+    "majors": 5,
+    "pgaTourWins": 9,
+    "ryderCup": 8,
+    "tier": "S"
+  },
+  {
+    "id": "greg-norman",
+    "name": "Greg Norman",
+    "country": "Australia",
+    "countryCode": "AU",
+    "continent": "OC",
+    "age": 71,
+    "heightCm": 183,
+    "majors": 2,
+    "pgaTourWins": 20,
+    "ryderCup": null,
+    "tier": "S"
+  },
+  {
+    "id": "nick-faldo",
+    "name": "Nick Faldo",
+    "country": "England",
+    "countryCode": "GB-ENG",
+    "continent": "EU",
+    "age": 68,
+    "heightCm": 190,
+    "majors": 6,
+    "pgaTourWins": 9,
+    "ryderCup": 12,
+    "tier": "S"
+  },
+  {
+    "id": "tom-watson",
+    "name": "Tom Watson",
+    "country": "United States",
+    "countryCode": "US",
+    "continent": "NA",
+    "age": 76,
+    "heightCm": 175,
+    "majors": 8,
+    "pgaTourWins": 39,
+    "ryderCup": 4,
+    "tier": "S"
+  },
+  {
+    "id": "gary-player",
+    "name": "Gary Player",
+    "country": "South Africa",
+    "countryCode": "ZA",
+    "continent": "AF",
+    "age": 90,
+    "heightCm": 168,
+    "majors": 9,
+    "pgaTourWins": 24,
+    "ryderCup": null,
+    "tier": "S"
+  },
+  {
+    "id": "lee-trevino",
+    "name": "Lee Trevino",
+    "country": "United States",
+    "countryCode": "US",
+    "continent": "NA",
+    "age": 86,
+    "heightCm": 170,
+    "majors": 6,
+    "pgaTourWins": 29,
+    "ryderCup": 6,
     "tier": "S"
   },
   {
@@ -196,7 +300,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 178,
     "majors": 0,
     "pgaTourWins": 7,
-    "turnedProYear": 2019,
+    "ryderCup": 3,
     "tier": "A"
   },
   {
@@ -209,7 +313,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 193,
     "majors": 0,
     "pgaTourWins": 6,
-    "turnedProYear": 2007,
+    "ryderCup": 2,
     "tier": "A"
   },
   {
@@ -222,7 +326,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 190,
     "majors": 0,
     "pgaTourWins": 2,
-    "turnedProYear": 2023,
+    "ryderCup": 2,
     "tier": "A"
   },
   {
@@ -235,7 +339,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 180,
     "majors": 1,
     "pgaTourWins": 6,
-    "turnedProYear": 2013,
+    "ryderCup": null,
     "tier": "A"
   },
   {
@@ -248,7 +352,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 180,
     "majors": 0,
     "pgaTourWins": 3,
-    "turnedProYear": 2019,
+    "ryderCup": 1,
     "tier": "A"
   },
   {
@@ -261,7 +365,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 183,
     "majors": 1,
     "pgaTourWins": 3,
-    "turnedProYear": 2017,
+    "ryderCup": 1,
     "tier": "A"
   },
   {
@@ -274,7 +378,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 183,
     "majors": 0,
     "pgaTourWins": 3,
-    "turnedProYear": 2018,
+    "ryderCup": null,
     "tier": "A"
   },
   {
@@ -287,7 +391,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 185,
     "majors": 1,
     "pgaTourWins": 3,
-    "turnedProYear": 2009,
+    "ryderCup": 3,
     "tier": "A"
   },
   {
@@ -300,7 +404,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 178,
     "majors": 1,
     "pgaTourWins": 5,
-    "turnedProYear": 2014,
+    "ryderCup": 4,
     "tier": "A"
   },
   {
@@ -313,7 +417,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 190,
     "majors": 0,
     "pgaTourWins": 1,
-    "turnedProYear": 2020,
+    "ryderCup": 0,
     "tier": "A"
   },
   {
@@ -326,7 +430,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 183,
     "majors": 0,
     "pgaTourWins": 2,
-    "turnedProYear": 2015,
+    "ryderCup": null,
     "tier": "A"
   },
   {
@@ -339,7 +443,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 183,
     "majors": 1,
     "pgaTourWins": 14,
-    "turnedProYear": 2000,
+    "ryderCup": null,
     "tier": "A"
   },
   {
@@ -352,7 +456,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 190,
     "majors": 1,
     "pgaTourWins": 13,
-    "turnedProYear": 1998,
+    "ryderCup": null,
     "tier": "A"
   },
   {
@@ -365,7 +469,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 178,
     "majors": 1,
     "pgaTourWins": 11,
-    "turnedProYear": 1999,
+    "ryderCup": 10,
     "tier": "A"
   },
   {
@@ -378,7 +482,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 183,
     "majors": 0,
     "pgaTourWins": 2,
-    "turnedProYear": 2018,
+    "ryderCup": null,
     "tier": "A"
   },
   {
@@ -391,7 +495,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 183,
     "majors": 0,
     "pgaTourWins": 5,
-    "turnedProYear": 2011,
+    "ryderCup": 1,
     "tier": "A"
   },
   {
@@ -404,7 +508,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 190,
     "majors": 0,
     "pgaTourWins": 4,
-    "turnedProYear": 2016,
+    "ryderCup": 2,
     "tier": "A"
   },
   {
@@ -417,7 +521,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 185,
     "majors": 0,
     "pgaTourWins": 3,
-    "turnedProYear": 2019,
+    "ryderCup": 0,
     "tier": "A"
   },
   {
@@ -430,7 +534,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 190,
     "majors": 1,
     "pgaTourWins": 8,
-    "turnedProYear": 2008,
+    "ryderCup": 3,
     "tier": "A"
   },
   {
@@ -443,7 +547,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 183,
     "majors": 1,
     "pgaTourWins": 9,
-    "turnedProYear": 2011,
+    "ryderCup": 3,
     "tier": "A"
   },
   {
@@ -456,7 +560,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 190,
     "majors": 2,
     "pgaTourWins": 12,
-    "turnedProYear": 2002,
+    "ryderCup": 4,
     "tier": "A"
   },
   {
@@ -469,7 +573,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 188,
     "majors": 1,
     "pgaTourWins": 7,
-    "turnedProYear": 2008,
+    "ryderCup": 3,
     "tier": "A"
   },
   {
@@ -482,7 +586,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 185,
     "majors": 0,
     "pgaTourWins": 5,
-    "turnedProYear": 2017,
+    "ryderCup": 2,
     "tier": "A"
   },
   {
@@ -495,7 +599,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 185,
     "majors": 0,
     "pgaTourWins": 6,
-    "turnedProYear": 2013,
+    "ryderCup": 1,
     "tier": "A"
   },
   {
@@ -508,7 +612,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 175,
     "majors": 0,
     "pgaTourWins": 6,
-    "turnedProYear": 2009,
+    "ryderCup": 5,
     "tier": "A"
   },
   {
@@ -521,7 +625,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 175,
     "majors": 0,
     "pgaTourWins": 1,
-    "turnedProYear": 2011,
+    "ryderCup": 4,
     "tier": "A"
   },
   {
@@ -534,7 +638,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 183,
     "majors": 1,
     "pgaTourWins": 13,
-    "turnedProYear": 2006,
+    "ryderCup": null,
     "tier": "A"
   },
   {
@@ -547,7 +651,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 170,
     "majors": 1,
     "pgaTourWins": 4,
-    "turnedProYear": 2009,
+    "ryderCup": 1,
     "tier": "A"
   },
   {
@@ -560,7 +664,124 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 193,
     "majors": 0,
     "pgaTourWins": 2,
-    "turnedProYear": 2016,
+    "ryderCup": null,
+    "tier": "A"
+  },
+  {
+    "id": "ernie-els",
+    "name": "Ernie Els",
+    "country": "South Africa",
+    "countryCode": "ZA",
+    "continent": "AF",
+    "age": 56,
+    "heightCm": 190,
+    "majors": 4,
+    "pgaTourWins": 19,
+    "ryderCup": null,
+    "tier": "A"
+  },
+  {
+    "id": "davis-love-iii",
+    "name": "Davis Love III",
+    "country": "United States",
+    "countryCode": "US",
+    "continent": "NA",
+    "age": 62,
+    "heightCm": 190,
+    "majors": 1,
+    "pgaTourWins": 21,
+    "ryderCup": 8,
+    "tier": "A"
+  },
+  {
+    "id": "fred-couples",
+    "name": "Fred Couples",
+    "country": "United States",
+    "countryCode": "US",
+    "continent": "NA",
+    "age": 66,
+    "heightCm": 180,
+    "majors": 1,
+    "pgaTourWins": 15,
+    "ryderCup": 5,
+    "tier": "A"
+  },
+  {
+    "id": "sandy-lyle",
+    "name": "Sandy Lyle",
+    "country": "England",
+    "countryCode": "GB-ENG",
+    "continent": "EU",
+    "age": 68,
+    "heightCm": 183,
+    "majors": 2,
+    "pgaTourWins": 6,
+    "ryderCup": 5,
+    "tier": "A"
+  },
+  {
+    "id": "ian-woosnam",
+    "name": "Ian Woosnam",
+    "country": "England",
+    "countryCode": "GB-ENG",
+    "continent": "EU",
+    "age": 68,
+    "heightCm": 163,
+    "majors": 1,
+    "pgaTourWins": 2,
+    "ryderCup": 9,
+    "tier": "A"
+  },
+  {
+    "id": "colin-montgomerie",
+    "name": "Colin Montgomerie",
+    "country": "Scotland",
+    "countryCode": "GB-SCT",
+    "continent": "EU",
+    "age": 62,
+    "heightCm": 185,
+    "majors": 0,
+    "pgaTourWins": 0,
+    "ryderCup": 9,
+    "tier": "A"
+  },
+  {
+    "id": "josé-maría-olazábal",
+    "name": "José María Olazábal",
+    "country": "Spain",
+    "countryCode": "ES",
+    "continent": "EU",
+    "age": 60,
+    "heightCm": 178,
+    "majors": 2,
+    "pgaTourWins": 6,
+    "ryderCup": 3,
+    "tier": "A"
+  },
+  {
+    "id": "lee-westwood",
+    "name": "Lee Westwood",
+    "country": "England",
+    "countryCode": "GB-ENG",
+    "continent": "EU",
+    "age": 53,
+    "heightCm": 183,
+    "majors": 0,
+    "pgaTourWins": 2,
+    "ryderCup": 11,
+    "tier": "A"
+  },
+  {
+    "id": "henrik-stenson",
+    "name": "Henrik Stenson",
+    "country": "Sweden",
+    "countryCode": "SE",
+    "continent": "EU",
+    "age": 50,
+    "heightCm": 188,
+    "majors": 1,
+    "pgaTourWins": 6,
+    "ryderCup": 5,
     "tier": "A"
   },
   {
@@ -573,7 +794,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 180,
     "majors": 0,
     "pgaTourWins": 4,
-    "turnedProYear": 2012,
+    "ryderCup": null,
     "tier": "B"
   },
   {
@@ -586,7 +807,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 188,
     "majors": 0,
     "pgaTourWins": 1,
-    "turnedProYear": 2018,
+    "ryderCup": 0,
     "tier": "B"
   },
   {
@@ -599,7 +820,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 173,
     "majors": 0,
     "pgaTourWins": 1,
-    "turnedProYear": 2009,
+    "ryderCup": null,
     "tier": "B"
   },
   {
@@ -612,7 +833,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 183,
     "majors": 0,
     "pgaTourWins": 2,
-    "turnedProYear": 2012,
+    "ryderCup": null,
     "tier": "B"
   },
   {
@@ -625,7 +846,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 175,
     "majors": 0,
     "pgaTourWins": 1,
-    "turnedProYear": 2012,
+    "ryderCup": 0,
     "tier": "B"
   },
   {
@@ -638,33 +859,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 188,
     "majors": 1,
     "pgaTourWins": 6,
-    "turnedProYear": 2001,
-    "tier": "B"
-  },
-  {
-    "id": "lee-westwood",
-    "name": "Lee Westwood",
-    "country": "England",
-    "countryCode": "GB-ENG",
-    "continent": "EU",
-    "age": 53,
-    "heightCm": 183,
-    "majors": 0,
-    "pgaTourWins": 2,
-    "turnedProYear": 1993,
-    "tier": "B"
-  },
-  {
-    "id": "henrik-stenson",
-    "name": "Henrik Stenson",
-    "country": "Sweden",
-    "countryCode": "SE",
-    "continent": "EU",
-    "age": 50,
-    "heightCm": 188,
-    "majors": 1,
-    "pgaTourWins": 6,
-    "turnedProYear": 1998,
+    "ryderCup": 0,
     "tier": "B"
   },
   {
@@ -677,7 +872,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 178,
     "majors": 0,
     "pgaTourWins": 4,
-    "turnedProYear": 2006,
+    "ryderCup": 0,
     "tier": "B"
   },
   {
@@ -690,7 +885,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 185,
     "majors": 0,
     "pgaTourWins": 1,
-    "turnedProYear": 2017,
+    "ryderCup": 0,
     "tier": "B"
   },
   {
@@ -703,7 +898,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 178,
     "majors": 0,
     "pgaTourWins": 5,
-    "turnedProYear": 2010,
+    "ryderCup": null,
     "tier": "B"
   },
   {
@@ -716,7 +911,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 185,
     "majors": 0,
     "pgaTourWins": 3,
-    "turnedProYear": 2015,
+    "ryderCup": 0,
     "tier": "B"
   },
   {
@@ -729,7 +924,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 193,
     "majors": 0,
     "pgaTourWins": 1,
-    "turnedProYear": 2021,
+    "ryderCup": 0,
     "tier": "B"
   },
   {
@@ -742,7 +937,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 190,
     "majors": 0,
     "pgaTourWins": 6,
-    "turnedProYear": 2007,
+    "ryderCup": 0,
     "tier": "B"
   },
   {
@@ -755,7 +950,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 183,
     "majors": 0,
     "pgaTourWins": 4,
-    "turnedProYear": 2000,
+    "ryderCup": 0,
     "tier": "B"
   },
   {
@@ -768,7 +963,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 188,
     "majors": 0,
     "pgaTourWins": 1,
-    "turnedProYear": 2015,
+    "ryderCup": 0,
     "tier": "B"
   },
   {
@@ -781,7 +976,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 180,
     "majors": 0,
     "pgaTourWins": 1,
-    "turnedProYear": 2012,
+    "ryderCup": 0,
     "tier": "B"
   },
   {
@@ -794,7 +989,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 180,
     "majors": 0,
     "pgaTourWins": 1,
-    "turnedProYear": 2010,
+    "ryderCup": 0,
     "tier": "C"
   },
   {
@@ -807,7 +1002,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 188,
     "majors": 0,
     "pgaTourWins": 3,
-    "turnedProYear": 2005,
+    "ryderCup": 0,
     "tier": "C"
   },
   {
@@ -820,7 +1015,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 197,
     "majors": 0,
     "pgaTourWins": 0,
-    "turnedProYear": 2016,
+    "ryderCup": 0,
     "tier": "C"
   },
   {
@@ -833,7 +1028,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 175,
     "majors": 0,
     "pgaTourWins": 0,
-    "turnedProYear": 2008,
+    "ryderCup": 1,
     "tier": "C"
   },
   {
@@ -846,7 +1041,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 183,
     "majors": 0,
     "pgaTourWins": 3,
-    "turnedProYear": 1997,
+    "ryderCup": 0,
     "tier": "C"
   },
   {
@@ -859,7 +1054,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 185,
     "majors": 0,
     "pgaTourWins": 1,
-    "turnedProYear": 2011,
+    "ryderCup": 0,
     "tier": "C"
   },
   {
@@ -872,7 +1067,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 185,
     "majors": 0,
     "pgaTourWins": 0,
-    "turnedProYear": 2016,
+    "ryderCup": 0,
     "tier": "C"
   },
   {
@@ -885,7 +1080,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 193,
     "majors": 0,
     "pgaTourWins": 2,
-    "turnedProYear": 2016,
+    "ryderCup": null,
     "tier": "C"
   },
   {
@@ -898,7 +1093,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 183,
     "majors": 0,
     "pgaTourWins": 2,
-    "turnedProYear": 2019,
+    "ryderCup": 0,
     "tier": "C"
   },
   {
@@ -911,7 +1106,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 185,
     "majors": 0,
     "pgaTourWins": 3,
-    "turnedProYear": 2018,
+    "ryderCup": 1,
     "tier": "C"
   },
   {
@@ -924,7 +1119,7 @@ export const GOLFERS: Golfer[] = [
     "heightCm": 190,
     "majors": 0,
     "pgaTourWins": 2,
-    "turnedProYear": 2024,
+    "ryderCup": 0,
     "tier": "C"
   }
 ];
