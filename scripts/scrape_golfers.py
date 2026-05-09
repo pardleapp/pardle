@@ -259,6 +259,33 @@ def fetch_wikitext(page_title: str) -> Optional[str]:
         return None
 
 
+def fetch_image_url(page_title: str) -> Optional[str]:
+    """Fetch the lead image (thumbnail) URL for a Wikipedia page. Used as the
+    player's portrait on the Pardle win/lose reveal."""
+    params = {
+        "action": "query",
+        "titles": page_title,
+        "format": "json",
+        "prop": "pageimages",
+        "piprop": "thumbnail",
+        "pithumbsize": "400",
+        "redirects": "1",
+    }
+    url = f"{WIKI_API}?{urllib.parse.urlencode(params)}"
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.load(resp)
+        pages = data.get("query", {}).get("pages", {})
+        for page in pages.values():
+            thumb = page.get("thumbnail", {}).get("source")
+            if thumb:
+                return thumb
+        return None
+    except Exception:
+        return None
+
+
 INFOBOX_RE = re.compile(r"\{\{Infobox golfer\b", re.IGNORECASE)
 
 
@@ -546,6 +573,8 @@ def scrape_one(page_title: str, tier: str) -> Optional[dict]:
     if name in RYDER_CUP_OVERRIDES:
         ryder_cup = RYDER_CUP_OVERRIDES[name]
 
+    image_url = fetch_image_url(page_title)
+
     return {
         "id": slugify(name),
         "name": name,
@@ -557,6 +586,7 @@ def scrape_one(page_title: str, tier: str) -> Optional[dict]:
         "majors": majors,
         "pgaTourWins": pga_wins,
         "ryderCup": ryder_cup,
+        "imageUrl": image_url,
         "tier": tier,
     }
 

@@ -15,6 +15,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 4,
     "pgaTourWins": 20,
     "ryderCup": 3,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Scottie_Scheffler_Ryder_Cup_2025_%28cropped%29.jpg/500px-Scottie_Scheffler_Ryder_Cup_2025_%28cropped%29.jpg",
     "tier": "S"
   },
   {
@@ -28,6 +29,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 6,
     "pgaTourWins": 30,
     "ryderCup": 8,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Rory_McIlroy_Ryder_Cup_2025-195_%28cropped%29.jpg/500px-Rory_McIlroy_Ryder_Cup_2025-195_%28cropped%29.jpg",
     "tier": "S"
   },
   {
@@ -41,6 +43,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 2,
     "pgaTourWins": 11,
     "ryderCup": 4,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Jon_Rahm_Ryder_Cup_2025-130_%28cropped%29.jpg/500px-Jon_Rahm_Ryder_Cup_2025-130_%28cropped%29.jpg",
     "tier": "S"
   },
   {
@@ -54,6 +57,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 2,
     "pgaTourWins": 10,
     "ryderCup": 3,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Xander_Schauffele_Ryder_Cup_2025_%28cropped%29.jpg/500px-Xander_Schauffele_Ryder_Cup_2025_%28cropped%29.jpg",
     "tier": "S"
   },
   {
@@ -67,6 +71,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 2,
     "pgaTourWins": 9,
     "ryderCup": 3,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e9/Bryson_DeChambeau_%2854565799176%29.jpg",
     "tier": "S"
   },
   {
@@ -80,6 +85,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 2,
     "pgaTourWins": 16,
     "ryderCup": 4,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Justin_Thomas_Ryder_Cup_2025-052_%28cropped%29.jpg/500px-Justin_Thomas_Ryder_Cup_2025-052_%28cropped%29.jpg",
     "tier": "S"
   },
   {
@@ -93,6 +99,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 3,
     "pgaTourWins": 13,
     "ryderCup": 5,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/Jordan_Spieth_Travelers-092_%28cropped%29.jpg/500px-Jordan_Spieth_Travelers-092_%28cropped%29.jpg",
     "tier": "S"
   },
   {
@@ -106,6 +113,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 5,
     "pgaTourWins": 9,
     "ryderCup": 4,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/Brooks_Koepka_Portrait.jpg/500px-Brooks_Koepka_Portrait.jpg",
     "tier": "S"
   },
   {
@@ -119,6 +127,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 2,
     "pgaTourWins": 24,
     "ryderCup": 5,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Dustin_Johnson_-_2022.jpg/500px-Dustin_Johnson_-_2022.jpg",
     "tier": "S"
   },
   {
@@ -132,6 +141,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 11,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Hideki_Matsuyama_ClevelandGolf4-21_%28cropped%29.jpg/500px-Hideki_Matsuyama_ClevelandGolf4-21_%28cropped%29.jpg",
     "tier": "S"
   },
   {
@@ -145,6 +155,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 2,
     "pgaTourWins": 7,
     "ryderCup": 3,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/Collin_Morikawa_Travelers-019_%28cropped%29.jpg/500px-Collin_Morikawa_Travelers-019_%28cropped%29.jpg",
     "tier": "S"
   },
   {
@@ -158,6 +169,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 15,
     "pgaTourWins": 82,
     "ryderCup": 8,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/President_Donald_Trump_hosts_a_reception_honoring_Black_History_Month_%2854341713089%29_%28cropped%29.jpg/500px-President_Donald_Trump_hosts_a_reception_honoring_Black_History_Month_%2854341713089%29_%28cropped%29.jpg",
     "tier": "S"
   },
   {
@@ -171,6 +183,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 6,
     "pgaTourWins": 45,
     "ryderCup": 12,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Phil_Mickelson_15_%28cropped%29.jpg/500px-Phil_Mickelson_15_%28cropped%29.jpg",
     "tier": "S"
   },
   {
@@ -184,6 +197,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 8,
     "ryderCup": 3,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Patrick_Cantlay_Ryder_Cup_2025-146_%28cropped%29.jpg/500px-Patrick_Cantlay_Ryder_Cup_2025-146_%28cropped%29.jpg",
     "tier": "S"
   },
   {
@@ -197,6 +211,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 18,
     "pgaTourWins": 73,
     "ryderCup": 6,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/68/Jack_Nicklaus_2019_Jenkins_Medal_Awards_%28cropped%29.jpg/500px-Jack_Nicklaus_2019_Jenkins_Medal_Awards_%28cropped%29.jpg",
     "tier": "S"
   },
   {
@@ -210,6 +225,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 7,
     "pgaTourWins": 62,
     "ryderCup": 6,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/d/d8/YN3ArnoldPalmer.jpg",
     "tier": "S"
   },
   {
@@ -223,6 +239,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 5,
     "pgaTourWins": 9,
     "ryderCup": 8,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Seve_Ballesteros_2006-07-19_%28cropped%29.jpg/500px-Seve_Ballesteros_2006-07-19_%28cropped%29.jpg",
     "tier": "S"
   },
   {
@@ -236,6 +253,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 2,
     "pgaTourWins": 20,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Greg_Norman_2014.jpg/500px-Greg_Norman_2014.jpg",
     "tier": "S"
   },
   {
@@ -249,6 +267,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 6,
     "pgaTourWins": 9,
     "ryderCup": 12,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Sir_Nick_Faldo.jpg/500px-Sir_Nick_Faldo.jpg",
     "tier": "S"
   },
   {
@@ -262,6 +281,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 8,
     "pgaTourWins": 39,
     "ryderCup": 4,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/Tom_Watson_after_winning_the_1982_US_Open.png/500px-Tom_Watson_after_winning_the_1982_US_Open.png",
     "tier": "S"
   },
   {
@@ -275,6 +295,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 9,
     "pgaTourWins": 24,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/All_Black_%28cropped%29.jpg/500px-All_Black_%28cropped%29.jpg",
     "tier": "S"
   },
   {
@@ -288,6 +309,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 6,
     "pgaTourWins": 29,
     "ryderCup": 6,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Lee_Trevino.jpg/500px-Lee_Trevino.jpg",
     "tier": "S"
   },
   {
@@ -301,6 +323,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 7,
     "ryderCup": 3,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Viktor_Hovland_Ryder_Cup_2025-205_%28cropped%29.jpg/500px-Viktor_Hovland_Ryder_Cup_2025-205_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -314,6 +337,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 6,
     "ryderCup": 2,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Bites_N_Sites_-_31009166248.jpg/500px-Bites_N_Sites_-_31009166248.jpg",
     "tier": "A"
   },
   {
@@ -327,6 +351,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 2,
     "ryderCup": 2,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Ludvig_%C3%85berg_Travelers-006_%28cropped%29%282%29.jpg/500px-Ludvig_%C3%85berg_Travelers-006_%28cropped%29%282%29.jpg",
     "tier": "A"
   },
   {
@@ -340,6 +365,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 6,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Cameron_Smith_introductory_press_conference_%28cropped%29.jpg/500px-Cameron_Smith_introductory_press_conference_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -353,6 +379,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 3,
     "ryderCup": 1,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Cameron_Young_Travelers-023_%28cropped%29.jpg/500px-Cameron_Young_Travelers-023_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -366,6 +393,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 3,
     "ryderCup": 1,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Wyndham_Clark_2023_01a.png/500px-Wyndham_Clark_2023_01a.png",
     "tier": "A"
   },
   {
@@ -379,6 +407,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 3,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Tom_Kim_Travelers-009_%28cropped%29.jpg/500px-Tom_Kim_Travelers-009_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -392,6 +421,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 3,
     "ryderCup": 3,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Shane_Lowry_Ryder_Cup_2025-194_%28cropped%29.jpg/500px-Shane_Lowry_Ryder_Cup_2025-194_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -405,6 +435,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 5,
     "ryderCup": 4,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Matt_Fitzpatrick_Travelers-022_%28cropped%29.jpg/500px-Matt_Fitzpatrick_Travelers-022_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -418,6 +449,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 1,
     "ryderCup": 0,
+    "imageUrl": null,
     "tier": "A"
   },
   {
@@ -431,6 +463,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 2,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Im_Sung-jae_2023.png/500px-Im_Sung-jae_2023.png",
     "tier": "A"
   },
   {
@@ -444,6 +477,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 2,
     "ryderCup": 2,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Robert_MacIntyre_Ryder_Cup_2025-109_%28cropped%29.jpg/500px-Robert_MacIntyre_Ryder_Cup_2025-109_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -457,6 +491,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 14,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/Adam_Scott_AAMSO_2017.jpg/500px-Adam_Scott_AAMSO_2017.jpg",
     "tier": "A"
   },
   {
@@ -470,6 +505,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 13,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Justin_Rose_Ryder_Cup_2025-168_%28cropped%29.jpg/500px-Justin_Rose_Ryder_Cup_2025-168_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -483,6 +519,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 11,
     "ryderCup": 10,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e5/Sergio_Garcia_2017.png",
     "tier": "A"
   },
   {
@@ -496,6 +533,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 2,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/76/Joaqu%C3%ADn_Niemann.jpg/500px-Joaqu%C3%ADn_Niemann.jpg",
     "tier": "A"
   },
   {
@@ -509,6 +547,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 5,
     "ryderCup": 1,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Russell_Henley_Ryder_Cup_2025-043_%28cropped%29.jpg/500px-Russell_Henley_Ryder_Cup_2025-043_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -522,6 +561,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 4,
     "ryderCup": 2,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Sepp_Straka_Ryder_Cup_2025_%28cropped%29.jpg/500px-Sepp_Straka_Ryder_Cup_2025_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -535,6 +575,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 3,
     "ryderCup": 0,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Akshay_Bhatia_Image_%28cropped%29.jpg/500px-Akshay_Bhatia_Image_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -548,6 +589,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 8,
     "ryderCup": 3,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/71/Keegan_Bradley_Ryder_Cup_2025-056_%28cropped%29.jpg/500px-Keegan_Bradley_Ryder_Cup_2025-056_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -561,6 +603,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 9,
     "ryderCup": 3,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/Patrick_Reed_Ryder_Cup_2018.jpg/500px-Patrick_Reed_Ryder_Cup_2018.jpg",
     "tier": "A"
   },
   {
@@ -574,6 +617,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 2,
     "pgaTourWins": 12,
     "ryderCup": 4,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/28/Bubba_Watson_2012.jpg/500px-Bubba_Watson_2012.jpg",
     "tier": "A"
   },
   {
@@ -587,6 +631,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 7,
     "ryderCup": 3,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/Webb_Simpson_cropped.jpg/500px-Webb_Simpson_cropped.jpg",
     "tier": "A"
   },
   {
@@ -600,6 +645,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 5,
     "ryderCup": 2,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Sam_Burns_Ryder_Cup_2025-227_%28cropped%29.jpg/500px-Sam_Burns_Ryder_Cup_2025-227_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -613,6 +659,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 6,
     "ryderCup": 1,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Max_Homa_-_2023.jpg/500px-Max_Homa_-_2023.jpg",
     "tier": "A"
   },
   {
@@ -626,6 +673,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 6,
     "ryderCup": 5,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Rickie_Fowler_Travelers-105_%28cropped%29.jpg/500px-Rickie_Fowler_Travelers-105_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -639,6 +687,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 1,
     "ryderCup": 4,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Tyrrell_Hatton_Ryder_Cup_2025-177_%28cropped%29.jpg/500px-Tyrrell_Hatton_Ryder_Cup_2025-177_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -652,6 +701,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 13,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Jason_Day_Travelers-057_%28cropped%29.jpg/500px-Jason_Day_Travelers-057_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -665,6 +715,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 4,
     "ryderCup": 1,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Brian_Harman_at_2015_Sony_Open_in_Hawaii_01_%28cropped%29.png/500px-Brian_Harman_at_2015_Sony_Open_in_Hawaii_01_%28cropped%29.png",
     "tier": "A"
   },
   {
@@ -678,6 +729,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 2,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Cameron_Davis_-_2017.jpg/500px-Cameron_Davis_-_2017.jpg",
     "tier": "A"
   },
   {
@@ -691,6 +743,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 1,
     "ryderCup": 0,
+    "imageUrl": null,
     "tier": "A"
   },
   {
@@ -704,6 +757,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 5,
     "ryderCup": 2,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Harris_English_Ryder_Cup_2025-047_%28cropped%29.jpg/500px-Harris_English_Ryder_Cup_2025-047_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -717,6 +771,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 1,
     "ryderCup": 0,
+    "imageUrl": null,
     "tier": "A"
   },
   {
@@ -730,6 +785,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 2,
     "ryderCup": 0,
+    "imageUrl": null,
     "tier": "A"
   },
   {
@@ -743,6 +799,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 0,
     "ryderCup": 1,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/d/d8/World_Amateur_Team_Championship_%28Eisenhower_Trophy%29_2018%2C_Nicolai_H%C3%B8jgaard.jpg",
     "tier": "A"
   },
   {
@@ -756,6 +813,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 1,
     "ryderCup": 0,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/KLM_Open_2009_Thomas_Detry.JPG/500px-KLM_Open_2009_Thomas_Detry.JPG",
     "tier": "A"
   },
   {
@@ -769,6 +827,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 2,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/Ryan_Fox_Travelers-113_%28cropped%29.jpg/500px-Ryan_Fox_Travelers-113_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -782,6 +841,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 0,
     "ryderCup": 1,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Alex_Noren_Ryder_Cup_2025-211_%28cropped%29.jpg/500px-Alex_Noren_Ryder_Cup_2025-211_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -795,6 +855,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 2,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/92/Erik_van_Rooyen_at_the_2019_Scandinavian_Invitation.jpg/500px-Erik_van_Rooyen_at_the_2019_Scandinavian_Invitation.jpg",
     "tier": "A"
   },
   {
@@ -808,6 +869,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 1,
     "ryderCup": 0,
+    "imageUrl": null,
     "tier": "A"
   },
   {
@@ -821,6 +883,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 6,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Leishman_2018_QLN.jpg/500px-Leishman_2018_QLN.jpg",
     "tier": "A"
   },
   {
@@ -834,6 +897,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 8,
     "ryderCup": 5,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Stewart_CInk_2017.png/500px-Stewart_CInk_2017.png",
     "tier": "A"
   },
   {
@@ -847,6 +911,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 2,
     "pgaTourWins": 3,
     "ryderCup": 11,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/aa/Bernhard_Langer.jpg/500px-Bernhard_Langer.jpg",
     "tier": "A"
   },
   {
@@ -860,6 +925,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 3,
     "pgaTourWins": 34,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Vijay_Singh.jpg/500px-Vijay_Singh.jpg",
     "tier": "A"
   },
   {
@@ -873,6 +939,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 4,
     "pgaTourWins": 19,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7d/Photo_Ernie_Els_cropped.jpg/500px-Photo_Ernie_Els_cropped.jpg",
     "tier": "A"
   },
   {
@@ -886,6 +953,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 3,
     "pgaTourWins": 6,
     "ryderCup": 7,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/P%C3%A1draig_Harrington%2C_Open_2007.jpg/500px-P%C3%A1draig_Harrington%2C_Open_2007.jpg",
     "tier": "A"
   },
   {
@@ -899,6 +967,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 21,
     "ryderCup": 8,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Davis_Love_III_%28cropped%29.jpg/500px-Davis_Love_III_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -912,6 +981,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 15,
     "ryderCup": 5,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Fred_Couples_%28cropped%29.jpg/500px-Fred_Couples_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -925,6 +995,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 2,
     "pgaTourWins": 6,
     "ryderCup": 5,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/en/thumb/4/48/Sandy_Lyle_signature.jpg/500px-Sandy_Lyle_signature.jpg",
     "tier": "A"
   },
   {
@@ -938,6 +1009,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 2,
     "ryderCup": 9,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Ian_Woosnam_at_Royal_Troon_cropped.jpg/500px-Ian_Woosnam_at_Royal_Troon_cropped.jpg",
     "tier": "A"
   },
   {
@@ -951,6 +1023,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 0,
     "ryderCup": 9,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/f/fe/ColinMontgomerie.jpg",
     "tier": "A"
   },
   {
@@ -964,6 +1037,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 2,
     "pgaTourWins": 6,
     "ryderCup": 3,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/Jos%C3%A9_Mar%C3%ADa_Olaz%C3%A1bal_Ryder_Cup_2025-116_%28cropped%29.jpg/500px-Jos%C3%A9_Mar%C3%ADa_Olaz%C3%A1bal_Ryder_Cup_2025-116_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -977,6 +1051,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 2,
     "ryderCup": 11,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Lee_Westwood_by_Eugene_Goh.jpg/500px-Lee_Westwood_by_Eugene_Goh.jpg",
     "tier": "A"
   },
   {
@@ -990,6 +1065,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 6,
     "ryderCup": 5,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/71/Henrik_Stenson_in_Jan_2014.jpg/500px-Henrik_Stenson_in_Jan_2014.jpg",
     "tier": "A"
   },
   {
@@ -1003,6 +1079,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 2,
     "pgaTourWins": 5,
     "ryderCup": 0,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/John_Daly.jpg/500px-John_Daly.jpg",
     "tier": "A"
   },
   {
@@ -1016,6 +1093,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 5,
     "ryderCup": 4,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/TomLehmanPentagonVisitCrop.jpg/500px-TomLehmanPentagonVisitCrop.jpg",
     "tier": "A"
   },
   {
@@ -1029,6 +1107,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 12,
     "ryderCup": 3,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/en/thumb/f/f8/Justin_Leonard_signature.jpg/500px-Justin_Leonard_signature.jpg",
     "tier": "A"
   },
   {
@@ -1042,6 +1121,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 12,
     "ryderCup": 4,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Steve_Stricker.jpg/500px-Steve_Stricker.jpg",
     "tier": "A"
   },
   {
@@ -1055,6 +1135,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 2,
     "pgaTourWins": 16,
     "ryderCup": 5,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/3/32/O%27Meara.jpg",
     "tier": "A"
   },
   {
@@ -1068,6 +1149,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 3,
     "pgaTourWins": 20,
     "ryderCup": 5,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/HaleIrwin1986.jpg/500px-HaleIrwin1986.jpg",
     "tier": "A"
   },
   {
@@ -1081,6 +1163,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 2,
     "pgaTourWins": 17,
     "ryderCup": 0,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/en/thumb/b/b1/Curtis_Strange_signature.jpg/500px-Curtis_Strange_signature.jpg",
     "tier": "A"
   },
   {
@@ -1094,6 +1177,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 13,
     "ryderCup": 4,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b6/Mark_Calcavecchia_2008.jpg/500px-Mark_Calcavecchia_2008.jpg",
     "tier": "A"
   },
   {
@@ -1107,6 +1191,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 12,
     "ryderCup": 0,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/Paul_Azinger_%284335299674%29.jpg/500px-Paul_Azinger_%284335299674%29.jpg",
     "tier": "A"
   },
   {
@@ -1120,6 +1205,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 17,
     "ryderCup": 11,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Jim_Furyk_Ryder_Cup_2025-147_%28cropped%29.jpg/500px-Jim_Furyk_Ryder_Cup_2025-147_%28cropped%29.jpg",
     "tier": "A"
   },
   {
@@ -1133,6 +1219,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 13,
     "ryderCup": 2,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/4/43/David_Duval.jpg",
     "tier": "A"
   },
   {
@@ -1146,6 +1233,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 4,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Si_Woo_Kim_Travelers-012_%28cropped%29.jpg/500px-Si_Woo_Kim_Travelers-012_%28cropped%29.jpg",
     "tier": "B"
   },
   {
@@ -1159,6 +1247,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 1,
     "ryderCup": 0,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Will_Zalatoris_2022_01.png/500px-Will_Zalatoris_2022_01.png",
     "tier": "B"
   },
   {
@@ -1172,6 +1261,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 1,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8b/Adam_Hadwin_Travelers-083_%28cropped%29.jpg/500px-Adam_Hadwin_Travelers-083_%28cropped%29.jpg",
     "tier": "B"
   },
   {
@@ -1185,6 +1275,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 2,
     "ryderCup": null,
+    "imageUrl": null,
     "tier": "B"
   },
   {
@@ -1198,6 +1289,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 1,
     "ryderCup": 0,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Stephan_J%C3%A4ger_in_Eichenried_%28cropped%29.jpg/500px-Stephan_J%C3%A4ger_in_Eichenried_%28cropped%29.jpg",
     "tier": "B"
   },
   {
@@ -1211,6 +1303,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 1,
     "pgaTourWins": 6,
     "ryderCup": 0,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/8/86/Lucas_Glover_cropped.jpg",
     "tier": "B"
   },
   {
@@ -1224,6 +1317,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 4,
     "ryderCup": 0,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Kevin_Kisner_-_2018.jpg/500px-Kevin_Kisner_-_2018.jpg",
     "tier": "B"
   },
   {
@@ -1237,6 +1331,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 1,
     "ryderCup": 0,
+    "imageUrl": null,
     "tier": "B"
   },
   {
@@ -1250,6 +1345,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 5,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Nick_Taylor_Travelers-115.jpg/500px-Nick_Taylor_Travelers-115.jpg",
     "tier": "B"
   },
   {
@@ -1263,6 +1359,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 3,
     "ryderCup": 0,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/68/J.T._Poston_Travelers-001.jpg/500px-J.T._Poston_Travelers-001.jpg",
     "tier": "B"
   },
   {
@@ -1276,6 +1373,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 1,
     "ryderCup": 0,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Davis_Thompson_Travelers-063_%28cropped%29.jpg/500px-Davis_Thompson_Travelers-063_%28cropped%29.jpg",
     "tier": "B"
   },
   {
@@ -1289,6 +1387,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 6,
     "ryderCup": 0,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Chris_Kirk_at_the_2021_Players_Championship.jpg/500px-Chris_Kirk_at_the_2021_Players_Championship.jpg",
     "tier": "B"
   },
   {
@@ -1302,6 +1401,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 4,
     "ryderCup": 0,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/en/thumb/2/20/Charley_Hoffman_signature.jpg/500px-Charley_Hoffman_signature.jpg",
     "tier": "B"
   },
   {
@@ -1315,6 +1415,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 1,
     "ryderCup": 0,
+    "imageUrl": null,
     "tier": "B"
   },
   {
@@ -1328,6 +1429,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 1,
     "ryderCup": 0,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/en/thumb/d/d3/Aaron_Rai_signature.jpg/500px-Aaron_Rai_signature.jpg",
     "tier": "B"
   },
   {
@@ -1341,6 +1443,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 1,
     "ryderCup": 0,
+    "imageUrl": null,
     "tier": "C"
   },
   {
@@ -1354,6 +1457,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 3,
     "ryderCup": 0,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Open_de_France_2015_20.jpg/500px-Open_de_France_2015_20.jpg",
     "tier": "C"
   },
   {
@@ -1367,6 +1471,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 0,
     "ryderCup": 0,
+    "imageUrl": null,
     "tier": "C"
   },
   {
@@ -1380,6 +1485,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 0,
     "ryderCup": 1,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e9/Thorbj%C3%B8rn_Olesen_at_the_2011_Omega_European_Masters.jpg",
     "tier": "C"
   },
   {
@@ -1393,6 +1499,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 3,
     "ryderCup": 0,
+    "imageUrl": null,
     "tier": "C"
   },
   {
@@ -1406,6 +1513,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 1,
     "ryderCup": 0,
+    "imageUrl": null,
     "tier": "C"
   },
   {
@@ -1419,6 +1527,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 0,
     "ryderCup": 0,
+    "imageUrl": null,
     "tier": "C"
   },
   {
@@ -1432,6 +1541,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 2,
     "ryderCup": null,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Cameron_Davis_-_2017.jpg/500px-Cameron_Davis_-_2017.jpg",
     "tier": "C"
   },
   {
@@ -1445,6 +1555,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 2,
     "ryderCup": 0,
+    "imageUrl": null,
     "tier": "C"
   },
   {
@@ -1458,6 +1569,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 3,
     "ryderCup": 1,
+    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/aa/Ben_Griffin_Ryder_Cup_2025-143_%28cropped%29.jpg/500px-Ben_Griffin_Ryder_Cup_2025-143_%28cropped%29.jpg",
     "tier": "C"
   },
   {
@@ -1471,6 +1583,7 @@ export const GOLFERS: Golfer[] = [
     "majors": 0,
     "pgaTourWins": 2,
     "ryderCup": 0,
+    "imageUrl": null,
     "tier": "C"
   }
 ];

@@ -12,6 +12,8 @@ export interface Golfer {
   pgaTourWins: number;
   /** Ryder Cup appearances. null = ineligible (not from USA or Europe). */
   ryderCup: number | null;
+  /** Wikipedia thumbnail URL, used on the win/lose reveal screen. */
+  imageUrl: string | null;
   tier: "S" | "A" | "B" | "C";
 }
 

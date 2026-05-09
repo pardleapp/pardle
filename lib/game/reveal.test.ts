@@ -13,6 +13,7 @@ const SCOTTIE: Golfer = {
   majors: 4,
   pgaTourWins: 20,
   ryderCup: 2,
+  imageUrl: null,
   tier: "S",
 };
 
@@ -27,6 +28,7 @@ const RORY: Golfer = {
   majors: 6,
   pgaTourWins: 30,
   ryderCup: 8,
+  imageUrl: null,
   tier: "S",
 };
 
@@ -41,6 +43,7 @@ const CAM_SMITH: Golfer = {
   majors: 1,
   pgaTourWins: 6,
   ryderCup: null,
+  imageUrl: null,
   tier: "A",
 };
 
@@ -55,6 +58,7 @@ const HIDEKI: Golfer = {
   majors: 1,
   pgaTourWins: 11,
   ryderCup: null,
+  imageUrl: null,
   tier: "S",
 };
 

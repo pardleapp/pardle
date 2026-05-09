@@ -209,23 +209,192 @@ input[type=text]:focus {
   font-weight: 500;
 }
 
-.result {
-  text-align: center;
-  padding: 20px;
-  font-size: 18px;
-  font-weight: 600;
-  border-radius: 8px;
-  margin-bottom: 16px;
-}
-
-.result.win {
-  background: rgba(123, 174, 63, 0.12);
+.reopen-result {
+  display: block;
+  margin: 12px auto;
+  padding: 10px 20px;
+  background: transparent;
+  border: 2px solid var(--green);
   color: var(--green);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
 }
 
-.result.lose {
-  background: rgba(198, 40, 40, 0.08);
-  color: #c62828;
+.reopen-result:hover {
+  background: rgba(123, 174, 63, 0.1);
+}
+
+/* ---------- Result modal ---------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: modal-fade-in 0.2s ease-out;
+  padding: 16px;
+}
+
+.modal-card {
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 16px;
+  padding: 28px 24px 24px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  position: relative;
+  animation: modal-scale-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.modal-photo {
+  width: 160px;
+  height: 160px;
+  object-fit: cover;
+  object-position: center 20%;
+  border-radius: 50%;
+  margin: 0 auto 16px;
+  display: block;
+  border: 4px solid var(--green);
+  background: var(--empty);
+}
+
+.modal-lose .modal-photo {
+  border-color: var(--grey);
+}
+
+.modal-photo-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64px;
+}
+
+.modal-title {
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  color: var(--green);
+  letter-spacing: -0.5px;
+}
+
+.modal-lose .modal-title {
+  color: var(--grey);
+}
+
+.modal-name {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.modal-stats {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.modal-guess-count {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 18px;
+  color: var(--text);
+}
+
+.modal-share {
+  background: var(--green);
+  color: white;
+  border: none;
+  padding: 13px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  font-family: inherit;
+  transition: opacity 0.15s;
+}
+
+.modal-share:hover {
+  opacity: 0.92;
+}
+
+.modal-share:active {
+  opacity: 0.85;
+}
+
+.modal-lose .modal-share {
+  background: var(--grey);
+}
+
+.modal-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px 8px;
+  z-index: 2;
+}
+
+.modal-close:hover {
+  color: var(--text);
+}
+
+/* ---------- Confetti ---------- */
+
+.confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.confetto {
+  position: absolute;
+  top: -24px;
+  width: 8px;
+  height: 14px;
+  border-radius: 1px;
+  animation-name: confetto-fall;
+  animation-timing-function: cubic-bezier(0.4, 0.05, 0.6, 1);
+  animation-fill-mode: forwards;
+  opacity: 0.9;
+}
+
+@keyframes confetto-fall {
+  0% {
+    transform: translateY(-30px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(560px) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-scale-in {
+  from { transform: scale(0.86); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 
 footer {
@@ -262,6 +431,14 @@ footer {
 
   .suggestions li {
     border-bottom-color: #2a2a2a;
+  }
+
+  .modal-close {
+    color: var(--muted);
+  }
+
+  .modal-close:hover {
+    color: white;
   }
 
   .suggestions li:hover,

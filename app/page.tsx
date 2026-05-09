@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BRAND } from "@/lib/brand";
 import { GOLFERS } from "@/lib/data/golfers";
 import { revealGuess } from "@/lib/game/reveal";
 import {
   type AttributeReveal,
+  type CellState,
   type Golfer,
   type GuessReveal,
   MAX_GUESSES,
@@ -13,20 +14,48 @@ import {
 
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 9);
 
-function pickMysteryGolfer(): Golfer {
+function dayIndexToday(): number {
   const now = new Date();
   const todayUTC = Date.UTC(
     now.getUTCFullYear(),
     now.getUTCMonth(),
     now.getUTCDate(),
   );
-  const dayIndex = Math.floor(
-    (todayUTC - LAUNCH_DATE_UTC) / (1000 * 60 * 60 * 24),
-  );
+  return Math.floor((todayUTC - LAUNCH_DATE_UTC) / (1000 * 60 * 60 * 24));
+}
+
+function pickMysteryGolfer(): Golfer {
+  const dayIndex = dayIndexToday();
   const safeIndex =
-    ((dayIndex % GOLFERS.length) + GOLFERS.length) %
-    GOLFERS.length;
+    ((dayIndex % GOLFERS.length) + GOLFERS.length) % GOLFERS.length;
   return GOLFERS[safeIndex];
+}
+
+function stateToEmoji(state: CellState): string {
+  if (state === "green") return "🟩";
+  if (state === "warm" || state === "yellow") return "🟨";
+  return "⬛";
+}
+
+function buildShareText(
+  guesses: GuessReveal[],
+  dayNumber: number,
+  won: boolean,
+): string {
+  const result = won ? `${guesses.length}/${MAX_GUESSES}` : `X/${MAX_GUESSES}`;
+  const grid = guesses
+    .map((g) =>
+      [
+        stateToEmoji(g.country.state),
+        stateToEmoji(g.age.state),
+        stateToEmoji(g.height.state),
+        stateToEmoji(g.majors.state),
+        stateToEmoji(g.pgaTourWins.state),
+        stateToEmoji(g.ryderCup.state),
+      ].join(""),
+    )
+    .join("\n");
+  return `${BRAND.name} #${dayNumber} ${result}\n${grid}\n${BRAND.domain}`;
 }
 
 function flagFor(countryCode: string): string {
@@ -53,14 +82,137 @@ function Arrow({ arrow }: { arrow: AttributeReveal["arrow"] }) {
   return <span className="arrow">{arrow === "up" ? "▲" : "▼"}</span>;
 }
 
+const CONFETTI_COLORS = ["#7BAE3F", "#B5D332", "#E8C547", "#5BA0E0", "#E07B5B"];
+
+function Confetti() {
+  return (
+    <div className="confetti" aria-hidden="true">
+      {Array.from({ length: 36 }).map((_, i) => (
+        <span
+          key={i}
+          className="confetto"
+          style={{
+            left: `${(i * 100) / 36 + (Math.sin(i) * 4)}%`,
+            backgroundColor: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+            animationDelay: `${(i % 8) * 0.05}s`,
+            animationDuration: `${1.4 + (i % 4) * 0.2}s`,
+            transform: `rotate(${(i * 47) % 360}deg)`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ResultModal({
+  isWin,
+  mystery,
+  guesses,
+  dayNumber,
+  onClose,
+}: {
+  isWin: boolean;
+  mystery: Golfer;
+  guesses: GuessReveal[];
+  dayNumber: number;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const shareText = useMemo(
+    () => buildShareText(guesses, dayNumber, isWin),
+    [guesses, dayNumber, isWin],
+  );
+
+  async function handleShare() {
+    const nav = navigator as Navigator & {
+      share?: (data: { text: string }) => Promise<void>;
+    };
+    if (nav.share) {
+      try {
+        await nav.share({ text: shareText });
+        return;
+      } catch {
+        // fall through to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        className={`modal-card ${isWin ? "modal-win" : "modal-lose"}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {isWin && <Confetti />}
+        <button
+          className="modal-close"
+          onClick={onClose}
+          aria-label="Close"
+        >
+          ×
+        </button>
+        {mystery.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={mystery.imageUrl}
+            alt={mystery.name}
+            className="modal-photo"
+          />
+        ) : (
+          <div className="modal-photo modal-photo-placeholder">
+            {flagFor(mystery.countryCode)}
+          </div>
+        )}
+        <h2 className="modal-title">
+          {isWin ? "Birdie! 🏌️" : "Out of guesses"}
+        </h2>
+        <p className="modal-name">
+          {flagFor(mystery.countryCode)} {mystery.name}
+        </p>
+        <p className="modal-stats">
+          Age {mystery.age} ·{" "}
+          {mystery.majors > 0 && `${mystery.majors} majors · `}
+          {mystery.pgaTourWins} PGA wins
+          {mystery.ryderCup !== null && ` · ${mystery.ryderCup} Ryder Cups`}
+        </p>
+        <p className="modal-guess-count">
+          {isWin
+            ? `Solved in ${guesses.length}/${MAX_GUESSES}`
+            : `${MAX_GUESSES}/${MAX_GUESSES} — better luck tomorrow`}
+        </p>
+        <button className="modal-share" onClick={handleShare}>
+          {copied ? "Copied to clipboard!" : "Share result"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Page() {
   const mystery = useMemo(() => pickMysteryGolfer(), []);
+  const dayNumber = useMemo(() => dayIndexToday() + 1, []);
   const [guesses, setGuesses] = useState<GuessReveal[]>([]);
   const [input, setInput] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
 
   const isWin = guesses.some((g) => g.isWin);
   const isLose = !isWin && guesses.length >= MAX_GUESSES;
   const isOver = isWin || isLose;
+
+  // Auto-open the modal once when the game ends.
+  useEffect(() => {
+    if (isOver) {
+      const t = setTimeout(() => setModalOpen(true), 350);
+      return () => clearTimeout(t);
+    }
+  }, [isOver]);
 
   const matches = useMemo(() => {
     const q = input.trim().toLowerCase();
@@ -172,15 +324,23 @@ export default function Page() {
         </div>
       )}
 
-      {isWin && (
-        <p className="result win">
-          You got it in {guesses.length}/{MAX_GUESSES}!
-        </p>
+      {isOver && !modalOpen && (
+        <button
+          className="reopen-result"
+          onClick={() => setModalOpen(true)}
+        >
+          View result
+        </button>
       )}
-      {isLose && (
-        <p className="result lose">
-          Out of guesses. The answer was {mystery.name}.
-        </p>
+
+      {isOver && modalOpen && (
+        <ResultModal
+          isWin={isWin}
+          mystery={mystery}
+          guesses={guesses}
+          dayNumber={dayNumber}
+          onClose={() => setModalOpen(false)}
+        />
       )}
 
       <footer>
