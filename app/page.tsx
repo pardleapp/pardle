@@ -84,49 +84,131 @@ function Arrow({ arrow }: { arrow: AttributeReveal["arrow"] }) {
 
 const CONFETTI_COLORS = ["#7BAE3F", "#B5D332", "#E8C547", "#5BA0E0", "#E07B5B"];
 
-function PlayerCard({ golfer }: { golfer: Golfer }) {
-  const ryderDisplay =
-    golfer.ryderCup === null ? "—" : String(golfer.ryderCup);
+function PlayerWalker({ golfer }: { golfer: Golfer }) {
   return (
-    <div className={`tcard tcard-tier-${golfer.tier}`}>
-      <div className="tcard-inner">
-        <div className="tcard-back">
-          <div className="tcard-back-logo">PARDLE</div>
-          <div className="tcard-back-pattern" aria-hidden="true" />
-        </div>
-        <div className="tcard-front">
-          <div className="tcard-shimmer" aria-hidden="true" />
-          <div className="tcard-rating">{golfer.tier}</div>
-          <div className="tcard-flag">{flagFor(golfer.countryCode)}</div>
-          <div className="tcard-photo">
+    <div className="walker-stage">
+      <div className="walker">
+        <div className="walker-figure">
+          {/* Shadow on the ground that scales with the bob */}
+          <div className="walker-shadow" />
+          {/* Body, legs and arms — drawn as an SVG so leg-swing pivots
+              correctly. The torso is intentionally generic; the player's
+              face on top is what gives the figure identity. */}
+          <svg
+            viewBox="0 0 140 240"
+            className="walker-body"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            {/* Neck */}
+            <rect x="63" y="0" width="14" height="14" fill="#f0c48a" />
+
+            {/* Polo shirt */}
+            <path
+              d="M 40 14 Q 40 8 50 8 L 60 8 Q 70 22 80 8 L 90 8 Q 100 8 100 14 L 105 90 Q 105 100 95 100 L 45 100 Q 35 100 35 90 Z"
+              fill="#ffffff"
+              stroke="#aaa"
+              strokeWidth="1"
+            />
+            {/* Collar */}
+            <path
+              d="M 60 8 L 70 22 L 80 8 L 76 8 L 70 16 L 64 8 Z"
+              fill="#7BAE3F"
+            />
+
+            {/* Belt */}
+            <rect x="40" y="100" width="60" height="6" fill="#2a2a2a" />
+
+            {/* Shorts / trousers */}
+            <path
+              d="M 40 106 L 70 106 L 70 158 L 56 158 Z"
+              fill="#4a4a4a"
+            />
+            <path
+              d="M 70 106 L 100 106 L 84 158 L 70 158 Z"
+              fill="#4a4a4a"
+            />
+
+            {/* Left leg (anatomical right) — pivots from the hip */}
+            <g className="walker-leg walker-leg-left">
+              <line
+                x1="58"
+                y1="158"
+                x2="56"
+                y2="210"
+                stroke="#f0c48a"
+                strokeWidth="11"
+                strokeLinecap="round"
+              />
+              {/* Shoe */}
+              <ellipse cx="54" cy="216" rx="11" ry="5" fill="#1a1a1a" />
+            </g>
+
+            {/* Right leg */}
+            <g className="walker-leg walker-leg-right">
+              <line
+                x1="82"
+                y1="158"
+                x2="84"
+                y2="210"
+                stroke="#f0c48a"
+                strokeWidth="11"
+                strokeLinecap="round"
+              />
+              <ellipse cx="86" cy="216" rx="11" ry="5" fill="#1a1a1a" />
+            </g>
+
+            {/* Left arm */}
+            <g className="walker-arm walker-arm-left">
+              <line
+                x1="40"
+                y1="22"
+                x2="22"
+                y2="76"
+                stroke="#ffffff"
+                strokeWidth="11"
+                strokeLinecap="round"
+              />
+              {/* Hand */}
+              <circle cx="22" cy="80" r="5" fill="#f0c48a" />
+            </g>
+
+            {/* Right arm holding a club */}
+            <g className="walker-arm walker-arm-right">
+              <line
+                x1="100"
+                y1="22"
+                x2="118"
+                y2="76"
+                stroke="#ffffff"
+                strokeWidth="11"
+                strokeLinecap="round"
+              />
+              <circle cx="118" cy="80" r="5" fill="#f0c48a" />
+              {/* Golf club shaft */}
+              <line
+                x1="118"
+                y1="80"
+                x2="128"
+                y2="200"
+                stroke="#c8c8c8"
+                strokeWidth="2"
+              />
+              {/* Club head */}
+              <ellipse cx="128" cy="202" rx="6" ry="3" fill="#888" />
+            </g>
+          </svg>
+
+          {/* Player's actual face sits on top of the body as the head */}
+          <div className="walker-head">
             {golfer.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={golfer.imageUrl} alt={golfer.name} />
             ) : (
-              <div className="tcard-photo-placeholder">
+              <div className="walker-head-placeholder">
                 {flagFor(golfer.countryCode)}
               </div>
             )}
-          </div>
-          <div className="tcard-name">{golfer.name.toUpperCase()}</div>
-          <div className="tcard-divider" />
-          <div className="tcard-stats">
-            <div>
-              <span>{golfer.majors}</span>
-              <em>MAJ</em>
-            </div>
-            <div>
-              <span>{golfer.pgaTourWins}</span>
-              <em>WIN</em>
-            </div>
-            <div>
-              <span>{ryderDisplay}</span>
-              <em>RC</em>
-            </div>
-            <div>
-              <span>{golfer.age}</span>
-              <em>AGE</em>
-            </div>
           </div>
         </div>
       </div>
@@ -210,7 +292,16 @@ function ResultModal({
         <h2 className="modal-title">
           {isWin ? "Birdie!" : "Out of guesses"}
         </h2>
-        <PlayerCard golfer={mystery} />
+        <PlayerWalker golfer={mystery} />
+        <p className="modal-name">
+          {flagFor(mystery.countryCode)} {mystery.name}
+        </p>
+        <p className="modal-stats">
+          Age {mystery.age} ·{" "}
+          {mystery.majors > 0 && `${mystery.majors} majors · `}
+          {mystery.pgaTourWins} PGA wins
+          {mystery.ryderCup !== null && ` · ${mystery.ryderCup} Ryder Cups`}
+        </p>
         <p className="modal-guess-count">
           {isWin
             ? `Solved in ${guesses.length}/${MAX_GUESSES}`
