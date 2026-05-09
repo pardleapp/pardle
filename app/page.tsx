@@ -175,8 +175,7 @@ export default function Page() {
 
       <footer>
         <p>
-          {BRAND.domain} · {GOLFERS.length} sample players · full DB
-          coming
+          {BRAND.domain} · {GOLFERS.length} pros in the database
         </p>
       </footer>
     </main>
