@@ -79,9 +79,9 @@ h1 {
 }
 
 .header-row span {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  text-align: center;
+  align-self: center;
+  line-height: 1.15;
 }
 
 .guess {
