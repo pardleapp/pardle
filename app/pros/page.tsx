@@ -42,8 +42,20 @@ function dayIndexToday(): number {
   return Math.floor((todayUTC - LAUNCH_DATE_UTC) / (1000 * 60 * 60 * 24));
 }
 
+// Hash-derived rotation offset so launch-day doesn't land on whichever
+// golfer happens to be GOLFERS[0|1|2] in tier order. Bump the version
+// suffix to reshuffle the rotation any time.
+function rotationOffset(): number {
+  const key = "pardle-pros-v2";
+  let h = 5381;
+  for (let i = 0; i < key.length; i++) {
+    h = ((h * 33) ^ key.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
 function pickMysteryGolfer(): Golfer {
-  const dayIndex = dayIndexToday();
+  const dayIndex = dayIndexToday() + rotationOffset();
   const safeIndex =
     ((dayIndex % GOLFERS.length) + GOLFERS.length) % GOLFERS.length;
   return GOLFERS[safeIndex];
