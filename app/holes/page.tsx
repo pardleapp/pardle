@@ -7,6 +7,7 @@ import { COURSES } from "@/lib/data/courses";
 import {
   type Course,
   type CourseGuessReveal,
+  type Difficulty,
   HOLES_MAX_GUESSES,
 } from "@/lib/game/holes-types";
 import type { AttributeReveal, CellState } from "@/lib/game/types";
@@ -28,6 +29,51 @@ import {
 
 const GAME_ID = "holes";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 10);
+const DIFFICULTY_KEY = "pardle.holesDifficulty";
+
+function loadDifficulty(): Difficulty {
+  if (typeof window === "undefined") return "easy";
+  try {
+    const stored = window.localStorage.getItem(DIFFICULTY_KEY);
+    return stored === "hard" ? "hard" : "easy";
+  } catch {
+    return "easy";
+  }
+}
+
+function saveDifficulty(d: Difficulty): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(DIFFICULTY_KEY, d);
+  } catch {
+    // ignore
+  }
+}
+
+interface SatelliteCoords {
+  lat: number;
+  lng: number;
+  zoom: number;
+}
+
+function coordsForView(course: Course, difficulty: Difficulty): SatelliteCoords {
+  if (difficulty === "hard") {
+    if (
+      course.iconicHoleLat !== undefined &&
+      course.iconicHoleLng !== undefined
+    ) {
+      return {
+        lat: course.iconicHoleLat,
+        lng: course.iconicHoleLng,
+        zoom: course.iconicHoleZoom ?? 18,
+      };
+    }
+    // Fallback: same centroid, zoom in much further. Less specific than a
+    // hand-curated hole but still meaningfully harder than the easy view.
+    return { lat: course.lat, lng: course.lng, zoom: 17 };
+  }
+  return { lat: course.lat, lng: course.lng, zoom: course.zoom };
+}
 
 function dayIndexToday(): number {
   const now = new Date();
@@ -122,18 +168,20 @@ export default function HolesPage() {
   const [challenge, setChallenge] = useState<ChallengePayload | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [challengeCopied, setChallengeCopied] = useState(false);
+  // Difficulty starts on "easy" for SSR consistency, then hydrates from
+  // localStorage in the effect below. Avoids hydration mismatch warnings.
+  const [difficulty, setDifficulty] = useState<Difficulty>("easy");
 
-  const satelliteUrl = useMemo(
-    () =>
-      mapboxStaticUrl({
-        lat: mystery.lat,
-        lng: mystery.lng,
-        zoom: mystery.zoom,
-        width: 600,
-        height: 400,
-      }),
-    [mystery],
-  );
+  const satelliteUrl = useMemo(() => {
+    const view = coordsForView(mystery, difficulty);
+    return mapboxStaticUrl({
+      lat: view.lat,
+      lng: view.lng,
+      zoom: view.zoom,
+      width: 600,
+      height: 400,
+    });
+  }, [mystery, difficulty]);
 
   const isWin = guesses.some((g) => g.isWin);
   const isLose = !isWin && guesses.length >= HOLES_MAX_GUESSES;
@@ -141,6 +189,7 @@ export default function HolesPage() {
 
   useEffect(() => {
     setStats(applyMissedDayReset(GAME_ID, dayNumber));
+    setDifficulty(loadDifficulty());
     try {
       const code = new URLSearchParams(window.location.search).get("c");
       if (code) {
@@ -151,6 +200,19 @@ export default function HolesPage() {
       // ignore — no challenge param
     }
   }, [dayNumber]);
+
+  function changeDifficulty(d: Difficulty) {
+    if (d === difficulty) return;
+    if (guesses.length > 0 && !isOver) {
+      const ok = window.confirm(
+        "Switching difficulty mid-puzzle will reset your guesses. Continue?",
+      );
+      if (!ok) return;
+      setGuesses([]);
+    }
+    setDifficulty(d);
+    saveDifficulty(d);
+  }
 
   useEffect(() => {
     if (!isOver) return;
@@ -288,6 +350,29 @@ export default function HolesPage() {
           </div>
         )}
       </header>
+
+      <div className="difficulty-toggle" role="tablist" aria-label="Difficulty">
+        <button
+          role="tab"
+          aria-selected={difficulty === "easy"}
+          className={`difficulty-toggle-btn ${
+            difficulty === "easy" ? "active" : ""
+          }`}
+          onClick={() => changeDifficulty("easy")}
+        >
+          Easy <span className="difficulty-toggle-hint">whole course</span>
+        </button>
+        <button
+          role="tab"
+          aria-selected={difficulty === "hard"}
+          className={`difficulty-toggle-btn ${
+            difficulty === "hard" ? "active" : ""
+          }`}
+          onClick={() => changeDifficulty("hard")}
+        >
+          Hard <span className="difficulty-toggle-hint">single hole</span>
+        </button>
+      </div>
 
       <div className="satellite-frame">
         {satelliteUrl ? (

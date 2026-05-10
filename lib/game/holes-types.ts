@@ -9,6 +9,8 @@ export type CourseType =
 
 export type CourseTier = "S" | "A" | "B" | "C";
 
+export type Difficulty = "easy" | "hard";
+
 export interface Course {
   id: string;
   name: string;
@@ -19,15 +21,24 @@ export interface Course {
   yearFounded: number;
   courseType: CourseType;
   par: number;
-  /** Latitude of the course centroid (degrees). */
+  /** Latitude of the course centroid (degrees). Used for the easy view. */
   lat: number;
-  /** Longitude of the course centroid (degrees). */
+  /** Longitude of the course centroid (degrees). Used for the easy view. */
   lng: number;
-  /** Mapbox zoom level. 14 fits the whole property; 16 zooms to a hole-area. */
+  /** Mapbox zoom level for the easy view. 14 fits the whole property; 16 zooms tighter. */
   zoom: number;
-  /** The hole that's revealed in the answer card — a famous one. */
+  /** The iconic hole revealed in the answer card. */
   iconicHole: number;
   iconicHoleNote?: string;
+  /**
+   * Optional precise coordinates of the iconic hole's green. When present,
+   * the hard-difficulty view centres the satellite image on this point at
+   * a high zoom, showing the actual hole rather than the whole property.
+   * When absent, hard mode falls back to the course centroid at zoom 17.
+   */
+  iconicHoleLat?: number;
+  iconicHoleLng?: number;
+  iconicHoleZoom?: number;
   tier: CourseTier;
 }
 
