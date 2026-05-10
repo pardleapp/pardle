@@ -18,6 +18,14 @@ import {
   type PardleStats,
   recordResult,
 } from "@/lib/streak";
+import {
+  type ChallengePayload,
+  type ChallengeScore,
+  decodeChallenge,
+  encodeChallenge,
+  loadChallengerName,
+  saveChallengerName,
+} from "@/lib/challenge";
 
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 9);
 
@@ -307,12 +315,48 @@ function TutorialModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function compareWithFriend(
+  myScore: ChallengeScore,
+  friendScore: ChallengeScore,
+  friendName: string,
+): { line: string; outcome: "win" | "lose" | "tie" } {
+  if (myScore === "X" && friendScore === "X") {
+    return { line: `Both stumped by today's puzzle.`, outcome: "tie" };
+  }
+  if (myScore === "X") {
+    return {
+      line: `${friendName} beat you — they got it in ${friendScore}/${MAX_GUESSES}.`,
+      outcome: "lose",
+    };
+  }
+  if (friendScore === "X") {
+    return {
+      line: `You beat ${friendName} — they didn't solve it.`,
+      outcome: "win",
+    };
+  }
+  if (myScore < friendScore) {
+    return {
+      line: `You beat ${friendName} by ${friendScore - myScore}!`,
+      outcome: "win",
+    };
+  }
+  if (myScore > friendScore) {
+    return {
+      line: `${friendName} beat you by ${myScore - friendScore}.`,
+      outcome: "lose",
+    };
+  }
+  return { line: `Tied with ${friendName}.`, outcome: "tie" };
+}
+
 function ResultModal({
   isWin,
   mystery,
   guesses,
   dayNumber,
   stats,
+  challenge,
   onClose,
 }: {
   isWin: boolean;
@@ -320,13 +364,21 @@ function ResultModal({
   guesses: GuessReveal[];
   dayNumber: number;
   stats: PardleStats | null;
+  challenge: ChallengePayload | null;
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [challengeCopied, setChallengeCopied] = useState(false);
   const shareText = useMemo(
     () => buildShareText(guesses, dayNumber, isWin),
     [guesses, dayNumber, isWin],
   );
+
+  const myScore: ChallengeScore = isWin ? guesses.length : "X";
+  const friendName = challenge?.challengerName || "your friend";
+  const versus = challenge
+    ? compareWithFriend(myScore, challenge.score, friendName)
+    : null;
 
   async function handleShare() {
     const nav = navigator as Navigator & {
@@ -346,6 +398,51 @@ function ResultModal({
       setTimeout(() => setCopied(false), 1600);
     } catch {
       setCopied(false);
+    }
+  }
+
+  async function handleChallenge() {
+    const existingName = loadChallengerName();
+    let name = existingName;
+    if (!name) {
+      const entered = window.prompt(
+        "What name should your friend see? (Optional — leave blank for none)",
+      );
+      if (entered !== null) {
+        const trimmed = entered.trim().slice(0, 30);
+        if (trimmed) {
+          saveChallengerName(trimmed);
+          name = trimmed;
+        }
+      }
+    }
+    const token = encodeChallenge({
+      dayNumber,
+      score: myScore,
+      challengerName: name || undefined,
+    });
+    const url = `${BRAND.url}/?c=${token}`;
+    const text = isWin
+      ? `I solved today's ${BRAND.name} in ${guesses.length}/${MAX_GUESSES}. Beat me: ${url}`
+      : `I couldn't crack today's ${BRAND.name}. Your turn: ${url}`;
+
+    const nav = navigator as Navigator & {
+      share?: (data: { text: string; url?: string }) => Promise<void>;
+    };
+    if (nav.share) {
+      try {
+        await nav.share({ text });
+        return;
+      } catch {
+        // fall through
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setChallengeCopied(true);
+      setTimeout(() => setChallengeCopied(false), 1800);
+    } catch {
+      setChallengeCopied(false);
     }
   }
 
@@ -386,6 +483,11 @@ function ResultModal({
             Better than {placeholderPercentile(guesses.length)}% of players
           </p>
         )}
+        {versus && (
+          <p className={`modal-versus modal-versus-${versus.outcome}`}>
+            {versus.line}
+          </p>
+        )}
         {stats && (
           <p className="modal-streak">
             <span aria-hidden="true">🔥</span> Streak: {stats.current}
@@ -395,7 +497,10 @@ function ResultModal({
           </p>
         )}
         <button className="modal-share" onClick={handleShare}>
-          {copied ? "Copied to clipboard!" : "Share result"}
+          {copied ? "Copied!" : "Share result"}
+        </button>
+        <button className="modal-challenge" onClick={handleChallenge}>
+          {challengeCopied ? "Challenge copied!" : "Challenge a friend"}
         </button>
       </div>
     </div>
@@ -410,19 +515,33 @@ export default function Page() {
   const [modalOpen, setModalOpen] = useState(false);
   const [stats, setStats] = useState<PardleStats | null>(null);
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [challenge, setChallenge] = useState<ChallengePayload | null>(null);
 
   const isWin = guesses.some((g) => g.isWin);
   const isLose = !isWin && guesses.length >= MAX_GUESSES;
   const isOver = isWin || isLose;
 
-  // Initialise stats and check whether we owe the player a tutorial
-  // — runs once on mount.
+  // Initialise stats, check tutorial, decode any incoming challenge link.
   useEffect(() => {
     setStats(applyMissedDayReset(dayNumber));
     if (!hasSeenTutorial()) {
       setTutorialOpen(true);
     }
+    try {
+      const code = new URLSearchParams(window.location.search).get("c");
+      if (code) {
+        const decoded = decodeChallenge(code);
+        if (decoded) setChallenge(decoded);
+      }
+    } catch {
+      // ignore — no challenge param
+    }
   }, [dayNumber]);
+
+  const challengeIsForToday =
+    challenge !== null && challenge.dayNumber === dayNumber;
+  const challengeIsExpired =
+    challenge !== null && challenge.dayNumber !== dayNumber;
 
   // Record the result and refresh streak the moment the game ends.
   useEffect(() => {
@@ -449,6 +568,24 @@ export default function Page() {
 
   return (
     <main className="container">
+      {challengeIsForToday && (
+        <div className="challenge-banner">
+          <span aria-hidden="true">🏌️</span>{" "}
+          <strong>{challenge?.challengerName || "A friend"}</strong> got
+          today&apos;s {BRAND.name} in{" "}
+          <strong>
+            {challenge?.score}/{MAX_GUESSES}
+          </strong>
+          . Beat them!
+        </div>
+      )}
+      {challengeIsExpired && (
+        <div className="challenge-banner challenge-expired">
+          That challenge link is from a different day — here&apos;s today&apos;s
+          puzzle.
+        </div>
+      )}
+
       <header className="brand">
         <button
           className="brand-help"
@@ -573,6 +710,7 @@ export default function Page() {
           guesses={guesses}
           dayNumber={dayNumber}
           stats={stats}
+          challenge={challengeIsForToday ? challenge : null}
           onClose={() => setModalOpen(false)}
         />
       )}

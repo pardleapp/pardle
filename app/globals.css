@@ -38,6 +38,36 @@ body {
   flex-direction: column;
 }
 
+.challenge-banner {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #78350f;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  text-align: center;
+  margin-bottom: 12px;
+  border: 1px solid rgba(180, 83, 9, 0.2);
+  line-height: 1.4;
+}
+
+.challenge-banner.challenge-expired {
+  background: rgba(120, 124, 126, 0.15);
+  color: var(--muted);
+  border-color: var(--border);
+}
+
+@media (prefers-color-scheme: dark) {
+  .challenge-banner {
+    background: linear-gradient(135deg, #4a3414 0%, #5c4519 100%);
+    color: #fde68a;
+    border-color: rgba(245, 158, 11, 0.3);
+  }
+  .challenge-banner.challenge-expired {
+    background: rgba(120, 124, 126, 0.15);
+    color: var(--muted);
+  }
+}
+
 .brand {
   text-align: center;
   margin-bottom: 20px;
@@ -994,6 +1024,31 @@ input[type=text]:focus {
   animation: modal-text-in 0.5s ease-out 1.7s both;
 }
 
+.modal-versus {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  letter-spacing: 0.2px;
+  animation: modal-text-in 0.5s ease-out 1.6s both;
+}
+
+.modal-versus-win {
+  background: rgba(123, 174, 63, 0.18);
+  color: #c8e6a4;
+}
+
+.modal-versus-lose {
+  background: rgba(220, 80, 80, 0.18);
+  color: #ffb4b4;
+}
+
+.modal-versus-tie {
+  background: rgba(232, 197, 71, 0.15);
+  color: #ffe28a;
+}
+
 .modal-share {
   background: var(--green);
   color: white;
@@ -1009,6 +1064,28 @@ input[type=text]:focus {
   letter-spacing: 0.5px;
   box-shadow: 0 8px 20px rgba(123, 174, 63, 0.4);
   animation: modal-text-in 0.5s ease-out 1.8s both;
+  margin-bottom: 8px;
+}
+
+.modal-challenge {
+  background: transparent;
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  padding: 11px 24px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+  letter-spacing: 0.3px;
+  animation: modal-text-in 0.5s ease-out 1.9s both;
+}
+
+.modal-challenge:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.7);
 }
 
 .modal-share:hover {
