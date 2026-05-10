@@ -16,36 +16,15 @@ const COLOR = {
   grey: "#5C6063",
 };
 
-type CellSpec = { state: "green" | "warm" | "yellow" | "grey"; arrow?: "up" | "down" };
+type CellState = "green" | "warm" | "yellow" | "grey";
 
-const ROWS: CellSpec[][] = [
-  [
-    { state: "grey" },
-    { state: "yellow", arrow: "up" },
-    { state: "grey" },
-    { state: "yellow", arrow: "down" },
-    { state: "grey" },
-    { state: "warm", arrow: "up" },
-  ],
-  [
-    { state: "warm", arrow: "up" },
-    { state: "green" },
-    { state: "grey" },
-    { state: "green" },
-    { state: "warm", arrow: "down" },
-    { state: "yellow", arrow: "up" },
-  ],
-  [
-    { state: "green" },
-    { state: "green" },
-    { state: "green" },
-    { state: "green" },
-    { state: "green" },
-    { state: "green" },
-  ],
+const ROWS: CellState[][] = [
+  ["grey", "yellow", "grey", "yellow", "grey", "warm"],
+  ["warm", "green", "grey", "green", "warm", "yellow"],
+  ["green", "green", "green", "green", "green", "green"],
 ];
 
-function cellColor(state: CellSpec["state"]): string {
+function cellColor(state: CellState): string {
   if (state === "green") return COLOR.green;
   if (state === "warm") return COLOR.warm;
   if (state === "yellow") return COLOR.yellow;
@@ -127,45 +106,34 @@ export default async function OpengraphImage() {
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: 12,
-            padding: 24,
+            gap: 10,
+            padding: 22,
             background: "rgba(255, 255, 255, 0.08)",
-            borderRadius: 22,
+            borderRadius: 20,
             transform: "rotate(3deg)",
           }}
         >
           {ROWS.map((row, rowIdx) => (
             <div
               key={rowIdx}
-              style={{ display: "flex", gap: 10 }}
+              style={{ display: "flex", gap: 8 }}
             >
               {row.map((cell, cellIdx) => (
                 <div
                   key={cellIdx}
                   style={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 8,
-                    background: cellColor(cell.state),
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 30,
-                    fontWeight: 900,
-                    color:
-                      cell.state === "yellow" || cell.state === "warm"
-                        ? "#1a1a1a"
-                        : "#ffffff",
+                    width: 64,
+                    height: 64,
+                    borderRadius: 7,
+                    background: cellColor(cell),
                   }}
-                >
-                  {cell.arrow === "up" ? "▲" : cell.arrow === "down" ? "▼" : ""}
-                </div>
+                />
               ))}
             </div>
           ))}
           <div
             style={{
-              marginTop: 8,
+              marginTop: 6,
               fontSize: 22,
               fontWeight: 700,
               color: "rgba(255, 255, 255, 0.85)",
