@@ -940,6 +940,15 @@ input[type=text]:focus {
   to { opacity: 1; transform: translateY(0); }
 }
 
+.modal-percentile {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffd64a;
+  margin-bottom: 6px;
+  letter-spacing: 0.2px;
+  animation: modal-text-in 0.5s ease-out 1.65s both;
+}
+
 .modal-streak {
   font-size: 13px;
   font-weight: 700;

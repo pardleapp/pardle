@@ -44,6 +44,22 @@ function stateToEmoji(state: CellState): string {
   return "⬛";
 }
 
+// Placeholder percentile mapping — these are static "feel-right" numbers
+// shown until we have a backend aggregating real per-puzzle stats.
+// TODO: replace with real percentile from Vercel KV (or similar) once wired.
+const PLACEHOLDER_PERCENTILE: Record<number, number> = {
+  1: 99,
+  2: 92,
+  3: 78,
+  4: 55,
+  5: 30,
+  6: 12,
+};
+
+function placeholderPercentile(guessCount: number): number | null {
+  return PLACEHOLDER_PERCENTILE[guessCount] ?? null;
+}
+
 function buildShareText(
   guesses: GuessReveal[],
   dayNumber: number,
@@ -364,6 +380,11 @@ function ResultModal({
             ? `Solved in ${guesses.length}/${MAX_GUESSES}`
             : `${MAX_GUESSES}/${MAX_GUESSES} — better luck tomorrow`}
         </p>
+        {isWin && placeholderPercentile(guesses.length) !== null && (
+          <p className="modal-percentile">
+            Better than {placeholderPercentile(guesses.length)}% of players
+          </p>
+        )}
         {stats && (
           <p className="modal-streak">
             <span aria-hidden="true">🔥</span> Streak: {stats.current}
