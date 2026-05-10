@@ -1,12 +1,11 @@
 /**
  * Mapbox Static Images URL builder. Used by the Holes game to fetch
- * satellite imagery for a given lat/lng/zoom. Token is a Mapbox public
- * token (`pk....`) injected at build time via NEXT_PUBLIC_MAPBOX_TOKEN.
+ * satellite imagery for a given lat/lng/zoom, optionally with an
+ * encoded polyline overlay tracing a hole's tee→green centreline.
  *
- * Free tier covers 50,000 requests/month — well above the traffic we
- * expect in validation. Cache headers are set by Mapbox itself, and
- * the URL is deterministic per coords/zoom so the browser/CDN cache
- * naturally dedupes repeat fetches.
+ * Token is a Mapbox public token (`pk....`) injected at build time
+ * via NEXT_PUBLIC_MAPBOX_TOKEN. Free tier covers 50,000 requests/
+ * month.
  *
  * If the token isn't set we return null so the UI can render a
  * friendly placeholder rather than a broken image.
@@ -18,26 +17,32 @@ export interface SatelliteRequest {
   lat: number;
   lng: number;
   zoom: number;
+  /** Mapbox auto-fits the image to this rectangle when provided. */
+  bbox?: [number, number, number, number];
+  /** Google polyline-encoded path overlaid on the satellite. */
+  path?: string;
+  /** Hex colour for the path (no leading '#'). Default: gold-yellow. */
+  pathColor?: string;
   width?: number;
   height?: number;
-  /** True for retina displays — doubles pixel density at the same dimensions. */
   retina?: boolean;
-  /** Bearing rotation in degrees (0-360). Default 0 (north up). */
-  bearing?: number;
 }
 
-export function mapboxStaticUrl({
-  lat,
-  lng,
-  zoom,
-  width = 640,
-  height = 640,
-  retina = true,
-  bearing = 0,
-}: SatelliteRequest): string | null {
+export function mapboxStaticUrl(req: SatelliteRequest): string | null {
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   if (!token) return null;
+  const width = req.width ?? 640;
+  const height = req.height ?? 640;
+  const retina = req.retina ?? true;
   const dims = `${width}x${height}${retina ? "@2x" : ""}`;
-  const camera = `${lng},${lat},${zoom},${bearing},0`;
-  return `https://api.mapbox.com/styles/v1/mapbox/${STYLE}/static/${camera}/${dims}?access_token=${token}&logo=false&attribution=false`;
+
+  const overlay = req.path
+    ? `path-4+${req.pathColor ?? "ffd64a"}-0.95(${encodeURIComponent(req.path)})/`
+    : "";
+
+  const camera = req.bbox
+    ? `[${req.bbox.join(",")}]`
+    : `${req.lng},${req.lat},${req.zoom},0,0`;
+
+  return `https://api.mapbox.com/styles/v1/mapbox/${STYLE}/static/${overlay}${camera}/${dims}?access_token=${token}&logo=false&attribution=false`;
 }

@@ -55,6 +55,8 @@ interface SatelliteCoords {
   lat: number;
   lng: number;
   zoom: number;
+  bbox?: [number, number, number, number];
+  path?: string;
 }
 
 function coordsForView(course: Course, difficulty: Difficulty): SatelliteCoords {
@@ -71,9 +73,18 @@ function coordsForView(course: Course, difficulty: Difficulty): SatelliteCoords 
       };
     }
     // Then OSM-derived coords for a real numbered hole on the property.
+    // When the OSM record includes a bbox + path (hole-line geometry),
+    // we use those so Mapbox auto-fits the whole hole and overlays the
+    // tee->green line in yellow.
     const osm = HOLE_COORDS[course.id];
     if (osm) {
-      return { lat: osm.lat, lng: osm.lng, zoom: osm.zoom };
+      return {
+        lat: osm.lat,
+        lng: osm.lng,
+        zoom: osm.zoom,
+        bbox: osm.bbox,
+        path: osm.path,
+      };
     }
     // Final fallback: zoom in on the Wikipedia centroid (often clubhouse-adjacent).
     return { lat: course.lat, lng: course.lng, zoom: 18 };
@@ -184,6 +195,8 @@ export default function HolesPage() {
       lat: view.lat,
       lng: view.lng,
       zoom: view.zoom,
+      bbox: view.bbox,
+      path: view.path,
       width: 600,
       height: 400,
     });
