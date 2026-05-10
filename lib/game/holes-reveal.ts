@@ -7,6 +7,7 @@ import type {
   HardCourseGuess,
   HardHoleGuess,
 } from "./holes-types";
+import { yardageFor } from "@/lib/data/course-yardage";
 
 const COMPASS: CompassDirection[] = [
   "N", "NE", "E", "SE", "S", "SW", "W", "NW",
@@ -98,20 +99,19 @@ export function revealHardCourseGuess(
   guess: Course,
   mystery: Course,
 ): HardCourseGuess {
+  const guessYardage = yardageFor(guess.id);
+  const mysteryYardage = yardageFor(mystery.id);
   return {
     course: guess,
     country: countryReveal(guess, mystery),
     par: numericReveal(guess.par, mystery.par, 0, 1, 2),
     direction: directionReveal(guess, mystery),
     courseType: courseTypeReveal(guess, mystery),
-    // Year founded: same windows as easy mode (green within 5, warm 15, yellow 40).
-    yearFounded: numericReveal(
-      guess.yearFounded,
-      mystery.yearFounded,
-      5,
-      15,
-      40,
-    ),
+    // Total yardage: green within 50, warm within 150, yellow within 400.
+    // Most championship courses are 6500-7900, so a 50-yard match is tight,
+    // 400 puts you in the same general length tier.
+    yardage: numericReveal(guessYardage, mysteryYardage, 50, 150, 400),
+    guessYardage,
     isCourseMatch: guess.id === mystery.id,
   };
 }

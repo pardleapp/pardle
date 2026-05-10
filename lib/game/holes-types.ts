@@ -75,7 +75,8 @@ export interface HardCourseGuess {
   par: AttributeReveal;
   direction: DirectionReveal;
   courseType: AttributeReveal;
-  yearFounded: AttributeReveal;
+  yardage: AttributeReveal;
+  guessYardage: number;
   isCourseMatch: boolean;
 }
 

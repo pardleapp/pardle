@@ -673,9 +673,9 @@ export default function HolesPage() {
                 <span>Direction</span>
                 <span>Type</span>
                 <span>
-                  Year
+                  Total
                   <br />
-                  built
+                  yards
                 </span>
               </div>
               {hardCourseGuesses.map((g, i) => (
@@ -703,9 +703,9 @@ export default function HolesPage() {
                     <span className={`cell cell-${g.courseType.state}`}>
                       {g.course.courseType}
                     </span>
-                    <span className={`cell cell-${g.yearFounded.state}`}>
-                      {g.course.yearFounded}
-                      <Arrow arrow={g.yearFounded.arrow} />
+                    <span className={`cell cell-${g.yardage.state}`}>
+                      {g.guessYardage}
+                      <Arrow arrow={g.yardage.arrow} />
                     </span>
                   </div>
                 </div>
