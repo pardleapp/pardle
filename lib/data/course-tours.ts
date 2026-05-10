@@ -1,10 +1,11 @@
-// Manual mapping of course id -> the major pro tours that course has
-// hosted regularly. Used to filter the daily puzzle pool in Holes.
+// Manual mapping of course id -> the major pro tours that course is
+// associated with for the Holes daily-puzzle filter.
 //
-// PGA = PGA Tour events (US-based tour, plus all four men's majors which
-//       are PGA Tour-sanctioned events)
-// DPW = DP World Tour (formerly European Tour) events, plus The Open
-//       Championship which is co-sanctioned
+// PGA = US-based PGA Tour event venues + US-hosted majors (US Open, PGA
+//       Championship, Players Championship, Masters)
+// DPW = DP World Tour (formerly European Tour) event venues + The Open
+//       Championship rota (which is co-sanctioned with the PGA Tour as a
+//       major, so Open courses also appear in the PGA filter)
 //
 // Courses not in this map appear in the "All" filter only — typically
 // destination resorts (Bandon, Cabot Cliffs) or Australasian / Asian Tour
@@ -13,14 +14,12 @@
 import type { Tour } from "@/lib/game/holes-types";
 
 export const COURSE_TOURS: Record<string, Tour[]> = {
-  // S tier — all major championship venues, hit both tours via the majors
+  // Masters — invitational major, technically both tours' players play it.
   "augusta-national-golf-club": ["PGA", "DPW"],
-  "old-course-at-st-andrews": ["PGA", "DPW"],
-  "pebble-beach-golf-links": ["PGA", "DPW"],
-  "tpc-sawgrass": ["PGA"],
-  "pinehurst-resort": ["PGA", "DPW"],
 
-  // The Open Championship rota — all major championship venues, both tours
+  // The Open Championship rota — major co-sanctioned with DP World Tour.
+  // Every Open venue appears in both filters.
+  "old-course-at-st-andrews": ["PGA", "DPW"],
   "royal-troon-golf-club": ["PGA", "DPW"],
   "carnoustie-golf-links": ["PGA", "DPW"],
   "muirfield": ["PGA", "DPW"],
@@ -31,23 +30,26 @@ export const COURSE_TOURS: Record<string, Tour[]> = {
   "royal-lytham-st-annes-golf-club": ["PGA", "DPW"],
   "trump-turnberry": ["PGA", "DPW"],
 
-  // US Open / PGA Championship venues — PGA Tour, plus majors trickle to DPW
-  "bethpage-state-park": ["PGA", "DPW"],
+  // US-based PGA Tour majors / signature events — PGA only.
+  // (Players sometimes count these for DPW points but they aren't DP World
+  // Tour course pedigree.)
+  "pebble-beach-golf-links": ["PGA"],
+  "tpc-sawgrass": ["PGA"],
+  "pinehurst-resort": ["PGA"],
+  "bethpage-state-park": ["PGA"],
   "cypress-point-club": ["PGA"],
-  "oakmont-country-club": ["PGA", "DPW"],
-  "shinnecock-hills-golf-club": ["PGA", "DPW"],
-  "winged-foot-golf-club": ["PGA", "DPW"],
-  "the-olympic-club": ["PGA", "DPW"],
-  "hazeltine-national-golf-club": ["PGA", "DPW"],
-  "medinah-country-club": ["PGA", "DPW"],
-  "valhalla-golf-club": ["PGA", "DPW"],
-  "merion-golf-club": ["PGA", "DPW"],
-  "baltusrol-golf-club": ["PGA", "DPW"],
-  "the-country-club": ["PGA", "DPW"],
-  "southern-hills-country-club": ["PGA", "DPW"],
+  "oakmont-country-club": ["PGA"],
+  "shinnecock-hills-golf-club": ["PGA"],
+  "winged-foot-golf-club": ["PGA"],
+  "the-olympic-club": ["PGA"],
+  "hazeltine-national-golf-club": ["PGA"],
+  "medinah-country-club": ["PGA"],
+  "valhalla-golf-club": ["PGA"],
+  "merion-golf-club": ["PGA"],
+  "baltusrol-golf-club": ["PGA"],
+  "the-country-club": ["PGA"],
+  "southern-hills-country-club": ["PGA"],
   "whistling-straits": ["PGA"],
-
-  // Active PGA Tour stops (non-major)
   "torrey-pines-golf-course": ["PGA"],
   "east-lake-golf-club": ["PGA"],
   "quail-hollow-club": ["PGA"],
@@ -55,15 +57,15 @@ export const COURSE_TOURS: Record<string, Tour[]> = {
   "riviera-country-club": ["PGA"],
   "olympia-fields-country-club": ["PGA"],
   "inverness-club": ["PGA"],
-  "erin-hills": ["PGA", "DPW"],
-  "chambers-bay": ["PGA", "DPW"],
+  "erin-hills": ["PGA"],
+  "chambers-bay": ["PGA"],
   "crooked-stick-golf-club": ["PGA"],
   "trump-national-doral-miami": ["PGA"],
   "pga-west": ["PGA"],
   "spyglass-hill-golf-course": ["PGA"],
   "pasatiempo-golf-club": ["PGA"],
 
-  // DP World Tour venues — European events, Irish / Scottish opens etc.
+  // DP World Tour-specific venues — European/Irish events.
   "wentworth-club": ["DPW"],
   "sunningdale-golf-club": ["DPW"],
   "le-golf-national": ["DPW"],

@@ -125,32 +125,28 @@ def hole_centroid(geometry: list[tuple[float, float]]) -> tuple[float, float]:
 
 
 def hole_bbox(geometry: list[tuple[float, float]]) -> list[float]:
-    """Return [minLng, minLat, maxLng, maxLat] padded so the surrounding
-    course is visible around the hole, not just the tee->green line.
+    """Return [minLng, minLat, maxLng, maxLat] focused on the green.
 
-    - 60% pad of the larger axis (so short par-3 lines don't render as
-      a tiny segment with mostly hazard/empty space around them).
-    - Minimum 0.0014 degrees (~150m) of padding on each axis as a floor
-      for very short holes.
-    - Forces the bbox to a near-square aspect since the rendered image
-      is 600x400 (1.5:1) — keeps a tall-thin hole from filling the frame
-      vertically and showing only sliver of fairway."""
-    lats = [p[0] for p in geometry]
-    lngs = [p[1] for p in geometry]
-    minLat, maxLat = min(lats), max(lats)
-    minLng, maxLng = min(lngs), max(lngs)
-    span = max(maxLat - minLat, maxLng - minLng)
-    pad = max(span * 0.6, 0.0014)
-    # Centre the bbox + expand symmetrically so the image isn't dominated
-    # by an unrelated water/forest neighbour.
-    cLat = (minLat + maxLat) / 2
-    cLng = (minLng + maxLng) / 2
-    half = span / 2 + pad
+    OSM hole geometries are tee->...->green polylines. Centring the bbox
+    on the geometry midpoint (previous approach) worked for short par-3s
+    but for long par-4/5 holes produced bboxes ~700-900m wide, large enough
+    to include neighbouring holes. Better: centre on the *green* (last
+    polyline point) with a fixed square radius. The green is the iconic
+    feature of every hole, so framing it centrally always reads as
+    "this is the hole", regardless of par.
+
+    Radius 0.0022 degrees ~= 245m → 490m total bbox side. A par-3 line
+    (~180m) fits comfortably with room to spare for context, a par-4
+    (~380m) shows the green + most of the approach, a par-5 (~500m)
+    shows the green + last portion of fairway with the tee just off-frame.
+    Players see consistent framing across all hole types."""
+    radius = 0.0022
+    green_lat, green_lng = geometry[-1]
     return [
-        round(cLng - half, 6),
-        round(cLat - half, 6),
-        round(cLng + half, 6),
-        round(cLat + half, 6),
+        round(green_lng - radius, 6),
+        round(green_lat - radius, 6),
+        round(green_lng + radius, 6),
+        round(green_lat + radius, 6),
     ]
 
 
