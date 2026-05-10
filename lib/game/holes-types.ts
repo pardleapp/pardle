@@ -3,6 +3,7 @@ import type { Continent, CellState, AttributeReveal } from "./types";
 export type CourseType =
   | "Links"
   | "Parkland"
+  | "Heathland"
   | "Stadium"
   | "Resort"
   | "Sandbelt";
