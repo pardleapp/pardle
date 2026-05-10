@@ -30,9 +30,9 @@ const GAMES: GameTile[] = [
   {
     href: "/holes",
     name: "Holes",
-    blurb: "Spot today's hole from a satellite view. Easy / medium / hard.",
+    blurb: "Identify today's golf course from a satellite view.",
     emoji: "🛰️",
-    status: "soon",
+    status: "live",
     accent: "#5BA0E0",
   },
   {
