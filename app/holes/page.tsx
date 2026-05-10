@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BRAND } from "@/lib/brand";
 import { COURSES } from "@/lib/data/courses";
+import { HOLE_COORDS } from "@/lib/data/hole-coords";
 import {
   type Course,
   type CourseGuessReveal,
@@ -58,6 +59,7 @@ interface SatelliteCoords {
 
 function coordsForView(course: Course, difficulty: Difficulty): SatelliteCoords {
   if (difficulty === "hard") {
+    // Hand-curated coords on the Course type win first.
     if (
       course.iconicHoleLat !== undefined &&
       course.iconicHoleLng !== undefined
@@ -68,10 +70,12 @@ function coordsForView(course: Course, difficulty: Difficulty): SatelliteCoords 
         zoom: course.iconicHoleZoom ?? 18,
       };
     }
-    // Fallback: same centroid, zoom in much further. Less specific than a
-    // hand-curated hole but still meaningfully harder than the easy view.
-    // Note: many courses' Wikipedia centroid is at the clubhouse, so this
-    // ends up showing clubhouse-adjacent holes rather than the iconic one.
+    // Then OSM-derived coords for a real numbered hole on the property.
+    const osm = HOLE_COORDS[course.id];
+    if (osm) {
+      return { lat: osm.lat, lng: osm.lng, zoom: osm.zoom };
+    }
+    // Final fallback: zoom in on the Wikipedia centroid (often clubhouse-adjacent).
     return { lat: course.lat, lng: course.lng, zoom: 18 };
   }
   return { lat: course.lat, lng: course.lng, zoom: course.zoom };
