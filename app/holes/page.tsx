@@ -21,7 +21,6 @@ import {
   revealHardCourseGuess,
   revealHardHoleGuess,
 } from "@/lib/game/holes-reveal";
-import { COURSE_WINNERS } from "@/lib/data/course-winners";
 import { mapboxStaticUrl } from "@/lib/mapbox";
 import {
   applyMissedDayReset,
@@ -384,12 +383,7 @@ export default function HolesPage() {
     if (isOver || hardCourseFound) return;
     setHardCourseGuesses((prev) => [
       ...prev,
-      revealHardCourseGuess(
-        course,
-        mystery,
-        COURSE_WINNERS[course.id],
-        COURSE_WINNERS[mystery.id],
-      ),
+      revealHardCourseGuess(course, mystery),
     ]);
     setHardCourseInput("");
   }
@@ -677,7 +671,7 @@ export default function HolesPage() {
                 <span>Country</span>
                 <span>Par</span>
                 <span>From your guess</span>
-                <span>Last winner</span>
+                <span>Type</span>
               </div>
               {hardCourseGuesses.map((g, i) => (
                 <div key={`hc-${i}`} className="guess">
@@ -701,19 +695,8 @@ export default function HolesPage() {
                         ? "✓"
                         : `${g.direction.bearing} ${g.direction.distanceMi}mi`}
                     </span>
-                    <span
-                      className={`cell ${
-                        g.lastWinner
-                          ? `cell-${g.lastWinner.state}`
-                          : "cell-info"
-                      }`}
-                      title={
-                        g.lastWinner
-                          ? COURSE_WINNERS[g.course.id] ?? "Not recorded"
-                          : "No record"
-                      }
-                    >
-                      {COURSE_WINNERS[g.course.id] ?? "—"}
+                    <span className={`cell cell-${g.courseType.state}`}>
+                      {g.course.courseType}
                     </span>
                   </div>
                 </div>

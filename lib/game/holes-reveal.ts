@@ -50,17 +50,6 @@ function directionReveal(guess: Course, mystery: Course): DirectionReveal {
   return { distanceMi: d, bearing: compassBearing(guess, mystery) };
 }
 
-function lastWinnerReveal(
-  guessWinner: string | undefined,
-  mysteryWinner: string | undefined,
-): AttributeReveal | null {
-  if (!mysteryWinner) return null;
-  if (!guessWinner) return { state: "grey", arrow: null };
-  return {
-    state: guessWinner === mysteryWinner ? "green" : "grey",
-    arrow: null,
-  };
-}
 
 function numericReveal(
   guessValue: number,
@@ -80,8 +69,16 @@ function numericReveal(
   return { state, arrow };
 }
 
+// For the Holes game we treat UK home nations (GB-ENG, GB-SCT, GB-WLS,
+// GB-NIR) as a single country: from a course-identification standpoint a
+// Scottish links shares more with an English links than with the rest of
+// Europe, and the visual signal "British Isles" is the useful one.
+function topLevelCountry(countryCode: string): string {
+  return countryCode.includes("-") ? countryCode.split("-")[0] : countryCode;
+}
+
 function countryReveal(guess: Course, mystery: Course): AttributeReveal {
-  if (guess.countryCode === mystery.countryCode) {
+  if (topLevelCountry(guess.countryCode) === topLevelCountry(mystery.countryCode)) {
     return { state: "green", arrow: null };
   }
   if (guess.continent === mystery.continent) {
@@ -100,15 +97,13 @@ function courseTypeReveal(guess: Course, mystery: Course): AttributeReveal {
 export function revealHardCourseGuess(
   guess: Course,
   mystery: Course,
-  guessWinner: string | undefined,
-  mysteryWinner: string | undefined,
 ): HardCourseGuess {
   return {
     course: guess,
     country: countryReveal(guess, mystery),
     par: numericReveal(guess.par, mystery.par, 0, 1, 2),
     direction: directionReveal(guess, mystery),
-    lastWinner: lastWinnerReveal(guessWinner, mysteryWinner),
+    courseType: courseTypeReveal(guess, mystery),
     isCourseMatch: guess.id === mystery.id,
   };
 }

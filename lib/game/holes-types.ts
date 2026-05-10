@@ -74,7 +74,7 @@ export interface HardCourseGuess {
   country: AttributeReveal;
   par: AttributeReveal;
   direction: DirectionReveal;
-  lastWinner: AttributeReveal | null;
+  courseType: AttributeReveal;
   isCourseMatch: boolean;
 }
 
