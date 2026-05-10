@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { BRAND } from "@/lib/brand";
 import { COURSES } from "@/lib/data/courses";
 import {
@@ -53,10 +53,8 @@ export default function HolesPage() {
   const dayNumber = useMemo(() => dayIndexToday() + 1, []);
   const [guesses, setGuesses] = useState<CourseGuessReveal[]>([]);
   const [input, setInput] = useState("");
-  const [satelliteUrl, setSatelliteUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSatelliteUrl(
+  const satelliteUrl = useMemo(
+    () =>
       mapboxStaticUrl({
         lat: mystery.lat,
         lng: mystery.lng,
@@ -64,8 +62,8 @@ export default function HolesPage() {
         width: 600,
         height: 400,
       }),
-    );
-  }, [mystery]);
+    [mystery],
+  );
 
   const isWin = guesses.some((g) => g.isWin);
   const isLose = !isWin && guesses.length >= HOLES_MAX_GUESSES;
