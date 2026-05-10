@@ -70,7 +70,9 @@ function coordsForView(course: Course, difficulty: Difficulty): SatelliteCoords 
     }
     // Fallback: same centroid, zoom in much further. Less specific than a
     // hand-curated hole but still meaningfully harder than the easy view.
-    return { lat: course.lat, lng: course.lng, zoom: 17 };
+    // Note: many courses' Wikipedia centroid is at the clubhouse, so this
+    // ends up showing clubhouse-adjacent holes rather than the iconic one.
+    return { lat: course.lat, lng: course.lng, zoom: 18 };
   }
   return { lat: course.lat, lng: course.lng, zoom: course.zoom };
 }
