@@ -38,6 +38,206 @@ body {
   flex-direction: column;
 }
 
+/* ---------- Hub home (/) ---------- */
+
+.hub {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 16px 48px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.hub-header {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.hub-wordmark {
+  font-size: 56px;
+  font-weight: 900;
+  letter-spacing: -2px;
+  line-height: 1;
+}
+
+.hub-subtitle {
+  font-size: 17px;
+  color: var(--muted);
+  margin-top: 8px;
+  letter-spacing: 0.3px;
+}
+
+.hub-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+@media (min-width: 640px) {
+  .hub-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.hub-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 18px 18px;
+  text-decoration: none;
+  color: var(--text);
+  position: relative;
+  transition: transform 0.15s ease-out, border-color 0.15s, box-shadow 0.15s;
+  overflow: hidden;
+}
+
+.hub-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: var(--accent);
+}
+
+.hub-card-live:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.hub-card-soon {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.hub-card-emoji {
+  font-size: 36px;
+  margin-bottom: 8px;
+  margin-top: 6px;
+}
+
+.hub-card-name {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  margin-bottom: 6px;
+}
+
+.hub-card-blurb {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+  margin-bottom: 14px;
+}
+
+.hub-card-cta {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.2px;
+  margin-top: auto;
+}
+
+.hub-card-status {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.05);
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-top: auto;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hub-card-status {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.hub-footer {
+  margin-top: auto;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  padding-top: 16px;
+}
+
+/* ---------- Coming-soon pages ---------- */
+
+.coming-soon {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.back-link {
+  align-self: flex-start;
+  font-size: 14px;
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 600;
+  margin-bottom: 32px;
+}
+
+.back-link:hover {
+  color: var(--green);
+}
+
+.coming-soon-emoji {
+  font-size: 84px;
+  margin-bottom: 18px;
+  margin-top: 32px;
+}
+
+.coming-soon h1 {
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  margin-bottom: 12px;
+}
+
+.coming-soon-tagline {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.coming-soon-blurb {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+  max-width: 380px;
+  margin-bottom: 36px;
+}
+
+.coming-soon-cta {
+  background: var(--green);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.coming-soon-cta:hover {
+  opacity: 0.9;
+}
+
 .challenge-banner {
   background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
   color: #78350f;
@@ -75,6 +275,30 @@ body {
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
   position: relative;
+}
+
+.brand-back {
+  position: absolute;
+  top: 8px;
+  left: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  border: 2px solid var(--border);
+  font-size: 18px;
+  font-weight: 700;
+  text-decoration: none;
+  line-height: 1;
+}
+
+.brand-back:hover {
+  color: var(--text);
+  border-color: var(--green);
 }
 
 .brand-help {
