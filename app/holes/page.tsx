@@ -342,7 +342,7 @@ export default function HolesPage() {
           ←
         </Link>
         <h1>{BRAND.name}</h1>
-        <p className="subtitle">Holes · Course #{dayNumber}</p>
+        <p className="subtitle">Holes · Day {dayNumber}</p>
         {stats && stats.current > 0 && (
           <div className="brand-streak" title={`Longest: ${stats.longest}`}>
             <span aria-hidden="true">🔥</span> {stats.current} day
