@@ -174,6 +174,17 @@ function Arrow({ arrow }: { arrow: AttributeReveal["arrow"] }) {
   return <span className="arrow">{arrow === "up" ? "▲" : "▼"}</span>;
 }
 
+const COMPASS_ARROWS: Record<string, string> = {
+  N: "↑",
+  NE: "↗",
+  E: "→",
+  SE: "↘",
+  S: "↓",
+  SW: "↙",
+  W: "←",
+  NW: "↖",
+};
+
 function stateToEmoji(state: CellState): string {
   if (state === "green") return "🟩";
   if (state === "warm" || state === "yellow") return "🟨";
@@ -693,12 +704,21 @@ export default function HolesPage() {
                       className={`cell ${
                         g.direction.distanceMi === 0
                           ? "cell-green"
-                          : "cell-info"
+                          : "cell-direction"
                       }`}
                     >
-                      {g.direction.distanceMi === 0
-                        ? "✓"
-                        : `${g.direction.bearing} ${g.direction.distanceMi}mi`}
+                      {g.direction.distanceMi === 0 ? (
+                        "✓"
+                      ) : (
+                        <span className="direction-content">
+                          <span className="direction-arrow">
+                            {COMPASS_ARROWS[g.direction.bearing ?? "N"]}
+                          </span>
+                          <span className="direction-miles">
+                            {g.direction.distanceMi.toLocaleString()} mi
+                          </span>
+                        </span>
+                      )}
                     </span>
                     <span className={`cell cell-${g.courseType.state}`}>
                       {g.course.courseType}

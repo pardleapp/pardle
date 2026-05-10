@@ -257,6 +257,40 @@ body {
   }
 }
 
+/* Direction cell: distinct steel-blue so it reads as "navigation info"
+   rather than the green/warm/yellow/grey win-state ladder. Stacks a
+   large compass arrow on top of the distance. */
+.cell-direction {
+  background: #3d6585;
+  color: white;
+  font-weight: 700;
+  padding: 4px 2px;
+}
+
+.direction-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  line-height: 1;
+}
+
+.direction-arrow {
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.direction-miles {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  opacity: 0.92;
+  line-height: 1;
+}
+
 .hard-phase-label {
   font-size: 12px;
   font-weight: 700;
