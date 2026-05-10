@@ -11,6 +11,13 @@ import {
   type GuessReveal,
   MAX_GUESSES,
 } from "@/lib/game/types";
+import {
+  applyMissedDayReset,
+  hasSeenTutorial,
+  markTutorialSeen,
+  type PardleStats,
+  recordResult,
+} from "@/lib/streak";
 
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 9);
 
@@ -235,17 +242,67 @@ function Confetti() {
   );
 }
 
+function TutorialModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="modal-overlay tutorial-overlay" onClick={onClose}>
+      <div className="tutorial-card" onClick={(e) => e.stopPropagation()}>
+        <button
+          className="modal-close"
+          onClick={onClose}
+          aria-label="Close"
+        >
+          ×
+        </button>
+        <h2 className="tutorial-title">How to play {BRAND.name}</h2>
+        <p className="tutorial-lead">
+          Guess today&apos;s mystery pro golfer in 6 tries.
+        </p>
+        <ul className="tutorial-list">
+          <li>
+            Each guess reveals match status on six attributes: country, age,
+            height, majors won, PGA Tour wins, and Ryder Cup appearances.
+          </li>
+          <li>
+            <span className="legend-cell legend-green" /> Green = exact
+            match.
+          </li>
+          <li>
+            <span className="legend-cell legend-warm" /> Lime + small arrow =
+            very close, with the arrow showing direction.
+          </li>
+          <li>
+            <span className="legend-cell legend-yellow" /> Yellow + arrow =
+            in the ballpark.
+          </li>
+          <li>
+            <span className="legend-cell legend-grey" /> Grey = far off.
+          </li>
+          <li>
+            New mystery golfer at midday local time. Solve every day to keep
+            your streak alive.
+          </li>
+        </ul>
+        <button className="tutorial-go" onClick={onClose}>
+          Let&apos;s play
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ResultModal({
   isWin,
   mystery,
   guesses,
   dayNumber,
+  stats,
   onClose,
 }: {
   isWin: boolean;
   mystery: Golfer;
   guesses: GuessReveal[];
   dayNumber: number;
+  stats: PardleStats | null;
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -307,6 +364,14 @@ function ResultModal({
             ? `Solved in ${guesses.length}/${MAX_GUESSES}`
             : `${MAX_GUESSES}/${MAX_GUESSES} — better luck tomorrow`}
         </p>
+        {stats && (
+          <p className="modal-streak">
+            <span aria-hidden="true">🔥</span> Streak: {stats.current}
+            {stats.longest > stats.current
+              ? ` · Best: ${stats.longest}`
+              : ""}
+          </p>
+        )}
         <button className="modal-share" onClick={handleShare}>
           {copied ? "Copied to clipboard!" : "Share result"}
         </button>
@@ -321,18 +386,30 @@ export default function Page() {
   const [guesses, setGuesses] = useState<GuessReveal[]>([]);
   const [input, setInput] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [stats, setStats] = useState<PardleStats | null>(null);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
 
   const isWin = guesses.some((g) => g.isWin);
   const isLose = !isWin && guesses.length >= MAX_GUESSES;
   const isOver = isWin || isLose;
 
-  // Auto-open the modal once when the game ends.
+  // Initialise stats and check whether we owe the player a tutorial
+  // — runs once on mount.
   useEffect(() => {
-    if (isOver) {
-      const t = setTimeout(() => setModalOpen(true), 350);
-      return () => clearTimeout(t);
+    setStats(applyMissedDayReset(dayNumber));
+    if (!hasSeenTutorial()) {
+      setTutorialOpen(true);
     }
-  }, [isOver]);
+  }, [dayNumber]);
+
+  // Record the result and refresh streak the moment the game ends.
+  useEffect(() => {
+    if (!isOver) return;
+    const updated = recordResult(dayNumber, isWin, guesses.length);
+    setStats(updated);
+    const t = setTimeout(() => setModalOpen(true), 350);
+    return () => clearTimeout(t);
+  }, [isOver, isWin, dayNumber, guesses.length]);
 
   const matches = useMemo(() => {
     const q = input.trim().toLowerCase();
@@ -351,8 +428,22 @@ export default function Page() {
   return (
     <main className="container">
       <header className="brand">
+        <button
+          className="brand-help"
+          onClick={() => setTutorialOpen(true)}
+          aria-label="How to play"
+          title="How to play"
+        >
+          ?
+        </button>
         <h1>{BRAND.name}</h1>
         <p className="subtitle">{BRAND.tagline}</p>
+        {stats && stats.current > 0 && (
+          <div className="brand-streak" title={`Longest: ${stats.longest}`}>
+            <span aria-hidden="true">🔥</span> {stats.current} day
+            {stats.current === 1 ? "" : "s"}
+          </div>
+        )}
       </header>
 
       <div className="grid">
@@ -459,7 +550,17 @@ export default function Page() {
           mystery={mystery}
           guesses={guesses}
           dayNumber={dayNumber}
+          stats={stats}
           onClose={() => setModalOpen(false)}
+        />
+      )}
+
+      {tutorialOpen && (
+        <TutorialModal
+          onClose={() => {
+            markTutorialSeen();
+            setTutorialOpen(false);
+          }}
         />
       )}
 

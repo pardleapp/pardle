@@ -42,8 +42,45 @@ body {
   text-align: center;
   margin-bottom: 20px;
   padding-top: 8px;
-  border-bottom: 1px solid var(--border);
   padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+.brand-help {
+  position: absolute;
+  top: 8px;
+  right: 4px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  border: 2px solid var(--border);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+}
+
+.brand-help:hover {
+  color: var(--text);
+  border-color: var(--green);
+}
+
+.brand-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px 12px;
+  background: rgba(232, 197, 71, 0.15);
+  color: #a8741a;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
 }
 
 h1 {
@@ -256,6 +293,102 @@ input[type=text]:focus {
   perspective: 1500px;
 }
 
+/* ---------- Tutorial modal (how to play) ---------- */
+
+.tutorial-overlay {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.tutorial-card {
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 14px;
+  padding: 24px 22px 22px;
+  max-width: 380px;
+  width: 100%;
+  text-align: left;
+  position: relative;
+  animation: modal-scale-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.tutorial-title {
+  font-size: 22px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.tutorial-lead {
+  font-size: 15px;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.tutorial-list {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tutorial-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.legend-cell {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.legend-green { background: var(--green); }
+.legend-warm { background: var(--warm); }
+.legend-yellow { background: var(--yellow); }
+.legend-grey { background: var(--grey); }
+
+.tutorial-go {
+  background: var(--green);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  font-family: inherit;
+}
+
+.tutorial-go:hover {
+  opacity: 0.9;
+}
+
+.tutorial-card .modal-close {
+  color: var(--muted);
+}
+
+.tutorial-card .modal-close:hover {
+  color: var(--text);
+}
+
+@media (prefers-color-scheme: dark) {
+  .tutorial-card {
+    background: #1f1f20;
+    color: white;
+  }
+}
+
 /* ---------- Player walker (cartoon character with real face) ---------- */
 
 .walker-stage {
@@ -465,6 +598,36 @@ input[type=text]:focus {
   to {
     transform: scaleX(0.86);
     opacity: 0.35;
+  }
+}
+
+/* Lose state: walker arrives without a celebratory hop and slumps slightly.
+   Override the bob animation and tilt the head down after arrival. */
+.modal-lose .walker-figure {
+  animation: walker-bob-sad 2.4s cubic-bezier(0.4, 0.05, 0.2, 1.02) forwards;
+}
+
+@keyframes walker-bob-sad {
+  0% { transform: translateY(0) rotate(0deg); }
+  10% { transform: translateY(-4px) rotate(-1deg); }
+  20% { transform: translateY(0) rotate(1deg); }
+  30% { transform: translateY(-4px) rotate(-1deg); }
+  40% { transform: translateY(0) rotate(1deg); }
+  50% { transform: translateY(-4px) rotate(-1deg); }
+  60% { transform: translateY(0) rotate(1deg); }
+  70% { transform: translateY(-4px) rotate(-1deg); }
+  78% { transform: translateY(0) rotate(0deg); }
+  /* No hop — just settle and slump forward */
+  100% { transform: translateY(2px) rotate(0deg); }
+}
+
+.modal-lose .walker-head {
+  animation: walker-head-slump 0.5s ease-out 1.95s forwards;
+}
+
+@keyframes walker-head-slump {
+  to {
+    transform: rotate(-14deg) translateY(4px);
   }
 }
 
@@ -777,6 +940,15 @@ input[type=text]:focus {
   to { opacity: 1; transform: translateY(0); }
 }
 
+.modal-streak {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 230, 120, 0.95);
+  margin-bottom: 16px;
+  letter-spacing: 0.3px;
+  animation: modal-text-in 0.5s ease-out 1.7s both;
+}
+
 .modal-share {
   background: var(--green);
   color: white;
@@ -791,7 +963,7 @@ input[type=text]:focus {
   transition: opacity 0.15s;
   letter-spacing: 0.5px;
   box-shadow: 0 8px 20px rgba(123, 174, 63, 0.4);
-  animation: modal-text-in 0.5s ease-out 1.75s both;
+  animation: modal-text-in 0.5s ease-out 1.8s both;
 }
 
 .modal-share:hover {
