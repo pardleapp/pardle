@@ -132,6 +132,128 @@ body {
   gap: 4px;
 }
 
+.guess-cells-5 {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.header-row-5 {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+  padding: 0 0 4px;
+}
+
+.header-row-5 span {
+  text-align: center;
+  align-self: center;
+  line-height: 1.15;
+}
+
+.hole-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+
+.selected-course-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(123, 174, 63, 0.15);
+  border: 2px solid var(--green);
+  border-radius: 8px;
+  padding: 0 6px 0 12px;
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.selected-course-name {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.selected-course-clear {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--green);
+  padding: 4px 6px;
+  line-height: 1;
+  font-family: inherit;
+}
+
+.selected-course-clear:hover {
+  color: #c62828;
+}
+
+.hole-input {
+  width: 84px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 12px 8px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  background: white;
+  color: var(--text);
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.hole-input::-webkit-outer-spin-button,
+.hole-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.hole-input:focus {
+  outline: none;
+  border-color: var(--green);
+}
+
+.hole-submit {
+  background: var(--green);
+  color: white;
+  border: none;
+  padding: 0 18px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0.4px;
+}
+
+.hole-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hole-input {
+    background: #1f1f20;
+    color: white;
+  }
+}
+
 .answer-card {
   background: rgba(123, 174, 63, 0.08);
   border: 2px solid var(--green);

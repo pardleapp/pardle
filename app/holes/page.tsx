@@ -144,6 +144,7 @@ function buildShareText(
         stateToEmoji(g.yearFounded.state),
         stateToEmoji(g.courseType.state),
         stateToEmoji(g.par.state),
+        stateToEmoji(g.hole.state),
       ].join(""),
     )
     .join("\n");
@@ -180,7 +181,9 @@ export default function HolesPage() {
   const mystery = useMemo(() => pickMysteryCourse(), []);
   const dayNumber = useMemo(() => dayIndexToday() + 1, []);
   const [guesses, setGuesses] = useState<CourseGuessReveal[]>([]);
-  const [input, setInput] = useState("");
+  const [courseInput, setCourseInput] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [holeInput, setHoleInput] = useState("");
   const [stats, setStats] = useState<PardleStats | null>(null);
   const [challenge, setChallenge] = useState<ChallengePayload | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
@@ -239,21 +242,36 @@ export default function HolesPage() {
   }, [isOver, isWin, dayNumber, guesses.length]);
 
   const matches = useMemo(() => {
-    const q = input.trim().toLowerCase();
+    const q = courseInput.trim().toLowerCase();
     if (!q) return [];
     return COURSES.filter(
       (c) =>
         c.name.toLowerCase().includes(q) ||
         c.shortName.toLowerCase().includes(q),
-    )
-      .filter((c) => !guesses.some((g) => g.course.id === c.id))
-      .slice(0, 6);
-  }, [input, guesses]);
+    ).slice(0, 6);
+  }, [courseInput]);
 
-  function submitGuess(course: Course) {
-    if (isOver) return;
-    setGuesses((prev) => [...prev, revealCourseGuess(course, mystery)]);
-    setInput("");
+  function chooseCourse(course: Course) {
+    setSelectedCourse(course);
+    setCourseInput("");
+  }
+
+  function clearCourse() {
+    setSelectedCourse(null);
+    setHoleInput("");
+  }
+
+  function submitGuess() {
+    if (isOver || !selectedCourse) return;
+    const holeNum = Number.parseInt(holeInput, 10);
+    if (!Number.isInteger(holeNum) || holeNum < 1 || holeNum > 18) return;
+    setGuesses((prev) => [
+      ...prev,
+      revealCourseGuess(selectedCourse, holeNum, mystery),
+    ]);
+    setSelectedCourse(null);
+    setCourseInput("");
+    setHoleInput("");
   }
 
   const challengeIsForToday =
@@ -412,7 +430,7 @@ export default function HolesPage() {
       </div>
 
       <div className="grid">
-        <div className="header-row">
+        <div className="header-row header-row-5">
           <span>Country</span>
           <span>
             Year
@@ -421,12 +439,15 @@ export default function HolesPage() {
           </span>
           <span>Type</span>
           <span>Par</span>
+          <span>Hole</span>
         </div>
 
         {guesses.map((g, i) => (
           <div key={i} className="guess">
-            <div className="guess-name">{g.course.shortName}</div>
-            <div className="guess-cells guess-cells-4">
+            <div className="guess-name">
+              {g.course.shortName} · #{g.holeGuessed}
+            </div>
+            <div className="guess-cells guess-cells-5">
               <span className={`cell cell-${g.country.state}`}>
                 {flagFor(g.course.countryCode)}
               </span>
@@ -441,6 +462,10 @@ export default function HolesPage() {
                 {g.course.par}
                 <Arrow arrow={g.par.arrow} />
               </span>
+              <span className={`cell cell-${g.hole.state}`}>
+                {g.holeGuessed}
+                <Arrow arrow={g.hole.arrow} />
+              </span>
             </div>
           </div>
         ))}
@@ -448,8 +473,8 @@ export default function HolesPage() {
         {Array.from({ length: HOLES_MAX_GUESSES - guesses.length }).map(
           (_, i) => (
             <div key={`empty-${i}`} className="guess empty-guess">
-              <div className="guess-cells guess-cells-4">
-                {Array.from({ length: 4 }).map((_, j) => (
+              <div className="guess-cells guess-cells-5">
+                {Array.from({ length: 5 }).map((_, j) => (
                   <span key={j} className="cell cell-empty" />
                 ))}
               </div>
@@ -458,12 +483,12 @@ export default function HolesPage() {
         )}
       </div>
 
-      {!isOver && (
+      {!isOver && !selectedCourse && (
         <div className="input-area">
           <input
             type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
+            value={courseInput}
+            onChange={(e) => setCourseInput(e.target.value)}
             placeholder="Type a course name..."
             autoComplete="off"
             autoCapitalize="words"
@@ -471,13 +496,57 @@ export default function HolesPage() {
           {matches.length > 0 && (
             <ul className="suggestions">
               {matches.map((c) => (
-                <li key={c.id} onClick={() => submitGuess(c)}>
+                <li key={c.id} onClick={() => chooseCourse(c)}>
                   {c.name}{" "}
                   <span className="suggestion-country">{c.country}</span>
                 </li>
               ))}
             </ul>
           )}
+        </div>
+      )}
+
+      {!isOver && selectedCourse && (
+        <div className="hole-input-row">
+          <div className="selected-course-pill">
+            <span className="selected-course-name">
+              {selectedCourse.shortName}
+            </span>
+            <button
+              type="button"
+              className="selected-course-clear"
+              onClick={clearCourse}
+              aria-label="Pick a different course"
+            >
+              ×
+            </button>
+          </div>
+          <input
+            className="hole-input"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={18}
+            value={holeInput}
+            onChange={(e) => setHoleInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitGuess();
+            }}
+            placeholder="Hole #"
+            autoFocus
+          />
+          <button
+            type="button"
+            className="hole-submit"
+            onClick={submitGuess}
+            disabled={
+              !holeInput ||
+              Number.parseInt(holeInput, 10) < 1 ||
+              Number.parseInt(holeInput, 10) > 18
+            }
+          >
+            Guess
+          </button>
         </div>
       )}
 

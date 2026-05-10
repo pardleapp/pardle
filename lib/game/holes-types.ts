@@ -45,10 +45,12 @@ export interface Course {
 
 export interface CourseGuessReveal {
   course: Course;
+  holeGuessed: number;
   country: AttributeReveal;
   yearFounded: AttributeReveal;
   courseType: AttributeReveal;
   par: AttributeReveal;
+  hole: AttributeReveal;
   isWin: boolean;
 }
 
