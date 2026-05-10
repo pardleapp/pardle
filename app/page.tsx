@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
@@ -29,8 +30,7 @@ const GAMES: GameTile[] = [
   {
     href: "/holes",
     name: "Holes",
-    blurb:
-      "Spot today's hole from a satellite view. Easy / medium / hard.",
+    blurb: "Spot today's hole from a satellite view. Easy / medium / hard.",
     emoji: "🛰️",
     status: "soon",
     accent: "#5BA0E0",
@@ -45,6 +45,25 @@ const GAMES: GameTile[] = [
   },
 ];
 
+function tileStyle(accent: string): CSSProperties {
+  return { "--accent": accent } as CSSProperties;
+}
+
+function CardBody({ game }: { game: GameTile }) {
+  return (
+    <>
+      <div className="hub-card-emoji">{game.emoji}</div>
+      <div className="hub-card-name">{game.name}</div>
+      <p className="hub-card-blurb">{game.blurb}</p>
+      {game.status === "live" ? (
+        <span className="hub-card-cta">Play today →</span>
+      ) : (
+        <span className="hub-card-status">Coming soon</span>
+      )}
+    </>
+  );
+}
+
 export default function HubHome() {
   return (
     <main className="hub">
@@ -54,37 +73,32 @@ export default function HubHome() {
       </header>
 
       <div className="hub-grid">
-        {GAMES.map((game) => {
-          const isLive = game.status === "live";
-          const Card = isLive ? Link : "div";
-          return (
-            <Card
+        {GAMES.map((game) =>
+          game.status === "live" ? (
+            <Link
               key={game.href}
-              {...(isLive ? { href: game.href } : {})}
-              className={`hub-card hub-card-${game.status}`}
-              style={
-                {
-                  "--accent": game.accent,
-                } as React.CSSProperties
-              }
+              href={game.href}
+              className="hub-card hub-card-live"
+              style={tileStyle(game.accent)}
             >
-              <div className="hub-card-emoji">{game.emoji}</div>
-              <div className="hub-card-name">{game.name}</div>
-              <p className="hub-card-blurb">{game.blurb}</p>
-              {isLive ? (
-                <span className="hub-card-cta">Play today →</span>
-              ) : (
-                <span className="hub-card-status">Coming soon</span>
-              )}
-            </Card>
-          );
-        })}
+              <CardBody game={game} />
+            </Link>
+          ) : (
+            <div
+              key={game.href}
+              className="hub-card hub-card-soon"
+              style={tileStyle(game.accent)}
+            >
+              <CardBody game={game} />
+            </div>
+          ),
+        )}
       </div>
 
       <footer className="hub-footer">
         <p>
-          {BRAND.domain} · A daily-puzzle hub for golf nerds. New games
-          rolling out.
+          {BRAND.domain} · A daily-puzzle hub for golf nerds. New games rolling
+          out.
         </p>
       </footer>
     </main>
