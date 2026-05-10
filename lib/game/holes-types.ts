@@ -12,6 +12,10 @@ export type CourseTier = "S" | "A" | "B" | "C";
 
 export type Difficulty = "easy" | "hard";
 
+export type Tour = "PGA" | "DPW";
+
+export type TourFilter = "all" | "PGA" | "DPW";
+
 export interface Course {
   id: string;
   name: string;

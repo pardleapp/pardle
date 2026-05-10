@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BRAND } from "@/lib/brand";
 import { COURSES } from "@/lib/data/courses";
+import { COURSE_TOURS } from "@/lib/data/course-tours";
 import { HOLE_COORDS } from "@/lib/data/hole-coords";
 import {
   type Course,
   type CourseGuessReveal,
   type Difficulty,
+  type TourFilter,
   HOLES_MAX_GUESSES,
 } from "@/lib/game/holes-types";
 import type { AttributeReveal, CellState } from "@/lib/game/types";
@@ -31,6 +33,35 @@ import {
 const GAME_ID = "holes";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 10);
 const DIFFICULTY_KEY = "pardle.holesDifficulty";
+const TOUR_FILTER_KEY = "pardle.holesTourFilter";
+
+function loadTourFilter(): TourFilter {
+  if (typeof window === "undefined") return "all";
+  try {
+    const stored = window.localStorage.getItem(TOUR_FILTER_KEY);
+    if (stored === "PGA" || stored === "DPW") return stored;
+    return "all";
+  } catch {
+    return "all";
+  }
+}
+
+function saveTourFilter(f: TourFilter): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(TOUR_FILTER_KEY, f);
+  } catch {
+    // ignore
+  }
+}
+
+function coursePool(filter: TourFilter): Course[] {
+  if (filter === "all") return COURSES;
+  return COURSES.filter((c) => {
+    const tours = COURSE_TOURS[c.id];
+    return tours?.includes(filter);
+  });
+}
 
 function loadDifficulty(): Difficulty {
   if (typeof window === "undefined") return "easy";
@@ -102,10 +133,12 @@ function dayIndexToday(): number {
   return Math.floor((today - LAUNCH_DATE_UTC) / (1000 * 60 * 60 * 24));
 }
 
-function pickMysteryCourse(): Course {
+function pickMysteryCourse(filter: TourFilter): Course {
+  const pool = coursePool(filter);
+  if (pool.length === 0) return COURSES[0];
   const dayIdx = dayIndexToday();
-  const safe = ((dayIdx % COURSES.length) + COURSES.length) % COURSES.length;
-  return COURSES[safe];
+  const safe = ((dayIdx % pool.length) + pool.length) % pool.length;
+  return pool[safe];
 }
 
 function flagFor(countryCode: string): string {
@@ -178,7 +211,8 @@ function compareWithFriend(
 }
 
 export default function HolesPage() {
-  const mystery = useMemo(() => pickMysteryCourse(), []);
+  const [tourFilter, setTourFilter] = useState<TourFilter>("all");
+  const mystery = useMemo(() => pickMysteryCourse(tourFilter), [tourFilter]);
   const dayNumber = useMemo(() => dayIndexToday() + 1, []);
   const [guesses, setGuesses] = useState<CourseGuessReveal[]>([]);
   const [courseInput, setCourseInput] = useState("");
@@ -212,6 +246,7 @@ export default function HolesPage() {
   useEffect(() => {
     setStats(applyMissedDayReset(GAME_ID, dayNumber));
     setDifficulty(loadDifficulty());
+    setTourFilter(loadTourFilter());
     try {
       const code = new URLSearchParams(window.location.search).get("c");
       if (code) {
@@ -236,6 +271,22 @@ export default function HolesPage() {
     saveDifficulty(d);
   }
 
+  function changeTourFilter(f: TourFilter) {
+    if (f === tourFilter) return;
+    if (guesses.length > 0 && !isOver) {
+      const ok = window.confirm(
+        "Switching tour filter changes today's puzzle. Reset and start over?",
+      );
+      if (!ok) return;
+      setGuesses([]);
+    }
+    setTourFilter(f);
+    saveTourFilter(f);
+    setSelectedCourse(null);
+    setCourseInput("");
+    setHoleInput("");
+  }
+
   useEffect(() => {
     if (!isOver) return;
     setStats(recordResult(GAME_ID, dayNumber, isWin, guesses.length));
@@ -244,12 +295,15 @@ export default function HolesPage() {
   const matches = useMemo(() => {
     const q = courseInput.trim().toLowerCase();
     if (!q) return [];
-    return COURSES.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.shortName.toLowerCase().includes(q),
-    ).slice(0, 6);
-  }, [courseInput]);
+    const pool = coursePool(tourFilter);
+    return pool
+      .filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.shortName.toLowerCase().includes(q),
+      )
+      .slice(0, 6);
+  }, [courseInput, tourFilter]);
 
   function chooseCourse(course: Course) {
     setSelectedCourse(course);
@@ -387,6 +441,33 @@ export default function HolesPage() {
           </div>
         )}
       </header>
+
+      <div className="tour-filter" role="tablist" aria-label="Tour filter">
+        <button
+          role="tab"
+          aria-selected={tourFilter === "all"}
+          className={`tour-filter-btn ${tourFilter === "all" ? "active" : ""}`}
+          onClick={() => changeTourFilter("all")}
+        >
+          All
+        </button>
+        <button
+          role="tab"
+          aria-selected={tourFilter === "PGA"}
+          className={`tour-filter-btn ${tourFilter === "PGA" ? "active" : ""}`}
+          onClick={() => changeTourFilter("PGA")}
+        >
+          PGA Tour
+        </button>
+        <button
+          role="tab"
+          aria-selected={tourFilter === "DPW"}
+          className={`tour-filter-btn ${tourFilter === "DPW" ? "active" : ""}`}
+          onClick={() => changeTourFilter("DPW")}
+        >
+          DP World
+        </button>
+      </div>
 
       <div className="difficulty-toggle" role="tablist" aria-label="Difficulty">
         <button
