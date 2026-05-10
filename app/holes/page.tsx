@@ -711,11 +711,11 @@ export default function HolesPage() {
                         "✓"
                       ) : (
                         <span className="direction-content">
-                          <span className="direction-arrow">
-                            {COMPASS_ARROWS[g.direction.bearing ?? "N"]}
-                          </span>
                           <span className="direction-miles">
                             {g.direction.distanceMi.toLocaleString()} mi
+                          </span>
+                          <span className="direction-arrow">
+                            {COMPASS_ARROWS[g.direction.bearing ?? "N"]}
                           </span>
                         </span>
                       )}
