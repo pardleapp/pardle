@@ -232,6 +232,7 @@ function PlayerWalker({ golfer }: { golfer: Golfer }) {
                 {flagFor(golfer.countryCode)}
               </div>
             )}
+            <div className="walker-tear" aria-hidden="true" />
           </div>
         </div>
       </div>

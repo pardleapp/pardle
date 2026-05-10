@@ -631,6 +631,42 @@ input[type=text]:focus {
   }
 }
 
+/* Comedic single tear that emerges and falls after the head slumps. */
+.walker-tear {
+  position: absolute;
+  top: 32%;
+  left: 28%;
+  width: 8px;
+  height: 13px;
+  border-radius: 50% 50% 50% 50% / 35% 35% 65% 65%;
+  background: linear-gradient(180deg, #a8d6f0 0%, #5ba0e0 60%, #3a78b8 100%);
+  box-shadow:
+    inset -1px -1px 2px rgba(255, 255, 255, 0.6),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.modal-lose .walker-tear {
+  animation: walker-tear 1.6s ease-in 2.2s forwards;
+}
+
+@keyframes walker-tear {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.4);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(48px) scale(0.7);
+  }
+}
+
 /* ---------- Trading card ---------- */
 
 .tcard {
