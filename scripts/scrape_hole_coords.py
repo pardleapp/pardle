@@ -124,19 +124,33 @@ def hole_centroid(geometry: list[tuple[float, float]]) -> tuple[float, float]:
     return (sum(lats) / len(lats), sum(lngs) / len(lngs))
 
 
-def hole_bbox(geometry: list[tuple[float, float]], pad_factor: float = 0.18) -> list[float]:
-    """Return [minLng, minLat, maxLng, maxLat] padded outward by pad_factor of each span."""
+def hole_bbox(geometry: list[tuple[float, float]]) -> list[float]:
+    """Return [minLng, minLat, maxLng, maxLat] padded so the surrounding
+    course is visible around the hole, not just the tee->green line.
+
+    - 60% pad of the larger axis (so short par-3 lines don't render as
+      a tiny segment with mostly hazard/empty space around them).
+    - Minimum 0.0014 degrees (~150m) of padding on each axis as a floor
+      for very short holes.
+    - Forces the bbox to a near-square aspect since the rendered image
+      is 600x400 (1.5:1) — keeps a tall-thin hole from filling the frame
+      vertically and showing only sliver of fairway."""
     lats = [p[0] for p in geometry]
     lngs = [p[1] for p in geometry]
     minLat, maxLat = min(lats), max(lats)
     minLng, maxLng = min(lngs), max(lngs)
-    lat_pad = max((maxLat - minLat) * pad_factor, 0.0003)
-    lng_pad = max((maxLng - minLng) * pad_factor, 0.0003)
+    span = max(maxLat - minLat, maxLng - minLng)
+    pad = max(span * 0.6, 0.0014)
+    # Centre the bbox + expand symmetrically so the image isn't dominated
+    # by an unrelated water/forest neighbour.
+    cLat = (minLat + maxLat) / 2
+    cLng = (minLng + maxLng) / 2
+    half = span / 2 + pad
     return [
-        round(minLng - lng_pad, 6),
-        round(minLat - lat_pad, 6),
-        round(maxLng + lng_pad, 6),
-        round(maxLat + lat_pad, 6),
+        round(cLng - half, 6),
+        round(cLat - half, 6),
+        round(cLng + half, 6),
+        round(cLat + half, 6),
     ]
 
 

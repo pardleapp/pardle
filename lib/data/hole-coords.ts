@@ -23,10 +23,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 12,
     "bbox": [
-      -82.023468,
-      33.494218,
-      -82.022108,
-      33.495934
+      -82.024746,
+      33.493118,
+      -82.02083,
+      33.497034
     ],
     "path": "ubmkE`_ssN|EvC"
   },
@@ -36,10 +36,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 17,
     "bbox": [
-      -81.391167,
-      30.193366,
-      -81.389876,
-      30.19493
+      -81.392404,
+      30.192266,
+      -81.38864,
+      30.19603
     ],
     "path": "mehwDrowoN_EhC"
   },
@@ -49,10 +49,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 18,
     "bbox": [
-      -2.821383,
-      56.041852,
-      -2.820654,
-      56.047046
+      -2.82522,
+      56.040247,
+      -2.816817,
+      56.048651
     ],
     "path": "wpauI|}ePzVX"
   },
@@ -62,10 +62,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 18,
     "bbox": [
-      -3.03938,
-      53.61823,
-      -3.032266,
-      53.62201
+      -3.041577,
+      53.614366,
+      -3.03007,
+      53.625873
     ],
     "path": "algfIfmpQ}HkNmFiP"
   },
@@ -75,10 +75,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 1,
     "bbox": [
-      -79.827467,
-      40.525207,
-      -79.82051,
-      40.52685
+      -79.829616,
+      40.520401,
+      -79.818362,
+      40.531655
     ],
     "path": "mcjvF|bffNmCsWaAkF"
   },
@@ -88,10 +88,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 18,
     "bbox": [
-      -72.443477,
-      40.894782,
-      -72.438701,
-      40.898529
+      -72.444953,
+      40.892792,
+      -72.437226,
+      40.900519
     ],
     "path": "u{rxFx~cyL|GyFv@m@lB}AjAoFTiA"
   },
@@ -101,10 +101,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 18,
     "bbox": [
-      -73.756183,
-      40.957301,
-      -73.754116,
-      40.962
+      -73.75895,
+      40.95585,
+      -73.751349,
+      40.963451
     ],
     "path": "sg_yFfmdaMpMiA`FyE"
   },
@@ -114,10 +114,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 10,
     "bbox": [
-      -118.501648,
-      34.045878,
-      -118.500159,
-      34.049068
+      -118.503484,
+      34.044892,
+      -118.498323,
+      34.050053
     ],
     "path": "acynElxgrUbJqDpB@"
   },
@@ -127,12 +127,25 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 17,
     "bbox": [
-      -88.050604,
-      41.959348,
-      -88.049694,
-      41.961474
+      -88.052312,
+      41.958248,
+      -88.047987,
+      41.962574
     ],
     "path": "yfb_GlglxOoH|@"
+  },
+  "valhalla-golf-club": {
+    "lat": 38.24026,
+    "lng": -85.47204,
+    "zoom": 18,
+    "holeShown": 18,
+    "bbox": [
+      -85.476172,
+      38.235464,
+      -85.467371,
+      38.244265
+    ],
+    "path": "sikhFjpthOiLrHmGXgBaB"
   },
   "merion-golf-club": {
     "lat": 40.00337,
@@ -140,25 +153,12 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 18,
     "bbox": [
-      -75.314143,
-      40.000854,
-      -75.312182,
-      40.006316
+      -75.317581,
+      39.999167,
+      -75.308745,
+      40.008003
     ],
     "path": "}qdsFnvtjMpOkCnGcC"
-  },
-  "the-country-club": {
-    "lat": 42.31401,
-    "lng": -71.14352,
-    "zoom": 18,
-    "holeShown": 17,
-    "bbox": [
-      -71.144174,
-      42.312272,
-      -71.14302,
-      42.316163
-    ],
-    "path": "ywgaGvdfqLxKlB`DcB"
   },
   "royal-aberdeen-golf-club": {
     "lat": 57.18183,
@@ -166,10 +166,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 8,
     "bbox": [
-      -2.083953,
-      57.181356,
-      -2.081362,
-      57.182313
+      -2.08501,
+      57.179482,
+      -2.080305,
+      57.184187
     ],
     "path": "qj_|ItquKdAzJ"
   },
@@ -179,10 +179,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 15,
     "bbox": [
-      -6.118665,
-      53.411654,
-      -6.116817,
-      53.413801
+      -6.119914,
+      53.410554,
+      -6.115568,
+      53.414901
     ],
     "path": "u__eI~vid@kHnFIF"
   },
@@ -192,10 +192,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 18,
     "bbox": [
-      -0.595133,
-      51.400776,
-      -0.58965,
-      51.404787
+      -0.596826,
+      51.398347,
+      -0.587957,
+      51.407216
     ],
     "path": "s{vxH`bsBxDoRrKuD"
   },
@@ -205,10 +205,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 18,
     "bbox": [
-      -0.630285,
-      51.38296,
-      -0.629022,
-      51.388406
+      -0.634059,
+      51.381278,
+      -0.625248,
+      51.390088
     ],
     "path": "_{rxHf|yBcMdAgF~@uBsA"
   },
@@ -218,25 +218,38 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 18,
     "bbox": [
-      -80.841277,
-      35.112703,
-      -80.838887,
-      35.117267
+      -80.843774,
+      35.111293,
+      -80.83639,
+      35.118677
     ],
     "path": "eaiuE~{klNmMtDoEhD"
   },
-  "olympia-fields-country-club": {
-    "lat": 41.52373,
-    "lng": -87.68468,
+  "inverness-club": {
+    "lat": 41.65071,
+    "lng": -83.64938,
     "zoom": 18,
     "holeShown": 18,
     "bbox": [
-      -87.686867,
-      41.521773,
-      -87.681871,
-      41.525874
+      -83.652988,
+      41.646864,
+      -83.645395,
+      41.654456
     ],
-    "path": "ilm|FxndvOdJjPrFrD"
+    "path": "uwe}Ftkp}N}CfM}AhF"
+  },
+  "erin-hills": {
+    "lat": 43.24459,
+    "lng": -88.40243,
+    "zoom": 18,
+    "holeShown": 18,
+    "bbox": [
+      -88.410378,
+      43.236634,
+      -88.394469,
+      43.252543
+    ],
+    "path": "af}fGvxqzOVqUKsU"
   },
   "chambers-bay": {
     "lat": 47.2036,
@@ -244,10 +257,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 1,
     "bbox": [
-      -122.580137,
-      47.202739,
-      -122.572293,
-      47.204327
+      -122.582559,
+      47.197189,
+      -122.569871,
+      47.209878
     ],
     "path": "_jb_HhbckVkChTy@vM"
   },
@@ -257,10 +270,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 18,
     "bbox": [
-      -86.196586,
-      39.943472,
-      -86.193342,
-      39.947648
+      -86.198342,
+      39.942182,
+      -86.191586,
+      39.948938
     ],
     "path": "cqxrF~dbmOgR}M"
   },
@@ -270,12 +283,25 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 18,
     "bbox": [
-      -116.264288,
-      33.643443,
-      -116.262211,
-      33.647934
+      -116.266882,
+      33.642056,
+      -116.259617,
+      33.649321
     ],
     "path": "{vjlE|xrdUnIcA`GuC`AmA"
+  },
+  "spyglass-hill-golf-course": {
+    "lat": 36.58486,
+    "lng": -121.95937,
+    "zoom": 18,
+    "holeShown": 1,
+    "bbox": [
+      -121.963969,
+      36.580012,
+      -121.955296,
+      36.588685
+    ],
+    "path": "{~g~El`kgV}Ma@mF~EgAtF"
   },
   "bandon-dunes-golf-resort": {
     "lat": 43.18682,
@@ -283,10 +309,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 16,
     "bbox": [
-      -124.4005,
-      43.185244,
-      -124.399125,
-      43.188899
+      -124.402768,
+      43.184116,
+      -124.396857,
+      43.190027
     ],
     "path": "sfrfG|xgvVdLo@rBxC"
   },
@@ -296,10 +322,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 18,
     "bbox": [
-      -61.302626,
-      46.236273,
-      -61.300739,
-      46.241324
+      -61.305768,
+      46.234713,
+      -61.297597,
+      46.242884
     ],
     "path": "ckfyGnzcuJhMlB|GrC"
   },
@@ -309,12 +335,25 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 18,
     "bbox": [
-      12.634546,
-      41.959529,
-      12.643458,
-      41.961479
+      12.631794,
+      41.953296,
+      12.64621,
+      41.967712
     ],
     "path": "}gb_GgedlAkEzQYrBg@~FDrB?xE"
+  },
+  "royal-cinque-ports-golf-club": {
+    "lat": 51.24176,
+    "lng": 1.39799,
+    "zoom": 18,
+    "holeShown": 18,
+    "bbox": [
+      1.393871,
+      51.237938,
+      1.401962,
+      51.246029
+    ],
+    "path": "{pwwHmapGrNdBjFmB"
   },
   "plainfield-country-club": {
     "lat": 40.59642,
@@ -322,10 +361,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 18,
     "bbox": [
-      -74.390057,
-      40.595497,
-      -74.385857,
-      40.597125
+      -74.391354,
+      40.592914,
+      -74.38456,
+      40.599708
     ],
     "path": "}_xvF`r_eMe@zKjElE"
   },
@@ -335,10 +374,10 @@ export const HOLE_COORDS: Record<string, HoleCoords> = {
     "zoom": 18,
     "holeShown": 18,
     "bbox": [
-      151.213141,
-      -33.922625,
-      151.215368,
-      -33.917026
+      151.209726,
+      -33.924354,
+      151.218783,
+      -33.915297
     ],
     "path": "vj`nEee}y[kJpCmHrD{CM"
   }
