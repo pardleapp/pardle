@@ -144,6 +144,21 @@ body {
   object-fit: cover;
 }
 
+/* Hard mode SVG illustration: yardage-book look. Slightly tinted frame
+   (deep green to match the SVG background) and a soft inner ring so the
+   art reads as a deliberate illustration, not a clipped satellite tile. */
+.hole-illustration-frame {
+  background: #143018;
+  border-color: #1f4524;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 6px 22px rgba(0, 0, 0, 0.28);
+}
+
+.hole-illustration-frame .satellite-image {
+  object-fit: contain;
+}
+
 .satellite-fallback {
   width: 100%;
   height: 100%;

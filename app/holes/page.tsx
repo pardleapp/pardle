@@ -6,6 +6,7 @@ import { BRAND } from "@/lib/brand";
 import { COURSES } from "@/lib/data/courses";
 import { COURSE_TOURS } from "@/lib/data/course-tours";
 import { HOLE_COORDS } from "@/lib/data/hole-coords";
+import { HOLE_SVG_IDS } from "@/lib/data/hole-svgs";
 import {
   type Course,
   type CourseGuessReveal,
@@ -66,12 +67,13 @@ function coursePool(filter: TourFilter, difficulty?: Difficulty): Course[] {
     filter === "all"
       ? COURSES
       : COURSES.filter((c) => COURSE_TOURS[c.id]?.includes(filter));
-  // Hard mode shows a specific hole highlighted on the satellite, which
-  // only works for courses with OSM polyline geometry. Filter the pool
-  // so we never pick a course that would fall back to a useless zoom-18
-  // centroid view (clubhouse roofs, parking lots, trees).
+  // Hard mode shows a clean single-hole illustration rendered from OSM
+  // polygons (fairway, green, bunkers, water) with the hole line drawn
+  // on top. We only have that for courses we've pre-rendered into
+  // public/holes/<id>.svg, so restrict the pool to keep every Hard mode
+  // puzzle high-quality and consistently framed.
   if (difficulty === "hard") {
-    pool = pool.filter((c) => HOLE_COORDS[c.id]?.path !== undefined);
+    pool = pool.filter((c) => HOLE_SVG_IDS.has(c.id));
   }
   return pool;
 }
@@ -281,7 +283,14 @@ export default function HolesPage() {
   const [shareCopied, setShareCopied] = useState(false);
   const [challengeCopied, setChallengeCopied] = useState(false);
 
-  const satelliteUrl = useMemo(() => {
+  // Hard mode: use the pre-rendered single-hole illustration (consistent
+  // framing, no neighbouring holes, no Mapbox cost).
+  // Easy mode: keep the Mapbox satellite — players need the whole course
+  // shape to spot fingerprint features (water, peninsula, dunes).
+  const imageUrl = useMemo(() => {
+    if (difficulty === "hard" && HOLE_SVG_IDS.has(mystery.id)) {
+      return `/holes/${mystery.id}.svg`;
+    }
     const view = coordsForView(mystery, difficulty);
     return mapboxStaticUrl({
       lat: view.lat,
@@ -615,17 +624,25 @@ export default function HolesPage() {
         </button>
       </div>
 
-      <div className="satellite-frame">
-        {satelliteUrl ? (
+      <div
+        className={`satellite-frame ${
+          difficulty === "hard" ? "hole-illustration-frame" : ""
+        }`}
+      >
+        {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={satelliteUrl}
-            alt="Satellite view of today's course"
+            src={imageUrl}
+            alt={
+              difficulty === "hard"
+                ? "Single-hole illustration of today's course"
+                : "Satellite view of today's course"
+            }
             className="satellite-image"
           />
         ) : (
           <div className="satellite-fallback">
-            <p>Satellite imagery unavailable.</p>
+            <p>Imagery unavailable.</p>
             <p className="satellite-fallback-note">
               Mapbox token missing or rate-limited.
             </p>
