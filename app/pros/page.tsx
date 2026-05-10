@@ -19,8 +19,6 @@ import {
   type PardleStats,
   recordResult,
 } from "@/lib/streak";
-
-const GAME_ID = "pros";
 import {
   type ChallengePayload,
   type ChallengeScore,
@@ -29,6 +27,8 @@ import {
   loadChallengerName,
   saveChallengerName,
 } from "@/lib/challenge";
+
+const GAME_ID = "pros";
 
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 9);
 
