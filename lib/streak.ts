@@ -1,4 +1,10 @@
-const KEY = "pardle.stats";
+/**
+ * Per-game streak + stats tracking, persisted in localStorage.
+ *
+ * Each game (pros, holes, …) keeps its own streak so playing Holes
+ * doesn't keep your Pros streak alive (and vice versa). Storage key
+ * is `pardle.stats.<game>`.
+ */
 
 export interface PardleStats {
   current: number;
@@ -18,10 +24,14 @@ const DEFAULT_STATS: PardleStats = {
   guessDistribution: {},
 };
 
-export function loadStats(): PardleStats {
+function statsKey(game: string): string {
+  return `pardle.stats.${game}`;
+}
+
+export function loadStats(game: string): PardleStats {
   if (typeof window === "undefined") return { ...DEFAULT_STATS };
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = window.localStorage.getItem(statsKey(game));
     if (!raw) return { ...DEFAULT_STATS };
     return { ...DEFAULT_STATS, ...JSON.parse(raw) };
   } catch {
@@ -29,43 +39,38 @@ export function loadStats(): PardleStats {
   }
 }
 
-function saveStats(stats: PardleStats): void {
+function saveStats(game: string, stats: PardleStats): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(stats));
+    window.localStorage.setItem(statsKey(game), JSON.stringify(stats));
   } catch {
     // localStorage full or disabled — fail silently
   }
 }
 
-/**
- * If the user missed one or more days since last playing, reset the streak.
- * Called on page load before any UI uses the streak.
- */
-export function applyMissedDayReset(currentDay: number): PardleStats {
-  const stats = loadStats();
+export function applyMissedDayReset(
+  game: string,
+  currentDay: number,
+): PardleStats {
+  const stats = loadStats(game);
   if (
     stats.lastPlayedDay !== null &&
     stats.lastPlayedDay < currentDay - 1 &&
     stats.current > 0
   ) {
     stats.current = 0;
-    saveStats(stats);
+    saveStats(game, stats);
   }
   return stats;
 }
 
-/**
- * Record the outcome of today's puzzle. Idempotent for the same day —
- * calling twice with the same dayNumber will not double-count.
- */
 export function recordResult(
+  game: string,
   currentDay: number,
   isWin: boolean,
   guessCount: number,
 ): PardleStats {
-  const stats = loadStats();
-
+  const stats = loadStats(game);
   if (stats.lastPlayedDay === currentDay) return stats;
 
   const isContinuation =
@@ -86,25 +91,54 @@ export function recordResult(
   stats.guessDistribution[distKey] =
     (stats.guessDistribution[distKey] ?? 0) + 1;
 
-  saveStats(stats);
+  saveStats(game, stats);
   return stats;
 }
 
-const TUTORIAL_KEY = "pardle.tutorialSeen";
+const TUTORIAL_KEY_PREFIX = "pardle.tutorialSeen.";
 
-export function hasSeenTutorial(): boolean {
+export function hasSeenTutorial(game: string): boolean {
   if (typeof window === "undefined") return true;
   try {
-    return window.localStorage.getItem(TUTORIAL_KEY) === "1";
+    return window.localStorage.getItem(TUTORIAL_KEY_PREFIX + game) === "1";
   } catch {
     return true;
   }
 }
 
-export function markTutorialSeen(): void {
+export function markTutorialSeen(game: string): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(TUTORIAL_KEY, "1");
+    window.localStorage.setItem(TUTORIAL_KEY_PREFIX + game, "1");
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * One-time migration: if an old `pardle.stats` blob exists from before the
+ * per-game key format, copy it into `pardle.stats.pros` so existing players
+ * don't lose their streak when the platform refactor lands.
+ */
+export function migrateLegacyStats(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const legacy = window.localStorage.getItem("pardle.stats");
+    if (!legacy) return;
+    const target = statsKey("pros");
+    if (window.localStorage.getItem(target)) {
+      // Already migrated — drop the legacy blob.
+      window.localStorage.removeItem("pardle.stats");
+      return;
+    }
+    window.localStorage.setItem(target, legacy);
+    window.localStorage.removeItem("pardle.stats");
+    // Same for the tutorial flag.
+    const legacyTutorial = window.localStorage.getItem("pardle.tutorialSeen");
+    if (legacyTutorial) {
+      window.localStorage.setItem(TUTORIAL_KEY_PREFIX + "pros", legacyTutorial);
+      window.localStorage.removeItem("pardle.tutorialSeen");
+    }
   } catch {
     // ignore
   }

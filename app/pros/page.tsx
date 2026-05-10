@@ -15,9 +15,12 @@ import {
   applyMissedDayReset,
   hasSeenTutorial,
   markTutorialSeen,
+  migrateLegacyStats,
   type PardleStats,
   recordResult,
 } from "@/lib/streak";
+
+const GAME_ID = "pros";
 import {
   type ChallengePayload,
   type ChallengeScore,
@@ -523,8 +526,9 @@ export default function Page() {
 
   // Initialise stats, check tutorial, decode any incoming challenge link.
   useEffect(() => {
-    setStats(applyMissedDayReset(dayNumber));
-    if (!hasSeenTutorial()) {
+    migrateLegacyStats();
+    setStats(applyMissedDayReset(GAME_ID, dayNumber));
+    if (!hasSeenTutorial(GAME_ID)) {
       setTutorialOpen(true);
     }
     try {
@@ -546,7 +550,7 @@ export default function Page() {
   // Record the result and refresh streak the moment the game ends.
   useEffect(() => {
     if (!isOver) return;
-    const updated = recordResult(dayNumber, isWin, guesses.length);
+    const updated = recordResult(GAME_ID, dayNumber, isWin, guesses.length);
     setStats(updated);
     const t = setTimeout(() => setModalOpen(true), 350);
     return () => clearTimeout(t);
@@ -721,7 +725,7 @@ export default function Page() {
       {tutorialOpen && (
         <TutorialModal
           onClose={() => {
-            markTutorialSeen();
+            markTutorialSeen(GAME_ID);
             setTutorialOpen(false);
           }}
         />

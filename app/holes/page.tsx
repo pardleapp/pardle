@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BRAND } from "@/lib/brand";
 import { COURSES } from "@/lib/data/courses";
 import {
@@ -9,10 +9,24 @@ import {
   type CourseGuessReveal,
   HOLES_MAX_GUESSES,
 } from "@/lib/game/holes-types";
-import type { AttributeReveal } from "@/lib/game/types";
+import type { AttributeReveal, CellState } from "@/lib/game/types";
 import { revealCourseGuess } from "@/lib/game/holes-reveal";
 import { mapboxStaticUrl } from "@/lib/mapbox";
+import {
+  applyMissedDayReset,
+  type PardleStats,
+  recordResult,
+} from "@/lib/streak";
+import {
+  type ChallengePayload,
+  type ChallengeScore,
+  decodeChallenge,
+  encodeChallenge,
+  loadChallengerName,
+  saveChallengerName,
+} from "@/lib/challenge";
 
+const GAME_ID = "holes";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 10);
 
 function dayIndexToday(): number {
@@ -48,11 +62,67 @@ function Arrow({ arrow }: { arrow: AttributeReveal["arrow"] }) {
   return <span className="arrow">{arrow === "up" ? "▲" : "▼"}</span>;
 }
 
+function stateToEmoji(state: CellState): string {
+  if (state === "green") return "🟩";
+  if (state === "warm" || state === "yellow") return "🟨";
+  return "⬛";
+}
+
+function buildShareText(
+  guesses: CourseGuessReveal[],
+  dayNumber: number,
+  won: boolean,
+): string {
+  const result = won ? `${guesses.length}/${HOLES_MAX_GUESSES}` : `X/${HOLES_MAX_GUESSES}`;
+  const grid = guesses
+    .map((g) =>
+      [
+        stateToEmoji(g.country.state),
+        stateToEmoji(g.yearFounded.state),
+        stateToEmoji(g.courseType.state),
+        stateToEmoji(g.par.state),
+      ].join(""),
+    )
+    .join("\n");
+  return `${BRAND.name}: Holes #${dayNumber} ${result}\n${grid}\n${BRAND.domain}/holes`;
+}
+
+function compareWithFriend(
+  myScore: ChallengeScore,
+  friendScore: ChallengeScore,
+  friendName: string,
+): { line: string; outcome: "win" | "lose" | "tie" } {
+  if (myScore === "X" && friendScore === "X") {
+    return { line: `Both stumped today.`, outcome: "tie" };
+  }
+  if (myScore === "X") {
+    return {
+      line: `${friendName} got it in ${friendScore}/${HOLES_MAX_GUESSES} — beat them tomorrow.`,
+      outcome: "lose",
+    };
+  }
+  if (friendScore === "X") {
+    return { line: `You beat ${friendName} — they didn't solve it.`, outcome: "win" };
+  }
+  if (myScore < friendScore) {
+    return { line: `You beat ${friendName} by ${friendScore - myScore}!`, outcome: "win" };
+  }
+  if (myScore > friendScore) {
+    return { line: `${friendName} beat you by ${myScore - friendScore}.`, outcome: "lose" };
+  }
+  return { line: `Tied with ${friendName}.`, outcome: "tie" };
+}
+
 export default function HolesPage() {
   const mystery = useMemo(() => pickMysteryCourse(), []);
   const dayNumber = useMemo(() => dayIndexToday() + 1, []);
   const [guesses, setGuesses] = useState<CourseGuessReveal[]>([]);
   const [input, setInput] = useState("");
+  const [stats, setStats] = useState<PardleStats | null>(null);
+  const [challenge, setChallenge] = useState<ChallengePayload | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [challengeCopied, setChallengeCopied] = useState(false);
+
   const satelliteUrl = useMemo(
     () =>
       mapboxStaticUrl({
@@ -68,6 +138,24 @@ export default function HolesPage() {
   const isWin = guesses.some((g) => g.isWin);
   const isLose = !isWin && guesses.length >= HOLES_MAX_GUESSES;
   const isOver = isWin || isLose;
+
+  useEffect(() => {
+    setStats(applyMissedDayReset(GAME_ID, dayNumber));
+    try {
+      const code = new URLSearchParams(window.location.search).get("c");
+      if (code) {
+        const decoded = decodeChallenge(code);
+        if (decoded) setChallenge(decoded);
+      }
+    } catch {
+      // ignore — no challenge param
+    }
+  }, [dayNumber]);
+
+  useEffect(() => {
+    if (!isOver) return;
+    setStats(recordResult(GAME_ID, dayNumber, isWin, guesses.length));
+  }, [isOver, isWin, dayNumber, guesses.length]);
 
   const matches = useMemo(() => {
     const q = input.trim().toLowerCase();
@@ -87,14 +175,118 @@ export default function HolesPage() {
     setInput("");
   }
 
+  const challengeIsForToday =
+    challenge !== null && challenge.dayNumber === dayNumber;
+  const challengeIsExpired =
+    challenge !== null && challenge.dayNumber !== dayNumber;
+
+  const myScore: ChallengeScore = isWin ? guesses.length : "X";
+  const versus =
+    challengeIsForToday && isOver && challenge
+      ? compareWithFriend(
+          myScore,
+          challenge.score,
+          challenge.challengerName || "your friend",
+        )
+      : null;
+
+  async function handleShare() {
+    const shareText = buildShareText(guesses, dayNumber, isWin);
+    const nav = navigator as Navigator & {
+      share?: (data: { text: string }) => Promise<void>;
+    };
+    if (nav.share) {
+      try {
+        await nav.share({ text: shareText });
+        return;
+      } catch {
+        // fall through
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 1600);
+    } catch {
+      setShareCopied(false);
+    }
+  }
+
+  async function handleChallenge() {
+    let name = loadChallengerName();
+    if (!name) {
+      const entered = window.prompt(
+        "What name should your friend see? (Optional)",
+      );
+      if (entered !== null) {
+        const trimmed = entered.trim().slice(0, 30);
+        if (trimmed) {
+          saveChallengerName(trimmed);
+          name = trimmed;
+        }
+      }
+    }
+    const token = encodeChallenge({
+      dayNumber,
+      score: myScore,
+      challengerName: name || undefined,
+    });
+    const url = `${BRAND.url}/holes?c=${token}`;
+    const text = isWin
+      ? `I solved today's ${BRAND.name}: Holes in ${guesses.length}/${HOLES_MAX_GUESSES}. Beat me: ${url}`
+      : `I couldn't crack today's ${BRAND.name}: Holes. Your turn: ${url}`;
+    const nav = navigator as Navigator & {
+      share?: (data: { text: string }) => Promise<void>;
+    };
+    if (nav.share) {
+      try {
+        await nav.share({ text });
+        return;
+      } catch {
+        // fall through
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setChallengeCopied(true);
+      setTimeout(() => setChallengeCopied(false), 1800);
+    } catch {
+      setChallengeCopied(false);
+    }
+  }
+
   return (
     <main className="container">
+      {challengeIsForToday && (
+        <div className="challenge-banner">
+          <span aria-hidden="true">🛰️</span>{" "}
+          <strong>{challenge?.challengerName || "A friend"}</strong> got
+          today&apos;s Holes in{" "}
+          <strong>
+            {challenge?.score}/{HOLES_MAX_GUESSES}
+          </strong>
+          . Beat them!
+        </div>
+      )}
+      {challengeIsExpired && (
+        <div className="challenge-banner challenge-expired">
+          That challenge link is from a different day — here&apos;s today&apos;s
+          puzzle.
+        </div>
+      )}
+
       <header className="brand">
         <Link className="brand-back" href="/" aria-label="All games">
           ←
         </Link>
         <h1>{BRAND.name}</h1>
-        <p className="subtitle">Holes · Guess the course #{dayNumber}</p>
+        <p className="subtitle">Holes · Course #{dayNumber}</p>
+        {stats && stats.current > 0 && (
+          <div className="brand-streak" title={`Longest: ${stats.longest}`}>
+            <span aria-hidden="true">🔥</span> {stats.current} day
+            {stats.current === 1 ? "" : "s"}
+          </div>
+        )}
       </header>
 
       <div className="satellite-frame">
@@ -201,6 +393,30 @@ export default function HolesPage() {
             Iconic hole: <strong>#{mystery.iconicHole}</strong>
             {mystery.iconicHoleNote ? ` — ${mystery.iconicHoleNote}` : ""}
           </p>
+
+          {versus && (
+            <p className={`modal-versus modal-versus-${versus.outcome}`}>
+              {versus.line}
+            </p>
+          )}
+
+          {stats && (
+            <p className="answer-card-streak">
+              <span aria-hidden="true">🔥</span> Streak: {stats.current}
+              {stats.longest > stats.current
+                ? ` · Best: ${stats.longest}`
+                : ""}
+            </p>
+          )}
+
+          <div className="answer-buttons">
+            <button className="answer-share" onClick={handleShare}>
+              {shareCopied ? "Copied!" : "Share result"}
+            </button>
+            <button className="answer-challenge" onClick={handleChallenge}>
+              {challengeCopied ? "Challenge copied!" : "Challenge a friend"}
+            </button>
+          </div>
         </div>
       )}
 

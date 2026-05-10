@@ -115,6 +115,60 @@ body {
   font-size: 13px;
   color: var(--text);
   font-style: italic;
+  margin-bottom: 12px;
+}
+
+.answer-card-streak {
+  font-size: 13px;
+  font-weight: 700;
+  color: #a8741a;
+  margin-bottom: 14px;
+  letter-spacing: 0.3px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .answer-card-streak {
+    color: #ffd64a;
+  }
+}
+
+.answer-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.answer-share,
+.answer-challenge {
+  border: none;
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0.3px;
+}
+
+.answer-share {
+  background: var(--green);
+  color: white;
+  box-shadow: 0 4px 12px rgba(123, 174, 63, 0.35);
+}
+
+.answer-share:hover {
+  opacity: 0.92;
+}
+
+.answer-challenge {
+  background: transparent;
+  color: var(--green);
+  border: 2px solid var(--green);
+}
+
+.answer-challenge:hover {
+  background: rgba(123, 174, 63, 0.1);
 }
 
 /* ---------- Hub home (/) ---------- */
