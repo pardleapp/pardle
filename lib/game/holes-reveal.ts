@@ -1,5 +1,66 @@
 import type { AttributeReveal, CellState } from "./types";
-import type { Course, CourseGuessReveal } from "./holes-types";
+import type {
+  CompassDirection,
+  Course,
+  CourseGuessReveal,
+  DirectionReveal,
+  HardCourseGuess,
+  HardHoleGuess,
+} from "./holes-types";
+
+const COMPASS: CompassDirection[] = [
+  "N", "NE", "E", "SE", "S", "SW", "W", "NW",
+];
+
+function distanceMi(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): number {
+  const R = 3958.8; // Earth radius in miles
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(h)));
+}
+
+function compassBearing(
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number },
+): CompassDirection {
+  const dLng = ((to.lng - from.lng) * Math.PI) / 180;
+  const fromLat = (from.lat * Math.PI) / 180;
+  const toLat = (to.lat * Math.PI) / 180;
+  const x = Math.sin(dLng) * Math.cos(toLat);
+  const y =
+    Math.cos(fromLat) * Math.sin(toLat) -
+    Math.sin(fromLat) * Math.cos(toLat) * Math.cos(dLng);
+  const deg = ((Math.atan2(x, y) * 180) / Math.PI + 360) % 360;
+  return COMPASS[Math.round(deg / 45) % 8];
+}
+
+function directionReveal(guess: Course, mystery: Course): DirectionReveal {
+  const d = distanceMi(guess, mystery);
+  if (d === 0 || guess.id === mystery.id) {
+    return { distanceMi: 0, bearing: null };
+  }
+  return { distanceMi: d, bearing: compassBearing(guess, mystery) };
+}
+
+function lastWinnerReveal(
+  guessWinner: string | undefined,
+  mysteryWinner: string | undefined,
+): AttributeReveal | null {
+  if (!mysteryWinner) return null;
+  if (!guessWinner) return { state: "grey", arrow: null };
+  return {
+    state: guessWinner === mysteryWinner ? "green" : "grey",
+    arrow: null,
+  };
+}
 
 function numericReveal(
   guessValue: number,
@@ -34,6 +95,33 @@ function courseTypeReveal(guess: Course, mystery: Course): AttributeReveal {
     return { state: "green", arrow: null };
   }
   return { state: "grey", arrow: null };
+}
+
+export function revealHardCourseGuess(
+  guess: Course,
+  mystery: Course,
+  guessWinner: string | undefined,
+  mysteryWinner: string | undefined,
+): HardCourseGuess {
+  return {
+    course: guess,
+    country: countryReveal(guess, mystery),
+    par: numericReveal(guess.par, mystery.par, 0, 1, 2),
+    direction: directionReveal(guess, mystery),
+    lastWinner: lastWinnerReveal(guessWinner, mysteryWinner),
+    isCourseMatch: guess.id === mystery.id,
+  };
+}
+
+export function revealHardHoleGuess(
+  holeGuessed: number,
+  mysteryHole: number,
+): HardHoleGuess {
+  return {
+    holeGuessed,
+    hole: numericReveal(holeGuessed, mysteryHole, 0, 1, 3),
+    isHoleMatch: holeGuessed === mysteryHole,
+  };
 }
 
 export function revealCourseGuess(

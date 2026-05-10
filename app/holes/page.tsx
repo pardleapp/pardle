@@ -10,11 +10,18 @@ import {
   type Course,
   type CourseGuessReveal,
   type Difficulty,
+  type HardCourseGuess,
+  type HardHoleGuess,
   type TourFilter,
   HOLES_MAX_GUESSES,
 } from "@/lib/game/holes-types";
 import type { AttributeReveal, CellState } from "@/lib/game/types";
-import { revealCourseGuess } from "@/lib/game/holes-reveal";
+import {
+  revealCourseGuess,
+  revealHardCourseGuess,
+  revealHardHoleGuess,
+} from "@/lib/game/holes-reveal";
+import { COURSE_WINNERS } from "@/lib/data/course-winners";
 import { mapboxStaticUrl } from "@/lib/mapbox";
 import {
   applyMissedDayReset,
@@ -224,10 +231,17 @@ export default function HolesPage() {
   const [tourFilter, setTourFilter] = useState<TourFilter>("all");
   const mystery = useMemo(() => pickMysteryCourse(tourFilter), [tourFilter]);
   const dayNumber = useMemo(() => dayIndexToday() + 1, []);
+  // Easy mode guesses (course + hole as one pair, current behavior).
   const [guesses, setGuesses] = useState<CourseGuessReveal[]>([]);
   const [courseInput, setCourseInput] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [holeInput, setHoleInput] = useState("");
+  // Hard mode guesses — split into two phases. Once a hard course guess
+  // matches, we flip to the hole phase and the player narrows on holes.
+  const [hardCourseGuesses, setHardCourseGuesses] = useState<HardCourseGuess[]>([]);
+  const [hardHoleGuesses, setHardHoleGuesses] = useState<HardHoleGuess[]>([]);
+  const [hardCourseInput, setHardCourseInput] = useState("");
+  const [hardHoleInput, setHardHoleInput] = useState("");
   const [stats, setStats] = useState<PardleStats | null>(null);
   const [challenge, setChallenge] = useState<ChallengePayload | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
@@ -249,9 +263,24 @@ export default function HolesPage() {
     });
   }, [mystery, difficulty]);
 
-  const isWin = guesses.some((g) => g.isWin);
-  const isLose = !isWin && guesses.length >= HOLES_MAX_GUESSES;
+  // Easy mode win/lose
+  const easyWin = guesses.some((g) => g.isWin);
+  const easyLose = !easyWin && guesses.length >= HOLES_MAX_GUESSES;
+
+  // Hard mode: course phase is "done" once a match lands. Then hole phase.
+  const hardCourseFound = hardCourseGuesses.some((g) => g.isCourseMatch);
+  const hardHoleFound = hardHoleGuesses.some((g) => g.isHoleMatch);
+  const hardGuessesUsed =
+    hardCourseGuesses.length + hardHoleGuesses.length;
+  const hardWin = hardCourseFound && hardHoleFound;
+  const hardLose = !hardWin && hardGuessesUsed >= HOLES_MAX_GUESSES;
+
+  const isWin = difficulty === "hard" ? hardWin : easyWin;
+  const isLose = difficulty === "hard" ? hardLose : easyLose;
   const isOver = isWin || isLose;
+  // For backwards-compatible streak/share — score = guess count used.
+  const scoreCount =
+    difficulty === "hard" ? hardGuessesUsed : guesses.length;
 
   useEffect(() => {
     setStats(applyMissedDayReset(GAME_ID, dayNumber));
@@ -268,14 +297,30 @@ export default function HolesPage() {
     }
   }, [dayNumber]);
 
+  function resetAllGameState() {
+    setGuesses([]);
+    setSelectedCourse(null);
+    setCourseInput("");
+    setHoleInput("");
+    setHardCourseGuesses([]);
+    setHardHoleGuesses([]);
+    setHardCourseInput("");
+    setHardHoleInput("");
+  }
+
+  const hasActiveGuesses =
+    guesses.length > 0 ||
+    hardCourseGuesses.length > 0 ||
+    hardHoleGuesses.length > 0;
+
   function changeDifficulty(d: Difficulty) {
     if (d === difficulty) return;
-    if (guesses.length > 0 && !isOver) {
+    if (hasActiveGuesses && !isOver) {
       const ok = window.confirm(
         "Switching difficulty mid-puzzle will reset your guesses. Continue?",
       );
       if (!ok) return;
-      setGuesses([]);
+      resetAllGameState();
     }
     setDifficulty(d);
     saveDifficulty(d);
@@ -283,24 +328,21 @@ export default function HolesPage() {
 
   function changeTourFilter(f: TourFilter) {
     if (f === tourFilter) return;
-    if (guesses.length > 0 && !isOver) {
+    if (hasActiveGuesses && !isOver) {
       const ok = window.confirm(
         "Switching tour filter changes today's puzzle. Reset and start over?",
       );
       if (!ok) return;
-      setGuesses([]);
     }
+    resetAllGameState();
     setTourFilter(f);
     saveTourFilter(f);
-    setSelectedCourse(null);
-    setCourseInput("");
-    setHoleInput("");
   }
 
   useEffect(() => {
     if (!isOver) return;
-    setStats(recordResult(GAME_ID, dayNumber, isWin, guesses.length));
-  }, [isOver, isWin, dayNumber, guesses.length]);
+    setStats(recordResult(GAME_ID, dayNumber, isWin, scoreCount));
+  }, [isOver, isWin, dayNumber, scoreCount]);
 
   const matches = useMemo(() => {
     const q = courseInput.trim().toLowerCase();
@@ -338,12 +380,52 @@ export default function HolesPage() {
     setHoleInput("");
   }
 
+  function submitHardCourseGuess(course: Course) {
+    if (isOver || hardCourseFound) return;
+    setHardCourseGuesses((prev) => [
+      ...prev,
+      revealHardCourseGuess(
+        course,
+        mystery,
+        COURSE_WINNERS[course.id],
+        COURSE_WINNERS[mystery.id],
+      ),
+    ]);
+    setHardCourseInput("");
+  }
+
+  function submitHardHoleGuess() {
+    if (isOver || !hardCourseFound) return;
+    const holeNum = Number.parseInt(hardHoleInput, 10);
+    if (!Number.isInteger(holeNum) || holeNum < 1 || holeNum > 18) return;
+    setHardHoleGuesses((prev) => [
+      ...prev,
+      revealHardHoleGuess(holeNum, mystery.iconicHole),
+    ]);
+    setHardHoleInput("");
+  }
+
+  const hardMatches = useMemo(() => {
+    const q = hardCourseInput.trim().toLowerCase();
+    if (!q) return [];
+    const pool = coursePool(tourFilter);
+    const alreadyGuessed = new Set(hardCourseGuesses.map((g) => g.course.id));
+    return pool
+      .filter(
+        (c) =>
+          !alreadyGuessed.has(c.id) &&
+          (c.name.toLowerCase().includes(q) ||
+            c.shortName.toLowerCase().includes(q)),
+      )
+      .slice(0, 6);
+  }, [hardCourseInput, tourFilter, hardCourseGuesses]);
+
   const challengeIsForToday =
     challenge !== null && challenge.dayNumber === dayNumber;
   const challengeIsExpired =
     challenge !== null && challenge.dayNumber !== dayNumber;
 
-  const myScore: ChallengeScore = isWin ? guesses.length : "X";
+  const myScore: ChallengeScore = isWin ? scoreCount : "X";
   const versus =
     challengeIsForToday && isOver && challenge
       ? compareWithFriend(
@@ -354,7 +436,12 @@ export default function HolesPage() {
       : null;
 
   async function handleShare() {
-    const shareText = buildShareText(guesses, dayNumber, isWin);
+    // Easy mode uses the existing 5-emoji grid; hard mode falls back to a
+    // simple summary line since the reveal cells aren't 1:1 with easy mode.
+    const shareText =
+      difficulty === "hard"
+        ? `${BRAND.name}: Holes #${dayNumber} ${isWin ? scoreCount : "X"}/${HOLES_MAX_GUESSES} (Hard)\n${BRAND.domain}/holes`
+        : buildShareText(guesses, dayNumber, isWin);
     const nav = navigator as Navigator & {
       share?: (data: { text: string }) => Promise<void>;
     };
@@ -396,7 +483,7 @@ export default function HolesPage() {
     });
     const url = `${BRAND.url}/holes?c=${token}`;
     const text = isWin
-      ? `I solved today's ${BRAND.name}: Holes in ${guesses.length}/${HOLES_MAX_GUESSES}. Beat me: ${url}`
+      ? `I solved today's ${BRAND.name}: Holes in ${scoreCount}/${HOLES_MAX_GUESSES}. Beat me: ${url}`
       : `I couldn't crack today's ${BRAND.name}: Holes. Your turn: ${url}`;
     const nav = navigator as Navigator & {
       share?: (data: { text: string }) => Promise<void>;
@@ -520,61 +607,142 @@ export default function HolesPage() {
         )}
       </div>
 
-      <div className="grid">
-        <div className="header-row header-row-5">
-          <span>Country</span>
-          <span>
-            Year
-            <br />
-            built
-          </span>
-          <span>Type</span>
-          <span>Par</span>
-          <span>Hole</span>
-        </div>
-
-        {guesses.map((g, i) => (
-          <div key={i} className="guess">
-            <div className="guess-name">
-              {g.course.shortName} · #{g.holeGuessed}
-            </div>
-            <div className="guess-cells guess-cells-5">
-              <span className={`cell cell-${g.country.state}`}>
-                {flagFor(g.course.countryCode)}
-              </span>
-              <span className={`cell cell-${g.yearFounded.state}`}>
-                {g.course.yearFounded}
-                <Arrow arrow={g.yearFounded.arrow} />
-              </span>
-              <span className={`cell cell-${g.courseType.state}`}>
-                {g.course.courseType}
-              </span>
-              <span className={`cell cell-${g.par.state}`}>
-                {g.course.par}
-                <Arrow arrow={g.par.arrow} />
-              </span>
-              <span className={`cell cell-${g.hole.state}`}>
-                {g.holeGuessed}
-                <Arrow arrow={g.hole.arrow} />
-              </span>
-            </div>
+      {difficulty === "easy" && (
+        <div className="grid">
+          <div className="header-row header-row-5">
+            <span>Country</span>
+            <span>
+              Year
+              <br />
+              built
+            </span>
+            <span>Type</span>
+            <span>Par</span>
+            <span>Hole</span>
           </div>
-        ))}
 
-        {Array.from({ length: HOLES_MAX_GUESSES - guesses.length }).map(
-          (_, i) => (
-            <div key={`empty-${i}`} className="guess empty-guess">
+          {guesses.map((g, i) => (
+            <div key={i} className="guess">
+              <div className="guess-name">
+                {g.course.shortName} · #{g.holeGuessed}
+              </div>
               <div className="guess-cells guess-cells-5">
-                {Array.from({ length: 5 }).map((_, j) => (
-                  <span key={j} className="cell cell-empty" />
-                ))}
+                <span className={`cell cell-${g.country.state}`}>
+                  {flagFor(g.course.countryCode)}
+                </span>
+                <span className={`cell cell-${g.yearFounded.state}`}>
+                  {g.course.yearFounded}
+                  <Arrow arrow={g.yearFounded.arrow} />
+                </span>
+                <span className={`cell cell-${g.courseType.state}`}>
+                  {g.course.courseType}
+                </span>
+                <span className={`cell cell-${g.par.state}`}>
+                  {g.course.par}
+                  <Arrow arrow={g.par.arrow} />
+                </span>
+                <span className={`cell cell-${g.hole.state}`}>
+                  {g.holeGuessed}
+                  <Arrow arrow={g.hole.arrow} />
+                </span>
               </div>
             </div>
-          ),
-        )}
-      </div>
+          ))}
 
-      {!isOver && !selectedCourse && (
+          {Array.from({ length: HOLES_MAX_GUESSES - guesses.length }).map(
+            (_, i) => (
+              <div key={`empty-${i}`} className="guess empty-guess">
+                <div className="guess-cells guess-cells-5">
+                  {Array.from({ length: 5 }).map((_, j) => (
+                    <span key={j} className="cell cell-empty" />
+                  ))}
+                </div>
+              </div>
+            ),
+          )}
+        </div>
+      )}
+
+      {difficulty === "hard" && (
+        <div className="grid">
+          <div className="hard-phase-label">
+            {hardCourseFound
+              ? `Course found in ${hardCourseGuesses.length} — now guess the hole`
+              : `Guess the course (${hardGuessesUsed}/${HOLES_MAX_GUESSES} used)`}
+          </div>
+
+          {hardCourseGuesses.length > 0 && (
+            <>
+              <div className="header-row header-row-4">
+                <span>Country</span>
+                <span>Par</span>
+                <span>From your guess</span>
+                <span>Last winner</span>
+              </div>
+              {hardCourseGuesses.map((g, i) => (
+                <div key={`hc-${i}`} className="guess">
+                  <div className="guess-name">{g.course.shortName}</div>
+                  <div className="guess-cells guess-cells-4">
+                    <span className={`cell cell-${g.country.state}`}>
+                      {flagFor(g.course.countryCode)}
+                    </span>
+                    <span className={`cell cell-${g.par.state}`}>
+                      {g.course.par}
+                      <Arrow arrow={g.par.arrow} />
+                    </span>
+                    <span
+                      className={`cell ${
+                        g.direction.distanceMi === 0
+                          ? "cell-green"
+                          : "cell-info"
+                      }`}
+                    >
+                      {g.direction.distanceMi === 0
+                        ? "✓"
+                        : `${g.direction.bearing} ${g.direction.distanceMi}mi`}
+                    </span>
+                    <span
+                      className={`cell ${
+                        g.lastWinner
+                          ? `cell-${g.lastWinner.state}`
+                          : "cell-info"
+                      }`}
+                      title={
+                        g.lastWinner
+                          ? COURSE_WINNERS[g.course.id] ?? "Not recorded"
+                          : "No record"
+                      }
+                    >
+                      {COURSE_WINNERS[g.course.id] ?? "—"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {hardCourseFound && hardHoleGuesses.length > 0 && (
+            <>
+              <div className="header-row header-row-1">
+                <span>Hole guess</span>
+              </div>
+              {hardHoleGuesses.map((g, i) => (
+                <div key={`hh-${i}`} className="guess">
+                  <div className="guess-cells guess-cells-1">
+                    <span className={`cell cell-${g.hole.state}`}>
+                      Hole {g.holeGuessed}
+                      <Arrow arrow={g.hole.arrow} />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* EASY MODE: pick course, then enter hole, submit as a pair. */}
+      {!isOver && difficulty === "easy" && !selectedCourse && (
         <div className="input-area">
           <input
             type="text"
@@ -597,7 +765,7 @@ export default function HolesPage() {
         </div>
       )}
 
-      {!isOver && selectedCourse && (
+      {!isOver && difficulty === "easy" && selectedCourse && (
         <div className="hole-input-row">
           <div className="selected-course-pill">
             <span className="selected-course-name">
@@ -634,6 +802,65 @@ export default function HolesPage() {
               !holeInput ||
               Number.parseInt(holeInput, 10) < 1 ||
               Number.parseInt(holeInput, 10) > 18
+            }
+          >
+            Guess
+          </button>
+        </div>
+      )}
+
+      {/* HARD MODE PHASE 1: guess the course. */}
+      {!isOver && difficulty === "hard" && !hardCourseFound && (
+        <div className="input-area">
+          <input
+            type="text"
+            value={hardCourseInput}
+            onChange={(e) => setHardCourseInput(e.target.value)}
+            placeholder="Type a course name..."
+            autoComplete="off"
+            autoCapitalize="words"
+          />
+          {hardMatches.length > 0 && (
+            <ul className="suggestions">
+              {hardMatches.map((c) => (
+                <li key={c.id} onClick={() => submitHardCourseGuess(c)}>
+                  {c.name}{" "}
+                  <span className="suggestion-country">{c.country}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* HARD MODE PHASE 2: course is found, now guess the hole. */}
+      {!isOver && difficulty === "hard" && hardCourseFound && (
+        <div className="hole-input-row">
+          <div className="selected-course-pill">
+            <span className="selected-course-name">{mystery.shortName}</span>
+          </div>
+          <input
+            className="hole-input"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={18}
+            value={hardHoleInput}
+            onChange={(e) => setHardHoleInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitHardHoleGuess();
+            }}
+            placeholder="Hole #"
+            autoFocus
+          />
+          <button
+            type="button"
+            className="hole-submit"
+            onClick={submitHardHoleGuess}
+            disabled={
+              !hardHoleInput ||
+              Number.parseInt(hardHoleInput, 10) < 1 ||
+              Number.parseInt(hardHoleInput, 10) > 18
             }
           >
             Guess

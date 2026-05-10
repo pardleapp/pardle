@@ -175,6 +175,71 @@ body {
   gap: 4px;
 }
 
+.guess-cells-4 {
+  display: grid;
+  grid-template-columns: 0.5fr 0.5fr 1fr 1fr;
+  gap: 4px;
+}
+
+.guess-cells-1 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+.header-row-4 {
+  display: grid;
+  grid-template-columns: 0.5fr 0.5fr 1fr 1fr;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+  padding: 0 0 4px;
+}
+
+.header-row-4 span {
+  text-align: center;
+  align-self: center;
+  line-height: 1.15;
+}
+
+.header-row-1 {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+  padding: 8px 0 4px;
+}
+
+.cell-info {
+  background: #3a3a3c;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+@media (prefers-color-scheme: light) {
+  .cell-info {
+    background: #d7d7da;
+    color: #1f1f1f;
+  }
+}
+
+.hard-phase-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  text-align: center;
+  padding: 6px 0 8px;
+}
+
 .header-row-5 {
   display: grid;
   grid-template-columns: repeat(5, 1fr);

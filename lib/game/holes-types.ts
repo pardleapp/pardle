@@ -58,6 +58,33 @@ export interface CourseGuessReveal {
   isWin: boolean;
 }
 
+export type CompassDirection =
+  | "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW";
+
+export interface DirectionReveal {
+  /** Miles from guess to mystery, rounded. 0 when same course. */
+  distanceMi: number;
+  /** 8-way compass direction from guess to mystery. null when same course. */
+  bearing: CompassDirection | null;
+}
+
+/** Used in Hard mode for course-phase guesses (player narrowing to course). */
+export interface HardCourseGuess {
+  course: Course;
+  country: AttributeReveal;
+  par: AttributeReveal;
+  direction: DirectionReveal;
+  lastWinner: AttributeReveal | null;
+  isCourseMatch: boolean;
+}
+
+/** Used in Hard mode for hole-phase guesses (course already correct). */
+export interface HardHoleGuess {
+  holeGuessed: number;
+  hole: AttributeReveal;
+  isHoleMatch: boolean;
+}
+
 export const HOLES_MAX_GUESSES = 6;
 
 // Re-exports so the holes page only imports from this module.
