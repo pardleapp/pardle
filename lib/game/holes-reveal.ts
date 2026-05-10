@@ -104,6 +104,14 @@ export function revealHardCourseGuess(
     par: numericReveal(guess.par, mystery.par, 0, 1, 2),
     direction: directionReveal(guess, mystery),
     courseType: courseTypeReveal(guess, mystery),
+    // Year founded: same windows as easy mode (green within 5, warm 15, yellow 40).
+    yearFounded: numericReveal(
+      guess.yearFounded,
+      mystery.yearFounded,
+      5,
+      15,
+      40,
+    ),
     isCourseMatch: guess.id === mystery.id,
   };
 }

@@ -667,16 +667,21 @@ export default function HolesPage() {
 
           {hardCourseGuesses.length > 0 && (
             <>
-              <div className="header-row header-row-4">
+              <div className="header-row header-row-hard5">
                 <span>Country</span>
                 <span>Par</span>
-                <span>From your guess</span>
+                <span>Direction</span>
                 <span>Type</span>
+                <span>
+                  Year
+                  <br />
+                  built
+                </span>
               </div>
               {hardCourseGuesses.map((g, i) => (
                 <div key={`hc-${i}`} className="guess">
                   <div className="guess-name">{g.course.shortName}</div>
-                  <div className="guess-cells guess-cells-4">
+                  <div className="guess-cells guess-cells-hard5">
                     <span className={`cell cell-${g.country.state}`}>
                       {flagFor(g.course.countryCode)}
                     </span>
@@ -697,6 +702,10 @@ export default function HolesPage() {
                     </span>
                     <span className={`cell cell-${g.courseType.state}`}>
                       {g.course.courseType}
+                    </span>
+                    <span className={`cell cell-${g.yearFounded.state}`}>
+                      {g.course.yearFounded}
+                      <Arrow arrow={g.yearFounded.arrow} />
                     </span>
                   </div>
                 </div>

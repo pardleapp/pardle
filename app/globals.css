@@ -181,6 +181,33 @@ body {
   gap: 4px;
 }
 
+/* Hard-mode 5-column layout: country flag (narrow), par (narrow),
+   direction (widest — shows "NE 624mi"), type (medium), year (medium). */
+.guess-cells-hard5 {
+  display: grid;
+  grid-template-columns: 0.4fr 0.4fr 1.2fr 0.9fr 0.6fr;
+  gap: 4px;
+}
+
+.header-row-hard5 {
+  display: grid;
+  grid-template-columns: 0.4fr 0.4fr 1.2fr 0.9fr 0.6fr;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+  padding: 0 0 4px;
+}
+
+.header-row-hard5 span {
+  text-align: center;
+  align-self: center;
+  line-height: 1.15;
+}
+
 .guess-cells-1 {
   display: grid;
   grid-template-columns: 1fr;
