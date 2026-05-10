@@ -61,12 +61,19 @@ function saveTourFilter(f: TourFilter): void {
   }
 }
 
-function coursePool(filter: TourFilter): Course[] {
-  if (filter === "all") return COURSES;
-  return COURSES.filter((c) => {
-    const tours = COURSE_TOURS[c.id];
-    return tours?.includes(filter);
-  });
+function coursePool(filter: TourFilter, difficulty?: Difficulty): Course[] {
+  let pool =
+    filter === "all"
+      ? COURSES
+      : COURSES.filter((c) => COURSE_TOURS[c.id]?.includes(filter));
+  // Hard mode shows a specific hole highlighted on the satellite, which
+  // only works for courses with OSM polyline geometry. Filter the pool
+  // so we never pick a course that would fall back to a useless zoom-18
+  // centroid view (clubhouse roofs, parking lots, trees).
+  if (difficulty === "hard") {
+    pool = pool.filter((c) => HOLE_COORDS[c.id]?.path !== undefined);
+  }
+  return pool;
 }
 
 function loadDifficulty(): Difficulty {
@@ -156,8 +163,11 @@ function filterDayOffset(filter: TourFilter): number {
   return h;
 }
 
-function pickMysteryCourse(filter: TourFilter): Course {
-  const pool = coursePool(filter);
+function pickMysteryCourse(
+  filter: TourFilter,
+  difficulty: Difficulty,
+): Course {
+  const pool = coursePool(filter, difficulty);
   if (pool.length === 0) return COURSES[0];
   const dayIdx = dayIndexToday() + filterDayOffset(filter);
   const safe = ((dayIdx % pool.length) + pool.length) % pool.length;
@@ -246,7 +256,14 @@ function compareWithFriend(
 
 export default function HolesPage() {
   const [tourFilter, setTourFilter] = useState<TourFilter>("all");
-  const mystery = useMemo(() => pickMysteryCourse(tourFilter), [tourFilter]);
+  // mystery is recomputed when filter OR difficulty changes — hard mode
+  // uses a smaller pool restricted to courses with OSM polyline data,
+  // so the daily mystery isn't necessarily the same across difficulties.
+  const [difficulty, setDifficulty] = useState<Difficulty>("easy");
+  const mystery = useMemo(
+    () => pickMysteryCourse(tourFilter, difficulty),
+    [tourFilter, difficulty],
+  );
   const dayNumber = useMemo(() => dayIndexToday() + 1, []);
   // Easy mode guesses (course + hole as one pair, current behavior).
   const [guesses, setGuesses] = useState<CourseGuessReveal[]>([]);
@@ -263,9 +280,6 @@ export default function HolesPage() {
   const [challenge, setChallenge] = useState<ChallengePayload | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [challengeCopied, setChallengeCopied] = useState(false);
-  // Difficulty starts on "easy" for SSR consistency, then hydrates from
-  // localStorage in the effect below. Avoids hydration mismatch warnings.
-  const [difficulty, setDifficulty] = useState<Difficulty>("easy");
 
   const satelliteUrl = useMemo(() => {
     const view = coordsForView(mystery, difficulty);
