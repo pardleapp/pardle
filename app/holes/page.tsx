@@ -133,10 +133,20 @@ function dayIndexToday(): number {
   return Math.floor((today - LAUNCH_DATE_UTC) / (1000 * 60 * 60 * 24));
 }
 
+// Per-filter starting offsets so each filter rotates through its own pool
+// independently from day 0 — without this, all three filters would land on
+// pool[0] (Augusta) on launch day since Augusta is first in COURSES and
+// passes both the PGA and DPW filters.
+function filterDayOffset(filter: TourFilter): number {
+  if (filter === "PGA") return 11;
+  if (filter === "DPW") return 23;
+  return 0;
+}
+
 function pickMysteryCourse(filter: TourFilter): Course {
   const pool = coursePool(filter);
   if (pool.length === 0) return COURSES[0];
-  const dayIdx = dayIndexToday();
+  const dayIdx = dayIndexToday() + filterDayOffset(filter);
   const safe = ((dayIdx % pool.length) + pool.length) % pool.length;
   return pool[safe];
 }
