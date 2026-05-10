@@ -1,9 +1,27 @@
 import "./globals.css";
+import type { Metadata } from "next";
 import { BRAND } from "@/lib/brand";
 
-export const metadata = {
+const description =
+  "Six guesses to identify today's mystery pro golfer. New puzzle every day.";
+
+export const metadata: Metadata = {
+  metadataBase: new URL(BRAND.url),
   title: `${BRAND.name} — ${BRAND.tagline}`,
-  description: "Six guesses to identify today's mystery pro golfer.",
+  description,
+  applicationName: BRAND.name,
+  openGraph: {
+    title: BRAND.name,
+    description,
+    url: BRAND.url,
+    siteName: BRAND.name,
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: BRAND.name,
+    description,
+  },
 };
 
 export const viewport = {
