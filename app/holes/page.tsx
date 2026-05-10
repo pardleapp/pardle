@@ -140,13 +140,20 @@ function dayIndexToday(): number {
 }
 
 // Per-filter starting offsets so each filter rotates through its own pool
-// independently from day 0 — without this, all three filters would land on
+// independently from day 0 — without an offset every filter would land on
 // pool[0] (Augusta) on launch day since Augusta is first in COURSES and
-// passes both the PGA and DPW filters.
+// passes both the PGA and DPW filters. Hashing the filter name produces a
+// stable, non-obvious offset and avoids hand-picking magic numbers.
+//
+// Bump the version suffix to advance every filter's offset by an
+// unpredictable amount (used e.g. when launch-day puzzles felt too easy).
 function filterDayOffset(filter: TourFilter): number {
-  if (filter === "PGA") return 11;
-  if (filter === "DPW") return 23;
-  return 0;
+  const key = `pardle-holes-${filter}-v3`;
+  let h = 5381;
+  for (let i = 0; i < key.length; i++) {
+    h = (((h * 33) ^ key.charCodeAt(i)) >>> 0);
+  }
+  return h;
 }
 
 function pickMysteryCourse(filter: TourFilter): Course {
