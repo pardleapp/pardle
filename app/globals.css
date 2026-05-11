@@ -3862,6 +3862,37 @@ footer {
   margin-top: 14px;
 }
 
+.faces-claim-by {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.faces-claim-by-me {
+  background: rgba(123, 174, 63, 0.2);
+  color: var(--green);
+}
+
+.faces-claim-by-them {
+  background: rgba(224, 123, 91, 0.15);
+  color: #c25a40;
+}
+
+.faces-claim-by-none {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--muted);
+}
+
+@media (prefers-color-scheme: dark) {
+  .faces-claim-by-none {
+    background: rgba(255, 255, 255, 0.07);
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   .faces-next-row {
     background: rgba(224, 123, 91, 0.12);

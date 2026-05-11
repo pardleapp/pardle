@@ -87,11 +87,11 @@ const GAMES: GameTile[] = [
     id: "faces",
     href: "/faces",
     name: "Faces",
-    blurb: "Two famous pros, blended into one face. Name them both.",
+    blurb: "Six blended-face puzzles. Name both pros in each.",
     emoji: "👥",
     status: "live",
     accent: "#E07B5B",
-    tag: "New",
+    tag: "Multiplayer",
   },
 ];
 

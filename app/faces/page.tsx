@@ -354,6 +354,9 @@ export default function FacesPage() {
             {shareCopied ? "Copied!" : "Share result"}
           </button>
           <div className="faces-result-links">
+            <Link className="faces-back" href="/faces/duel">
+              ⚔️ Race friends in a Faces Duel →
+            </Link>
             <Link className="faces-back" href="/">
               ← Play another game
             </Link>
@@ -414,6 +417,10 @@ export default function FacesPage() {
           </div>
         )}
       </header>
+
+      <Link href="/faces/duel" className="trivia-duel-cta">
+        ⚔️ Or race a friend in a live Faces Duel →
+      </Link>
 
       <div className="faces-progress">
         <div className="faces-progress-text">
