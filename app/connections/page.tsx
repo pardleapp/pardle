@@ -96,6 +96,11 @@ export default function ConnectionsPage() {
   const [mistakes, setMistakes] = useState(0);
   const [history, setHistory] = useState<ConnectionsDifficulty[][]>([]);
   const [shake, setShake] = useState(false);
+  // Hint state: revealed category labels (free help, doesn't cost
+  // mistakes) and a transient 'one away' flash when a wrong guess
+  // had 3 of 4 in the same group.
+  const [revealedHints, setRevealedHints] = useState<Set<string>>(new Set());
+  const [oneAwayFlash, setOneAwayFlash] = useState(false);
   const [stats, setStats] = useState<PardleStats | null>(null);
   const [challenge, setChallenge] = useState<ChallengePayload | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
@@ -179,6 +184,21 @@ export default function ConnectionsPage() {
       setSolved((prev) => [...prev, matching]);
       setSelected(new Set());
     } else {
+      // One-away check: if 3 of the 4 selected items belong to the
+      // same (unsolved) category, surface "One away!" so the player
+      // knows to swap one tile rather than blow up the whole guess.
+      let bestOverlap = 0;
+      for (const cat of puzzle.categories) {
+        if (solved.some((s) => s.label === cat.label)) continue;
+        const overlap = selectedArr.filter((id) =>
+          cat.memberIds.includes(id),
+        ).length;
+        if (overlap > bestOverlap) bestOverlap = overlap;
+      }
+      if (bestOverlap === 3) {
+        setOneAwayFlash(true);
+        setTimeout(() => setOneAwayFlash(false), 2200);
+      }
       // Wrong guess — flash a shake animation, count a mistake, clear selection.
       setShake(true);
       setTimeout(() => setShake(false), 450);
@@ -191,6 +211,26 @@ export default function ConnectionsPage() {
     if (isOver) return;
     setSelected(new Set());
   }
+
+  function revealHint() {
+    if (isOver) return;
+    // Reveal the easiest still-unsolved unrevealed category. Puzzles are
+    // built in difficulty order (yellow → purple) so iterating in that
+    // order gives the most helpful hint first.
+    const next = puzzle.categories.find(
+      (c) =>
+        !solved.some((s) => s.label === c.label) &&
+        !revealedHints.has(c.label),
+    );
+    if (!next) return;
+    setRevealedHints((prev) => new Set([...prev, next.label]));
+  }
+
+  const remainingHints = puzzle.categories.filter(
+    (c) =>
+      !solved.some((s) => s.label === c.label) &&
+      !revealedHints.has(c.label),
+  ).length;
 
   const challengeIsForToday =
     challenge !== null && challenge.dayNumber === dayNumber;
@@ -329,6 +369,17 @@ export default function ConnectionsPage() {
         </div>
       )}
 
+      {!isOver && revealedHints.size > 0 && (
+        <div className="conn-hints">
+          <div className="conn-hints-label">Revealed categories</div>
+          <ul className="conn-hints-list">
+            {Array.from(revealedHints).map((label) => (
+              <li key={label}>{label}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {!isOver && (
         <>
           <div className={`conn-grid ${shake ? "conn-shake" : ""}`}>
@@ -346,6 +397,12 @@ export default function ConnectionsPage() {
               );
             })}
           </div>
+
+          {oneAwayFlash && (
+            <div className="conn-one-away" role="status">
+              One away!
+            </div>
+          )}
 
           <div className="conn-status">
             <div className="conn-mistakes">
@@ -369,6 +426,15 @@ export default function ConnectionsPage() {
               disabled={selected.size === 0}
             >
               Deselect all
+            </button>
+            <button
+              type="button"
+              className="conn-btn conn-btn-secondary"
+              onClick={revealHint}
+              disabled={remainingHints === 0}
+              title="Reveal one category's label (free help)"
+            >
+              Hint
             </button>
             <button
               type="button"
