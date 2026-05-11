@@ -1,32 +1,16 @@
 import { ImageResponse } from "next/og";
 
-// Per-game OG card — what people see when they paste pardle.app/pros
-// into WhatsApp / iMessage. Keeps the iconic Wordle-grid theme since
-// that's the game's signature visual.
+// Per-game OG card for pardle.app/clubs. Parchment + ink silhouette
+// to match the in-game card style.
 
 export const runtime = "edge";
 export const revalidate = 1800;
-export const alt = "Pardle: Pros — today's mystery golfer puzzle";
+export const alt = "Pardle: Clubs — name the course from its clubhouse";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-const PROS_LAUNCH_UTC = Date.UTC(2026, 4, 9);
-const ACCENT = "#7BAE3F";
-
-const CELL = {
-  green: "#7BAE3F",
-  warm: "#B5D332",
-  yellow: "#E8C547",
-  grey: "#5C6063",
-};
-
-type CellState = "green" | "warm" | "yellow" | "grey";
-
-const ROWS: CellState[][] = [
-  ["grey", "yellow", "grey", "yellow", "grey", "warm"],
-  ["warm", "green", "grey", "green", "warm", "yellow"],
-  ["green", "green", "green", "green", "green", "green"],
-];
+const CLUBS_LAUNCH_UTC = Date.UTC(2026, 4, 11);
+const ACCENT = "#E0A85B";
 
 function dayNumberToday(launchUtc: number): number {
   const now = new Date();
@@ -39,7 +23,7 @@ function dayNumberToday(launchUtc: number): number {
 }
 
 export default async function OpengraphImage() {
-  const day = dayNumberToday(PROS_LAUNCH_UTC);
+  const day = dayNumberToday(CLUBS_LAUNCH_UTC);
   return new ImageResponse(
     (
       <div
@@ -84,20 +68,20 @@ export default async function OpengraphImage() {
               gap: 24,
             }}
           >
-            <div style={{ fontSize: 140, display: "flex" }}>🏌️</div>
-            <div style={{ display: "flex" }}>Pros</div>
+            <div style={{ fontSize: 140, display: "flex" }}>🏛️</div>
+            <div style={{ display: "flex" }}>Clubs</div>
           </div>
           <div
             style={{
               fontSize: 40,
               fontWeight: 700,
               marginTop: 28,
-              maxWidth: 540,
+              maxWidth: 560,
               lineHeight: 1.15,
               display: "flex",
             }}
           >
-            Guess today&apos;s mystery pro golfer
+            Name the course from its clubhouse
           </div>
           <div
             style={{
@@ -108,7 +92,7 @@ export default async function OpengraphImage() {
               display: "flex",
             }}
           >
-            Six guesses. Beat your friends.
+            Six guesses, top-down silhouette.
           </div>
           <div
             style={{
@@ -119,48 +103,37 @@ export default async function OpengraphImage() {
               display: "flex",
             }}
           >
-            pardle.app/pros
+            pardle.app/clubs
           </div>
         </div>
 
+        {/* Parchment card with a generic clubhouse silhouette */}
         <div
           style={{
             display: "flex",
-            flexDirection: "column",
-            gap: 10,
-            padding: 22,
-            background: "rgba(255, 255, 255, 0.08)",
-            borderRadius: 20,
-            transform: "rotate(3deg)",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 360,
+            height: 360,
+            background: "#f3ead5",
+            borderRadius: 24,
+            border: "3px solid #d8c89a",
+            padding: 28,
+            transform: "rotate(-3deg)",
           }}
         >
-          {ROWS.map((row, rowIdx) => (
-            <div key={rowIdx} style={{ display: "flex", gap: 8 }}>
-              {row.map((cell, cellIdx) => (
-                <div
-                  key={cellIdx}
-                  style={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: 7,
-                    background: CELL[cell],
-                  }}
-                />
-              ))}
-            </div>
-          ))}
-          <div
-            style={{
-              marginTop: 6,
-              fontSize: 22,
-              fontWeight: 700,
-              color: "rgba(255, 255, 255, 0.85)",
-              display: "flex",
-              justifyContent: "center",
-            }}
-          >
-            Solved in 3/6
-          </div>
+          <svg width="100%" height="100%" viewBox="0 0 320 240">
+            <g fill="#2a2a2a">
+              <rect x="30" y="120" width="260" height="80" />
+              <polygon points="20,120 160,40 300,120" />
+              <rect x="70" y="70" width="20" height="30" />
+              <rect x="148" y="140" width="24" height="60" fill="#f3ead5" />
+              <rect x="60" y="150" width="22" height="22" fill="#f3ead5" />
+              <rect x="220" y="150" width="22" height="22" fill="#f3ead5" />
+              <rect x="100" y="150" width="22" height="22" fill="#f3ead5" />
+              <rect x="180" y="150" width="22" height="22" fill="#f3ead5" />
+            </g>
+          </svg>
         </div>
       </div>
     ),

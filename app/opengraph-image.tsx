@@ -1,35 +1,21 @@
 import { ImageResponse } from "next/og";
 
+// Hub OG card — what people see when they paste pardle.app into
+// WhatsApp / iMessage / Twitter. Three game tiles + wordmark, so the
+// link preview reads as "Pardle is a hub for golf puzzles" rather
+// than "Pardle is one game" (which the previous Pros-grid card said).
+
 export const runtime = "edge";
-export const alt = "Pardle — daily mystery golfer";
+export const revalidate = 3600;
+export const alt = "Pardle — Daily golf puzzles";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-const COLOR = {
-  bgFrom: "#0F1F0F",
-  bgTo: "#1F3A1A",
-  accent: "#FFD64A",
-  white: "#FFFFFF",
-  green: "#7BAE3F",
-  warm: "#B5D332",
-  yellow: "#E8C547",
-  grey: "#5C6063",
-};
-
-type CellState = "green" | "warm" | "yellow" | "grey";
-
-const ROWS: CellState[][] = [
-  ["grey", "yellow", "grey", "yellow", "grey", "warm"],
-  ["warm", "green", "grey", "green", "warm", "yellow"],
-  ["green", "green", "green", "green", "green", "green"],
+const GAMES = [
+  { emoji: "🏌️", name: "Pros", color: "#7BAE3F", blurb: "Guess the pro" },
+  { emoji: "🛰️", name: "Holes", color: "#5BA0E0", blurb: "ID the course" },
+  { emoji: "🏛️", name: "Clubs", color: "#E0A85B", blurb: "Spot the clubhouse" },
 ];
-
-function cellColor(state: CellState): string {
-  if (state === "green") return COLOR.green;
-  if (state === "warm") return COLOR.warm;
-  if (state === "yellow") return COLOR.yellow;
-  return COLOR.grey;
-}
 
 export default async function OpengraphImage() {
   return new ImageResponse(
@@ -41,10 +27,10 @@ export default async function OpengraphImage() {
           background:
             "linear-gradient(135deg, #0F1F0F 0%, #1F3A1A 50%, #2c5a28 100%)",
           display: "flex",
-          alignItems: "center",
+          flexDirection: "column",
           justifyContent: "space-between",
-          padding: "72px 96px",
-          color: COLOR.white,
+          padding: 70,
+          color: "#FFFFFF",
           fontFamily: "system-ui, sans-serif",
         }}
       >
@@ -52,15 +38,17 @@ export default async function OpengraphImage() {
           style={{
             display: "flex",
             flexDirection: "column",
+            alignItems: "center",
+            width: "100%",
           }}
         >
           <div
             style={{
               fontSize: 168,
               fontWeight: 900,
-              letterSpacing: -7,
+              letterSpacing: "-6px",
               lineHeight: 1,
-              color: COLOR.white,
+              display: "flex",
             }}
           >
             PARDLE
@@ -68,81 +56,76 @@ export default async function OpengraphImage() {
           <div
             style={{
               fontSize: 40,
-              fontWeight: 700,
-              marginTop: 24,
-              maxWidth: 540,
-              lineHeight: 1.1,
-            }}
-          >
-            Guess today&apos;s mystery pro golfer
-          </div>
-          <div
-            style={{
-              fontSize: 28,
-              fontWeight: 500,
+              opacity: 0.85,
               marginTop: 16,
-              maxWidth: 480,
-              opacity: 0.75,
-              lineHeight: 1.35,
               display: "flex",
             }}
           >
-            Six guesses. Beat your friends. New every day.
-          </div>
-          <div
-            style={{
-              marginTop: 56,
-              fontSize: 38,
-              fontWeight: 800,
-              color: COLOR.accent,
-              display: "flex",
-            }}
-          >
-            pardle.app
+            Daily golf puzzles
           </div>
         </div>
 
         <div
           style={{
             display: "flex",
-            flexDirection: "column",
-            gap: 10,
-            padding: 22,
-            background: "rgba(255, 255, 255, 0.08)",
-            borderRadius: 20,
-            transform: "rotate(3deg)",
+            gap: 24,
+            justifyContent: "center",
+            width: "100%",
           }}
         >
-          {ROWS.map((row, rowIdx) => (
+          {GAMES.map((g) => (
             <div
-              key={rowIdx}
-              style={{ display: "flex", gap: 8 }}
+              key={g.name}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                background: "rgba(255,255,255,0.06)",
+                border: `3px solid ${g.color}`,
+                borderRadius: 28,
+                padding: "32px 36px",
+                width: 280,
+              }}
             >
-              {row.map((cell, cellIdx) => (
-                <div
-                  key={cellIdx}
-                  style={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: 7,
-                    background: cellColor(cell),
-                  }}
-                />
-              ))}
+              <div style={{ fontSize: 96, lineHeight: 1, display: "flex" }}>
+                {g.emoji}
+              </div>
+              <div
+                style={{
+                  fontSize: 52,
+                  fontWeight: 900,
+                  color: g.color,
+                  marginTop: 12,
+                  display: "flex",
+                }}
+              >
+                {g.name}
+              </div>
+              <div
+                style={{
+                  fontSize: 22,
+                  opacity: 0.85,
+                  marginTop: 6,
+                  display: "flex",
+                }}
+              >
+                {g.blurb}
+              </div>
             </div>
           ))}
-          <div
-            style={{
-              marginTop: 6,
-              fontSize: 22,
-              fontWeight: 700,
-              color: "rgba(255, 255, 255, 0.85)",
-              display: "flex",
-              justifyContent: "center",
-            }}
-          >
-            Solved in 3/6
-          </div>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            fontSize: 36,
+            fontWeight: 800,
+            color: "#FFD64A",
+            width: "100%",
+          }}
+        >
+          pardle.app
         </div>
       </div>
     ),

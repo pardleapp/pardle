@@ -1,32 +1,16 @@
 import { ImageResponse } from "next/og";
 
-// Per-game OG card — what people see when they paste pardle.app/pros
-// into WhatsApp / iMessage. Keeps the iconic Wordle-grid theme since
-// that's the game's signature visual.
+// Per-game OG card for pardle.app/holes. Stylised yardage-book hole
+// graphic to match the in-game illustrated silhouettes.
 
 export const runtime = "edge";
 export const revalidate = 1800;
-export const alt = "Pardle: Pros — today's mystery golfer puzzle";
+export const alt = "Pardle: Holes — today's mystery course";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-const PROS_LAUNCH_UTC = Date.UTC(2026, 4, 9);
-const ACCENT = "#7BAE3F";
-
-const CELL = {
-  green: "#7BAE3F",
-  warm: "#B5D332",
-  yellow: "#E8C547",
-  grey: "#5C6063",
-};
-
-type CellState = "green" | "warm" | "yellow" | "grey";
-
-const ROWS: CellState[][] = [
-  ["grey", "yellow", "grey", "yellow", "grey", "warm"],
-  ["warm", "green", "grey", "green", "warm", "yellow"],
-  ["green", "green", "green", "green", "green", "green"],
-];
+const HOLES_LAUNCH_UTC = Date.UTC(2026, 4, 10);
+const ACCENT = "#5BA0E0";
 
 function dayNumberToday(launchUtc: number): number {
   const now = new Date();
@@ -39,7 +23,7 @@ function dayNumberToday(launchUtc: number): number {
 }
 
 export default async function OpengraphImage() {
-  const day = dayNumberToday(PROS_LAUNCH_UTC);
+  const day = dayNumberToday(HOLES_LAUNCH_UTC);
   return new ImageResponse(
     (
       <div
@@ -84,20 +68,20 @@ export default async function OpengraphImage() {
               gap: 24,
             }}
           >
-            <div style={{ fontSize: 140, display: "flex" }}>🏌️</div>
-            <div style={{ display: "flex" }}>Pros</div>
+            <div style={{ fontSize: 140, display: "flex" }}>🛰️</div>
+            <div style={{ display: "flex" }}>Holes</div>
           </div>
           <div
             style={{
               fontSize: 40,
               fontWeight: 700,
               marginTop: 28,
-              maxWidth: 540,
+              maxWidth: 560,
               lineHeight: 1.15,
               display: "flex",
             }}
           >
-            Guess today&apos;s mystery pro golfer
+            Identify today&apos;s mystery course
           </div>
           <div
             style={{
@@ -108,7 +92,7 @@ export default async function OpengraphImage() {
               display: "flex",
             }}
           >
-            Six guesses. Beat your friends.
+            67 of the world&apos;s most iconic holes.
           </div>
           <div
             style={{
@@ -119,48 +103,45 @@ export default async function OpengraphImage() {
               display: "flex",
             }}
           >
-            pardle.app/pros
+            pardle.app/holes
           </div>
         </div>
 
+        {/* Stylised hole illustration — fairway shape with green at top,
+            bunker on the side, hole-line in gold. Mirrors the in-game art. */}
         <div
           style={{
             display: "flex",
-            flexDirection: "column",
-            gap: 10,
-            padding: 22,
-            background: "rgba(255, 255, 255, 0.08)",
-            borderRadius: 20,
-            transform: "rotate(3deg)",
+            width: 360,
+            height: 460,
+            background: "#143018",
+            borderRadius: 24,
+            border: "3px solid #1f4524",
+            padding: 28,
+            transform: "rotate(-3deg)",
+            position: "relative",
           }}
         >
-          {ROWS.map((row, rowIdx) => (
-            <div key={rowIdx} style={{ display: "flex", gap: 8 }}>
-              {row.map((cell, cellIdx) => (
-                <div
-                  key={cellIdx}
-                  style={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: 7,
-                    background: CELL[cell],
-                  }}
-                />
-              ))}
-            </div>
-          ))}
-          <div
-            style={{
-              marginTop: 6,
-              fontSize: 22,
-              fontWeight: 700,
-              color: "rgba(255, 255, 255, 0.85)",
-              display: "flex",
-              justifyContent: "center",
-            }}
-          >
-            Solved in 3/6
-          </div>
+          <svg width="100%" height="100%" viewBox="0 0 300 400">
+            <path
+              d="M150,40 a55,40 0 1,0 0.1,0 Z"
+              fill="#2f7825"
+            />
+            <path
+              d="M130 80 Q 60 200 90 360 Q 150 380 210 360 Q 240 200 170 80 Z"
+              fill="#4e8b39"
+            />
+            <ellipse cx="80" cy="200" rx="34" ry="22" fill="#e7d6a3" />
+            <ellipse cx="225" cy="280" rx="28" ry="20" fill="#e7d6a3" />
+            <path
+              d="M150 360 Q 150 220 150 60"
+              stroke="#FFD64A"
+              strokeWidth="6"
+              fill="none"
+              strokeLinecap="round"
+            />
+            <circle cx="150" cy="55" r="9" fill="#FFD64A" />
+          </svg>
         </div>
       </div>
     ),
