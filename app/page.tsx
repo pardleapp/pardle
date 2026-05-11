@@ -38,9 +38,9 @@ const GAMES: GameTile[] = [
   {
     href: "/clubs",
     name: "Clubs",
-    blurb: "Name the clubhouse from the photo.",
+    blurb: "Name the course from its clubhouse silhouette.",
     emoji: "🏛️",
-    status: "soon",
+    status: "live",
     accent: "#E0A85B",
   },
 ];
