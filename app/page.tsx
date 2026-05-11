@@ -32,6 +32,8 @@ interface GameTile {
   emoji: string;
   status: "live" | "soon";
   accent: string;
+  /** Optional badge shown on the card (e.g. 'Multiplayer'). */
+  tag?: string;
 }
 
 const GAMES: GameTile[] = [
@@ -79,6 +81,7 @@ const GAMES: GameTile[] = [
     emoji: "❓",
     status: "live",
     accent: "#E8C547",
+    tag: "Multiplayer",
   },
 ];
 
@@ -102,6 +105,7 @@ function CardBody({
   const line = statsLine(stats);
   return (
     <>
+      {game.tag && <span className="hub-card-tag">{game.tag}</span>}
       <div className="hub-card-emoji">{game.emoji}</div>
       <div className="hub-card-name">{game.name}</div>
       <p className="hub-card-blurb">{game.blurb}</p>

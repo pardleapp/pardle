@@ -63,13 +63,14 @@ export default function DuelLandingPage() {
         setCreating(false);
         return;
       }
-      // Mark the host as seated in slot p1 before navigating so the
+      // Mark the host as seated in slot 0 before navigating so the
       // room page skips the 'You've been challenged' join screen
-      // (which only makes sense for the second visitor).
+      // (which only makes sense for joiners). Slot is stored as a
+      // numeric string to match the multi-player room page format.
       try {
         window.localStorage.setItem(
           `pardle.duel.seated.${data.room.roomId}`,
-          "p1",
+          "0",
         );
       } catch {
         // ignore — the room page will fall back to detecting our slot
