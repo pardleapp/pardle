@@ -969,7 +969,11 @@ h1 {
 
 .header-row {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  /* minmax(0, 1fr) so a long header word like "Appearances" can't push
+     its column wider than 1/6 of the row, which would shift every
+     header out of alignment with the cells below. The base .guess-cells
+     uses the same template. */
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 4px;
   font-size: 11px;
   font-weight: 600;
@@ -984,6 +988,11 @@ h1 {
   text-align: center;
   align-self: center;
   line-height: 1.15;
+  /* Long words ("Appearances") wrap inside their column instead of
+     overflowing past it. */
+  overflow-wrap: break-word;
+  hyphens: auto;
+  min-width: 0;
 }
 
 .guess {
@@ -1009,7 +1018,7 @@ h1 {
 
 .guess-cells {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 4px;
 }
 
