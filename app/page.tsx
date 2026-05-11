@@ -4,6 +4,7 @@ import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import { getGolfHeadlines } from "@/lib/golf-news";
 import { NewsTicker } from "@/app/_components/NewsTicker";
+import { WelcomeModal } from "@/app/_components/WelcomeModal";
 import { todayDayNumber } from "@/lib/day-index";
 import {
   readPerGameStats,
@@ -119,6 +120,8 @@ export default async function HubHome() {
 
   return (
     <main className="hub">
+      <WelcomeModal />
+
       <header className="hub-header">
         <h1 className="hub-wordmark">{BRAND.name}</h1>
         <p className="hub-subtitle">Daily golf puzzles</p>
