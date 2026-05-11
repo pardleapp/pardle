@@ -132,6 +132,7 @@ export const TRIVIA_QUESTIONS: TriviaQuestion[] = [
       "Player ahead",
     ],
     correct: 0,
+    difficulty: "easy",
   },
   {
     id: "e-ryder-cup-teams",
