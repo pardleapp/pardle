@@ -54,11 +54,14 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "invalid_payload" }, { status: 400 });
   }
   try {
-    const room = await joinRoom({ roomId, ...body });
-    if (!room) {
+    const result = await joinRoom({ roomId, ...body });
+    if (!result) {
       return NextResponse.json({ error: "room_full_or_missing" }, { status: 404 });
     }
-    return NextResponse.json({ room: publicRoomView(room) });
+    return NextResponse.json({
+      room: publicRoomView(result.room),
+      slot: result.slot,
+    });
   } catch (err) {
     console.error("duel join failed", err);
     return NextResponse.json({ error: "backend_failure" }, { status: 500 });

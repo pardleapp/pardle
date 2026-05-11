@@ -94,12 +94,13 @@ export default function DuelLandingPage() {
 
       <div className="duel-landing">
         <h2 className="duel-landing-title">
-          Race a friend through 10 trivia questions
+          Race up to 3 friends through 10 trivia questions
         </h2>
         <p className="duel-landing-blurb">
           First to click the correct answer wins the question. Click a
-          wrong answer and you&apos;re out for that question — your
-          friend can still steal it. Best of 10 wins the duel.
+          wrong answer and you&apos;re out for that question — anyone
+          left can still steal it. Best of 10 wins the duel. Up to 4
+          players total.
         </p>
 
         <label className="duel-field">

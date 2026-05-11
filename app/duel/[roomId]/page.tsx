@@ -10,6 +10,22 @@ import {
 } from "@/lib/challenge";
 
 const PLAYER_TOKEN_KEY = "pardle.duel.playerToken";
+const MAX_PLAYERS = 4;
+const MIN_PLAYERS_TO_START = 2;
+const POLL_MS = 1000;
+
+interface PublicPick {
+  answer: number;
+  correct: boolean;
+  clickedAt: number;
+}
+
+interface PublicQuestionState {
+  picks: (PublicPick | null)[];
+  resolved: boolean;
+  winnerSlot: number | null;
+  resolvedAt: number | null;
+}
 
 interface PublicQuestion {
   id: string;
@@ -17,15 +33,7 @@ interface PublicQuestion {
   options: [string, string, string, string];
   correct: number | null;
   fact: string | null;
-  state: {
-    p1Answer: number | null;
-    p2Answer: number | null;
-    p1Correct: boolean | null;
-    p2Correct: boolean | null;
-    resolved: boolean;
-    winner: "p1" | "p2" | "none" | null;
-    resolvedAt: number | null;
-  };
+  state: PublicQuestionState;
 }
 
 interface PublicPlayer {
@@ -36,8 +44,7 @@ interface PublicPlayer {
 interface PublicRoom {
   roomId: string;
   difficulty: "easy" | "medium" | "hard";
-  p1: PublicPlayer | null;
-  p2: PublicPlayer | null;
+  players: (PublicPlayer | null)[];
   status: "waiting" | "active" | "finished";
   currentQuestionIndex: number;
   questions: PublicQuestion[];
@@ -62,8 +69,6 @@ function getOrCreatePlayerToken(): string {
   }
 }
 
-const POLL_MS = 1000;
-
 export default function DuelGamePage() {
   const params = useParams<{ roomId: string }>();
   const roomId = params?.roomId ?? "";
@@ -71,17 +76,17 @@ export default function DuelGamePage() {
 
   const [room, setRoom] = useState<PublicRoom | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  // Synchronously hydrate seated slot from localStorage on first render
-  // so the host (who set the marker before navigating here) doesn't
-  // see a flash of the 'You've been challenged' join screen meant
-  // for p2.
-  const [seated, setSeated] = useState<"p1" | "p2" | null>(() => {
+  // Slot index 0..3 once the player has been seated.
+  const [seatedSlot, setSeatedSlot] = useState<number | null>(() => {
     if (typeof window === "undefined") return null;
     try {
       const v = window.localStorage.getItem(
         `pardle.duel.seated.${roomId}`,
       );
-      if (v === "p1" || v === "p2") return v;
+      if (v) {
+        const n = Number(v);
+        if (Number.isInteger(n) && n >= 0 && n < MAX_PLAYERS) return n;
+      }
     } catch {
       // ignore
     }
@@ -92,13 +97,8 @@ export default function DuelGamePage() {
   );
   const [joinError, setJoinError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
-
-  // Determine which slot we own from the room data (by name match — token
-  // is server-private). We track seated state ourselves below as well.
-  // The most reliable test is to ask the server: did our token match?
-  // Easier: when fetching state we know it succeeded if room is non-null
-  // and one of p1/p2 has our name AND we've called join before.
 
   const fetchState = useCallback(async () => {
     if (!roomId) return;
@@ -111,45 +111,19 @@ export default function DuelGamePage() {
       const data = await res.json();
       if (data.room) setRoom(data.room);
     } catch {
-      // best-effort poll; will retry next tick
+      // best-effort poll
     }
   }, [roomId]);
 
-  // Initial load.
   useEffect(() => {
     fetchState();
   }, [fetchState]);
 
-  // Polling loop. Don't poll once we know we're not seated yet (we
-  // still want one poll to load the room initially, then the join
-  // flow runs; after seated, resume polling).
   useEffect(() => {
     if (!roomId) return;
     const id = setInterval(fetchState, POLL_MS);
     return () => clearInterval(id);
   }, [roomId, fetchState]);
-
-  // Try to figure out which slot we are. The server's /join endpoint
-  // returns the room with our slot filled in; we then compare names.
-  // Since playerToken is private, easiest seat-detection is to attempt
-  // a join — the server returns the room with us in a slot.
-  useEffect(() => {
-    if (!roomId || !room || seated) return;
-    // If we've already seated ourselves through join, that path sets
-    // seated. Otherwise — try to detect from cached state.
-    // We don't have token visibility, so the most robust is: if our
-    // localStorage saved 'joined as' marker exists for this room.
-    try {
-      const marker = window.localStorage.getItem(
-        `pardle.duel.seated.${roomId}`,
-      );
-      if (marker === "p1" || marker === "p2") {
-        setSeated(marker);
-      }
-    } catch {
-      // ignore
-    }
-  }, [roomId, room, seated]);
 
   async function handleJoin() {
     setJoinError(null);
@@ -172,37 +146,52 @@ export default function DuelGamePage() {
       if (!res.ok || !data.room) {
         setJoinError(
           data.error === "room_full_or_missing"
-            ? "Room is full or doesn't exist."
+            ? "Room is full or has already started."
             : "Couldn't join — try again.",
         );
         return;
       }
       setRoom(data.room);
-      // Figure out which slot we landed in by name match.
-      const r: PublicRoom = data.room;
-      if (r.p1?.name === trimmed) {
-        setSeated("p1");
+      if (typeof data.slot === "number") {
+        setSeatedSlot(data.slot);
         try {
-          window.localStorage.setItem(`pardle.duel.seated.${roomId}`, "p1");
-        } catch {}
-      } else if (r.p2?.name === trimmed) {
-        setSeated("p2");
-        try {
-          window.localStorage.setItem(`pardle.duel.seated.${roomId}`, "p2");
-        } catch {}
+          window.localStorage.setItem(
+            `pardle.duel.seated.${roomId}`,
+            String(data.slot),
+          );
+        } catch {
+          // ignore
+        }
       }
     } catch {
       setJoinError("Network issue — try again.");
     }
   }
 
+  async function handleStart() {
+    if (starting) return;
+    setStarting(true);
+    try {
+      const res = await fetch(`/api/duel/${roomId}/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hostToken: playerToken }),
+      });
+      const data = await res.json();
+      if (res.ok && data.room) setRoom(data.room);
+    } catch {
+      // ignore — next poll will catch up
+    } finally {
+      setStarting(false);
+    }
+  }
+
   async function handleAnswer(answerIndex: number) {
-    if (!room || !seated || submitting) return;
+    if (!room || seatedSlot === null || submitting) return;
     if (room.status !== "active") return;
     const idx = room.currentQuestionIndex;
     const q = room.questions[idx];
-    // Don't double-submit
-    const mine = seated === "p1" ? q.state.p1Answer : q.state.p2Answer;
+    const mine = q.state.picks[seatedSlot];
     if (mine !== null) return;
     setSubmitting(true);
     try {
@@ -236,9 +225,9 @@ export default function DuelGamePage() {
   }
 
   async function shareInvite() {
-    if (!room?.p1) return;
     const url = `${BRAND.url}/duel/${roomId}`;
-    const text = `${room.p1.name} is challenging you to a Pardle Trivia Duel! 10 questions, fastest correct answer wins. Click to play:`;
+    const hostName = room?.players[0]?.name ?? "A friend";
+    const text = `${hostName} is challenging you to a Pardle Trivia Duel! 10 questions, fastest correct answer wins. Click to play:`;
     const nav = navigator as Navigator & {
       share?: (data: { text: string; url?: string }) => Promise<void>;
     };
@@ -290,11 +279,14 @@ export default function DuelGamePage() {
     );
   }
 
-  const isHost = seated === "p1";
-  const me = seated === "p1" ? room.p1 : seated === "p2" ? room.p2 : null;
-  const them = seated === "p1" ? room.p2 : seated === "p2" ? room.p1 : null;
-  const needsToJoin = !seated && room.status === "waiting" && !room.p2;
-  const cannotJoin = !seated && (room.status !== "waiting" || !!room.p2);
+  const activePlayers = room.players.filter((p): p is PublicPlayer => p !== null);
+  const isHost = seatedSlot === 0;
+  const me = seatedSlot !== null ? room.players[seatedSlot] : null;
+  const needsToJoin =
+    seatedSlot === null && room.status === "waiting" && activePlayers.length < MAX_PLAYERS;
+  const cannotJoin =
+    seatedSlot === null &&
+    (room.status !== "waiting" || activePlayers.length >= MAX_PLAYERS);
 
   return (
     <main className="container">
@@ -309,25 +301,40 @@ export default function DuelGamePage() {
       </header>
 
       {/* SCOREBOARD — shown once seated */}
-      {seated && (
-        <div className="duel-scoreboard">
-          <div className={`duel-scoreboard-player ${seated === "p1" ? "duel-scoreboard-me" : ""}`}>
-            <div className="duel-scoreboard-name">{room.p1?.name ?? "—"}</div>
-            <div className="duel-scoreboard-score">{room.p1?.score ?? 0}</div>
-          </div>
-          <div className="duel-scoreboard-vs">vs</div>
-          <div className={`duel-scoreboard-player ${seated === "p2" ? "duel-scoreboard-me" : ""}`}>
-            <div className="duel-scoreboard-name">{room.p2?.name ?? "Waiting…"}</div>
-            <div className="duel-scoreboard-score">{room.p2?.score ?? 0}</div>
-          </div>
+      {seatedSlot !== null && (
+        <div
+          className={`duel-scoreboard duel-scoreboard-${activePlayers.length}`}
+        >
+          {room.players.map((p, i) => {
+            if (!p) return null;
+            return (
+              <div
+                key={i}
+                className={`duel-scoreboard-player ${seatedSlot === i ? "duel-scoreboard-me" : ""}`}
+              >
+                <div className="duel-scoreboard-name">{p.name}</div>
+                <div className="duel-scoreboard-score">{p.score}</div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* HOST view — duel will start as soon as someone joins via the link */}
-      {seated === "p1" && room.status === "waiting" && (
+      {/* HOST view: lobby with invite link + start button */}
+      {seatedSlot !== null && isHost && room.status === "waiting" && (
         <div className="duel-waiting">
-          <h2>Send this to a friend to start</h2>
-          <p>The duel begins the moment they tap the link.</p>
+          <h2>Send this to your friends to play</h2>
+          <p>
+            {activePlayers.length === 1 ? (
+              <>Up to 3 friends can join. Hit start when ready.</>
+            ) : (
+              <>
+                {activePlayers.length} player
+                {activePlayers.length === 1 ? "" : "s"} in the room. Add up to{" "}
+                {MAX_PLAYERS - activePlayers.length} more, or start now.
+              </>
+            )}
+          </p>
           <div className="duel-link-row">
             <code className="duel-link">{`${BRAND.url}/duel/${roomId}`}</code>
           </div>
@@ -347,25 +354,42 @@ export default function DuelGamePage() {
               {shareCopied ? "Copied!" : "Copy link"}
             </button>
           </div>
-        </div>
-      )}
-      {/* If p2 lands here while p1 is also waiting (rare race), still show
-         a holding state instead of nothing. */}
-      {seated === "p2" && room.status === "waiting" && (
-        <div className="duel-waiting">
-          <h2>Sit tight — duel starting…</h2>
-          <p>Connecting you with {room.p1?.name ?? "the host"}.</p>
+          <button
+            type="button"
+            className="duel-cta duel-cta-start"
+            onClick={handleStart}
+            disabled={activePlayers.length < MIN_PLAYERS_TO_START || starting}
+          >
+            {starting
+              ? "Starting…"
+              : activePlayers.length < MIN_PLAYERS_TO_START
+                ? "Waiting for at least one friend…"
+                : `Start the duel (${activePlayers.length} player${activePlayers.length === 1 ? "" : "s"})`}
+          </button>
         </div>
       )}
 
-      {/* JOIN as p2 — visitor flow */}
+      {/* NON-HOST seated view while host is still in the lobby */}
+      {seatedSlot !== null && !isHost && room.status === "waiting" && (
+        <div className="duel-waiting">
+          <h2>You&apos;re in</h2>
+          <p>
+            Waiting for{" "}
+            <strong>{room.players[0]?.name ?? "the host"}</strong> to start
+            the duel. {activePlayers.length} player
+            {activePlayers.length === 1 ? "" : "s"} in the room so far.
+          </p>
+        </div>
+      )}
+
+      {/* JOIN — fresh visitor */}
       {needsToJoin && (
         <div className="duel-join">
           <h2>You&apos;ve been challenged</h2>
           <p>
-            <strong>{room.p1?.name || "A friend"}</strong> wants a Trivia
-            Duel. 10 {room.difficulty} questions, fastest correct answer
-            wins each one.
+            <strong>{room.players[0]?.name || "A friend"}</strong> wants a
+            Pardle Trivia Duel. 10 {room.difficulty} questions, fastest
+            correct answer wins each one.
           </p>
           <label className="duel-field">
             <span className="duel-field-label">Your name</span>
@@ -376,7 +400,7 @@ export default function DuelGamePage() {
               onChange={(e) => setJoinName(e.target.value)}
               maxLength={30}
               autoComplete="given-name"
-              placeholder="What should your friend see?"
+              placeholder="What should the others see?"
             />
           </label>
           {joinError && <p className="duel-error">{joinError}</p>}
@@ -393,19 +417,19 @@ export default function DuelGamePage() {
       {cannotJoin && (
         <div className="duel-empty">
           <h2>Can&apos;t join this duel</h2>
-          <p>This room is already in progress with two players, or the duel has finished.</p>
+          <p>
+            This room is full or the duel has already started.
+          </p>
           <Link href="/duel" className="duel-cta">
             Start a new duel →
           </Link>
         </div>
       )}
 
-      {/* ACTIVE — currently playing */}
-      {seated && room.status === "active" && (() => {
+      {/* ACTIVE GAME */}
+      {seatedSlot !== null && room.status === "active" && (() => {
         const q = room.questions[room.currentQuestionIndex];
-        const myAns = seated === "p1" ? q.state.p1Answer : q.state.p2Answer;
-        const theirAns = seated === "p1" ? q.state.p2Answer : q.state.p1Answer;
-        const myCorrect = seated === "p1" ? q.state.p1Correct : q.state.p2Correct;
+        const myPick = q.state.picks[seatedSlot];
         const resolved = q.state.resolved;
         return (
           <div className="duel-stage">
@@ -417,7 +441,7 @@ export default function DuelGamePage() {
                 <div
                   className="trivia-progress-bar-fill"
                   style={{
-                    width: `${((room.currentQuestionIndex) / 10) * 100}%`,
+                    width: `${(room.currentQuestionIndex / 10) * 100}%`,
                     background: "#7BAE3F",
                   }}
                 />
@@ -428,16 +452,22 @@ export default function DuelGamePage() {
 
             <div className="trivia-options">
               {q.options.map((opt, idx) => {
-                const isMine = myAns === idx;
-                const isTheirs = theirAns === idx;
+                // Which players (by slot) picked this option?
+                const pickers: number[] = [];
+                room.players.forEach((p, slot) => {
+                  if (!p) return;
+                  const pick = q.state.picks[slot];
+                  if (pick && pick.answer === idx) pickers.push(slot);
+                });
+                const isMine = myPick !== null && myPick.answer === idx;
                 let cls = "trivia-option";
                 if (resolved && q.correct !== null) {
                   if (idx === q.correct) cls += " trivia-option-correct";
-                  else if (isMine || isTheirs) cls += " trivia-option-wrong";
+                  else if (pickers.length > 0) cls += " trivia-option-wrong";
                   else cls += " trivia-option-disabled";
                 } else if (isMine) {
                   cls += " trivia-option-picked";
-                } else if (myAns !== null || resolved) {
+                } else if (myPick !== null || resolved) {
                   cls += " trivia-option-disabled";
                 }
                 return (
@@ -446,53 +476,72 @@ export default function DuelGamePage() {
                     type="button"
                     className={cls}
                     onClick={() => handleAnswer(idx)}
-                    disabled={myAns !== null || resolved || submitting}
+                    disabled={myPick !== null || resolved || submitting}
                   >
                     <span className="trivia-option-letter">
                       {["A", "B", "C", "D"][idx]}
                     </span>
                     <span className="trivia-option-text">{opt}</span>
-                    {isMine && !resolved && (
-                      <span className="duel-tag duel-tag-me">you</span>
-                    )}
-                    {isTheirs && !resolved && (
-                      <span className="duel-tag duel-tag-them">{them?.name ?? "them"}</span>
+                    {/* Show name tags for any player who picked this option */}
+                    {pickers.length > 0 && (
+                      <span className="duel-tags">
+                        {pickers.map((slot) => (
+                          <span
+                            key={slot}
+                            className={`duel-tag ${slot === seatedSlot ? "duel-tag-me" : "duel-tag-them"}`}
+                          >
+                            {slot === seatedSlot
+                              ? "you"
+                              : (room.players[slot]?.name ?? "?")}
+                          </span>
+                        ))}
+                      </span>
                     )}
                   </button>
                 );
               })}
             </div>
 
-            {!resolved && myAns !== null && (
-              <p className="duel-status-line">
-                You&apos;ve answered. Waiting for {them?.name ?? "your opponent"}…
-              </p>
-            )}
-            {!resolved && myAns === null && theirAns !== null && (
-              <p className="duel-status-line">
-                {them?.name ?? "Your opponent"} has answered. Your turn!
-              </p>
-            )}
+            {/* Status line */}
+            {!resolved && (() => {
+              const unanswered = room.players
+                .map((p, slot) =>
+                  p && q.state.picks[slot] === null ? p.name : null,
+                )
+                .filter((n): n is string => n !== null && room.players.findIndex((pp) => pp?.name === n) !== seatedSlot);
+              if (myPick !== null && unanswered.length > 0) {
+                return (
+                  <p className="duel-status-line">
+                    You&apos;ve answered. Waiting for {unanswered.join(", ")}…
+                  </p>
+                );
+              }
+              return null;
+            })()}
 
             {resolved && (
               <div className="trivia-reveal">
-                {q.state.winner === seated && (
+                {q.state.winnerSlot === seatedSlot && (
                   <p className="trivia-reveal-text trivia-reveal-correct">
                     You won this question!
                   </p>
                 )}
-                {q.state.winner === (seated === "p1" ? "p2" : "p1") && (
-                  <p className="trivia-reveal-text trivia-reveal-wrong">
-                    {them?.name ?? "Opponent"} got there first.
-                  </p>
-                )}
-                {q.state.winner === "none" && (
+                {q.state.winnerSlot !== null &&
+                  q.state.winnerSlot !== -1 &&
+                  q.state.winnerSlot !== seatedSlot && (
+                    <p className="trivia-reveal-text trivia-reveal-wrong">
+                      {room.players[q.state.winnerSlot]?.name ?? "Someone"} got there first.
+                    </p>
+                  )}
+                {q.state.winnerSlot === -1 && (
                   <p className="trivia-reveal-text">
-                    Both wrong — no points awarded.
+                    Everyone wrong — no points awarded.
                   </p>
                 )}
-                {myCorrect === false && q.state.winner !== seated && (
-                  <p className="duel-fineprint">You picked wrong — eliminated for this question.</p>
+                {myPick !== null && !myPick.correct && q.state.winnerSlot !== seatedSlot && (
+                  <p className="duel-fineprint">
+                    You picked wrong — eliminated for this question.
+                  </p>
                 )}
                 {q.fact && <p className="trivia-fact">{q.fact}</p>}
                 <p className="duel-fineprint">Next question in a moment…</p>
@@ -503,25 +552,34 @@ export default function DuelGamePage() {
       })()}
 
       {/* FINISHED */}
-      {seated && room.status === "finished" && (() => {
+      {seatedSlot !== null && room.status === "finished" && (() => {
+        const ranked = room.players
+          .map((p, slot) => (p ? { slot, ...p } : null))
+          .filter((p): p is { slot: number; name: string; score: number } => p !== null)
+          .sort((a, b) => b.score - a.score);
         const myScore = me?.score ?? 0;
-        const theirScore = them?.score ?? 0;
-        const result =
-          myScore > theirScore
-            ? "win"
-            : myScore < theirScore
-              ? "lose"
-              : "draw";
+        const topScore = ranked[0]?.score ?? 0;
+        const iWon = myScore === topScore && ranked.filter((p) => p.score === topScore).length === 1;
+        const tied = myScore === topScore && ranked.filter((p) => p.score === topScore).length > 1;
         return (
           <div className="answer-card">
             <h3 className="answer-card-title">
-              {result === "win" && "You won the duel!"}
-              {result === "lose" && "Out-duelled."}
-              {result === "draw" && "It's a tie."}
+              {iWon && "You won the duel!"}
+              {!iWon && tied && "Tied for the win."}
+              {!iWon && !tied && myScore !== topScore && "Out-duelled."}
             </h3>
-            <p className="answer-card-detail">
-              Final score: {myScore} — {theirScore}
-            </p>
+            <div className="duel-final-table">
+              {ranked.map((p, i) => (
+                <div
+                  key={p.slot}
+                  className={`duel-final-row ${p.slot === seatedSlot ? "duel-final-me" : ""}`}
+                >
+                  <span className="duel-final-rank">{i + 1}</span>
+                  <span className="duel-final-name">{p.name}</span>
+                  <span className="duel-final-score">{p.score}</span>
+                </div>
+              ))}
+            </div>
 
             <div className="answer-buttons">
               <Link href="/duel" className="answer-share">
@@ -536,7 +594,7 @@ export default function DuelGamePage() {
       })()}
 
       <footer>
-        <p>{BRAND.domain} · Trivia Duel</p>
+        <p>{BRAND.domain} · Trivia Duel · Up to 4 players</p>
       </footer>
     </main>
   );

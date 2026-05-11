@@ -1,61 +1,68 @@
 /**
- * Shared types for the Trivia Duel mode.
+ * Shared types for the Trivia Duel mode (up to 4 players).
  *
- * A "duel" is a 2-player real-time trivia race. Both players see the
- * same 10 questions in the same order. For each question, whoever
+ * A duel is a real-time trivia race for 2–4 players. All players see
+ * the same 10 questions in the same order. For each question, whoever
  * clicks the *correct* answer first wins that question. Clicking the
- * wrong answer eliminates you from that question; the other player
- * can still try. If both answer wrong, the question is a draw.
+ * wrong answer eliminates you from that question; remaining players
+ * can still try. If everyone left clicks wrong (or all answer wrong),
+ * the question is a draw and no points are awarded.
  *
- * The host creates a room and is auto-slotted as p1. They share the
- * URL with one friend who joins as p2. State lives in Upstash Redis
- * with a 1-hour TTL.
+ * The host creates a room and is seated in slot 0. They share the URL
+ * with friends — up to 3 more can join. The host explicitly starts
+ * the duel when ready (any time after the second player joins).
+ * Rooms live in Upstash Redis with a 1-hour TTL.
  */
 
 import type { TriviaDifficulty } from "@/lib/data/trivia";
 
-export type PlayerSlot = "p1" | "p2";
+export const MAX_PLAYERS = 4;
+export const MIN_PLAYERS_TO_START = 2;
 
 export interface DuelPlayer {
   /** Stable per-device token, also used to authenticate /answer calls. */
   token: string;
   name: string;
-  /** Number of questions won so far. */
   score: number;
 }
 
-/** Per-question state — what each player picked, who won. */
+export interface DuelPick {
+  /** Index 0..3 of the player's chosen option. */
+  answer: number;
+  correct: boolean;
+  /** Server timestamp when the click was recorded. */
+  clickedAt: number;
+}
+
 export interface DuelQuestionState {
-  /** Player's chosen answer index for this question, if they've picked yet. */
-  p1Answer: number | null;
-  p2Answer: number | null;
-  /** Was each player's pick correct? null until they've answered. */
-  p1Correct: boolean | null;
-  p2Correct: boolean | null;
-  /** Server timestamps for each player's click (for race auditing). */
-  p1ClickedAt: number | null;
-  p2ClickedAt: number | null;
-  /** Once resolved, who won this question. */
+  /** Length-MAX_PLAYERS, null for "this player hasn't answered yet". */
+  picks: (DuelPick | null)[];
+  /** Once the question has been decided. */
   resolved: boolean;
-  winner: PlayerSlot | "none" | null;
-  /** Server timestamp at resolution — used by clients to auto-advance. */
+  /**
+   * Index of the winning player slot once resolved.
+   *   -1 = nobody won (everyone wrong, or no answers landed before all
+   *   non-eliminated players had taken their attempt).
+   *   null = not resolved yet.
+   */
+  winnerSlot: number | null;
   resolvedAt: number | null;
 }
 
 export type DuelStatus =
-  | "waiting" // p2 hasn't joined yet
+  | "waiting" // host hasn't started the duel yet
   | "active" // game in progress
   | "finished"; // all 10 questions resolved
 
 export interface DuelRoom {
   roomId: string;
   difficulty: TriviaDifficulty;
-  /** Mulberry32 seed for picking which 10 questions to use. */
+  /** Mulberry32 seed for picking the 10 questions. */
   seed: number;
-  p1: DuelPlayer | null;
-  p2: DuelPlayer | null;
+  /** Length-MAX_PLAYERS — null = empty slot. Slot 0 is the host. */
+  players: (DuelPlayer | null)[];
   status: DuelStatus;
-  /** 0..9 — which question is currently active. Equals 10 when finished. */
+  /** 0..9 — currently active question. Equals 10 when finished. */
   currentQuestionIndex: number;
   /** Length-10 array of per-question state. */
   questions: DuelQuestionState[];
@@ -63,6 +70,3 @@ export interface DuelRoom {
   startedAt: number | null;
   finishedAt: number | null;
 }
-
-/** Sentinel for "no winner yet" / "this is a draw". */
-export const NO_WINNER = "none" as const;
