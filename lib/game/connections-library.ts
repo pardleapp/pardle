@@ -1,31 +1,31 @@
 /**
  * Hand-curated category library for Pardle: Connections.
  *
- * V3 design principle: every category is *clever* — a pattern that
- * gives an "aha" moment when spotted, not just a fact you either know
- * or don't. Three flavours of cleverness, each tied to a difficulty
- * tier:
+ * V4 design principle: every category gives an "aha" moment when
+ * spotted. We cut categories that were pure classification (from Asia,
+ * surnames starting with a vowel, three-letter surnames) because
+ * those just test whether you can read, not whether you can spot a
+ * pattern. Categories now come in three clever flavours:
  *
- *   GREEN  — Year-specific major winners. "The four 2022 major
- *            champions" is more satisfying to spot than "Won the
- *            Masters", because each player belongs to exactly one
- *            year, and recognising the year is the trick.
+ *   GREEN  — Year-specific major winners. Each group is exactly the
+ *            four players who won that calendar year's four majors.
+ *            The PUZZLE is recognising the year.
  *
- *   BLUE   — Specific narrative feats: 2-majors-in-a-year, Olympic
- *            medallists, Ryder Cup captains for one continent.
+ *   BLUE   — Narrative feats: won-in-playoff, shot-59, back-to-back-
+ *            majors, 25-or-younger, three-decades, captained a side.
+ *            Each one is a specific story you have to recall.
  *
- *   PURPLE — Pure wordplay over names: common-English-word surnames,
- *            surnames-that-are-first-names, four-letter surnames,
- *            surnames ending in -son. Pure NYT purple energy.
+ *   PURPLE — Pure wordplay: common-English-word surname, surname-
+ *            that's-also-a-first-name, surnames ending in -son,
+ *            first/last-name-same-length, surname-starts-with-a-word.
  *
- *   YELLOW — Country groupings. Still the most accessible / fastest-
- *            to-spot tier so beginners have a foothold.
+ *   YELLOW — Country groupings. Kept as the most accessible tier so
+ *            beginners always have a foothold, but no broad / lazy
+ *            "From Asia" type entries.
  *
  * The puzzle generator (connections.ts) enforces strict non-overlap
  * per puzzle: every chosen golfer belongs to EXACTLY ONE of the four
- * selected categories' full member lists. So Rory could be the "2014
- * major winner" answer one day and the "Held world #1" answer
- * another, but never both in the same puzzle.
+ * selected categories' full member lists.
  */
 
 import type { ConnectionsDifficulty } from "./connections-types";
@@ -101,16 +101,10 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "thorbjørn-olesen",
     ],
   },
-  {
-    id: "y-asia",
-    label: "From Asia",
-    difficulty: "yellow",
-    memberIds: ["hideki-matsuyama", "tom-kim", "si-woo-kim", "sungjae-im"],
-  },
 
   // ─── GREEN: the four winners of one year's majors ─────────────────
-  // Each group is exactly 4. Spotting the *year* is the puzzle —
-  // recognising the four specific names as a set is the "aha".
+  // Each group is exactly the four players who won that calendar
+  // year's four majors. Recognising the *year* is the aha moment.
   {
     id: "g-majors-2023",
     label: "Won a major in 2023",
@@ -151,6 +145,17 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
     ],
   },
   {
+    id: "g-majors-2012",
+    label: "Won a major in 2012",
+    difficulty: "green",
+    memberIds: [
+      "bubba-watson",
+      "webb-simpson",
+      "ernie-els",
+      "rory-mcilroy",
+    ],
+  },
+  {
     id: "g-majors-1997",
     label: "Won a major in 1997",
     difficulty: "green",
@@ -162,8 +167,9 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
     ],
   },
 
-  // Broader event categories — wider pools so the assembler has slack
-  // for non-overlap constraints. Used when year-specific cats clash.
+  // Broader event categories — wider pools so the assembler always
+  // has slack to fill green even when several year-specific cats
+  // can't be paired together.
   {
     id: "g-multiple-masters",
     label: "Multiple Masters titles",
@@ -198,37 +204,89 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
     ],
   },
   {
-    id: "g-career-pga-champ",
-    label: "Won the PGA Championship",
+    id: "g-same-major-three-plus",
+    label: "Won the same major three or more times",
     difficulty: "green",
     memberIds: [
-      "scottie-scheffler",
-      "xander-schauffele",
-      "brooks-koepka",
-      "justin-thomas",
-      "collin-morikawa",
-      "phil-mickelson",
-      "tiger-woods",
-      "jason-day",
-      "keegan-bradley",
-      "rory-mcilroy",
-      "jack-nicklaus",
-      "gary-player",
-      "lee-trevino",
-      "padraig-harrington",
-      "vijay-singh",
-      "davis-love-iii",
-      "john-daly",
+      "tiger-woods", // Masters x5, US Open x3, Open x3, PGA x4
+      "phil-mickelson", // Masters x3
+      "nick-faldo", // Masters x3, Open x3
+      "gary-player", // Masters x3, Open x3
+      "tom-watson", // Open x5
+      "jack-nicklaus", // Masters x6, US Open x4, PGA x5
     ],
   },
 
-  // ─── BLUE: narrative / specific feats ─────────────────────────────
+  // ─── BLUE: narrative feats ────────────────────────────────────────
   {
-    id: "b-two-majors-one-year",
-    label: "Won two majors in the same year",
+    id: "b-major-under-25",
+    label: "Won a major aged 25 or younger",
     difficulty: "blue",
     memberIds: [
-      "tiger-woods", // 2000, 2002
+      "tiger-woods", // 21 at 1997 Masters
+      "rory-mcilroy", // 22 at 2011 US Open
+      "jordan-spieth", // 21 at 2015 Masters
+      "justin-thomas", // 24 at 2017 PGA
+      "collin-morikawa", // 23 at 2020 PGA
+      "scottie-scheffler", // 25 at 2022 Masters
+      "jack-nicklaus", // 22 at 1962 US Open
+      "gary-player", // 23 at 1959 Open
+    ],
+  },
+  {
+    id: "b-major-playoff",
+    label: "Won a major in a playoff",
+    difficulty: "blue",
+    memberIds: [
+      "tiger-woods", // 2008 US Open vs Mediate
+      "bubba-watson", // 2012, 2014 Masters
+      "john-daly", // 1995 Open vs Rocca
+      "stewart-cink", // 2009 Open vs Watson
+      "padraig-harrington", // 2007 Open vs Garcia
+      "mark-calcavecchia", // 1989 Open
+    ],
+  },
+  {
+    id: "b-shot-59-or-lower",
+    label: "Has shot 59 or lower on the PGA Tour",
+    difficulty: "blue",
+    memberIds: [
+      "jim-furyk", // 58 + 59
+      "adam-hadwin", // 59 in 2017
+      "justin-thomas", // 59 in 2017
+      "david-duval", // 59 in 1999
+    ],
+  },
+  {
+    id: "b-three-decades",
+    label: "Won majors in three different decades",
+    difficulty: "blue",
+    memberIds: [
+      "gary-player", // 50s/60s/70s/80s
+      "jack-nicklaus", // 60s/70s/80s
+      "tiger-woods", // 90s/00s/10s
+      "phil-mickelson", // 00s/10s/20s
+    ],
+  },
+  {
+    id: "b-back-to-back-major",
+    label: "Won the same major in back-to-back years",
+    difficulty: "blue",
+    memberIds: [
+      "tiger-woods", // PGA 1999/2000, Masters 2001/2002
+      "padraig-harrington", // Open 2007/2008
+      "brooks-koepka", // US Open 2017/2018, PGA 2018/2019
+      "nick-faldo", // Masters 1989/1990
+      "tom-watson", // Open 1982/1983
+      "lee-trevino", // Open 1971/1972
+    ],
+  },
+  {
+    id: "b-two-majors-one-year",
+    label: "Won two majors in the same calendar year",
+    difficulty: "blue",
+    memberIds: [
+      "tiger-woods", // 2000 (3), 2002 (2)
       "jordan-spieth", // 2015 Masters + US Open
       "tom-watson", // 1977 Masters + Open, 1982 US Open + Open
       "lee-trevino", // 1971 US Open + Open
@@ -336,21 +394,44 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
     ],
   },
   {
-    id: "b-major-after-40",
-    label: "Won a major aged 40 or older",
+    id: "b-ryder-2023-europe",
+    label: "Played for Europe at the 2023 Ryder Cup",
     difficulty: "blue",
     memberIds: [
-      "phil-mickelson",
-      "vijay-singh",
-      "hale-irwin",
-      "mark-omeara",
-      "lee-trevino",
-      "gary-player",
-      "jack-nicklaus",
+      "rory-mcilroy",
+      "jon-rahm",
+      "tyrrell-hatton",
+      "shane-lowry",
+      "matt-fitzpatrick",
+      "viktor-hovland",
+      "nicolai-højgaard",
+      "ludvig-åberg",
+      "sepp-straka",
+      "robert-macintyre",
+      "justin-rose",
+    ],
+  },
+  {
+    id: "b-ryder-2023-usa",
+    label: "Played for USA at the 2023 Ryder Cup",
+    difficulty: "blue",
+    memberIds: [
+      "scottie-scheffler",
+      "xander-schauffele",
+      "patrick-cantlay",
+      "jordan-spieth",
+      "justin-thomas",
+      "brooks-koepka",
+      "sam-burns",
+      "wyndham-clark",
+      "rickie-fowler",
+      "max-homa",
+      "collin-morikawa",
+      "brian-harman",
     ],
   },
 
-  // ─── PURPLE: name-pattern wordplay ────────────────────────────────
+  // ─── PURPLE: pure wordplay ────────────────────────────────────────
   {
     id: "p-surname-english-word",
     label: "Surname is a common English word",
@@ -376,7 +457,7 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "adam-scott", // Scott
       "keith-mitchell", // Mitchell
       "davis-riley", // Riley
-      "sandy-lyle", // Lyle (Lyle Lovett, etc)
+      "sandy-lyle", // Lyle
     ],
   },
   {
@@ -394,29 +475,10 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
     ],
   },
   {
-    id: "p-surname-starts-vowel",
-    label: "Surname starts with a vowel",
-    difficulty: "purple",
-    memberIds: [
-      "josé-maría-olazábal",
-      "thorbjørn-olesen",
-      "ludvig-åberg",
-      "sungjae-im",
-      "harris-english",
-      "ernie-els",
-    ],
-  },
-  {
     id: "p-first-name-tom",
     label: "First name is Tom",
     difficulty: "purple",
     memberIds: ["tom-watson", "tom-kim", "tom-hoge", "tom-lehman"],
-  },
-  {
-    id: "p-three-letter-surname",
-    label: "Three-letter surname",
-    difficulty: "purple",
-    memberIds: ["jason-day", "ryan-fox", "tom-kim", "si-woo-kim", "aaron-rai"],
   },
   {
     id: "p-four-letter-surname",
@@ -430,6 +492,30 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "max-homa", // Homa
       "john-daly", // Daly
       "patrick-reed", // Reed
+    ],
+  },
+  {
+    id: "p-same-length-name",
+    label: "First and last name are the same length",
+    difficulty: "purple",
+    memberIds: [
+      "tom-kim", // 3 / 3
+      "john-daly", // 4 / 4
+      "vijay-singh", // 5 / 5
+      "sergio-garcía", // 6 / 6
+    ],
+  },
+  {
+    id: "p-surname-starts-with-word",
+    label: "Surname begins with a common English word",
+    difficulty: "purple",
+    memberIds: [
+      "tyrrell-hatton", // HAT
+      "lucas-glover", // GLOVE
+      "gary-player", // PLAY
+      "fred-couples", // COUPLE
+      "sam-burns", // BURN
+      "jim-furyk", // FUR
     ],
   },
 ];
