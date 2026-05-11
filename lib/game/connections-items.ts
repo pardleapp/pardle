@@ -183,6 +183,48 @@ export const ITEM_REGISTRY: Record<string, string> = {
   // different interpretations.
   "w-word-money": "Money", // "___ shot" + perfectly struck shot
   "w-word-cart": "Cart", // "Golf ___" + type of bag
+
+  // ─── Animal nicknames of famous pros ──────────────────────────
+  //   Tiger Woods · Golden Bear (Nicklaus) · Great White Shark (Norman)
+  //   The Hawk (Hogan)
+  // "Tiger" lives at w-fname-tiger and is reused by this category —
+  // when "Animal nicknames" is selected the puzzle excludes the
+  // "Famous first names" category (and vice-versa).
+  "w-nick-bear": "Bear",
+  "w-nick-shark": "Shark",
+  "w-nick-hawk": "Hawk",
+
+  // ─── Short-game shot types ────────────────────────────────────
+  // "Bunker" reused from course features — bunker shot vs sand
+  // bunker as a hazard.
+  "w-short-putt": "Putt",
+  "w-short-chip": "Chip",
+  "w-short-pitch": "Pitch",
+  "w-short-lob": "Lob",
+
+  // ─── Golf course design styles ────────────────────────────────
+  "w-design-links": "Links",
+  "w-design-parkland": "Parkland",
+  "w-design-heathland": "Heathland",
+  "w-design-stadium": "Stadium",
+  "w-design-sandbelt": "Sandbelt",
+
+  // ─── Adjectives a golfer uses to describe a hole ──────────────
+  // "Open" reused from tournament names below — overlap is the
+  // whole point.
+  "w-adj-long": "Long",
+  "w-adj-tight": "Tight",
+  "w-adj-tough": "Tough",
+  "w-adj-forgiving": "Forgiving",
+
+  // ─── Swing checkpoint additions ───────────────────────────────
+  // "Top" reused from mis-hits (w-mishit-top) — top of the
+  // backswing vs topping the ball.
+  "w-swing-impact": "Impact",
+
+  // ─── Tournament names (additions for cross-category overlap) ──
+  "w-event-open": "Open",
+  "w-event-masters": "Masters",
 };
 
 export function itemTextOrNull(id: string): string | null {

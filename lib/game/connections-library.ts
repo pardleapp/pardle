@@ -151,6 +151,18 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "w-shot-draw",
     ],
   },
+  {
+    id: "y-short-game",
+    label: "Short-game shot types",
+    difficulty: "yellow",
+    memberIds: [
+      "w-short-putt",
+      "w-short-chip",
+      "w-short-pitch",
+      "w-short-lob",
+      "w-feature-bunker", // shared with "Course features"
+    ],
+  },
 
   // ─── GREEN: the four winners of one year's majors ─────────────────
   // Each group is exactly the four players who won that calendar
@@ -563,6 +575,29 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
     ],
   },
   {
+    id: "b-animal-nicknames",
+    label: "Animal nicknames of famous pros",
+    difficulty: "blue",
+    memberIds: [
+      "w-fname-tiger", // Tiger Woods — shared with "Famous golfer first names"
+      "w-nick-bear", // Golden Bear — Jack Nicklaus
+      "w-nick-shark", // Great White Shark — Greg Norman
+      "w-nick-hawk", // The Hawk — Ben Hogan
+    ],
+  },
+  {
+    id: "b-design-styles",
+    label: "Golf course design styles",
+    difficulty: "blue",
+    memberIds: [
+      "w-design-links",
+      "w-design-parkland",
+      "w-design-heathland",
+      "w-design-stadium",
+      "w-design-sandbelt",
+    ],
+  },
+  {
     id: "b-ryder-2023-europe",
     label: "Played for Europe at the 2023 Ryder Cup",
     difficulty: "blue",
@@ -707,7 +742,9 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
     memberIds: [
       "w-swing-setup",
       "w-swing-backswing",
+      "w-mishit-top", // shared with "Mis-hits" — top of backswing / topping
       "w-swing-downswing",
+      "w-swing-impact",
       "w-swing-followthrough",
     ],
   },
@@ -749,7 +786,7 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
   },
   {
     id: "p-event-common-words",
-    label: "PGA Tour events whose names are also common English words",
+    label: "Golf tournament names that are also common English words",
     difficulty: "purple",
     memberIds: [
       "w-event-players",
@@ -757,6 +794,20 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "w-event-travelers",
       "w-event-heritage",
       "w-event-genesis",
+      "w-event-open", // shared with "Hole adjectives"
+      "w-event-masters",
+    ],
+  },
+  {
+    id: "p-hole-adjectives",
+    label: "Adjectives a golfer uses to describe a hole",
+    difficulty: "purple",
+    memberIds: [
+      "w-adj-long",
+      "w-event-open", // shared with "Tournament names"
+      "w-adj-tight",
+      "w-adj-tough",
+      "w-adj-forgiving",
     ],
   },
 ];
