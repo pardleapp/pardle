@@ -269,14 +269,36 @@ export default function TriviaPage() {
       name = entered.trim().slice(0, 30);
       if (name) saveChallengerName(name);
     }
-    const token = encodeTriviaChallenge({
+    const payload = {
       d: difficulty,
       n: dayNumber,
       p: name || "A friend",
       a: answers,
       s: correctCount,
-    });
-    const url = `${BRAND.url}/trivia/c/${token}`;
+    };
+    // Try the short-id path first — POSTs the payload to Redis and
+    // gets back a 6-char id. Falls back to the long base64url token
+    // in the URL if the network/Redis is down.
+    let url = "";
+    try {
+      const res = await fetch("/api/trivia-challenge/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.id === "string" && data.id.length > 0) {
+          url = `${BRAND.url}/trivia/c/${data.id}`;
+        }
+      }
+    } catch {
+      // ignore — falls through to the long-token fallback below
+    }
+    if (!url) {
+      const token = encodeTriviaChallenge(payload);
+      url = `${BRAND.url}/trivia/c/${token}`;
+    }
     const tier =
       difficulty === "easy"
         ? "Easy"

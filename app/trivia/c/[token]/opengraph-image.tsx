@@ -1,5 +1,9 @@
 import { ImageResponse } from "next/og";
-import { decodeTriviaChallenge } from "@/lib/trivia-challenge";
+import {
+  decodeTriviaChallenge,
+  type TriviaChallengePayload,
+} from "@/lib/trivia-challenge";
+import { loadChallenge } from "@/lib/trivia-challenge-store";
 
 export const runtime = "edge";
 export const alt = "Pardle Trivia challenge";
@@ -16,9 +20,25 @@ const DIFFICULTY_ACCENT: Record<string, string> = {
   hard: "#E07070",
 };
 
+const SHORT_ID_MAX = 12;
+
+async function resolvePayload(
+  token: string,
+): Promise<TriviaChallengePayload | null> {
+  // Short ids → Redis lookup. Longer strings → legacy base64url decode.
+  if (token.length <= SHORT_ID_MAX) {
+    try {
+      return await loadChallenge(token);
+    } catch {
+      return null;
+    }
+  }
+  return decodeTriviaChallenge(token);
+}
+
 export default async function OpengraphImage({ params }: Params) {
   const { token } = await params;
-  const decoded = decodeTriviaChallenge(token);
+  const decoded = await resolvePayload(token);
 
   if (!decoded) {
     return new ImageResponse(

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { BRAND } from "@/lib/brand";
 import { generateDailyTrivia } from "@/lib/game/trivia";
@@ -17,6 +17,10 @@ import {
 
 const TOTAL_QUESTIONS = 10;
 
+/** Anything longer than this is treated as a legacy base64url token,
+ *  not a short Redis-backed id. Short ids are typically 6 chars. */
+const SHORT_ID_MAX = 12;
+
 const DIFFICULTY_ACCENT: Record<string, string> = {
   easy: "#7BAE3F",
   medium: "#E8C547",
@@ -27,10 +31,48 @@ export default function TriviaChallengePage() {
   const params = useParams<{ token: string }>();
   const token = params?.token ?? "";
 
-  const payload: TriviaChallengePayload | null = useMemo(
-    () => decodeTriviaChallenge(token),
-    [token],
-  );
+  // Short ids (≤ SHORT_ID_MAX chars) live in Redis; anything longer is
+  // a legacy base64url token we can decode client-side. We try inline
+  // decode first (covers legacy + lets the page render without a
+  // network round-trip when possible), then fetch from Redis if it's a
+  // short id we don't recognise.
+  const inlinePayload: TriviaChallengePayload | null = useMemo(() => {
+    if (!token || token.length <= SHORT_ID_MAX) return null;
+    return decodeTriviaChallenge(token);
+  }, [token]);
+
+  const [fetchedPayload, setFetchedPayload] =
+    useState<TriviaChallengePayload | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token || token.length > SHORT_ID_MAX) return;
+    // Look up the short-id payload from the server.
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/trivia-challenge/${token}`, {
+          cache: "no-store",
+        });
+        if (cancelled) return;
+        if (!res.ok) {
+          setFetchError(res.status === 404 ? "not_found" : "server");
+          return;
+        }
+        const data = await res.json();
+        if (data?.payload) setFetchedPayload(data.payload);
+        else setFetchError("not_found");
+      } catch {
+        if (!cancelled) setFetchError("network");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const payload: TriviaChallengePayload | null =
+    inlinePayload ?? fetchedPayload;
 
   // Friend's name + intro screen state.
   const [intro, setIntro] = useState(true);
@@ -86,14 +128,35 @@ export default function TriviaChallengePage() {
       friendName.trim().slice(0, 30) ||
       loadChallengerName().slice(0, 30) ||
       "Friend";
-    const newToken = encodeTriviaChallenge({
+    const newPayload = {
       d: payload.d,
       n: payload.n,
       p: myName,
       a: answers,
       s: myCorrect,
-    });
-    const url = `${BRAND.url}/trivia/c/${newToken}`;
+    };
+    // Same short-id-with-base64-fallback path as the original
+    // 'Challenge a friend' button on the solo trivia page.
+    let url = "";
+    try {
+      const res = await fetch("/api/trivia-challenge/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newPayload),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.id === "string") {
+          url = `${BRAND.url}/trivia/c/${data.id}`;
+        }
+      }
+    } catch {
+      // ignore — falls through to legacy long token below
+    }
+    if (!url) {
+      const newToken = encodeTriviaChallenge(newPayload);
+      url = `${BRAND.url}/trivia/c/${newToken}`;
+    }
     const text = `I just played ${BRAND.name} Trivia — ${myCorrect}/${TOTAL_QUESTIONS} on ${payload.d}. Beat me: ${url}`;
     const nav = navigator as Navigator & {
       share?: (data: { text: string }) => Promise<void>;
@@ -116,6 +179,12 @@ export default function TriviaChallengePage() {
   }
 
   if (!payload || !daily) {
+    // Still loading a short-id challenge from the server — show a
+    // gentle loading state. If the fetch returned not-found / errored,
+    // show the not-found state instead.
+    const shouldShowError =
+      fetchError !== null ||
+      (token.length > SHORT_ID_MAX && !inlinePayload);
     return (
       <main className="container">
         <header className="brand">
@@ -124,16 +193,22 @@ export default function TriviaChallengePage() {
           </Link>
           <h1>{BRAND.name}</h1>
         </header>
-        <div className="duel-empty">
-          <h2>Challenge not found</h2>
-          <p>
-            This trivia challenge link couldn&apos;t be read. It may be
-            corrupted or expired.
+        {shouldShowError ? (
+          <div className="duel-empty">
+            <h2>Challenge not found</h2>
+            <p>
+              This trivia challenge link couldn&apos;t be read. It may be
+              corrupted or have expired (challenges live for 30 days).
+            </p>
+            <Link href="/trivia" className="duel-cta">
+              Play trivia →
+            </Link>
+          </div>
+        ) : (
+          <p className="subtitle" style={{ textAlign: "center" }}>
+            Loading challenge…
           </p>
-          <Link href="/trivia" className="duel-cta">
-            Play trivia →
-          </Link>
-        </div>
+        )}
       </main>
     );
   }
