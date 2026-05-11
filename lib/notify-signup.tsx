@@ -9,9 +9,13 @@ import { useState } from "react";
 // actually sending the daily reminder.
 const FORMSPREE_URL = "https://formspree.io/f/mlgzaeze";
 
-// One subscription serves all three games. Once a user has said yes
-// on any answer card, we suppress the prompt on the others too.
-const SUBSCRIBED_KEY = "pardle.notifySubscribed";
+// Subscription is tracked per-game so a user who said yes on Pros
+// still sees the prompt on Holes / Clubhouses / Connections. Each
+// game's signup gives us an extra confirmed lead and a signal about
+// which game converted them.
+function subscribedKey(gameId: string): string {
+  return `pardle.notifySubscribed.${gameId}`;
+}
 
 interface Props {
   gameId: "pros" | "holes" | "clubs" | "connections";
@@ -19,25 +23,25 @@ interface Props {
 }
 
 type State =
-  | { tag: "hidden" }      // already subscribed on this device
+  | { tag: "hidden" }      // already subscribed for *this* game
   | { tag: "init" }        // form visible, awaiting input
   | { tag: "submitting" }
   | { tag: "success" }
   | { tag: "error" }
   | { tag: "dismissed" };
 
-function readSubscribed(): boolean {
+function readSubscribed(gameId: string): boolean {
   if (typeof window === "undefined") return false;
   try {
-    return window.localStorage.getItem(SUBSCRIBED_KEY) === "true";
+    return window.localStorage.getItem(subscribedKey(gameId)) === "true";
   } catch {
     return false;
   }
 }
 
-function markSubscribed(): void {
+function markSubscribed(gameId: string): void {
   try {
-    window.localStorage.setItem(SUBSCRIBED_KEY, "true");
+    window.localStorage.setItem(subscribedKey(gameId), "true");
   } catch {
     // ignore — user blocking localStorage, signup still hit Formspree
   }
@@ -45,7 +49,7 @@ function markSubscribed(): void {
 
 export function NotifySignup({ gameId, dayNumber }: Props) {
   const [state, setState] = useState<State>(() =>
-    readSubscribed() ? { tag: "hidden" } : { tag: "init" },
+    readSubscribed(gameId) ? { tag: "hidden" } : { tag: "init" },
   );
   const [email, setEmail] = useState("");
 
@@ -81,7 +85,7 @@ export function NotifySignup({ gameId, dayNumber }: Props) {
         }),
       });
       if (res.ok) {
-        markSubscribed();
+        markSubscribed(gameId);
         setState({ tag: "success" });
       } else {
         setState({ tag: "error" });
