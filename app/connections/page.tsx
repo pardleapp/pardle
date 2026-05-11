@@ -27,6 +27,39 @@ import { NotifySignup } from "@/lib/notify-signup";
 const GAME_ID = "connections";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 11);
 const MAX_MISTAKES = 4;
+const STATE_KEY = "pardle.connections.todayState";
+
+// Persisted snapshot of today's puzzle so a refresh — whether mid-game
+// or after finishing — restores progress rather than starting over.
+interface PersistedDayState {
+  dayNumber: number;
+  mistakes: number;
+  history: ConnectionsDifficulty[][];
+  solvedLabels: string[];
+  revealedHints: string[];
+}
+
+function loadDayState(dayNumber: number): PersistedDayState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedDayState;
+    if (parsed.dayNumber !== dayNumber) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveDayState(state: PersistedDayState): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STATE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore — over quota or disabled
+  }
+}
 
 function dayIndexToday(): number {
   const now = new Date();
@@ -101,6 +134,11 @@ export default function ConnectionsPage() {
   // had 3 of 4 in the same group.
   const [revealedHints, setRevealedHints] = useState<Set<string>>(new Set());
   const [oneAwayFlash, setOneAwayFlash] = useState(false);
+  // True when this page load restored a *finished* game from
+  // localStorage (player came back to today's puzzle). Drives the
+  // 'you already played today' banner so the celebration ('Solved!')
+  // doesn't reappear every time they revisit.
+  const [returnedAfterFinish, setReturnedAfterFinish] = useState(false);
   const [stats, setStats] = useState<PardleStats | null>(null);
   const [challenge, setChallenge] = useState<ChallengePayload | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
@@ -130,6 +168,22 @@ export default function ConnectionsPage() {
 
   useEffect(() => {
     setStats(applyMissedDayReset(GAME_ID, dayNumber));
+    // Restore today's in-progress (or completed) game from localStorage
+    // so a refresh doesn't blow away guesses, mistakes, or the final
+    // answer-card view.
+    const saved = loadDayState(dayNumber);
+    if (saved) {
+      setMistakes(saved.mistakes);
+      setHistory(saved.history);
+      const solvedSet = new Set(saved.solvedLabels);
+      setSolved(
+        puzzle.categories.filter((c) => solvedSet.has(c.label)),
+      );
+      setRevealedHints(new Set(saved.revealedHints));
+      const finishedAlready =
+        saved.solvedLabels.length === 4 || saved.mistakes >= MAX_MISTAKES;
+      if (finishedAlready) setReturnedAfterFinish(true);
+    }
     try {
       const code = new URLSearchParams(window.location.search).get("c");
       if (code) {
@@ -139,7 +193,23 @@ export default function ConnectionsPage() {
     } catch {
       // ignore
     }
+    // puzzle.categories is derived from dayNumber so referencing it once
+    // here is stable; intentionally not in deps to avoid re-restoring on
+    // every render of the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayNumber]);
+
+  // Persist day-state every time the meaningful slices change. Keeps
+  // the localStorage snapshot in lockstep with what the player sees.
+  useEffect(() => {
+    saveDayState({
+      dayNumber,
+      mistakes,
+      history,
+      solvedLabels: solved.map((c) => c.label),
+      revealedHints: Array.from(revealedHints),
+    });
+  }, [dayNumber, mistakes, history, solved, revealedHints]);
 
   useEffect(() => {
     if (!isOver) return;
@@ -330,6 +400,12 @@ export default function ConnectionsPage() {
         <div className="challenge-banner challenge-expired">
           That challenge link is from a different day — here&apos;s today&apos;s
           puzzle.
+        </div>
+      )}
+      {returnedAfterFinish && (
+        <div className="challenge-banner">
+          <span aria-hidden="true">✅</span> You&apos;ve already finished
+          today&apos;s Connections. Come back tomorrow for a new puzzle.
         </div>
       )}
 
