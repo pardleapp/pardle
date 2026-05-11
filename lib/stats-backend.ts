@@ -22,7 +22,8 @@ export type StatsGameId =
   | "holes"
   | "clubs"
   | "connections"
-  | "trivia";
+  | "trivia"
+  | "faces";
 
 export const STATS_GAMES: readonly StatsGameId[] = [
   "pros",
@@ -30,6 +31,7 @@ export const STATS_GAMES: readonly StatsGameId[] = [
   "clubs",
   "connections",
   "trivia",
+  "faces",
 ];
 
 export interface GameDayStats {

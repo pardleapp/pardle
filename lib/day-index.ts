@@ -12,6 +12,7 @@ const LAUNCH: Record<StatsGameId, number> = {
   clubs: Date.UTC(2026, 4, 11),
   connections: Date.UTC(2026, 4, 11),
   trivia: Date.UTC(2026, 4, 11),
+  faces: Date.UTC(2026, 4, 11),
 };
 
 function todayUtc(): number {

@@ -1,0 +1,80 @@
+/**
+ * Pardle: Faces — daily face-blend puzzle picker.
+ *
+ * Two players' Wikipedia headshots are blended into one ambiguous face
+ * via stacked images + mix-blend-mode. The player has to identify both
+ * pros from the merged image.
+ *
+ * Pool is restricted to recognisable pros (S/A/B tier) WITH a
+ * non-null Wikipedia imageUrl — anyone the player wouldn't have heard
+ * of, or anyone we have no photo for, is skipped.
+ *
+ * The puzzle for each UTC day is the same for every player.
+ */
+
+import { GOLFERS } from "@/lib/data/golfers";
+import type { Golfer } from "@/lib/game/types";
+
+export const TOTAL_GUESSES = 4;
+
+/** All pros eligible for face puzzles. Filtered to ensure recognisability
+ * and that we actually have a photo to merge. */
+export function facesPool(): Golfer[] {
+  return GOLFERS.filter(
+    (g) =>
+      g.imageUrl !== null &&
+      (g.tier === "S" || g.tier === "A" || g.tier === "B"),
+  );
+}
+
+export interface FacesPuzzle {
+  dayNumber: number;
+  /** Both pros to guess. Order is arbitrary — the player can name them
+   *  in either slot. */
+  left: Golfer;
+  right: Golfer;
+}
+
+// Mulberry32 — deterministic PRNG seeded from day index.
+function seededRandom(seed: number): () => number {
+  let a = (seed >>> 0) || 1;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function pickDailyPair(dayNumber: number): FacesPuzzle {
+  const pool = facesPool();
+  if (pool.length < 2) {
+    throw new Error(
+      `Faces pool has only ${pool.length} eligible pros — need at least 2.`,
+    );
+  }
+  // Seed the RNG from the day index so today's pair is stable.
+  const rand = seededRandom(dayNumber * 7919 + 13);
+  const a = Math.floor(rand() * pool.length);
+  let b = Math.floor(rand() * pool.length);
+  while (b === a) b = (b + 1) % pool.length;
+  return { dayNumber, left: pool[a], right: pool[b] };
+}
+
+/** Normalise a typed guess for case- + diacritic-insensitive matching. */
+export function normaliseGuess(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // strip diacritics
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+}
+
+/** Is `guess` an acceptable rendering of `golfer`'s name? */
+export function matchesGolfer(guess: string, golfer: Golfer): boolean {
+  const g = normaliseGuess(guess);
+  if (g.length === 0) return false;
+  return normaliseGuess(golfer.name) === g;
+}

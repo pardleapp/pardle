@@ -83,6 +83,16 @@ const GAMES: GameTile[] = [
     accent: "#E8C547",
     tag: "Multiplayer",
   },
+  {
+    id: "faces",
+    href: "/faces",
+    name: "Faces",
+    blurb: "Two famous pros, blended into one face. Name them both.",
+    emoji: "👥",
+    status: "live",
+    accent: "#E07B5B",
+    tag: "New",
+  },
 ];
 
 function tileStyle(accent: string): CSSProperties {
