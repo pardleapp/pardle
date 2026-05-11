@@ -14,7 +14,7 @@ const FORMSPREE_URL = "https://formspree.io/f/mlgzaeze";
 const SUBSCRIBED_KEY = "pardle.notifySubscribed";
 
 interface Props {
-  gameId: "pros" | "holes" | "clubs";
+  gameId: "pros" | "holes" | "clubs" | "connections";
   dayNumber: number;
 }
 

@@ -43,6 +43,14 @@ const GAMES: GameTile[] = [
     status: "live",
     accent: "#E0A85B",
   },
+  {
+    href: "/connections",
+    name: "Connections",
+    blurb: "Find four groups of four golfers that share something.",
+    emoji: "🧩",
+    status: "live",
+    accent: "#B388D6",
+  },
 ];
 
 function tileStyle(accent: string): CSSProperties {

@@ -38,6 +38,197 @@ body {
   flex-direction: column;
 }
 
+/* ---------- Connections game ---------- */
+
+.conn-prompt {
+  text-align: center;
+  font-size: 14px;
+  color: var(--muted);
+  margin: 4px 0 14px;
+}
+
+.conn-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.conn-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 64px;
+  padding: 6px 4px;
+  border-radius: 8px;
+  background: #efe7d2;
+  border: 2px solid transparent;
+  color: #1a1a1a;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-family: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  /* names can be long (e.g. "Cameron Smith") — let them wrap */
+  word-break: break-word;
+  hyphens: auto;
+  transition: transform 80ms ease, background 80ms ease;
+}
+
+.conn-tile:hover {
+  background: #e6dcc1;
+}
+
+.conn-tile-selected {
+  background: #5a5a5e;
+  color: white;
+  border-color: #3a3a3c;
+  transform: scale(0.97);
+}
+
+.conn-tile-selected:hover {
+  background: #4a4a4e;
+}
+
+@keyframes connShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.conn-shake {
+  animation: connShake 420ms ease;
+}
+
+.conn-status {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.conn-mistakes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+
+.conn-dots {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.conn-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text);
+  opacity: 0.85;
+}
+
+.conn-dot-used {
+  background: transparent;
+  border: 2px solid var(--border);
+}
+
+.conn-controls {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.conn-btn {
+  padding: 12px 22px;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  border: 2px solid var(--text);
+  background: transparent;
+  color: var(--text);
+  letter-spacing: 0.2px;
+}
+
+.conn-btn-primary {
+  background: var(--text);
+  color: var(--bg, white);
+}
+
+.conn-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.conn-solved-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.conn-solved-strip {
+  padding: 12px 14px;
+  border-radius: 10px;
+  text-align: center;
+  color: #1a1a1a;
+}
+
+.conn-solved-label {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.conn-solved-members {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.conn-strip-yellow { background: #f9df6d; }
+.conn-strip-green { background: #a0c35a; }
+.conn-strip-blue { background: #b0c4ef; }
+.conn-strip-purple { background: #ba81c5; }
+
+@media (prefers-color-scheme: dark) {
+  .conn-tile {
+    background: #2c2c2e;
+    color: white;
+  }
+  .conn-tile:hover {
+    background: #38383a;
+  }
+  .conn-tile-selected {
+    background: #efe7d2;
+    color: #1a1a1a;
+    border-color: #f3ead5;
+  }
+  .conn-tile-selected:hover {
+    background: #e6dcc1;
+  }
+  .conn-btn-primary {
+    background: white;
+    color: #1a1a1a;
+    border-color: white;
+  }
+  .conn-btn-secondary {
+    border-color: white;
+    color: white;
+  }
+}
+
 /* ---------- Holes game ---------- */
 
 .tour-filter {
