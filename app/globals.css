@@ -661,6 +661,20 @@ body {
   padding-top: 16px;
 }
 
+.hub-footer p {
+  margin: 4px 0;
+}
+
+.hub-footer-link {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.hub-footer-link:hover {
+  color: var(--text);
+}
+
 /* ---------- Coming-soon pages ---------- */
 
 .coming-soon {

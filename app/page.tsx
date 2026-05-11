@@ -97,6 +97,14 @@ export default function HubHome() {
 
       <footer className="hub-footer">
         <p>{BRAND.domain} · A daily-puzzle hub for golf nerds.</p>
+        <p>
+          <a
+            className="hub-footer-link"
+            href={`mailto:${BRAND.email}?subject=Pardle%20feedback`}
+          >
+            Contact us
+          </a>
+        </p>
       </footer>
     </main>
   );
