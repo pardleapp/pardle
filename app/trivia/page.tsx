@@ -20,11 +20,17 @@ const GAME_ID = "trivia";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 11);
 const TOTAL_QUESTIONS = 10;
 
-const STATE_KEY = "pardle.trivia.todayState";
 const DIFFICULTY_KEY = "pardle.trivia.difficulty";
 
-// Persisted snapshot so a refresh mid-puzzle (or after finishing)
-// restores progress rather than starting over.
+/**
+ * One persisted state slot PER difficulty so the player can have an
+ * in-progress easy puzzle AND an in-progress medium puzzle on the
+ * same day without the two clobbering each other.
+ */
+function stateKey(difficulty: TriviaDifficulty): string {
+  return `pardle.trivia.todayState.${difficulty}`;
+}
+
 interface PersistedDayState {
   dayNumber: number;
   difficulty: TriviaDifficulty;
@@ -72,9 +78,10 @@ function loadDayState(
 ): PersistedDayState | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(STATE_KEY);
+    const raw = window.localStorage.getItem(stateKey(difficulty));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PersistedDayState;
+    // Same difficulty's state from a PREVIOUS day is stale — start fresh.
     if (parsed.dayNumber !== dayNumber || parsed.difficulty !== difficulty) {
       return null;
     }
@@ -87,7 +94,10 @@ function loadDayState(
 function saveDayState(state: PersistedDayState): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STATE_KEY, JSON.stringify(state));
+    window.localStorage.setItem(
+      stateKey(state.difficulty),
+      JSON.stringify(state),
+    );
   } catch {
     // ignore
   }
@@ -167,12 +177,11 @@ export default function TriviaPage() {
       setAnswers(new Array(TOTAL_QUESTIONS).fill(-1));
       setCurrentIndex(0);
     }
+    // Intentionally NOT saving here — the save would race with this
+    // load when switching difficulties (writing one difficulty's
+    // answers into another difficulty's slot before the load resolves).
+    // Saves happen imperatively inside pickAnswer / goNext below.
   }, [dayNumber, difficulty]);
-
-  // Persist after any state change.
-  useEffect(() => {
-    saveDayState({ dayNumber, difficulty, currentIndex, answers });
-  }, [dayNumber, difficulty, currentIndex, answers]);
 
   // Record the result the first time the puzzle finishes.
   useEffect(() => {
@@ -198,17 +207,43 @@ export default function TriviaPage() {
     setAnswers((prev) => {
       const next = prev.slice();
       next[currentIndex] = optionIndex;
+      // Persist this difficulty's state immediately. Doing the save
+      // inside the action handler (rather than via a useEffect tied
+      // to [answers, currentIndex]) avoids the race where switching
+      // difficulties briefly writes one slot's data into another's.
+      saveDayState({
+        dayNumber,
+        difficulty,
+        currentIndex,
+        answers: next,
+      });
       return next;
     });
   }
 
   function goNext() {
-    setCurrentIndex((i) => i + 1);
+    setCurrentIndex((i) => {
+      const next = i + 1;
+      saveDayState({
+        dayNumber,
+        difficulty,
+        currentIndex: next,
+        answers,
+      });
+      return next;
+    });
   }
 
   function restartDifficulty() {
-    setAnswers(new Array(TOTAL_QUESTIONS).fill(-1));
+    const fresh = new Array(TOTAL_QUESTIONS).fill(-1);
+    setAnswers(fresh);
     setCurrentIndex(0);
+    saveDayState({
+      dayNumber,
+      difficulty,
+      currentIndex: 0,
+      answers: fresh,
+    });
   }
 
   function changeDifficulty(d: TriviaDifficulty) {
