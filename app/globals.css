@@ -496,6 +496,95 @@ body {
   margin-top: 4px;
 }
 
+.notify-signup {
+  margin-top: 16px;
+  padding: 12px 14px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+
+.notify-prompt {
+  font-size: 13px;
+  color: var(--text);
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.notify-form {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.notify-form input {
+  flex: 1;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  color: #1a1a1a;
+  font-family: inherit;
+  min-width: 0;
+}
+
+.notify-form input:focus {
+  outline: 2px solid var(--green);
+  outline-offset: -1px;
+}
+
+.notify-form button {
+  padding: 9px 14px;
+  border: none;
+  border-radius: 6px;
+  background: var(--green);
+  color: white;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.notify-form button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.notify-dismiss {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 11px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px;
+  font-family: inherit;
+}
+
+.notify-dismiss:hover {
+  color: var(--text);
+}
+
+.notify-error {
+  color: #e07070;
+  font-size: 12px;
+  margin: 6px 0 0;
+}
+
+.notify-success {
+  margin-top: 16px;
+  padding: 10px;
+  background: rgba(123, 174, 63, 0.18);
+  border-radius: 8px;
+  color: #c8e0a0;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .answer-share,
 .answer-challenge {
   border: none;

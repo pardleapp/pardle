@@ -27,6 +27,7 @@ import {
   loadChallengerName,
   saveChallengerName,
 } from "@/lib/challenge";
+import { NotifySignup } from "@/lib/notify-signup";
 
 const GAME_ID = "pros";
 
@@ -517,6 +518,7 @@ function ResultModal({
         <button className="modal-challenge" onClick={handleChallenge}>
           {challengeCopied ? "Challenge copied!" : "Challenge a friend"}
         </button>
+        <NotifySignup gameId="pros" dayNumber={dayNumber} />
       </div>
     </div>
   );

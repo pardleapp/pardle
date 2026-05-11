@@ -27,6 +27,7 @@ import {
   loadChallengerName,
   saveChallengerName,
 } from "@/lib/challenge";
+import { NotifySignup } from "@/lib/notify-signup";
 
 const GAME_ID = "clubs";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 11);
@@ -531,6 +532,8 @@ export default function ClubsPage() {
               {challengeCopied ? "Challenge copied!" : "Challenge a friend"}
             </button>
           </div>
+
+          <NotifySignup gameId="clubs" dayNumber={dayNumber} />
         </div>
       )}
 
