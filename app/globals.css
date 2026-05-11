@@ -1042,14 +1042,20 @@ body {
   margin-top: 16px;
   padding: 12px 14px 8px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
+  /* Mild contrast tint that looks right whether the surrounding
+     element is light (answer-card) or dark (Pros result modal). */
+  background: rgba(127, 127, 127, 0.10);
+  border: 1px solid rgba(127, 127, 127, 0.30);
   text-align: center;
 }
 
 .notify-prompt {
   font-size: 13px;
-  color: var(--text);
+  /* Inherit so the prompt is readable in whatever context the
+     parent puts us in — Pros modal forces color: white, the answer
+     cards on Holes/Clubs/Connections use --text which flips with
+     the OS dark-mode preference. */
+  color: inherit;
   margin: 0 0 8px;
   font-weight: 600;
 }
@@ -1098,7 +1104,10 @@ body {
 .notify-dismiss {
   background: none;
   border: none;
-  color: var(--muted);
+  /* currentColor inherits from parent then we drop opacity so the
+     dismiss link looks secondary regardless of light/dark context. */
+  color: currentColor;
+  opacity: 0.6;
   font-size: 11px;
   text-decoration: underline;
   cursor: pointer;
@@ -1107,7 +1116,7 @@ body {
 }
 
 .notify-dismiss:hover {
-  color: var(--text);
+  opacity: 1;
 }
 
 .notify-error {
@@ -1119,12 +1128,15 @@ body {
 .notify-success {
   margin-top: 16px;
   padding: 10px;
-  background: rgba(123, 174, 63, 0.18);
+  background: rgba(123, 174, 63, 0.20);
+  border: 1px solid rgba(123, 174, 63, 0.45);
   border-radius: 8px;
-  color: #c8e0a0;
+  /* inherit so the message reads against both light and dark
+     parent backgrounds; tint + border do the 'success' signalling. */
+  color: inherit;
   text-align: center;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .answer-share,
