@@ -323,11 +323,11 @@ export default function DuelGamePage() {
         </div>
       )}
 
-      {/* WAITING for friend (host view) */}
-      {seated && room.status === "waiting" && (
+      {/* HOST view — duel will start as soon as someone joins via the link */}
+      {seated === "p1" && room.status === "waiting" && (
         <div className="duel-waiting">
-          <h2>Waiting for your friend…</h2>
-          <p>Share this link. The duel starts the moment they tap it.</p>
+          <h2>Send this to a friend to start</h2>
+          <p>The duel begins the moment they tap the link.</p>
           <div className="duel-link-row">
             <code className="duel-link">{`${BRAND.url}/duel/${roomId}`}</code>
           </div>
@@ -347,6 +347,14 @@ export default function DuelGamePage() {
               {shareCopied ? "Copied!" : "Copy link"}
             </button>
           </div>
+        </div>
+      )}
+      {/* If p2 lands here while p1 is also waiting (rare race), still show
+         a holding state instead of nothing. */}
+      {seated === "p2" && room.status === "waiting" && (
+        <div className="duel-waiting">
+          <h2>Sit tight — duel starting…</h2>
+          <p>Connecting you with {room.p1?.name ?? "the host"}.</p>
         </div>
       )}
 
