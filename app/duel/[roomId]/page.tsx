@@ -71,8 +71,22 @@ export default function DuelGamePage() {
 
   const [room, setRoom] = useState<PublicRoom | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  // null = haven't tried yet, true = we are p1 or p2 in the room
-  const [seated, setSeated] = useState<"p1" | "p2" | null>(null);
+  // Synchronously hydrate seated slot from localStorage on first render
+  // so the host (who set the marker before navigating here) doesn't
+  // see a flash of the 'You've been challenged' join screen meant
+  // for p2.
+  const [seated, setSeated] = useState<"p1" | "p2" | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const v = window.localStorage.getItem(
+        `pardle.duel.seated.${roomId}`,
+      );
+      if (v === "p1" || v === "p2") return v;
+    } catch {
+      // ignore
+    }
+    return null;
+  });
   const [joinName, setJoinName] = useState(() =>
     typeof window === "undefined" ? "" : loadChallengerName(),
   );

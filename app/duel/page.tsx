@@ -63,6 +63,18 @@ export default function DuelLandingPage() {
         setCreating(false);
         return;
       }
+      // Mark the host as seated in slot p1 before navigating so the
+      // room page skips the 'You've been challenged' join screen
+      // (which only makes sense for the second visitor).
+      try {
+        window.localStorage.setItem(
+          `pardle.duel.seated.${data.room.roomId}`,
+          "p1",
+        );
+      } catch {
+        // ignore — the room page will fall back to detecting our slot
+        // by name on the next poll
+      }
       router.push(`/duel/${data.room.roomId}`);
     } catch {
       setError("Network issue — try again.");
