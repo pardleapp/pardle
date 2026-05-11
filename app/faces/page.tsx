@@ -275,7 +275,7 @@ export default function FacesPage() {
   let overlayOpacity = 0.5; // right pro
   if (hintActive && isLeftSolved) {
     baseOpacity = 0.18;
-    overlayOpacity = 0.95;
+    overlayOpacity = 0.75;
   } else if (hintActive && isRightSolved) {
     baseOpacity = 1;
     overlayOpacity = 0.12;
