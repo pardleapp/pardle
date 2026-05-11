@@ -532,7 +532,35 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
     id: "b-bag-types",
     label: "Types of golf bag",
     difficulty: "blue",
-    memberIds: ["w-bag-staff", "w-bag-cart", "w-bag-carry", "w-bag-tour"],
+    memberIds: [
+      "w-bag-staff",
+      "w-word-cart", // shared with "Golf ___"
+      "w-bag-carry",
+      "w-bag-tour",
+    ],
+  },
+  {
+    id: "b-club-materials",
+    label: "Materials used in golf clubs",
+    difficulty: "blue",
+    memberIds: [
+      "w-club-wood", // shared with "Types of golf club"
+      "w-club-iron", // shared with "Types of golf club"
+      "w-mat-steel",
+      "w-mat-graphite",
+      "w-mat-titanium",
+    ],
+  },
+  {
+    id: "b-practice-aspects",
+    label: "Aspects of golf practice",
+    difficulty: "blue",
+    memberIds: [
+      "w-pre-club-driving", // shared with "___ club" (Driving club / Driving range)
+      "w-practice-putting",
+      "w-practice-chipping",
+      "w-practice-approach",
+    ],
   },
   {
     id: "b-ryder-2023-europe",
@@ -653,7 +681,7 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
     difficulty: "purple",
     memberIds: [
       "w-pre-shot-trick",
-      "w-pre-shot-money",
+      "w-word-money", // shared with "Perfectly struck shot"
       "w-pre-shot-hero",
       "w-pre-shot-punch",
     ],
@@ -664,7 +692,7 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
     difficulty: "purple",
     memberIds: [
       "w-post-golf-ball",
-      "w-post-golf-cart",
+      "w-word-cart", // shared with "Types of bag"
       "w-post-golf-bag",
       "w-post-golf-glove",
       "w-post-golf-cap",
@@ -703,7 +731,7 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
     memberIds: [
       "w-pure-pure",
       "w-pure-flush",
-      "w-pure-money",
+      "w-word-money", // shared with "___ shot"
       "w-pure-sweet",
       "w-pure-stripe",
     ],

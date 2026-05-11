@@ -73,14 +73,16 @@ export const ITEM_REGISTRY: Record<string, string> = {
   "w-pre-club-driving": "Driving",
 
   // ─── "____ shot" — words that can precede SHOT ────────────────
+  // Note: "Money" lives at w-word-money below — shared between
+  //   "___ shot" (money shot) and "Pure shot" categories.
   "w-pre-shot-trick": "Trick",
-  "w-pre-shot-money": "Money",
   "w-pre-shot-hero": "Hero",
   "w-pre-shot-punch": "Punch",
 
   // ─── "Golf ____" — words that can follow GOLF ─────────────────
+  // Note: "Cart" lives at w-word-cart below — shared between
+  //   "Golf ___" (golf cart) and "Bag types" (cart bag) categories.
   "w-post-golf-ball": "Ball",
-  "w-post-golf-cart": "Cart",
   "w-post-golf-bag": "Bag",
   "w-post-golf-glove": "Glove",
   "w-post-golf-cap": "Cap",
@@ -113,7 +115,6 @@ export const ITEM_REGISTRY: Record<string, string> = {
   // ─── Insider words for a perfectly struck shot ────────────────
   "w-pure-pure": "Pure",
   "w-pure-flush": "Flush",
-  "w-pure-money": "Money",
   "w-pure-sweet": "Sweet",
   "w-pure-stripe": "Stripe",
 
@@ -149,8 +150,8 @@ export const ITEM_REGISTRY: Record<string, string> = {
   "w-water-stream": "Stream",
 
   // ─── Types of golf bag ────────────────────────────────────────
+  // Note: "Cart" shared with "Golf ___" — see w-word-cart below.
   "w-bag-staff": "Staff",
-  "w-bag-cart": "Cart",
   "w-bag-carry": "Carry",
   "w-bag-tour": "Tour",
 
@@ -160,6 +161,28 @@ export const ITEM_REGISTRY: Record<string, string> = {
   "w-event-travelers": "Travelers",
   "w-event-heritage": "Heritage",
   "w-event-genesis": "Genesis",
+
+  // ─── Materials used in golf club construction ─────────────────
+  // Steel / Graphite / Titanium pair with Wood and Iron from the
+  // clubs section above — the same word IS both a club and a
+  // material, which is exactly the cross-meaning trick we want.
+  "w-mat-steel": "Steel",
+  "w-mat-graphite": "Graphite",
+  "w-mat-titanium": "Titanium",
+
+  // ─── Aspects of golf practice ─────────────────────────────────
+  // "Driving" is also in the "___ club" filler — same word, two
+  // intended readings (driving club / driving practice).
+  "w-practice-putting": "Putting",
+  "w-practice-chipping": "Chipping",
+  "w-practice-approach": "Approach",
+
+  // ─── Words shared across multiple category meanings ───────────
+  // Single registry entry per display text — categories reference
+  // the same id when they want the same word to appear under
+  // different interpretations.
+  "w-word-money": "Money", // "___ shot" + perfectly struck shot
+  "w-word-cart": "Cart", // "Golf ___" + type of bag
 };
 
 export function itemTextOrNull(id: string): string | null {
