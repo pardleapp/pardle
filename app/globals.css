@@ -213,15 +213,26 @@ body {
    higher specificity, those bases (which appear later in the file)
    override these and the header columns drift out of alignment with
    the cells below them on mobile. */
+/* minmax(0, Nfr) instead of Nfr so columns use *strict* fr ratios
+   regardless of content size — without minmax(0, …), CSS Grid uses
+   `auto` as the min-track-size, which means a wide cell (e.g. the
+   direction column showing "1,234 mi ↗") can stretch its column and
+   shift everything else. Header text is shorter, so the header
+   columns stayed proportional while the cell columns drifted — only
+   visible on narrow mobile widths where the squeeze is real. */
 .guess-cells.guess-cells-hard5 {
   display: grid;
-  grid-template-columns: 0.4fr 0.4fr 1.2fr 0.9fr 0.6fr;
+  grid-template-columns:
+    minmax(0, 0.4fr) minmax(0, 0.4fr) minmax(0, 1.2fr)
+    minmax(0, 0.9fr) minmax(0, 0.6fr);
   gap: 4px;
 }
 
 .header-row.header-row-hard5 {
   display: grid;
-  grid-template-columns: 0.4fr 0.4fr 1.2fr 0.9fr 0.6fr;
+  grid-template-columns:
+    minmax(0, 0.4fr) minmax(0, 0.4fr) minmax(0, 1.2fr)
+    minmax(0, 0.9fr) minmax(0, 0.6fr);
   gap: 4px;
   font-size: 11px;
   font-weight: 600;
@@ -1013,6 +1024,10 @@ h1 {
   text-align: center;
   color: white;
   padding: 0 2px;
+  /* So a grid cell with wide content (e.g. "1,234 mi ↗") can't expand
+     its track and shift the header columns out of alignment with it. */
+  min-width: 0;
+  overflow: hidden;
 }
 
 .cell-empty {
