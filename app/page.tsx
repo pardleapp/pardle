@@ -96,10 +96,7 @@ export default function HubHome() {
       </div>
 
       <footer className="hub-footer">
-        <p>
-          {BRAND.domain} · A daily-puzzle hub for golf nerds. New games rolling
-          out.
-        </p>
+        <p>{BRAND.domain} · A daily-puzzle hub for golf nerds.</p>
       </footer>
     </main>
   );
