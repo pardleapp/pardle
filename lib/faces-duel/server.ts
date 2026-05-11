@@ -12,7 +12,7 @@
  */
 
 import { Redis } from "@upstash/redis";
-import { matchesGolfer, pickPuzzleSet } from "@/lib/game/faces";
+import { headshotUrl, matchesGolfer, pickPuzzleSet } from "@/lib/game/faces";
 import type { FacesPuzzle } from "@/lib/game/faces";
 import {
   ADVANCE_AFTER_MS,
@@ -281,8 +281,8 @@ export function publicRoomView(room: FacesDuelRoom) {
       const r = room.rounds[i];
       const reveal = r.resolved || i < room.currentRoundIndex;
       return {
-        leftImage: puz.left.imageUrl,
-        rightImage: puz.right.imageUrl,
+        leftImage: headshotUrl(puz.left),
+        rightImage: headshotUrl(puz.right),
         leftName: reveal ? puz.left.name : null,
         rightName: reveal ? puz.right.name : null,
         leftId: reveal ? puz.left.id : null,

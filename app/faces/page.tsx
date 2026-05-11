@@ -6,6 +6,7 @@ import { BRAND } from "@/lib/brand";
 import { GOLFERS } from "@/lib/data/golfers";
 import {
   facesPool,
+  headshotUrl,
   matchesGolfer,
   pickPuzzleSet,
   PUZZLES_PER_DAY,
@@ -448,19 +449,19 @@ export default function FacesPage() {
               puzzleOver ? "faces-stage-over" : ""
             }`}
           >
-            {currentPuzzle.left.imageUrl && (
+            {headshotUrl(currentPuzzle.left) && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={currentPuzzle.left.imageUrl}
+                src={headshotUrl(currentPuzzle.left)!}
                 alt=""
                 className="faces-img faces-img-base"
                 style={{ opacity: baseOpacity }}
               />
             )}
-            {currentPuzzle.right.imageUrl && (
+            {headshotUrl(currentPuzzle.right) && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={currentPuzzle.right.imageUrl}
+                src={headshotUrl(currentPuzzle.right)!}
                 alt=""
                 className="faces-img faces-img-overlay"
                 style={{ opacity: overlayOpacity }}
@@ -480,11 +481,11 @@ export default function FacesPage() {
               <div className="faces-slot-num">1</div>
               {isLeftSolved || puzzleOver ? (
                 <>
-                  {currentPuzzle.left.imageUrl && (
+                  {headshotUrl(currentPuzzle.left) && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       className="faces-slot-img"
-                      src={currentPuzzle.left.imageUrl}
+                      src={headshotUrl(currentPuzzle.left)!}
                       alt={currentPuzzle.left.name}
                     />
                   )}
@@ -504,11 +505,11 @@ export default function FacesPage() {
               <div className="faces-slot-num">2</div>
               {isRightSolved || puzzleOver ? (
                 <>
-                  {currentPuzzle.right.imageUrl && (
+                  {headshotUrl(currentPuzzle.right) && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       className="faces-slot-img"
-                      src={currentPuzzle.right.imageUrl}
+                      src={headshotUrl(currentPuzzle.right)!}
                       alt={currentPuzzle.right.name}
                     />
                   )}
@@ -625,11 +626,12 @@ export default function FacesPage() {
 }
 
 function ProTag({ pro, solved }: { pro: Golfer; solved: boolean }) {
+  const headshot = headshotUrl(pro);
   return (
     <div className={`faces-recap-pro ${solved ? "faces-recap-solved" : ""}`}>
-      {pro.imageUrl && (
+      {headshot && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={pro.imageUrl} alt={pro.name} />
+        <img src={headshot} alt={pro.name} />
       )}
       <span className="faces-recap-name">{pro.name}</span>
       <span className="faces-recap-mark">{solved ? "✓" : "—"}</span>
