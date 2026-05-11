@@ -56,15 +56,6 @@ const GAMES: GameTile[] = [
     accent: "#5BA0E0",
   },
   {
-    id: "clubs",
-    href: "/clubs",
-    name: "Clubhouses",
-    blurb: "Name the course from its clubhouse silhouette.",
-    emoji: "🏛️",
-    status: "live",
-    accent: "#E0A85B",
-  },
-  {
     id: "connections",
     href: "/connections",
     name: "Connections",
