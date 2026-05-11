@@ -632,9 +632,9 @@ export default function Page() {
           <span>Majors</span>
           <span>Wins</span>
           <span title="Ryder Cup appearances">
-            Ryder
+            Ryder Cup
             <br />
-            Cup
+            Appearances
           </span>
         </div>
 
