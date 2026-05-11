@@ -3585,6 +3585,7 @@ footer {
   height: 100%;
   object-fit: cover;
   object-position: center 20%;
+  transition: opacity 0.55s ease;
 }
 
 .faces-img-base {
@@ -3707,6 +3708,34 @@ footer {
 
 .faces-guess-text {
   margin-left: 6px;
+}
+
+.faces-hint-btn {
+  display: block;
+  width: 100%;
+  margin: 6px 0 4px;
+  padding: 10px 14px;
+  border: 1px solid var(--green);
+  background: rgba(123, 174, 63, 0.12);
+  color: var(--green);
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.faces-hint-btn:hover {
+  background: rgba(123, 174, 63, 0.2);
+  transform: translateY(-1px);
+}
+
+.faces-hint-active {
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-style: italic;
+  margin: 2px 0 6px;
 }
 
 .faces-history {

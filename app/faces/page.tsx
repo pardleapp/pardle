@@ -42,6 +42,8 @@ interface PersistedDayState {
   wrongCount: number;
   /** Final guess history (text + matched id or null), for the share card. */
   history: { text: string; matchedId: string | null }[];
+  /** True once the player has used the "emphasise the other face" hint. */
+  hintUsed?: boolean;
 }
 
 function loadDayState(dayNumber: number): PersistedDayState | null {
@@ -92,6 +94,7 @@ export default function FacesPage() {
   const [history, setHistory] = useState<
     { text: string; matchedId: string | null }[]
   >([]);
+  const [hintUsed, setHintUsed] = useState(false);
   const [stats, setStats] = useState<PardleStats | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   /** Brief flash after a wrong guess so the player sees the rejection. */
@@ -108,6 +111,7 @@ export default function FacesPage() {
       setSolvedIds(persisted.solved);
       setWrongCount(persisted.wrongCount);
       setHistory(persisted.history);
+      setHintUsed(!!persisted.hintUsed);
     }
     setStats(applyMissedDayReset(GAME_ID, day));
   }, []);
@@ -177,6 +181,7 @@ export default function FacesPage() {
         solved: nextSolved,
         wrongCount,
         history: nextHistory,
+        hintUsed,
       });
     } else {
       const nextWrong = wrongCount + 1;
@@ -188,8 +193,21 @@ export default function FacesPage() {
         solved: solvedIds,
         wrongCount: nextWrong,
         history: nextHistory,
+        hintUsed,
       });
     }
+  }
+
+  function useHint() {
+    if (hintUsed || dayNumber == null) return;
+    setHintUsed(true);
+    saveDayState({
+      dayNumber,
+      solved: solvedIds,
+      wrongCount,
+      history,
+      hintUsed: true,
+    });
   }
 
   function pickFromList(g: Golfer) {
@@ -246,6 +264,25 @@ export default function FacesPage() {
 
   const remaining = TOTAL_GUESSES - wrongCount;
 
+  const isLeftSolved = solvedIds.includes(puzzle.left.id);
+  const isRightSolved = solvedIds.includes(puzzle.right.id);
+  // When the hint is active and exactly one face is solved, fade the
+  // identified face down so the unknown one shines through. Once both
+  // are solved (or the game is over) we drop back to the default blend
+  // so the result screen looks normal.
+  const hintActive = hintUsed && !isOver && (isLeftSolved !== isRightSolved);
+  let baseOpacity = 1; // left pro
+  let overlayOpacity = 0.5; // right pro
+  if (hintActive && isLeftSolved) {
+    baseOpacity = 0.18;
+    overlayOpacity = 0.95;
+  } else if (hintActive && isRightSolved) {
+    baseOpacity = 1;
+    overlayOpacity = 0.12;
+  }
+  const canUseHint =
+    !hintUsed && !isOver && (isLeftSolved !== isRightSolved);
+
   return (
     <main className="container">
       <header className="brand">
@@ -278,6 +315,7 @@ export default function FacesPage() {
             src={puzzle.left.imageUrl}
             alt=""
             className="faces-img faces-img-base"
+            style={{ opacity: baseOpacity }}
           />
         )}
         {/* Top layer — right pro at 50% opacity, blended over the bottom. */}
@@ -287,6 +325,7 @@ export default function FacesPage() {
             src={puzzle.right.imageUrl}
             alt=""
             className="faces-img faces-img-overlay"
+            style={{ opacity: overlayOpacity }}
           />
         )}
         {rightFlash && <div className="faces-flash-right">Got one! ✓</div>}
@@ -354,6 +393,21 @@ export default function FacesPage() {
             : "Out of guesses"}
         </span>
       </div>
+
+      {canUseHint && (
+        <button
+          type="button"
+          className="faces-hint-btn"
+          onClick={useHint}
+        >
+          🔍 Hint: emphasise the other face
+        </button>
+      )}
+      {hintUsed && !isOver && (
+        <p className="faces-hint-active">
+          Hint on — the face you haven&apos;t guessed is in front.
+        </p>
+      )}
 
       {!isOver && (
         <div className="input-area">
