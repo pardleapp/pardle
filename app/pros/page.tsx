@@ -102,7 +102,7 @@ function buildShareText(
       ].join(""),
     )
     .join("\n");
-  return `${BRAND.name} #${dayNumber} ${result}\n${grid}\n${BRAND.domain}`;
+  return `${BRAND.name} #${dayNumber} ${result}\n${grid}\n${BRAND.url}/pros`;
 }
 
 function flagFor(countryCode: string): string {

@@ -142,7 +142,7 @@ function buildShareText(
       ].join(""),
     )
     .join("\n");
-  return `${BRAND.name}: Clubs #${dayNumber} ${result}\n${grid}\n${BRAND.domain}/clubs`;
+  return `${BRAND.name}: Clubs #${dayNumber} ${result}\n${grid}\n${BRAND.url}/clubs`;
 }
 
 function compareWithFriend(

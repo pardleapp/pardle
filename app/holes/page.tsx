@@ -226,7 +226,7 @@ function buildShareText(
       ].join(""),
     )
     .join("\n");
-  return `${BRAND.name}: Holes #${dayNumber} ${result}\n${grid}\n${BRAND.domain}/holes`;
+  return `${BRAND.name}: Holes #${dayNumber} ${result}\n${grid}\n${BRAND.url}/holes`;
 }
 
 function compareWithFriend(
@@ -454,7 +454,7 @@ export default function HolesPage() {
     // simple summary line since the reveal cells aren't 1:1 with easy mode.
     const shareText =
       difficulty === "hard"
-        ? `${BRAND.name}: Holes #${dayNumber} ${isWin ? scoreCount : "X"}/${HOLES_MAX_GUESSES} (Hard)\n${BRAND.domain}/holes`
+        ? `${BRAND.name}: Holes #${dayNumber} ${isWin ? scoreCount : "X"}/${HOLES_MAX_GUESSES} (Hard)\n${BRAND.url}/holes`
         : buildShareText(guesses, dayNumber, isWin);
     const nav = navigator as Navigator & {
       share?: (data: { text: string }) => Promise<void>;
