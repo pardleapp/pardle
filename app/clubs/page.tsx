@@ -29,6 +29,7 @@ import {
 } from "@/lib/challenge";
 import { NotifySignup } from "@/lib/notify-signup";
 import { encodeGridPros, encodeShareCard } from "@/lib/share-card";
+import { recordPlayClient } from "@/lib/stats-client";
 
 const GAME_ID = "clubs";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 11);
@@ -249,6 +250,12 @@ export default function ClubsPage() {
   useEffect(() => {
     if (!isOver) return;
     setStats(recordResult(GAME_ID, dayNumber, isWin, scoreCount));
+    void recordPlayClient({
+      game: "clubs",
+      day: dayNumber,
+      isWin,
+      score: scoreCount,
+    });
   }, [isOver, isWin, dayNumber, scoreCount]);
 
   const matches = useMemo(() => {

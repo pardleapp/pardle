@@ -117,6 +117,10 @@ export default async function HubHome() {
       <footer className="hub-footer">
         <p>{BRAND.domain} · A daily-puzzle hub for golf nerds.</p>
         <p>
+          <Link className="hub-footer-link" href="/today">
+            Today&apos;s stats
+          </Link>
+          {" · "}
           <a
             className="hub-footer-link"
             href={`mailto:${BRAND.email}?subject=Pardle%20feedback`}

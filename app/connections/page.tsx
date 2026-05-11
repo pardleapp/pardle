@@ -24,6 +24,7 @@ import {
 } from "@/lib/challenge";
 import { NotifySignup } from "@/lib/notify-signup";
 import { encodeGridConnections, encodeShareCard } from "@/lib/share-card";
+import { recordPlayClient } from "@/lib/stats-client";
 
 const GAME_ID = "connections";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 11);
@@ -223,6 +224,12 @@ export default function ConnectionsPage() {
     if (!isOver) return;
     // Score = number of mistakes used (lower is better; X if loss).
     setStats(recordResult(GAME_ID, dayNumber, isWin, mistakes));
+    void recordPlayClient({
+      game: "connections",
+      day: dayNumber,
+      isWin,
+      score: mistakes,
+    });
   }, [isOver, isWin, dayNumber, mistakes]);
 
   function toggleItem(id: string) {

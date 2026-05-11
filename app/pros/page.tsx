@@ -29,6 +29,7 @@ import {
 } from "@/lib/challenge";
 import { NotifySignup } from "@/lib/notify-signup";
 import { encodeGridPros, encodeShareCard } from "@/lib/share-card";
+import { recordPlayClient } from "@/lib/stats-client";
 
 const GAME_ID = "pros";
 
@@ -585,6 +586,12 @@ export default function Page() {
     if (!isOver) return;
     const updated = recordResult(GAME_ID, dayNumber, isWin, guesses.length);
     setStats(updated);
+    void recordPlayClient({
+      game: "pros",
+      day: dayNumber,
+      isWin,
+      score: guesses.length,
+    });
     const t = setTimeout(() => setModalOpen(true), 350);
     return () => clearTimeout(t);
   }, [isOver, isWin, dayNumber, guesses.length]);

@@ -36,6 +36,7 @@ import {
 } from "@/lib/challenge";
 import { NotifySignup } from "@/lib/notify-signup";
 import { encodeGridPros, encodeShareCard } from "@/lib/share-card";
+import { recordPlayClient } from "@/lib/stats-client";
 
 const GAME_ID = "holes";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 10);
@@ -397,6 +398,12 @@ export default function HolesPage() {
   useEffect(() => {
     if (!isOver) return;
     setStats(recordResult(GAME_ID, dayNumber, isWin, scoreCount));
+    void recordPlayClient({
+      game: "holes",
+      day: dayNumber,
+      isWin,
+      score: scoreCount,
+    });
   }, [isOver, isWin, dayNumber, scoreCount]);
 
   const matches = useMemo(() => {
