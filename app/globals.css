@@ -222,17 +222,25 @@ body {
    visible on narrow mobile widths where the squeeze is real. */
 .guess-cells.guess-cells-hard5 {
   display: grid;
+  /* Column ratios sized to fit the *header text* on a 360px phone:
+     "COUNTRY" needs ~46px, "DIRECTION" ~60px, "TOTAL YARDS" ~50px.
+     Earlier 0.4/0.4/1.2/0.9/0.6 split was sized for cell content
+     (flag, par number) and made COUNTRY overflow into PAR. */
   grid-template-columns:
-    minmax(0, 0.4fr) minmax(0, 0.4fr) minmax(0, 1.2fr)
-    minmax(0, 0.9fr) minmax(0, 0.6fr);
+    minmax(0, 0.65fr) minmax(0, 0.5fr) minmax(0, 1.15fr)
+    minmax(0, 0.85fr) minmax(0, 0.7fr);
   gap: 4px;
 }
 
 .header-row.header-row-hard5 {
   display: grid;
+  /* Column ratios sized to fit the *header text* on a 360px phone:
+     "COUNTRY" needs ~46px, "DIRECTION" ~60px, "TOTAL YARDS" ~50px.
+     Earlier 0.4/0.4/1.2/0.9/0.6 split was sized for cell content
+     (flag, par number) and made COUNTRY overflow into PAR. */
   grid-template-columns:
-    minmax(0, 0.4fr) minmax(0, 0.4fr) minmax(0, 1.2fr)
-    minmax(0, 0.9fr) minmax(0, 0.6fr);
+    minmax(0, 0.65fr) minmax(0, 0.5fr) minmax(0, 1.15fr)
+    minmax(0, 0.85fr) minmax(0, 0.7fr);
   gap: 4px;
   font-size: 11px;
   font-weight: 600;
