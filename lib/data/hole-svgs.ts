@@ -16,6 +16,7 @@ export const HOLE_SVG_IDS: ReadonlySet<string> = new Set([
   "medinah-country-club",
   "merion-golf-club",
   "muirfield",
+  "oakmont-country-club",
   "olympia-fields-country-club",
   "pga-west",
   "plainfield-country-club",
