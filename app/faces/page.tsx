@@ -273,12 +273,15 @@ export default function FacesPage() {
   const hintActive = hintUsed && !isOver && (isLeftSolved !== isRightSolved);
   let baseOpacity = 1; // left pro
   let overlayOpacity = 0.5; // right pro
+  // Hint = mild nudge, not a reveal. Fade the solved face just enough
+  // that the unknown one reads clearer, but keep the blend feel: both
+  // pros should still be visible, the unknown just slightly favoured.
   if (hintActive && isLeftSolved) {
-    baseOpacity = 0.18;
-    overlayOpacity = 0.75;
+    baseOpacity = 0.55;
+    overlayOpacity = 0.62;
   } else if (hintActive && isRightSolved) {
     baseOpacity = 1;
-    overlayOpacity = 0.12;
+    overlayOpacity = 0.25;
   }
   const canUseHint =
     !hintUsed && !isOver && (isLeftSolved !== isRightSolved);
