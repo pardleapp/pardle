@@ -260,6 +260,13 @@ export default function TriviaPage() {
         )}
       </header>
 
+      <Link
+        href="/duel"
+        className="trivia-duel-cta"
+      >
+        ⚔️ Or duel a friend in real-time →
+      </Link>
+
       <div
         className="difficulty-toggle"
         role="tablist"

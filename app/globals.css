@@ -306,6 +306,273 @@ body {
   opacity: 0.92;
 }
 
+/* ---------- Trivia Duel ---------- */
+
+.duel-landing {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.duel-landing-title {
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.2;
+  margin: 0;
+  color: var(--text);
+}
+
+.duel-landing-blurb {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0;
+}
+
+.duel-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.duel-field-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+
+.duel-input {
+  padding: 12px 14px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: white;
+  color: #1a1a1a;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.duel-input:focus {
+  outline: 2px solid var(--green);
+  outline-offset: -1px;
+}
+
+.duel-cta {
+  padding: 14px 22px;
+  border: none;
+  border-radius: 999px;
+  background: var(--green);
+  color: white;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0.3px;
+  box-shadow: 0 4px 14px rgba(123, 174, 63, 0.35);
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.duel-cta:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.duel-cta-share {
+  flex: 1;
+}
+
+.duel-cta-secondary {
+  flex: 1;
+  padding: 14px 22px;
+  border-radius: 999px;
+  background: transparent;
+  border: 2px solid var(--green);
+  color: var(--green);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.duel-share-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.duel-error {
+  color: #e07070;
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.duel-landing-footnote {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+.duel-empty,
+.duel-waiting,
+.duel-join {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+  padding: 24px 18px;
+  border-radius: 14px;
+  background: rgba(123, 174, 63, 0.08);
+  border: 1px solid rgba(123, 174, 63, 0.30);
+  margin-bottom: 18px;
+  text-align: center;
+}
+
+.duel-empty h2,
+.duel-waiting h2,
+.duel-join h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  color: var(--text);
+}
+
+.duel-empty p,
+.duel-waiting p,
+.duel-join p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.duel-link-row {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0 8px;
+}
+
+.duel-link {
+  display: inline-block;
+  padding: 8px 12px;
+  background: rgba(127, 127, 127, 0.12);
+  border-radius: 8px;
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: 12px;
+  color: var(--text);
+  word-break: break-all;
+  text-align: center;
+}
+
+.duel-scoreboard {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(127, 127, 127, 0.08);
+  border: 1px solid rgba(127, 127, 127, 0.30);
+}
+
+.duel-scoreboard-player {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.duel-scoreboard-me .duel-scoreboard-name {
+  color: var(--green);
+}
+
+.duel-scoreboard-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.duel-scoreboard-score {
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  color: var(--text);
+  line-height: 1;
+}
+
+.duel-scoreboard-vs {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+}
+
+.duel-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.duel-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.duel-progress-text {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+
+.duel-tag {
+  margin-left: auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.duel-tag-me {
+  background: var(--green);
+  color: white;
+}
+
+.duel-tag-them {
+  background: rgba(127, 127, 127, 0.25);
+  color: var(--text);
+}
+
+.duel-status-line {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+.duel-fineprint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
 /* ---------- Trivia game ---------- */
 
 .trivia-stage {
@@ -553,6 +820,24 @@ body {
   text-transform: capitalize;
   margin: 0 4px;
   padding: 0;
+}
+
+.trivia-duel-cta {
+  display: block;
+  margin: 0 0 14px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(232, 197, 71, 0.15);
+  border: 1px solid rgba(232, 197, 71, 0.45);
+  color: var(--text);
+  font-weight: 800;
+  font-size: 14px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.trivia-duel-cta:hover {
+  background: rgba(232, 197, 71, 0.22);
 }
 
 /* ---------- Connections game ---------- */
