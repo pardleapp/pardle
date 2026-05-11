@@ -102,6 +102,56 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
     ],
   },
 
+  // ─── YELLOW (word categories): golf-related concepts ──────────────
+  {
+    id: "y-clubs",
+    label: "Types of golf club",
+    difficulty: "yellow",
+    memberIds: [
+      "w-club-driver",
+      "w-club-iron",
+      "w-club-wood",
+      "w-club-wedge",
+      "w-club-putter",
+      "w-club-hybrid",
+    ],
+  },
+  {
+    id: "y-features",
+    label: "Course features",
+    difficulty: "yellow",
+    memberIds: [
+      "w-feature-fairway",
+      "w-feature-bunker",
+      "w-feature-green",
+      "w-feature-rough",
+      "w-feature-tee",
+      "w-feature-pin",
+    ],
+  },
+  {
+    id: "y-under-par",
+    label: "Scores under par",
+    difficulty: "yellow",
+    memberIds: [
+      "w-score-eagle",
+      "w-score-birdie",
+      "w-score-albatross",
+      "w-score-ace",
+    ],
+  },
+  {
+    id: "y-shot-shapes",
+    label: "Ball flight shapes",
+    difficulty: "yellow",
+    memberIds: [
+      "w-shot-slice",
+      "w-shot-hook",
+      "w-shot-fade",
+      "w-shot-draw",
+    ],
+  },
+
   // ─── GREEN: the four winners of one year's majors ─────────────────
   // Each group is exactly the four players who won that calendar
   // year's four majors. Recognising the *year* is the aha moment.
@@ -203,6 +253,47 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "greg-norman",
     ],
   },
+  // ─── GREEN (word categories) ──────────────────────────────────────
+  {
+    id: "g-open-venues",
+    label: "Open Championship venues",
+    difficulty: "green",
+    memberIds: [
+      "w-venue-carnoustie",
+      "w-venue-birkdale",
+      "w-venue-troon",
+      "w-venue-hoylake",
+      "w-venue-muirfield",
+      "w-venue-st-andrews",
+      "w-venue-portrush",
+      "w-venue-turnberry",
+    ],
+  },
+  {
+    id: "g-augusta-features",
+    label: "Augusta National landmarks (first word)",
+    difficulty: "green",
+    memberIds: [
+      "w-augusta-amen", // Corner
+      "w-augusta-magnolia", // Lane
+      "w-augusta-eisenhower", // Tree
+      "w-augusta-hogan", // Bridge
+    ],
+  },
+  {
+    id: "g-equipment-brands",
+    label: "Golf equipment brands",
+    difficulty: "green",
+    memberIds: [
+      "w-brand-titleist",
+      "w-brand-callaway",
+      "w-brand-taylormade",
+      "w-brand-ping",
+      "w-brand-cobra",
+      "w-brand-mizuno",
+    ],
+  },
+
   {
     id: "g-same-major-three-plus",
     label: "Won the same major three or more times",
@@ -516,6 +607,45 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "fred-couples", // COUPLE
       "sam-burns", // BURN
       "jim-furyk", // FUR
+    ],
+  },
+
+  // ─── PURPLE (word categories): pure phrase-filler wordplay ────────
+  // These are the NYT-purple-style "____ X" / "X ____" categories.
+  // Items are short words that look like they could belong anywhere
+  // until you spot the connector.
+  {
+    id: "p-precede-club",
+    label: "___ club",
+    difficulty: "purple",
+    memberIds: [
+      "w-pre-club-golf",
+      "w-pre-club-country",
+      "w-pre-club-night",
+      "w-pre-club-driving",
+    ],
+  },
+  {
+    id: "p-precede-shot",
+    label: "___ shot",
+    difficulty: "purple",
+    memberIds: [
+      "w-pre-shot-trick",
+      "w-pre-shot-money",
+      "w-pre-shot-hero",
+      "w-pre-shot-punch",
+    ],
+  },
+  {
+    id: "p-follow-golf",
+    label: "Golf ___",
+    difficulty: "purple",
+    memberIds: [
+      "w-post-golf-ball",
+      "w-post-golf-cart",
+      "w-post-golf-bag",
+      "w-post-golf-glove",
+      "w-post-golf-cap",
     ],
   },
 ];

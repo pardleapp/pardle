@@ -28,12 +28,27 @@
 
 import { GOLFERS } from "@/lib/data/golfers";
 import { CATEGORY_LIBRARY, type CategoryDef } from "./connections-library";
+import { itemTextOrNull } from "./connections-items";
 import {
   type ConnectionsCategory,
   type ConnectionsPuzzle,
   DIFFICULTY_ORDER,
   type ConnectionsDifficulty,
 } from "./connections-types";
+
+// Resolve any item id (whether it comes from the GOLFERS dataset or
+// the standalone ITEM_REGISTRY for golf words/venues/brands) to its
+// display text.
+function resolveItemText(
+  id: string,
+  golferById: Map<string, { id: string; name: string }>,
+): string {
+  const word = itemTextOrNull(id);
+  if (word !== null) return word;
+  const g = golferById.get(id);
+  if (g) return g.name;
+  throw new Error(`Unknown Connections item id: ${id}`);
+}
 
 export type {
   ConnectionsCategory,
@@ -177,17 +192,14 @@ export function generatePuzzle(dayNumber: number): ConnectionsPuzzle {
     }
     if (aborted) continue;
 
-    const byId = new Map(GOLFERS.map((g) => [g.id, g] as const));
+    const byId = new Map(
+      GOLFERS.map((g) => [g.id, { id: g.id, name: g.name }] as const),
+    );
     const allIds = finalCategories.flatMap((c) => c.memberIds);
-    const items = shuffle(allIds, rand).map((id) => {
-      const g = byId.get(id);
-      if (!g) {
-        throw new Error(
-          `Connections category references unknown golfer id: ${id}`,
-        );
-      }
-      return { id, name: g.name };
-    });
+    const items = shuffle(allIds, rand).map((id) => ({
+      id,
+      name: resolveItemText(id, byId),
+    }));
 
     return {
       dayNumber,
