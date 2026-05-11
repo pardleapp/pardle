@@ -82,9 +82,34 @@ def best_rotation_angle(points: list[tuple[float, float]]) -> float:
     return best_angle
 
 
+QUALITY_MARKERS = (
+    "building=clubhouse",
+    "amenity=clubhouse",
+    "name~clubhouse",
+    "name~course",
+)
+
+
+def is_boring(polygon: list, picked_via: str) -> bool:
+    """A pick is "boring" if OSM gave us a plain rectangle (4 unique
+    vertices, no curves, no wings) AND the scoring fell back to pure
+    size/distance with no name or tag match. These render as a
+    featureless dark rectangle on parchment — visually blank, no fun
+    to guess. Reject them so the pool only contains recognisable
+    silhouettes."""
+    pts = polygon[:-1] if polygon and polygon[0] == polygon[-1] else polygon
+    unique_count = len({(round(p[0], 6), round(p[1], 6)) for p in pts})
+    has_marker = any(m in picked_via for m in QUALITY_MARKERS)
+    if has_marker:
+        return False
+    return unique_count <= 4
+
+
 def render(course_id: str, record: dict) -> str | None:
     polygon = record.get("polygon") or []
     if len(polygon) < 3:
+        return None
+    if is_boring(polygon, record.get("pickedVia", "")):
         return None
 
     # Project into metres using the polygon centroid as origin.
@@ -175,15 +200,24 @@ def main() -> int:
     data = load_clubhouses()
     os.makedirs(OUT_DIR, exist_ok=True)
     rendered_ids: list[str] = []
+    skipped_ids: list[str] = []
     for course_id, record in data.items():
+        out_path = os.path.join(OUT_DIR, f"{course_id}.svg")
         svg = render(course_id, record)
         if not svg:
-            print(f"skip {course_id} (bad polygon)")
+            skipped_ids.append(course_id)
+            # Clean up stale SVG from previous runs so the on-disk
+            # manifest matches the current quality filter.
+            if os.path.exists(out_path):
+                os.remove(out_path)
             continue
-        out_path = os.path.join(OUT_DIR, f"{course_id}.svg")
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(svg)
         rendered_ids.append(course_id)
+    if skipped_ids:
+        print(f"Skipped {len(skipped_ids)} as featureless rectangles:")
+        for cid in skipped_ids:
+            print(f"  - {cid}")
 
     on_disk = sorted(
         os.path.splitext(f)[0]
