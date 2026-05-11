@@ -371,8 +371,9 @@ export default function ConnectionsPage() {
       dayNumber,
       score: myScore,
       challengerName: name || undefined,
+      game: "connections",
     });
-    const url = `${BRAND.url}/connections?c=${token}`;
+    const url = `${BRAND.url}/c/${token}`;
     const text = isWin
       ? `I solved today's ${BRAND.name}: Connections with ${mistakes} mistakes. Beat me: ${url}`
       : `I couldn't crack today's ${BRAND.name}: Connections. Your turn: ${url}`;

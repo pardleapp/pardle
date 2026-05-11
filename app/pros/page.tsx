@@ -456,8 +456,9 @@ function ResultModal({
       dayNumber,
       score: myScore,
       challengerName: name || undefined,
+      game: "pros",
     });
-    const url = `${BRAND.url}/pros?c=${token}`;
+    const url = `${BRAND.url}/c/${token}`;
     const text = isWin
       ? `I solved today's ${BRAND.name} in ${guesses.length}/${MAX_GUESSES}. Beat me: ${url}`
       : `I couldn't crack today's ${BRAND.name}. Your turn: ${url}`;

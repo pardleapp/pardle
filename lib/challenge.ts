@@ -1,21 +1,36 @@
 export type ChallengeScore = number | "X";
 
+export type ChallengeGame = "pros" | "holes" | "clubs" | "connections";
+
 export interface ChallengePayload {
   dayNumber: number;
   score: ChallengeScore;
   challengerName?: string;
+  /**
+   * Game the challenge was issued from. Newer tokens always include
+   * this so the /c/{token} landing page knows where to send the
+   * recipient; older tokens (pre-personalised-preview) won't have it
+   * and the in-game banner falls back to inferring it from the URL.
+   */
+  game?: ChallengeGame;
 }
 
 interface ChallengeWire {
   d: number;
   s: ChallengeScore;
   n?: string;
+  g?: ChallengeGame;
 }
+
+const VALID_GAMES: ChallengeGame[] = ["pros", "holes", "clubs", "connections"];
 
 export function encodeChallenge(p: ChallengePayload): string {
   const wire: ChallengeWire = { d: p.dayNumber, s: p.score };
   if (p.challengerName) {
     wire.n = p.challengerName.slice(0, 30);
+  }
+  if (p.game) {
+    wire.g = p.game;
   }
   return base64UrlEncode(JSON.stringify(wire));
 }
@@ -25,8 +40,9 @@ export function decodeChallenge(token: string): ChallengePayload | null {
   try {
     const data = JSON.parse(base64UrlDecode(token)) as Partial<ChallengeWire>;
     if (typeof data.d !== "number" || data.d < 1) return null;
+    // Allow score 0–6: Connections wins land in 0–3 (mistakes used).
     if (data.s !== "X") {
-      if (typeof data.s !== "number" || data.s < 1 || data.s > 6) return null;
+      if (typeof data.s !== "number" || data.s < 0 || data.s > 6) return null;
     }
     const out: ChallengePayload = {
       dayNumber: data.d,
@@ -34,6 +50,12 @@ export function decodeChallenge(token: string): ChallengePayload | null {
     };
     if (typeof data.n === "string" && data.n.length > 0) {
       out.challengerName = data.n.slice(0, 30);
+    }
+    if (
+      typeof data.g === "string" &&
+      (VALID_GAMES as readonly string[]).includes(data.g)
+    ) {
+      out.game = data.g as ChallengeGame;
     }
     return out;
   } catch {

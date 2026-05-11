@@ -235,6 +235,35 @@ body {
   line-height: 1;
 }
 
+.challenge-card {
+  gap: 6px;
+}
+
+.challenge-card-from {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+
+.challenge-card-name {
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  line-height: 1.05;
+  text-align: center;
+}
+
+.challenge-card-detail {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+  text-align: center;
+  margin-top: 4px;
+}
+
 .share-card-grid {
   display: flex;
   flex-direction: column;

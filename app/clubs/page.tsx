@@ -333,8 +333,9 @@ export default function ClubsPage() {
       dayNumber,
       score: myScore,
       challengerName: name || undefined,
+      game: "clubs",
     });
-    const url = `${BRAND.url}/clubs?c=${token}`;
+    const url = `${BRAND.url}/c/${token}`;
     const text = isWin
       ? `I solved today's ${BRAND.name}: Clubhouses in ${scoreCount}/${HOLES_MAX_GUESSES}. Beat me: ${url}`
       : `I couldn't crack today's ${BRAND.name}: Clubhouses. Your turn: ${url}`;
