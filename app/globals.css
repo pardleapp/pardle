@@ -190,12 +190,6 @@ body {
   gap: 4px;
 }
 
-.guess-cells-4 {
-  display: grid;
-  grid-template-columns: 0.5fr 0.5fr 1fr 1fr;
-  gap: 4px;
-}
-
 /* Hard-mode 5-column layout: country flag (narrow), par (narrow),
    direction (widest — shows "NE 624mi"), type (medium), year (medium). */
 .guess-cells-hard5 {
@@ -231,7 +225,7 @@ body {
 
 .header-row-4 {
   display: grid;
-  grid-template-columns: 0.5fr 0.5fr 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 4px;
   font-size: 11px;
   font-weight: 600;

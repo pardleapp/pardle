@@ -223,7 +223,6 @@ function buildShareText(
         stateToEmoji(g.yearFounded.state),
         stateToEmoji(g.courseType.state),
         stateToEmoji(g.par.state),
-        stateToEmoji(g.hole.state),
       ].join(""),
     )
     .join("\n");
@@ -267,11 +266,9 @@ export default function HolesPage() {
     [tourFilter, difficulty],
   );
   const dayNumber = useMemo(() => dayIndexToday() + 1, []);
-  // Easy mode guesses (course + hole as one pair, current behavior).
+  // Easy mode: each guess is a single course (no hole step).
   const [guesses, setGuesses] = useState<CourseGuessReveal[]>([]);
   const [courseInput, setCourseInput] = useState("");
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-  const [holeInput, setHoleInput] = useState("");
   // Hard mode guesses — split into two phases. Once a hard course guess
   // matches, we flip to the hole phase and the player narrows on holes.
   const [hardCourseGuesses, setHardCourseGuesses] = useState<HardCourseGuess[]>([]);
@@ -339,9 +336,7 @@ export default function HolesPage() {
 
   function resetAllGameState() {
     setGuesses([]);
-    setSelectedCourse(null);
     setCourseInput("");
-    setHoleInput("");
     setHardCourseGuesses([]);
     setHardHoleGuesses([]);
     setHardCourseInput("");
@@ -397,27 +392,10 @@ export default function HolesPage() {
       .slice(0, 6);
   }, [courseInput, tourFilter]);
 
-  function chooseCourse(course: Course) {
-    setSelectedCourse(course);
+  function submitEasyGuess(course: Course) {
+    if (isOver) return;
+    setGuesses((prev) => [...prev, revealCourseGuess(course, mystery)]);
     setCourseInput("");
-  }
-
-  function clearCourse() {
-    setSelectedCourse(null);
-    setHoleInput("");
-  }
-
-  function submitGuess() {
-    if (isOver || !selectedCourse) return;
-    const holeNum = Number.parseInt(holeInput, 10);
-    if (!Number.isInteger(holeNum) || holeNum < 1 || holeNum > 18) return;
-    setGuesses((prev) => [
-      ...prev,
-      revealCourseGuess(selectedCourse, holeNum, mystery),
-    ]);
-    setSelectedCourse(null);
-    setCourseInput("");
-    setHoleInput("");
   }
 
   function submitHardCourseGuess(course: Course) {
@@ -652,7 +630,7 @@ export default function HolesPage() {
 
       {difficulty === "easy" && (
         <div className="grid">
-          <div className="header-row header-row-5">
+          <div className="header-row header-row-4">
             <span>Country</span>
             <span>
               Year
@@ -661,15 +639,12 @@ export default function HolesPage() {
             </span>
             <span>Type</span>
             <span>Par</span>
-            <span>Hole</span>
           </div>
 
           {guesses.map((g, i) => (
             <div key={i} className="guess">
-              <div className="guess-name">
-                {g.course.shortName} · #{g.holeGuessed}
-              </div>
-              <div className="guess-cells guess-cells-5">
+              <div className="guess-name">{g.course.shortName}</div>
+              <div className="guess-cells guess-cells-4">
                 <span className={`cell cell-${g.country.state}`}>
                   {flagFor(g.course.countryCode)}
                 </span>
@@ -684,10 +659,6 @@ export default function HolesPage() {
                   {g.course.par}
                   <Arrow arrow={g.par.arrow} />
                 </span>
-                <span className={`cell cell-${g.hole.state}`}>
-                  {g.holeGuessed}
-                  <Arrow arrow={g.hole.arrow} />
-                </span>
               </div>
             </div>
           ))}
@@ -695,8 +666,8 @@ export default function HolesPage() {
           {Array.from({ length: HOLES_MAX_GUESSES - guesses.length }).map(
             (_, i) => (
               <div key={`empty-${i}`} className="guess empty-guess">
-                <div className="guess-cells guess-cells-5">
-                  {Array.from({ length: 5 }).map((_, j) => (
+                <div className="guess-cells guess-cells-4">
+                  {Array.from({ length: 4 }).map((_, j) => (
                     <span key={j} className="cell cell-empty" />
                   ))}
                 </div>
@@ -791,8 +762,8 @@ export default function HolesPage() {
         </div>
       )}
 
-      {/* EASY MODE: pick course, then enter hole, submit as a pair. */}
-      {!isOver && difficulty === "easy" && !selectedCourse && (
+      {/* EASY MODE: type a course, pick from suggestions to submit. */}
+      {!isOver && difficulty === "easy" && (
         <div className="input-area">
           <input
             type="text"
@@ -805,57 +776,13 @@ export default function HolesPage() {
           {matches.length > 0 && (
             <ul className="suggestions">
               {matches.map((c) => (
-                <li key={c.id} onClick={() => chooseCourse(c)}>
+                <li key={c.id} onClick={() => submitEasyGuess(c)}>
                   {c.name}{" "}
                   <span className="suggestion-country">{c.country}</span>
                 </li>
               ))}
             </ul>
           )}
-        </div>
-      )}
-
-      {!isOver && difficulty === "easy" && selectedCourse && (
-        <div className="hole-input-row">
-          <div className="selected-course-pill">
-            <span className="selected-course-name">
-              {selectedCourse.shortName}
-            </span>
-            <button
-              type="button"
-              className="selected-course-clear"
-              onClick={clearCourse}
-              aria-label="Pick a different course"
-            >
-              ×
-            </button>
-          </div>
-          <input
-            className="hole-input"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={18}
-            value={holeInput}
-            onChange={(e) => setHoleInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submitGuess();
-            }}
-            placeholder="Hole #"
-            autoFocus
-          />
-          <button
-            type="button"
-            className="hole-submit"
-            onClick={submitGuess}
-            disabled={
-              !holeInput ||
-              Number.parseInt(holeInput, 10) < 1 ||
-              Number.parseInt(holeInput, 10) > 18
-            }
-          >
-            Guess
-          </button>
         </div>
       )}
 

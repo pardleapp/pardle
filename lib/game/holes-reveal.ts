@@ -129,14 +129,10 @@ export function revealHardHoleGuess(
 
 export function revealCourseGuess(
   guess: Course,
-  holeGuessed: number,
   mystery: Course,
 ): CourseGuessReveal {
-  const courseMatches = guess.id === mystery.id;
-  const holeMatches = holeGuessed === mystery.iconicHole;
   return {
     course: guess,
-    holeGuessed,
     country: countryReveal(guess, mystery),
     // Year founded: green within 5 years, warm within 15, yellow within 40.
     yearFounded: numericReveal(
@@ -149,8 +145,6 @@ export function revealCourseGuess(
     courseType: courseTypeReveal(guess, mystery),
     // Par: most courses are par 70-72; tight windows.
     par: numericReveal(guess.par, mystery.par, 0, 1, 2),
-    // Hole 1-18; green = exact, warm = within 1, yellow = within 3.
-    hole: numericReveal(holeGuessed, mystery.iconicHole, 0, 1, 3),
-    isWin: courseMatches && holeMatches,
+    isWin: guess.id === mystery.id,
   };
 }
