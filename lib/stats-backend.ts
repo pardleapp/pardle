@@ -76,15 +76,18 @@ export async function recordPlay(args: {
 }
 
 /**
- * Read aggregated stats for a single day across all games.
- * Distribution buckets are pulled for guess-counts 0..6 plus "X".
+ * Read aggregated stats for *today* across all four games. Each game
+ * has its own launch date so its own day index — pass them in as a
+ * map. Single Redis pipeline regardless of game count.
  */
-export async function readDayStats(day: number): Promise<DayStats> {
+export async function readPerGameStats(
+  days: Record<StatsGameId, number>,
+): Promise<GameDayStats[]> {
   const distBuckets = ["0", "1", "2", "3", "4", "5", "6", "X"];
 
   const pipeline = redis.pipeline();
   for (const game of STATS_GAMES) {
-    const b = base(game, day);
+    const b = base(game, days[game]);
     pipeline.get(`${b}:total`);
     pipeline.get(`${b}:wins`);
     for (const bucket of distBuckets) {
@@ -109,5 +112,5 @@ export async function readDayStats(day: number): Promise<DayStats> {
     games.push({ game, total, wins, distribution });
   }
 
-  return { day, games };
+  return games;
 }

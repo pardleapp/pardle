@@ -3,7 +3,7 @@ import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import { todayDayNumber } from "@/lib/day-index";
 import {
-  readDayStats,
+  readPerGameStats,
   STATS_GAMES,
   type GameDayStats,
   type StatsGameId,
@@ -52,22 +52,18 @@ function distributionMax(g: GameDayStats): number {
 }
 
 export default async function TodayStatsPage() {
-  // Pull all 4 games using the Pros launch as the "anchor" day — but
-  // since each game has its own launch date, we fetch each separately
-  // using its own day index.
-  const results: { meta: typeof GAME_META[StatsGameId]; stats: GameDayStats }[] =
-    [];
-
-  for (const game of STATS_GAMES) {
-    const day = todayDayNumber(game);
-    const data = await readDayStats(day);
-    const stats = data.games.find((g) => g.game === game)!;
-    results.push({ meta: GAME_META[game], stats });
-  }
+  const days = Object.fromEntries(
+    STATS_GAMES.map((g) => [g, todayDayNumber(g)]),
+  ) as Record<StatsGameId, number>;
+  const allStats = await readPerGameStats(days);
+  const statsByGame = new Map(allStats.map((s) => [s.game, s]));
 
   // Sort by popularity (most played first) so the most engaged game
-  // is the headline.
-  results.sort((a, b) => b.stats.total - a.stats.total);
+  // leads the page.
+  const results = STATS_GAMES.map((game) => ({
+    meta: GAME_META[game],
+    stats: statsByGame.get(game)!,
+  })).sort((a, b) => b.stats.total - a.stats.total);
 
   const totalPlays = results.reduce((sum, r) => sum + r.stats.total, 0);
 

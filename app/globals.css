@@ -1226,7 +1226,49 @@ body {
   font-size: 13px;
   color: var(--muted);
   line-height: 1.4;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
+}
+
+.hub-card-stats {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  margin: 0 0 12px;
+  opacity: 0.9;
+}
+
+.hub-stats-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0 22px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: rgba(123, 174, 63, 0.10);
+  border: 1px solid rgba(123, 174, 63, 0.35);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+  text-decoration: none;
+  letter-spacing: 0.2px;
+}
+
+.hub-stats-link:hover {
+  background: rgba(123, 174, 63, 0.15);
+}
+
+.hub-stats-link-count {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--green);
+  padding: 4px 10px;
+  background: rgba(123, 174, 63, 0.18);
+  border-radius: 999px;
 }
 
 .hub-card-cta {
