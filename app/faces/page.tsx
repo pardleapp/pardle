@@ -7,7 +7,8 @@ import { GOLFERS } from "@/lib/data/golfers";
 import {
   facesPool,
   matchesGolfer,
-  pickDailyPair,
+  pickPuzzleSet,
+  PUZZLES_PER_DAY,
   TOTAL_GUESSES,
   type FacesPuzzle,
 } from "@/lib/game/faces";
@@ -24,6 +25,8 @@ const GAME_ID = "faces";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 11);
 const STATE_KEY = "pardle.faces.todayState";
 
+const PROS_PER_DAY = PUZZLES_PER_DAY * 2; // 12
+
 function dayIndexToday(): number {
   const now = new Date();
   const today = Date.UTC(
@@ -34,16 +37,33 @@ function dayIndexToday(): number {
   return Math.floor((today - LAUNCH_DATE_UTC) / (1000 * 60 * 60 * 24));
 }
 
+interface PerPuzzleState {
+  /** IDs of pros named so far in this puzzle (0..2). */
+  solved: string[];
+  /** Number of wrong guesses (0..TOTAL_GUESSES). */
+  wrongCount: number;
+  hintUsed: boolean;
+  history: { text: string; matchedId: string | null }[];
+}
+
 interface PersistedDayState {
   dayNumber: number;
-  /** IDs of pros the player has correctly named so far. */
-  solved: string[];
-  /** Wrong-guess count (max TOTAL_GUESSES). */
-  wrongCount: number;
-  /** Final guess history (text + matched id or null), for the share card. */
-  history: { text: string; matchedId: string | null }[];
-  /** True once the player has used the "emphasise the other face" hint. */
-  hintUsed?: boolean;
+  /** 0..PUZZLES_PER_DAY — `=== PUZZLES_PER_DAY` means all 6 are done. */
+  currentIndex: number;
+  /** Length-PUZZLES_PER_DAY array, one state slot per puzzle. */
+  puzzles: PerPuzzleState[];
+}
+
+function freshPuzzleState(): PerPuzzleState {
+  return { solved: [], wrongCount: 0, hintUsed: false, history: [] };
+}
+
+function freshDayState(dayNumber: number): PersistedDayState {
+  return {
+    dayNumber,
+    currentIndex: 0,
+    puzzles: Array.from({ length: PUZZLES_PER_DAY }, freshPuzzleState),
+  };
 }
 
 function loadDayState(dayNumber: number): PersistedDayState | null {
@@ -53,6 +73,11 @@ function loadDayState(dayNumber: number): PersistedDayState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PersistedDayState;
     if (parsed.dayNumber !== dayNumber) return null;
+    // Tolerate older single-puzzle persistence — if the shape doesn't
+    // match the new schema, start fresh.
+    if (!Array.isArray(parsed.puzzles) || parsed.puzzles.length !== PUZZLES_PER_DAY) {
+      return null;
+    }
     return parsed;
   } catch {
     return null;
@@ -68,146 +93,161 @@ function saveDayState(state: PersistedDayState): void {
   }
 }
 
+/**
+ * Total pros correctly named across all 6 puzzles (0..12).
+ */
+function totalCorrect(state: PersistedDayState): number {
+  return state.puzzles.reduce((acc, p) => acc + p.solved.length, 0);
+}
+
+/** Share grid: one row per puzzle, 2 squares each (left / right pro). */
 function buildShareText(
   dayNumber: number,
-  puzzle: FacesPuzzle,
-  solvedIds: string[],
-  wrongCount: number,
+  puzzles: FacesPuzzle[],
+  state: PersistedDayState,
 ): string {
-  const bothSolved =
-    solvedIds.includes(puzzle.left.id) && solvedIds.includes(puzzle.right.id);
-  const score = bothSolved
-    ? `${wrongCount + 2}/${TOTAL_GUESSES + 2}`
-    : `X/${TOTAL_GUESSES + 2}`;
-  const leftMark = solvedIds.includes(puzzle.left.id) ? "🟩" : "⬛";
-  const rightMark = solvedIds.includes(puzzle.right.id) ? "🟩" : "⬛";
-  const wrongRow = "🟥".repeat(wrongCount) + "⬜".repeat(TOTAL_GUESSES - wrongCount);
-  return `${BRAND.name} Faces #${dayNumber} ${score}\n${leftMark}${rightMark}\n${wrongRow}\n${BRAND.url}/faces`;
+  const correct = totalCorrect(state);
+  const rows = puzzles
+    .map((puz, i) => {
+      const s = state.puzzles[i];
+      const l = s.solved.includes(puz.left.id) ? "🟩" : "⬛";
+      const r = s.solved.includes(puz.right.id) ? "🟩" : "⬛";
+      return l + r;
+    })
+    .join("\n");
+  return `${BRAND.name} Faces #${dayNumber} ${correct}/${PROS_PER_DAY}\n${rows}\n${BRAND.url}/faces`;
 }
 
 export default function FacesPage() {
   const [dayNumber, setDayNumber] = useState<number | null>(null);
-  const [puzzle, setPuzzle] = useState<FacesPuzzle | null>(null);
+  const [puzzles, setPuzzles] = useState<FacesPuzzle[] | null>(null);
+  const [day, setDay] = useState<PersistedDayState | null>(null);
   const [input, setInput] = useState("");
-  const [solvedIds, setSolvedIds] = useState<string[]>([]);
-  const [wrongCount, setWrongCount] = useState(0);
-  const [history, setHistory] = useState<
-    { text: string; matchedId: string | null }[]
-  >([]);
-  const [hintUsed, setHintUsed] = useState(false);
   const [stats, setStats] = useState<PardleStats | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
-  /** Brief flash after a wrong guess so the player sees the rejection. */
   const [wrongFlash, setWrongFlash] = useState(false);
-  /** Brief flash after a correct guess. */
   const [rightFlash, setRightFlash] = useState<string | null>(null);
 
   useEffect(() => {
-    const day = dayIndexToday() + 1;
-    setDayNumber(day);
-    setPuzzle(pickDailyPair(day));
-    const persisted = loadDayState(day);
-    if (persisted) {
-      setSolvedIds(persisted.solved);
-      setWrongCount(persisted.wrongCount);
-      setHistory(persisted.history);
-      setHintUsed(!!persisted.hintUsed);
-    }
-    setStats(applyMissedDayReset(GAME_ID, day));
+    const dn = dayIndexToday() + 1;
+    setDayNumber(dn);
+    setPuzzles(pickPuzzleSet({ seed: dn }));
+    setDay(loadDayState(dn) ?? freshDayState(dn));
+    setStats(applyMissedDayReset(GAME_ID, dn));
   }, []);
 
-  const bothSolved =
-    puzzle != null &&
-    solvedIds.includes(puzzle.left.id) &&
-    solvedIds.includes(puzzle.right.id);
-  const outOfGuesses = wrongCount >= TOTAL_GUESSES;
-  const isOver = puzzle != null && (bothSolved || outOfGuesses);
-  const isWin = bothSolved;
+  const currentIndex = day?.currentIndex ?? 0;
+  const isFinished =
+    day != null && currentIndex >= PUZZLES_PER_DAY;
+  const currentPuzzle =
+    puzzles && !isFinished ? puzzles[currentIndex] : null;
+  const currentState = day && !isFinished ? day.puzzles[currentIndex] : null;
 
-  // Suggestion list — filter the pool by the typed text. We use the FULL
-  // GOLFERS list (not just the eligible pool) so the player can type any
-  // pro's name; the matcher checks against the puzzle's two pros only,
-  // so a "wrong" guess against a real pro still costs them a turn.
+  const isLeftSolved =
+    currentState && currentPuzzle
+      ? currentState.solved.includes(currentPuzzle.left.id)
+      : false;
+  const isRightSolved =
+    currentState && currentPuzzle
+      ? currentState.solved.includes(currentPuzzle.right.id)
+      : false;
+  const bothSolved = isLeftSolved && isRightSolved;
+  const outOfGuesses =
+    !!currentState && currentState.wrongCount >= TOTAL_GUESSES;
+  const puzzleOver = !!currentState && (bothSolved || outOfGuesses);
+
   const matches = useMemo(() => {
+    if (!currentState || !currentPuzzle) return [];
     const q = input.trim().toLowerCase();
-    if (!q || isOver) return [];
+    if (!q || puzzleOver) return [];
     return GOLFERS.filter((g) => g.name.toLowerCase().includes(q))
-      .filter((g) => !solvedIds.includes(g.id))
+      .filter((g) => !currentState.solved.includes(g.id))
       .slice(0, 6);
-  }, [input, solvedIds, isOver]);
+  }, [input, currentState, currentPuzzle, puzzleOver]);
 
-  // Record stats + streak on completion.
+  // Record stats + streak on finish.
   useEffect(() => {
-    if (!isOver || dayNumber == null) return;
-    const score = bothSolved ? wrongCount + 2 : 0;
-    setStats(recordResult(GAME_ID, dayNumber, bothSolved, score));
+    if (!isFinished || day == null || dayNumber == null) return;
+    const correct = totalCorrect(day);
+    // "Win" threshold = 8/12 — feels right for a hard recognition task.
+    // Used for the streak bonus; doesn't affect the displayed score.
+    const won = correct >= 8;
+    setStats(recordResult(GAME_ID, dayNumber, won, correct));
     void recordPlayClient({
       game: "faces",
       day: dayNumber,
-      isWin: bothSolved,
-      score: bothSolved ? wrongCount : 0,
+      isWin: won,
+      score: correct,
     });
-  }, [isOver, dayNumber, bothSolved, wrongCount]);
+  }, [isFinished, day, dayNumber]);
+
+  function mutateCurrent(fn: (p: PerPuzzleState) => PerPuzzleState) {
+    if (!day) return;
+    const next: PersistedDayState = {
+      ...day,
+      puzzles: day.puzzles.map((p, i) =>
+        i === day.currentIndex ? fn(p) : p,
+      ),
+    };
+    setDay(next);
+    saveDayState(next);
+  }
 
   function submitGuess(text: string) {
-    if (!puzzle || isOver) return;
+    if (!currentPuzzle || !currentState || puzzleOver) return;
     const trimmed = text.trim();
     if (!trimmed) return;
 
     let matchedId: string | null = null;
     if (
-      !solvedIds.includes(puzzle.left.id) &&
-      matchesGolfer(trimmed, puzzle.left)
+      !currentState.solved.includes(currentPuzzle.left.id) &&
+      matchesGolfer(trimmed, currentPuzzle.left)
     ) {
-      matchedId = puzzle.left.id;
+      matchedId = currentPuzzle.left.id;
     } else if (
-      !solvedIds.includes(puzzle.right.id) &&
-      matchesGolfer(trimmed, puzzle.right)
+      !currentState.solved.includes(currentPuzzle.right.id) &&
+      matchesGolfer(trimmed, currentPuzzle.right)
     ) {
-      matchedId = puzzle.right.id;
+      matchedId = currentPuzzle.right.id;
     }
 
-    const nextHistory = [...history, { text: trimmed, matchedId }];
-    setHistory(nextHistory);
     setInput("");
 
-    if (matchedId) {
-      const nextSolved = [...solvedIds, matchedId];
-      setSolvedIds(nextSolved);
-      setRightFlash(matchedId);
-      setTimeout(() => setRightFlash(null), 700);
-      saveDayState({
-        dayNumber: dayNumber!,
-        solved: nextSolved,
-        wrongCount,
-        history: nextHistory,
-        hintUsed,
-      });
-    } else {
-      const nextWrong = wrongCount + 1;
-      setWrongCount(nextWrong);
+    mutateCurrent((p) => {
+      const nextHistory = [...p.history, { text: trimmed, matchedId }];
+      if (matchedId) {
+        setRightFlash(matchedId);
+        setTimeout(() => setRightFlash(null), 700);
+        return {
+          ...p,
+          solved: [...p.solved, matchedId],
+          history: nextHistory,
+        };
+      }
       setWrongFlash(true);
       setTimeout(() => setWrongFlash(false), 400);
-      saveDayState({
-        dayNumber: dayNumber!,
-        solved: solvedIds,
-        wrongCount: nextWrong,
+      return {
+        ...p,
+        wrongCount: p.wrongCount + 1,
         history: nextHistory,
-        hintUsed,
-      });
-    }
+      };
+    });
   }
 
   function useHint() {
-    if (hintUsed || dayNumber == null) return;
-    setHintUsed(true);
-    saveDayState({
-      dayNumber,
-      solved: solvedIds,
-      wrongCount,
-      history,
-      hintUsed: true,
-    });
+    if (!currentState || currentState.hintUsed) return;
+    mutateCurrent((p) => ({ ...p, hintUsed: true }));
+  }
+
+  function advancePuzzle() {
+    if (!day) return;
+    const next: PersistedDayState = {
+      ...day,
+      currentIndex: Math.min(day.currentIndex + 1, PUZZLES_PER_DAY),
+    };
+    setDay(next);
+    saveDayState(next);
+    setInput("");
   }
 
   function pickFromList(g: Golfer) {
@@ -226,8 +266,8 @@ export default function FacesPage() {
   }
 
   async function handleShare() {
-    if (!puzzle || dayNumber == null) return;
-    const text = buildShareText(dayNumber, puzzle, solvedIds, wrongCount);
+    if (!puzzles || !day || dayNumber == null) return;
+    const text = buildShareText(dayNumber, puzzles, day);
     const nav = navigator as Navigator & {
       share?: (data: { text: string }) => Promise<void>;
     };
@@ -248,7 +288,7 @@ export default function FacesPage() {
     }
   }
 
-  if (!puzzle || dayNumber == null) {
+  if (!puzzles || !day || dayNumber == null) {
     return (
       <main className="container">
         <header className="brand">
@@ -262,20 +302,84 @@ export default function FacesPage() {
     );
   }
 
-  const remaining = TOTAL_GUESSES - wrongCount;
+  // ---------- FINISHED SCREEN ----------
+  if (isFinished) {
+    const correct = totalCorrect(day);
+    return (
+      <main className="container">
+        <header className="brand">
+          <Link className="brand-back" href="/" aria-label="All games">
+            ←
+          </Link>
+          <h1>{BRAND.name}</h1>
+          <p className="subtitle">Faces · Day {dayNumber}</p>
+          {stats && stats.current > 0 && (
+            <div className="brand-streak" title={`Longest: ${stats.longest}`}>
+              <span aria-hidden="true">🔥</span> {stats.current} day
+              {stats.current === 1 ? "" : "s"}
+            </div>
+          )}
+        </header>
 
-  const isLeftSolved = solvedIds.includes(puzzle.left.id);
-  const isRightSolved = solvedIds.includes(puzzle.right.id);
-  // When the hint is active and exactly one face is solved, fade the
-  // identified face down so the unknown one shines through. Once both
-  // are solved (or the game is over) we drop back to the default blend
-  // so the result screen looks normal.
-  const hintActive = hintUsed && !isOver && (isLeftSolved !== isRightSolved);
-  let baseOpacity = 1; // left pro
-  let overlayOpacity = 0.5; // right pro
-  // Hint = mild nudge, not a reveal. Fade the solved face just enough
-  // that the unknown one reads clearer, but keep the blend feel: both
-  // pros should still be visible, the unknown just slightly favoured.
+        <div className="faces-result">
+          <h2 className="faces-result-title">
+            {correct === PROS_PER_DAY
+              ? "Perfect — all 12!"
+              : correct >= 8
+                ? `Strong round — ${correct}/${PROS_PER_DAY}`
+                : `You got ${correct}/${PROS_PER_DAY}`}
+          </h2>
+          <p className="faces-result-sub">Today&apos;s blended pros:</p>
+
+          <div className="faces-recap">
+            {puzzles.map((puz, i) => {
+              const s = day.puzzles[i];
+              return (
+                <div key={i} className="faces-recap-row">
+                  <span className="faces-recap-num">{i + 1}</span>
+                  <ProTag
+                    pro={puz.left}
+                    solved={s.solved.includes(puz.left.id)}
+                  />
+                  <ProTag
+                    pro={puz.right}
+                    solved={s.solved.includes(puz.right.id)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          <button className="faces-share" onClick={handleShare}>
+            {shareCopied ? "Copied!" : "Share result"}
+          </button>
+          <div className="faces-result-links">
+            <Link className="faces-back" href="/">
+              ← Play another game
+            </Link>
+          </div>
+        </div>
+
+        <NotifySignup gameId="faces" dayNumber={dayNumber} />
+
+        <footer>
+          <p>
+            {BRAND.domain} · pool of {facesPool().length} recognisable pros
+          </p>
+        </footer>
+      </main>
+    );
+  }
+
+  // ---------- ACTIVE PUZZLE ----------
+  // Hint opacity calculation — only one face is solved.
+  const hintActive =
+    !!currentState &&
+    currentState.hintUsed &&
+    !puzzleOver &&
+    isLeftSolved !== isRightSolved;
+  let baseOpacity = 1;
+  let overlayOpacity = 0.5;
   if (hintActive && isLeftSolved) {
     baseOpacity = 0.55;
     overlayOpacity = 0.62;
@@ -284,7 +388,16 @@ export default function FacesPage() {
     overlayOpacity = 0.25;
   }
   const canUseHint =
-    !hintUsed && !isOver && (isLeftSolved !== isRightSolved);
+    !!currentState &&
+    !currentState.hintUsed &&
+    !puzzleOver &&
+    isLeftSolved !== isRightSolved;
+  const remaining = TOTAL_GUESSES - (currentState?.wrongCount ?? 0);
+  const isLastPuzzle = currentIndex === PUZZLES_PER_DAY - 1;
+  const completedSoFar = day.puzzles.reduce(
+    (acc, p, i) => (i < currentIndex ? acc + p.solved.length : acc),
+    0,
+  );
 
   return (
     <main className="container">
@@ -302,191 +415,217 @@ export default function FacesPage() {
         )}
       </header>
 
-      <p className="faces-hint">
-        Two pros, one blended face. Name them both.
-      </p>
-
-      <div
-        className={`faces-stage ${wrongFlash ? "faces-stage-wrong" : ""} ${
-          isOver ? "faces-stage-over" : ""
-        }`}
-      >
-        {/* Bottom layer — left pro at full opacity. */}
-        {puzzle.left.imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={puzzle.left.imageUrl}
-            alt=""
-            className="faces-img faces-img-base"
-            style={{ opacity: baseOpacity }}
-          />
-        )}
-        {/* Top layer — right pro at 50% opacity, blended over the bottom. */}
-        {puzzle.right.imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={puzzle.right.imageUrl}
-            alt=""
-            className="faces-img faces-img-overlay"
-            style={{ opacity: overlayOpacity }}
-          />
-        )}
-        {rightFlash && <div className="faces-flash-right">Got one! ✓</div>}
-      </div>
-
-      <div className="faces-slots">
-        <div
-          className={`faces-slot ${
-            solvedIds.includes(puzzle.left.id) ? "faces-slot-solved" : ""
-          }`}
-        >
-          <div className="faces-slot-num">1</div>
-          {solvedIds.includes(puzzle.left.id) || isOver ? (
-            <>
-              {puzzle.left.imageUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  className="faces-slot-img"
-                  src={puzzle.left.imageUrl}
-                  alt={puzzle.left.name}
-                />
-              )}
-              <div className="faces-slot-name">{puzzle.left.name}</div>
-            </>
-          ) : (
-            <div className="faces-slot-placeholder">?</div>
-          )}
+      <div className="faces-progress">
+        <div className="faces-progress-text">
+          Puzzle {currentIndex + 1} of {PUZZLES_PER_DAY}
+          <span className="trivia-score-tag">
+            {completedSoFar + (currentState?.solved.length ?? 0)} /{" "}
+            {PROS_PER_DAY} so far
+          </span>
         </div>
-        <div
-          className={`faces-slot ${
-            solvedIds.includes(puzzle.right.id) ? "faces-slot-solved" : ""
-          }`}
-        >
-          <div className="faces-slot-num">2</div>
-          {solvedIds.includes(puzzle.right.id) || isOver ? (
-            <>
-              {puzzle.right.imageUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  className="faces-slot-img"
-                  src={puzzle.right.imageUrl}
-                  alt={puzzle.right.name}
-                />
-              )}
-              <div className="faces-slot-name">{puzzle.right.name}</div>
-            </>
-          ) : (
-            <div className="faces-slot-placeholder">?</div>
-          )}
+        <div className="trivia-progress-bar">
+          <div
+            className="trivia-progress-bar-fill"
+            style={{
+              width: `${(currentIndex / PUZZLES_PER_DAY) * 100}%`,
+              background: "#E07B5B",
+            }}
+          />
         </div>
       </div>
 
-      <div className="faces-guess-meter">
-        {Array.from({ length: TOTAL_GUESSES }).map((_, i) => (
-          <span
-            key={i}
-            className={`faces-pip ${
-              i < wrongCount ? "faces-pip-used" : "faces-pip-fresh"
+      {currentPuzzle && (
+        <>
+          <div
+            className={`faces-stage ${wrongFlash ? "faces-stage-wrong" : ""} ${
+              puzzleOver ? "faces-stage-over" : ""
             }`}
-          />
-        ))}
-        <span className="faces-guess-text">
-          {remaining > 0
-            ? `${remaining} wrong guess${remaining === 1 ? "" : "es"} left`
-            : "Out of guesses"}
-        </span>
-      </div>
+          >
+            {currentPuzzle.left.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={currentPuzzle.left.imageUrl}
+                alt=""
+                className="faces-img faces-img-base"
+                style={{ opacity: baseOpacity }}
+              />
+            )}
+            {currentPuzzle.right.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={currentPuzzle.right.imageUrl}
+                alt=""
+                className="faces-img faces-img-overlay"
+                style={{ opacity: overlayOpacity }}
+              />
+            )}
+            {rightFlash && (
+              <div className="faces-flash-right">Got one! ✓</div>
+            )}
+          </div>
 
-      {canUseHint && (
-        <button
-          type="button"
-          className="faces-hint-btn"
-          onClick={useHint}
-        >
-          🔍 Hint: emphasise the other face
-        </button>
-      )}
-      {hintUsed && !isOver && (
-        <p className="faces-hint-active">
-          Hint on — the face you haven&apos;t guessed is in front.
-        </p>
-      )}
+          <div className="faces-slots">
+            <div
+              className={`faces-slot ${
+                isLeftSolved ? "faces-slot-solved" : ""
+              }`}
+            >
+              <div className="faces-slot-num">1</div>
+              {isLeftSolved || puzzleOver ? (
+                <>
+                  {currentPuzzle.left.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      className="faces-slot-img"
+                      src={currentPuzzle.left.imageUrl}
+                      alt={currentPuzzle.left.name}
+                    />
+                  )}
+                  <div className="faces-slot-name">
+                    {currentPuzzle.left.name}
+                  </div>
+                </>
+              ) : (
+                <div className="faces-slot-placeholder">?</div>
+              )}
+            </div>
+            <div
+              className={`faces-slot ${
+                isRightSolved ? "faces-slot-solved" : ""
+              }`}
+            >
+              <div className="faces-slot-num">2</div>
+              {isRightSolved || puzzleOver ? (
+                <>
+                  {currentPuzzle.right.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      className="faces-slot-img"
+                      src={currentPuzzle.right.imageUrl}
+                      alt={currentPuzzle.right.name}
+                    />
+                  )}
+                  <div className="faces-slot-name">
+                    {currentPuzzle.right.name}
+                  </div>
+                </>
+              ) : (
+                <div className="faces-slot-placeholder">?</div>
+              )}
+            </div>
+          </div>
 
-      {!isOver && (
-        <div className="input-area">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="Type a player's name..."
-            autoComplete="off"
-            autoCapitalize="words"
-            autoFocus
-          />
-          {matches.length > 0 && (
-            <ul className="suggestions">
-              {matches.map((g) => (
-                <li key={g.id} onClick={() => pickFromList(g)}>
-                  {g.name}{" "}
-                  <span className="suggestion-country">{g.country}</span>
+          <div className="faces-guess-meter">
+            {Array.from({ length: TOTAL_GUESSES }).map((_, i) => (
+              <span
+                key={i}
+                className={`faces-pip ${
+                  i < (currentState?.wrongCount ?? 0)
+                    ? "faces-pip-used"
+                    : "faces-pip-fresh"
+                }`}
+              />
+            ))}
+            <span className="faces-guess-text">
+              {remaining > 0
+                ? `${remaining} wrong guess${remaining === 1 ? "" : "es"} left`
+                : "Out of guesses"}
+            </span>
+          </div>
+
+          {canUseHint && (
+            <button
+              type="button"
+              className="faces-hint-btn"
+              onClick={useHint}
+            >
+              🔍 Hint: emphasise the other face
+            </button>
+          )}
+          {currentState?.hintUsed && !puzzleOver && (
+            <p className="faces-hint-active">
+              Hint on — the face you haven&apos;t guessed is in front.
+            </p>
+          )}
+
+          {!puzzleOver && (
+            <div className="input-area">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder="Type a player's name..."
+                autoComplete="off"
+                autoCapitalize="words"
+                autoFocus
+              />
+              {matches.length > 0 && (
+                <ul className="suggestions">
+                  {matches.map((g) => (
+                    <li key={g.id} onClick={() => pickFromList(g)}>
+                      {g.name}{" "}
+                      <span className="suggestion-country">{g.country}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {currentState && currentState.history.length > 0 && (
+            <ul className="faces-history">
+              {currentState.history.map((h, i) => (
+                <li
+                  key={i}
+                  className={
+                    h.matchedId
+                      ? "faces-history-right"
+                      : "faces-history-wrong"
+                  }
+                >
+                  <span>{h.text}</span>
+                  <span aria-hidden="true">{h.matchedId ? "✓" : "✗"}</span>
                 </li>
               ))}
             </ul>
           )}
-        </div>
-      )}
 
-      {history.length > 0 && (
-        <ul className="faces-history">
-          {history.map((h, i) => (
-            <li
-              key={i}
-              className={
-                h.matchedId
-                  ? "faces-history-right"
-                  : "faces-history-wrong"
-              }
-            >
-              <span>{h.text}</span>
-              <span aria-hidden="true">{h.matchedId ? "✓" : "✗"}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {isOver && (
-        <div className="faces-result">
-          <h2 className="faces-result-title">
-            {isWin
-              ? wrongCount === 0
-                ? "Perfect — both on the first try!"
-                : `Got 'em in ${wrongCount + 2}`
-              : "Not today!"}
-          </h2>
-          <p className="faces-result-sub">
-            Today&apos;s pair was{" "}
-            <strong>{puzzle.left.name}</strong> and{" "}
-            <strong>{puzzle.right.name}</strong>.
-          </p>
-          <button className="faces-share" onClick={handleShare}>
-            {shareCopied ? "Copied!" : "Share result"}
-          </button>
-          <Link className="faces-back" href="/">
-            ← Play another game
-          </Link>
-        </div>
-      )}
-
-      {isOver && (
-        <NotifySignup gameId="faces" dayNumber={dayNumber} />
+          {puzzleOver && (
+            <div className="faces-next-row">
+              <p className="faces-next-blurb">
+                {bothSolved
+                  ? `Nice — both named in ${
+                      (currentState?.wrongCount ?? 0) + 2
+                    }.`
+                  : `Out of guesses.`}
+              </p>
+              <button className="faces-next-btn" onClick={advancePuzzle}>
+                {isLastPuzzle ? "See your score →" : "Next puzzle →"}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       <footer>
         <p>
-          {BRAND.domain} · pool of {facesPool().length} recognisable pros
+          {BRAND.domain} · {PUZZLES_PER_DAY} blended pairs per day
         </p>
       </footer>
     </main>
+  );
+}
+
+function ProTag({ pro, solved }: { pro: Golfer; solved: boolean }) {
+  return (
+    <div className={`faces-recap-pro ${solved ? "faces-recap-solved" : ""}`}>
+      {pro.imageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={pro.imageUrl} alt={pro.name} />
+      )}
+      <span className="faces-recap-name">{pro.name}</span>
+      <span className="faces-recap-mark">{solved ? "✓" : "—"}</span>
+    </div>
   );
 }

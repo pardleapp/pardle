@@ -91,7 +91,13 @@ export async function recordPlay(args: {
 export async function readPerGameStats(
   days: Record<StatsGameId, number>,
 ): Promise<GameDayStats[]> {
-  const distBuckets = ["0", "1", "2", "3", "4", "5", "6", "X"];
+  // Widened to 0..12 so the Faces game (max 12 pros named) and Trivia
+  // (max 10/10) report a complete distribution on /today. Pros/Holes/
+  // Clubs only ever write 0..6 so the extra buckets cost a few empty
+  // Redis GETs per page-load (free-tier headroom is fine).
+  const distBuckets = [
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "X",
+  ];
 
   const pipeline = redis.pipeline();
   for (const game of STATS_GAMES) {

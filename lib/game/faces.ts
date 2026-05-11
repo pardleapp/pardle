@@ -17,6 +17,9 @@ import type { Golfer } from "@/lib/game/types";
 
 export const TOTAL_GUESSES = 4;
 
+/** Number of blended-face puzzles in a daily round. */
+export const PUZZLES_PER_DAY = 6;
+
 /** All pros eligible for face puzzles. Filtered to ensure recognisability
  * and that we actually have a photo to merge. */
 export function facesPool(): Golfer[] {
@@ -60,6 +63,44 @@ export function pickDailyPair(dayNumber: number): FacesPuzzle {
   let b = Math.floor(rand() * pool.length);
   while (b === a) b = (b + 1) % pool.length;
   return { dayNumber, left: pool[a], right: pool[b] };
+}
+
+/**
+ * Pick the day's full set of N face puzzles. All 2N pros across the set
+ * are distinct — we shuffle the pool deterministically and take pairs
+ * off the top — so no pro appears twice in the same day's puzzle set.
+ *
+ * Used by the solo 6-puzzle mode and the multiplayer duel (which seeds
+ * the same shuffle from a per-room seed so all players see the same
+ * puzzles in the same order).
+ */
+export function pickPuzzleSet(args: {
+  /** Either a day number (solo) or a room seed (multiplayer). */
+  seed: number;
+  count?: number;
+}): FacesPuzzle[] {
+  const count = args.count ?? PUZZLES_PER_DAY;
+  const pool = facesPool();
+  if (pool.length < count * 2) {
+    throw new Error(
+      `Faces pool has ${pool.length} eligible pros — need at least ${count * 2} for ${count} puzzles.`,
+    );
+  }
+  const rand = seededRandom(args.seed * 7919 + 13);
+  const shuffled = pool.slice();
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const puzzles: FacesPuzzle[] = [];
+  for (let i = 0; i < count; i++) {
+    puzzles.push({
+      dayNumber: args.seed,
+      left: shuffled[i * 2],
+      right: shuffled[i * 2 + 1],
+    });
+  }
+  return puzzles;
 }
 
 /** Normalise a typed guess for case- + diacritic-insensitive matching. */
