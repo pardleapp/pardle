@@ -293,6 +293,17 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "w-brand-mizuno",
     ],
   },
+  {
+    id: "g-augusta-flowers",
+    label: "Augusta National back-nine flower holes",
+    difficulty: "green",
+    memberIds: [
+      "w-azalea-golden-bell", // 12
+      "w-azalea-azalea", // 13
+      "w-azalea-redbud", // 16
+      "w-azalea-holly", // 18
+    ],
+  },
 
   {
     id: "g-same-major-three-plus",
@@ -485,6 +496,45 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
     ],
   },
   {
+    id: "b-grip-styles",
+    label: "Famous golf grip styles",
+    difficulty: "blue",
+    memberIds: [
+      "w-grip-interlocking",
+      "w-grip-overlapping",
+      "w-grip-baseball",
+      "w-grip-vardon",
+    ],
+  },
+  {
+    id: "b-ball-anatomy",
+    label: "Anatomy of a golf ball",
+    difficulty: "blue",
+    memberIds: [
+      "w-ball-dimple",
+      "w-ball-cover",
+      "w-ball-core",
+      "w-ball-compression",
+    ],
+  },
+  {
+    id: "b-water-hazards",
+    label: "Types of water hazard",
+    difficulty: "blue",
+    memberIds: [
+      "w-water-lake",
+      "w-water-pond",
+      "w-water-creek",
+      "w-water-stream",
+    ],
+  },
+  {
+    id: "b-bag-types",
+    label: "Types of golf bag",
+    difficulty: "blue",
+    memberIds: ["w-bag-staff", "w-bag-cart", "w-bag-carry", "w-bag-tour"],
+  },
+  {
     id: "b-ryder-2023-europe",
     label: "Played for Europe at the 2023 Ryder Cup",
     difficulty: "blue",
@@ -552,38 +602,10 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
     ],
   },
   {
-    id: "p-surname-ends-son",
-    label: "Surname ends in -son",
-    difficulty: "purple",
-    memberIds: [
-      "phil-mickelson",
-      "henrik-stenson",
-      "tom-watson",
-      "webb-simpson",
-      "dustin-johnson",
-      "davis-thompson",
-      "bubba-watson",
-    ],
-  },
-  {
     id: "p-first-name-tom",
     label: "First name is Tom",
     difficulty: "purple",
     memberIds: ["tom-watson", "tom-kim", "tom-hoge", "tom-lehman"],
-  },
-  {
-    id: "p-four-letter-surname",
-    label: "Four-letter surname",
-    difficulty: "purple",
-    memberIds: [
-      "justin-rose", // Rose
-      "stewart-cink", // Cink
-      "chris-kirk", // Kirk
-      "tom-hoge", // Hoge
-      "max-homa", // Homa
-      "john-daly", // Daly
-      "patrick-reed", // Reed
-    ],
   },
   {
     id: "p-same-length-name",
@@ -646,6 +668,67 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "w-post-golf-bag",
       "w-post-golf-glove",
       "w-post-golf-cap",
+    ],
+  },
+
+  // ─── PURPLE (clever golf-specific wordplay — V6 additions) ────────
+  {
+    id: "p-swing-parts",
+    label: "Parts of a golf swing",
+    difficulty: "purple",
+    memberIds: [
+      "w-swing-setup",
+      "w-swing-backswing",
+      "w-swing-downswing",
+      "w-swing-followthrough",
+    ],
+  },
+  {
+    id: "p-mis-hits",
+    label: "Words for a mis-hit",
+    difficulty: "purple",
+    memberIds: [
+      "w-mishit-shank",
+      "w-mishit-chunk",
+      "w-mishit-skull",
+      "w-mishit-thin",
+      "w-mishit-fat",
+      "w-mishit-top",
+    ],
+  },
+  {
+    id: "p-pure-strike",
+    label: "Words for a perfectly struck shot",
+    difficulty: "purple",
+    memberIds: [
+      "w-pure-pure",
+      "w-pure-flush",
+      "w-pure-money",
+      "w-pure-sweet",
+      "w-pure-stripe",
+    ],
+  },
+  {
+    id: "p-hole-objects",
+    label: "Things found at a golf hole (also non-golf words)",
+    difficulty: "purple",
+    memberIds: [
+      "w-hole-cup",
+      "w-feature-pin",
+      "w-hole-flag",
+      "w-hole-hole",
+    ],
+  },
+  {
+    id: "p-event-common-words",
+    label: "PGA Tour events whose names are also common English words",
+    difficulty: "purple",
+    memberIds: [
+      "w-event-players",
+      "w-event-memorial",
+      "w-event-travelers",
+      "w-event-heritage",
+      "w-event-genesis",
     ],
   },
 ];

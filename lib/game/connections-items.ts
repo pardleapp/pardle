@@ -95,6 +95,71 @@ export const ITEM_REGISTRY: Record<string, string> = {
   "w-fname-jack": "Jack",
   "w-fname-bubba": "Bubba",
   "w-fname-sergio": "Sergio",
+
+  // ─── Parts of the golf swing ──────────────────────────────────
+  "w-swing-setup": "Setup",
+  "w-swing-backswing": "Backswing",
+  "w-swing-downswing": "Downswing",
+  "w-swing-followthrough": "Follow-through",
+
+  // ─── Mis-hit terms (every golfer's nightmare vocabulary) ──────
+  "w-mishit-shank": "Shank",
+  "w-mishit-chunk": "Chunk",
+  "w-mishit-skull": "Skull",
+  "w-mishit-thin": "Thin",
+  "w-mishit-fat": "Fat",
+  "w-mishit-top": "Top",
+
+  // ─── Insider words for a perfectly struck shot ────────────────
+  "w-pure-pure": "Pure",
+  "w-pure-flush": "Flush",
+  "w-pure-money": "Money",
+  "w-pure-sweet": "Sweet",
+  "w-pure-stripe": "Stripe",
+
+  // ─── Famous golf grip styles ──────────────────────────────────
+  "w-grip-interlocking": "Interlocking",
+  "w-grip-overlapping": "Overlapping",
+  "w-grip-baseball": "Baseball",
+  "w-grip-vardon": "Vardon",
+
+  // ─── Augusta back-nine "flower" holes ─────────────────────────
+  //   12 Golden Bell · 13 Azalea · 16 Redbud · 18 Holly
+  "w-azalea-golden-bell": "Golden Bell",
+  "w-azalea-azalea": "Azalea",
+  "w-azalea-redbud": "Redbud",
+  "w-azalea-holly": "Holly",
+
+  // ─── Things on a golf hole that all have non-golf meanings ────
+  "w-hole-cup": "Cup",
+  "w-hole-flag": "Flag",
+  "w-hole-hole": "Hole",
+  // Note: "Pin" already exists as w-feature-pin.
+
+  // ─── Anatomy of a golf ball ───────────────────────────────────
+  "w-ball-dimple": "Dimple",
+  "w-ball-cover": "Cover",
+  "w-ball-core": "Core",
+  "w-ball-compression": "Compression",
+
+  // ─── Types of water hazard ────────────────────────────────────
+  "w-water-lake": "Lake",
+  "w-water-pond": "Pond",
+  "w-water-creek": "Creek",
+  "w-water-stream": "Stream",
+
+  // ─── Types of golf bag ────────────────────────────────────────
+  "w-bag-staff": "Staff",
+  "w-bag-cart": "Cart",
+  "w-bag-carry": "Carry",
+  "w-bag-tour": "Tour",
+
+  // ─── PGA Tour events whose names are also common words ────────
+  "w-event-players": "Players",
+  "w-event-memorial": "Memorial",
+  "w-event-travelers": "Travelers",
+  "w-event-heritage": "Heritage",
+  "w-event-genesis": "Genesis",
 };
 
 export function itemTextOrNull(id: string): string | null {
