@@ -15,6 +15,11 @@ import {
 } from "@/lib/streak";
 import { NotifySignup } from "@/lib/notify-signup";
 import { recordPlayClient } from "@/lib/stats-client";
+import { encodeTriviaChallenge } from "@/lib/trivia-challenge";
+import {
+  loadChallengerName,
+  saveChallengerName,
+} from "@/lib/challenge";
 
 const GAME_ID = "trivia";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 11);
@@ -146,6 +151,7 @@ export default function TriviaPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [stats, setStats] = useState<PardleStats | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [challengeCopied, setChallengeCopied] = useState(false);
 
   const isFinished = currentIndex >= TOTAL_QUESTIONS;
   const currentQ = !isFinished ? daily.questions[currentIndex] : null;
@@ -250,6 +256,52 @@ export default function TriviaPage() {
     if (d === difficulty) return;
     setDifficulty(d);
     saveDifficulty(d);
+  }
+
+  async function handleChallenge() {
+    const stored = loadChallengerName();
+    let name = stored;
+    if (!name) {
+      const entered = window.prompt(
+        "What name should your friend see?",
+      );
+      if (entered === null) return;
+      name = entered.trim().slice(0, 30);
+      if (name) saveChallengerName(name);
+    }
+    const token = encodeTriviaChallenge({
+      d: difficulty,
+      n: dayNumber,
+      p: name || "A friend",
+      a: answers,
+      s: correctCount,
+    });
+    const url = `${BRAND.url}/trivia/c/${token}`;
+    const tier =
+      difficulty === "easy"
+        ? "Easy"
+        : difficulty === "medium"
+          ? "Medium"
+          : "Hard";
+    const text = `I just played ${BRAND.name} Trivia — ${correctCount}/${TOTAL_QUESTIONS} on ${tier}. See if you can beat me: ${url}`;
+    const nav = navigator as Navigator & {
+      share?: (data: { text: string }) => Promise<void>;
+    };
+    if (nav.share) {
+      try {
+        await nav.share({ text });
+        return;
+      } catch {
+        // fall through
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setChallengeCopied(true);
+      setTimeout(() => setChallengeCopied(false), 1800);
+    } catch {
+      setChallengeCopied(false);
+    }
   }
 
   async function handleShare() {
@@ -464,8 +516,11 @@ export default function TriviaPage() {
             <button className="answer-share" onClick={handleShare}>
               {shareCopied ? "Copied!" : "Share result"}
             </button>
+            <button className="answer-challenge" onClick={handleChallenge}>
+              {challengeCopied ? "Challenge copied!" : "Challenge a friend"}
+            </button>
             <button
-              className="answer-challenge"
+              className="answer-challenge trivia-restart-btn"
               onClick={restartDifficulty}
             >
               Try this tier again
