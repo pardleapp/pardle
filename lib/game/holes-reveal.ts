@@ -2,7 +2,6 @@ import type { AttributeReveal, CellState } from "./types";
 import type {
   CompassDirection,
   Course,
-  CourseGuessReveal,
   DirectionReveal,
   HardCourseGuess,
   HardHoleGuess,
@@ -127,24 +126,3 @@ export function revealHardHoleGuess(
   };
 }
 
-export function revealCourseGuess(
-  guess: Course,
-  mystery: Course,
-): CourseGuessReveal {
-  return {
-    course: guess,
-    country: countryReveal(guess, mystery),
-    // Year founded: green within 5 years, warm within 15, yellow within 40.
-    yearFounded: numericReveal(
-      guess.yearFounded,
-      mystery.yearFounded,
-      5,
-      15,
-      40,
-    ),
-    courseType: courseTypeReveal(guess, mystery),
-    // Par: most courses are par 70-72; tight windows.
-    par: numericReveal(guess.par, mystery.par, 0, 1, 2),
-    isWin: guess.id === mystery.id,
-  };
-}

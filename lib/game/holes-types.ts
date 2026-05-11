@@ -47,15 +47,6 @@ export interface Course {
   tier: CourseTier;
 }
 
-export interface CourseGuessReveal {
-  course: Course;
-  country: AttributeReveal;
-  yearFounded: AttributeReveal;
-  courseType: AttributeReveal;
-  par: AttributeReveal;
-  isWin: boolean;
-}
-
 export type CompassDirection =
   | "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW";
 

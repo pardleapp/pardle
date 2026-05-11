@@ -9,7 +9,6 @@ import { HOLE_COORDS } from "@/lib/data/hole-coords";
 import { HOLE_SVG_IDS } from "@/lib/data/hole-svgs";
 import {
   type Course,
-  type CourseGuessReveal,
   type Difficulty,
   type HardCourseGuess,
   type HardHoleGuess,
@@ -18,7 +17,6 @@ import {
 } from "@/lib/game/holes-types";
 import type { AttributeReveal, CellState } from "@/lib/game/types";
 import {
-  revealCourseGuess,
   revealHardCourseGuess,
   revealHardHoleGuess,
 } from "@/lib/game/holes-reveal";
@@ -211,7 +209,7 @@ function stateToEmoji(state: CellState): string {
 }
 
 function buildShareText(
-  guesses: CourseGuessReveal[],
+  guesses: HardCourseGuess[],
   dayNumber: number,
   won: boolean,
 ): string {
@@ -220,9 +218,10 @@ function buildShareText(
     .map((g) =>
       [
         stateToEmoji(g.country.state),
-        stateToEmoji(g.yearFounded.state),
-        stateToEmoji(g.courseType.state),
         stateToEmoji(g.par.state),
+        g.direction.distanceMi === 0 ? "🟩" : "🧭",
+        stateToEmoji(g.courseType.state),
+        stateToEmoji(g.yardage.state),
       ].join(""),
     )
     .join("\n");
@@ -266,8 +265,9 @@ export default function HolesPage() {
     [tourFilter, difficulty],
   );
   const dayNumber = useMemo(() => dayIndexToday() + 1, []);
-  // Easy mode: each guess is a single course (no hole step).
-  const [guesses, setGuesses] = useState<CourseGuessReveal[]>([]);
+  // Easy mode: each guess is a single course, revealed with the same
+  // 5-attribute set as Hard mode's course phase.
+  const [guesses, setGuesses] = useState<HardCourseGuess[]>([]);
   const [courseInput, setCourseInput] = useState("");
   // Hard mode guesses — split into two phases. Once a hard course guess
   // matches, we flip to the hole phase and the player narrows on holes.
@@ -301,7 +301,7 @@ export default function HolesPage() {
   }, [mystery, difficulty]);
 
   // Easy mode win/lose
-  const easyWin = guesses.some((g) => g.isWin);
+  const easyWin = guesses.some((g) => g.isCourseMatch);
   const easyLose = !easyWin && guesses.length >= HOLES_MAX_GUESSES;
 
   // Hard mode: course phase is "done" once a match lands. Then hole phase.
@@ -394,7 +394,7 @@ export default function HolesPage() {
 
   function submitEasyGuess(course: Course) {
     if (isOver) return;
-    setGuesses((prev) => [...prev, revealCourseGuess(course, mystery)]);
+    setGuesses((prev) => [...prev, revealHardCourseGuess(course, mystery)]);
     setCourseInput("");
   }
 
@@ -630,34 +630,55 @@ export default function HolesPage() {
 
       {difficulty === "easy" && (
         <div className="grid">
-          <div className="header-row header-row-4">
+          <div className="header-row header-row-hard5">
             <span>Country</span>
-            <span>
-              Year
-              <br />
-              built
-            </span>
-            <span>Type</span>
             <span>Par</span>
+            <span>Direction</span>
+            <span>Type</span>
+            <span>
+              Total
+              <br />
+              yards
+            </span>
           </div>
 
           {guesses.map((g, i) => (
             <div key={i} className="guess">
               <div className="guess-name">{g.course.shortName}</div>
-              <div className="guess-cells guess-cells-4">
+              <div className="guess-cells guess-cells-hard5">
                 <span className={`cell cell-${g.country.state}`}>
                   {flagFor(g.course.countryCode)}
-                </span>
-                <span className={`cell cell-${g.yearFounded.state}`}>
-                  {g.course.yearFounded}
-                  <Arrow arrow={g.yearFounded.arrow} />
-                </span>
-                <span className={`cell cell-${g.courseType.state}`}>
-                  {g.course.courseType}
                 </span>
                 <span className={`cell cell-${g.par.state}`}>
                   {g.course.par}
                   <Arrow arrow={g.par.arrow} />
+                </span>
+                <span
+                  className={`cell ${
+                    g.direction.distanceMi === 0
+                      ? "cell-green"
+                      : "cell-direction"
+                  }`}
+                >
+                  {g.direction.distanceMi === 0 ? (
+                    "✓"
+                  ) : (
+                    <span className="direction-content">
+                      <span className="direction-miles">
+                        {g.direction.distanceMi.toLocaleString()} mi
+                      </span>
+                      <span className="direction-arrow">
+                        {COMPASS_ARROWS[g.direction.bearing ?? "N"]}
+                      </span>
+                    </span>
+                  )}
+                </span>
+                <span className={`cell cell-${g.courseType.state}`}>
+                  {g.course.courseType}
+                </span>
+                <span className={`cell cell-${g.yardage.state}`}>
+                  {g.guessYardage}
+                  <Arrow arrow={g.yardage.arrow} />
                 </span>
               </div>
             </div>
@@ -666,8 +687,8 @@ export default function HolesPage() {
           {Array.from({ length: HOLES_MAX_GUESSES - guesses.length }).map(
             (_, i) => (
               <div key={`empty-${i}`} className="guess empty-guess">
-                <div className="guess-cells guess-cells-4">
-                  {Array.from({ length: 4 }).map((_, j) => (
+                <div className="guess-cells guess-cells-hard5">
+                  {Array.from({ length: 5 }).map((_, j) => (
                     <span key={j} className="cell cell-empty" />
                   ))}
                 </div>
