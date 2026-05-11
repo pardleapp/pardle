@@ -27,6 +27,7 @@ const GAME_META: Record<
   holes: { name: "Holes", emoji: "🛰️", accent: "#5BA0E0", maxScore: 6 },
   clubs: { name: "Clubhouses", emoji: "🏛️", accent: "#E0A85B", maxScore: 6 },
   connections: { name: "Connections", emoji: "🧩", accent: "#B388D6", maxScore: 4 },
+  trivia: { name: "Trivia", emoji: "❓", accent: "#E8C547", maxScore: 10 },
 };
 
 function winRate(g: GameDayStats): number | null {

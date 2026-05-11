@@ -17,13 +17,19 @@ import { Redis } from "@upstash/redis";
 
 const redis = Redis.fromEnv();
 
-export type StatsGameId = "pros" | "holes" | "clubs" | "connections";
+export type StatsGameId =
+  | "pros"
+  | "holes"
+  | "clubs"
+  | "connections"
+  | "trivia";
 
 export const STATS_GAMES: readonly StatsGameId[] = [
   "pros",
   "holes",
   "clubs",
   "connections",
+  "trivia",
 ];
 
 export interface GameDayStats {

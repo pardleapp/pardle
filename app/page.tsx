@@ -71,6 +71,15 @@ const GAMES: GameTile[] = [
     status: "live",
     accent: "#B388D6",
   },
+  {
+    id: "trivia",
+    href: "/trivia",
+    name: "Trivia",
+    blurb: "10 golf trivia questions. Easy, medium, or hard.",
+    emoji: "❓",
+    status: "live",
+    accent: "#E8C547",
+  },
 ];
 
 function tileStyle(accent: string): CSSProperties {

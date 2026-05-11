@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 
-const SEEN_KEY = "pardle.welcomeSeen";
+// Bump the version suffix when the modal content meaningfully changes
+// (e.g. a new game added) so returning users see the refreshed list
+// once. Old "pardle.welcomeSeen" keys stay in localStorage harmlessly.
+const SEEN_KEY = "pardle.welcomeSeen.v2";
 
 interface GameExplainer {
   emoji: string;
@@ -35,6 +38,12 @@ const EXPLAINERS: GameExplainer[] = [
     name: "Connections",
     blurb: "Find four groups of four golf-related items.",
     accent: "#B388D6",
+  },
+  {
+    emoji: "❓",
+    name: "Trivia",
+    blurb: "10 golf trivia questions, easy / medium / hard.",
+    accent: "#E8C547",
   },
 ];
 

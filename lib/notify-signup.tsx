@@ -18,7 +18,7 @@ function subscribedKey(gameId: string): string {
 }
 
 interface Props {
-  gameId: "pros" | "holes" | "clubs" | "connections";
+  gameId: "pros" | "holes" | "clubs" | "connections" | "trivia";
   dayNumber: number;
 }
 

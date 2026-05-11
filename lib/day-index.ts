@@ -11,6 +11,7 @@ const LAUNCH: Record<StatsGameId, number> = {
   holes: Date.UTC(2026, 4, 10),
   clubs: Date.UTC(2026, 4, 11),
   connections: Date.UTC(2026, 4, 11),
+  trivia: Date.UTC(2026, 4, 11),
 };
 
 function todayUtc(): number {
