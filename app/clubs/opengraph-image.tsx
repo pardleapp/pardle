@@ -5,7 +5,7 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
 export const revalidate = 1800;
-export const alt = "Pardle: Clubs — name the course from its clubhouse";
+export const alt = "Pardle: Clubhouses — name the course from its clubhouse";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -69,7 +69,7 @@ export default async function OpengraphImage() {
             }}
           >
             <div style={{ fontSize: 140, display: "flex" }}>🏛️</div>
-            <div style={{ display: "flex" }}>Clubs</div>
+            <div style={{ display: "flex" }}>Clubhouses</div>
           </div>
           <div
             style={{

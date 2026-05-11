@@ -14,7 +14,7 @@ export const contentType = "image/png";
 const GAMES = [
   { emoji: "🏌️", name: "Pros", color: "#7BAE3F", blurb: "Guess the pro" },
   { emoji: "🛰️", name: "Holes", color: "#5BA0E0", blurb: "ID the course" },
-  { emoji: "🏛️", name: "Clubs", color: "#E0A85B", blurb: "Spot the clubhouse" },
+  { emoji: "🏛️", name: "Clubhouses", color: "#E0A85B", blurb: "Name the course" },
 ];
 
 export default async function OpengraphImage() {

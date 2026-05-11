@@ -142,7 +142,7 @@ function buildShareText(
       ].join(""),
     )
     .join("\n");
-  return `${BRAND.name}: Clubs #${dayNumber} ${result}\n${grid}\n${BRAND.url}/clubs`;
+  return `${BRAND.name}: Clubhouses #${dayNumber} ${result}\n${grid}\n${BRAND.url}/clubs`;
 }
 
 function compareWithFriend(
@@ -313,8 +313,8 @@ export default function ClubsPage() {
     });
     const url = `${BRAND.url}/clubs?c=${token}`;
     const text = isWin
-      ? `I solved today's ${BRAND.name}: Clubs in ${scoreCount}/${HOLES_MAX_GUESSES}. Beat me: ${url}`
-      : `I couldn't crack today's ${BRAND.name}: Clubs. Your turn: ${url}`;
+      ? `I solved today's ${BRAND.name}: Clubhouses in ${scoreCount}/${HOLES_MAX_GUESSES}. Beat me: ${url}`
+      : `I couldn't crack today's ${BRAND.name}: Clubhouses. Your turn: ${url}`;
     const nav = navigator as Navigator & {
       share?: (data: { text: string }) => Promise<void>;
     };
@@ -341,7 +341,7 @@ export default function ClubsPage() {
         <div className="challenge-banner">
           <span aria-hidden="true">🏛️</span>{" "}
           <strong>{challenge?.challengerName || "A friend"}</strong> got
-          today&apos;s Clubs in{" "}
+          today&apos;s Clubhouses in{" "}
           <strong>
             {challenge?.score}/{HOLES_MAX_GUESSES}
           </strong>
@@ -360,7 +360,7 @@ export default function ClubsPage() {
           ←
         </Link>
         <h1>{BRAND.name}</h1>
-        <p className="subtitle">Clubs · Day {dayNumber}</p>
+        <p className="subtitle">Clubhouses · Day {dayNumber}</p>
         {stats && stats.current > 0 && (
           <div className="brand-streak" title={`Longest: ${stats.longest}`}>
             <span aria-hidden="true">🔥</span> {stats.current} day
@@ -539,7 +539,7 @@ export default function ClubsPage() {
 
       <footer>
         <p>
-          {BRAND.domain} · Clubs · {coursePool("all").length} clubhouses
+          {BRAND.domain} · Clubhouses · {coursePool("all").length} courses
         </p>
       </footer>
     </main>
