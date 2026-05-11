@@ -4,7 +4,7 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
 export const revalidate = 1800;
-export const alt = "Pardle: Connections — group four golfers by what they share";
+export const alt = "Pardle: Connections — find four groups of four golf items";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -82,7 +82,7 @@ export default async function OpengraphImage() {
               display: "flex",
             }}
           >
-            Find four groups of four golfers that share something.
+            Find four groups of four. Every item has a golf connection.
           </div>
           <div
             style={{

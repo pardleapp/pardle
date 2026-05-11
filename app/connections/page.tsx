@@ -348,7 +348,7 @@ export default function ConnectionsPage() {
       </header>
 
       <p className="conn-prompt">
-        Find four groups of four golfers that share something.
+        Find four groups of four. Every item has a golf connection.
       </p>
 
       {solved.length > 0 && (

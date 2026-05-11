@@ -46,7 +46,7 @@ const GAMES: GameTile[] = [
   {
     href: "/connections",
     name: "Connections",
-    blurb: "Find four groups of four golfers that share something.",
+    blurb: "Find four groups of four. Every item has a golf connection.",
     emoji: "🧩",
     status: "live",
     accent: "#B388D6",
