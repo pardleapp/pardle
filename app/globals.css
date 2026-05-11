@@ -3593,8 +3593,10 @@ footer {
 }
 
 .faces-img-overlay {
+  /* Pure 50% alpha overlay — gives a symmetric ghost-blend so neither
+     pro dominates by default. The hint mode tweaks these opacities
+     inline to deliberately favour the unknown face. */
   opacity: 0.5;
-  mix-blend-mode: lighten;
 }
 
 .faces-flash-right {
