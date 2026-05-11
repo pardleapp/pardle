@@ -35,6 +35,7 @@ import {
   saveChallengerName,
 } from "@/lib/challenge";
 import { NotifySignup } from "@/lib/notify-signup";
+import { encodeGridPros, encodeShareCard } from "@/lib/share-card";
 
 const GAME_ID = "holes";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 10);
@@ -226,7 +227,25 @@ function buildShareText(
       ].join(""),
     )
     .join("\n");
-  return `${BRAND.name}: Holes #${dayNumber} ${result}\n${grid}\n${BRAND.url}/holes`;
+  const encodedGrid = encodeGridPros(
+    guesses.map((g) => [
+      g.country.state,
+      g.par.state,
+      // Direction column: distance===0 means we got the right course
+      // (green); anything else is just informative compass+miles
+      // (rendered yellow in the PNG card).
+      g.direction.distanceMi === 0 ? "green" : "yellow",
+      g.courseType.state,
+      g.yardage.state,
+    ]),
+  );
+  const token = encodeShareCard({
+    g: "holes",
+    d: dayNumber,
+    s: result,
+    r: encodedGrid,
+  });
+  return `${BRAND.name}: Holes #${dayNumber} ${result}\n${grid}\n${BRAND.url}/r/${token}`;
 }
 
 function compareWithFriend(
@@ -452,10 +471,28 @@ export default function HolesPage() {
   async function handleShare() {
     // Easy mode uses the existing 5-emoji grid; hard mode falls back to a
     // simple summary line since the reveal cells aren't 1:1 with easy mode.
-    const shareText =
-      difficulty === "hard"
-        ? `${BRAND.name}: Holes #${dayNumber} ${isWin ? scoreCount : "X"}/${HOLES_MAX_GUESSES} (Hard)\n${BRAND.url}/holes`
-        : buildShareText(guesses, dayNumber, isWin);
+    const shareText = (() => {
+      if (difficulty !== "hard") {
+        return buildShareText(guesses, dayNumber, isWin);
+      }
+      const result = `${isWin ? scoreCount : "X"}/${HOLES_MAX_GUESSES}`;
+      const encodedGrid = encodeGridPros(
+        hardCourseGuesses.map((g) => [
+          g.country.state,
+          g.par.state,
+          g.direction.distanceMi === 0 ? "green" : "yellow",
+          g.courseType.state,
+          g.yardage.state,
+        ]),
+      );
+      const token = encodeShareCard({
+        g: "holes",
+        d: dayNumber,
+        s: result,
+        r: encodedGrid,
+      });
+      return `${BRAND.name}: Holes #${dayNumber} ${result} (Hard)\n${BRAND.url}/r/${token}`;
+    })();
     const nav = navigator as Navigator & {
       share?: (data: { text: string }) => Promise<void>;
     };

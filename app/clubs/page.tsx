@@ -28,6 +28,7 @@ import {
   saveChallengerName,
 } from "@/lib/challenge";
 import { NotifySignup } from "@/lib/notify-signup";
+import { encodeGridPros, encodeShareCard } from "@/lib/share-card";
 
 const GAME_ID = "clubs";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 11);
@@ -142,7 +143,22 @@ function buildShareText(
       ].join(""),
     )
     .join("\n");
-  return `${BRAND.name}: Clubhouses #${dayNumber} ${result}\n${grid}\n${BRAND.url}/clubs`;
+  const encodedGrid = encodeGridPros(
+    guesses.map((g) => [
+      g.country.state,
+      g.par.state,
+      g.direction.distanceMi === 0 ? "green" : "yellow",
+      g.courseType.state,
+      g.yardage.state,
+    ]),
+  );
+  const token = encodeShareCard({
+    g: "clubs",
+    d: dayNumber,
+    s: result,
+    r: encodedGrid,
+  });
+  return `${BRAND.name}: Clubhouses #${dayNumber} ${result}\n${grid}\n${BRAND.url}/r/${token}`;
 }
 
 function compareWithFriend(

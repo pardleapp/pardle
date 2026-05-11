@@ -28,6 +28,7 @@ import {
   saveChallengerName,
 } from "@/lib/challenge";
 import { NotifySignup } from "@/lib/notify-signup";
+import { encodeGridPros, encodeShareCard } from "@/lib/share-card";
 
 const GAME_ID = "pros";
 
@@ -102,7 +103,25 @@ function buildShareText(
       ].join(""),
     )
     .join("\n");
-  return `${BRAND.name} #${dayNumber} ${result}\n${grid}\n${BRAND.url}/pros`;
+  // Token URL whose OG preview is a PNG of the result — when pasted
+  // in WhatsApp/iMessage/etc, the link unfurls into a branded card.
+  const encodedGrid = encodeGridPros(
+    guesses.map((g) => [
+      g.country.state,
+      g.age.state,
+      g.height.state,
+      g.majors.state,
+      g.pgaTourWins.state,
+      g.ryderCup.state,
+    ]),
+  );
+  const token = encodeShareCard({
+    g: "pros",
+    d: dayNumber,
+    s: result,
+    r: encodedGrid,
+  });
+  return `${BRAND.name} #${dayNumber} ${result}\n${grid}\n${BRAND.url}/r/${token}`;
 }
 
 function flagFor(countryCode: string): string {

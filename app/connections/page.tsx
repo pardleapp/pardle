@@ -23,6 +23,7 @@ import {
   saveChallengerName,
 } from "@/lib/challenge";
 import { NotifySignup } from "@/lib/notify-signup";
+import { encodeGridConnections, encodeShareCard } from "@/lib/share-card";
 
 const GAME_ID = "connections";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 11);
@@ -88,7 +89,14 @@ function buildShareText(
   const grid = history
     .map((row) => row.map((d) => DIFFICULTY_EMOJI[d]).join(""))
     .join("\n");
-  return `${BRAND.name}: Connections #${dayNumber} (${result})\n${grid}\n${BRAND.url}/connections`;
+  const encodedGrid = encodeGridConnections(history);
+  const token = encodeShareCard({
+    g: "connections",
+    d: dayNumber,
+    s: won ? String(mistakes) : "X",
+    r: encodedGrid,
+  });
+  return `${BRAND.name}: Connections #${dayNumber} (${result})\n${grid}\n${BRAND.url}/r/${token}`;
 }
 
 function compareWithFriend(

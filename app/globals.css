@@ -38,6 +38,76 @@ body {
   flex-direction: column;
 }
 
+/* ---------- Share landing page (/r/[token]) ---------- */
+
+.share-landing {
+  align-items: center;
+  text-align: center;
+}
+
+.share-card {
+  margin: 24px 0 16px;
+  padding: 24px 28px;
+  border-radius: 16px;
+  background: rgba(123, 174, 63, 0.08);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 360px;
+  width: 100%;
+}
+
+.share-card-result {
+  font-size: 56px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+
+.share-card-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.share-card-grid-row {
+  display: flex;
+  gap: 4px;
+}
+
+.share-card-cell {
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+}
+
+.share-landing-tagline {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 4px 0 16px;
+}
+
+.share-cta {
+  display: inline-block;
+  padding: 14px 28px;
+  border-radius: 999px;
+  background: var(--green);
+  color: white;
+  font-size: 16px;
+  font-weight: 800;
+  text-decoration: none;
+  margin-bottom: 24px;
+  letter-spacing: 0.3px;
+  box-shadow: 0 4px 14px rgba(123, 174, 63, 0.35);
+}
+
+.share-cta:hover {
+  opacity: 0.92;
+}
+
 /* ---------- Connections game ---------- */
 
 .conn-prompt {
