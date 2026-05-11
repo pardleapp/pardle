@@ -2,6 +2,13 @@ import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
+import { getGolfHeadlines } from "@/lib/golf-news";
+import { NewsTicker } from "@/app/_components/NewsTicker";
+
+// Hub is rebuilt at most every 30 minutes so the news ticker rotates
+// through reasonably fresh headlines without re-fetching the RSS feed
+// on every visitor request.
+export const revalidate = 1800;
 
 export const metadata: Metadata = {
   title: `${BRAND.name} — Daily golf puzzles`,
@@ -72,13 +79,17 @@ function CardBody({ game }: { game: GameTile }) {
   );
 }
 
-export default function HubHome() {
+export default async function HubHome() {
+  const headlines = await getGolfHeadlines();
+
   return (
     <main className="hub">
       <header className="hub-header">
         <h1 className="hub-wordmark">{BRAND.name}</h1>
         <p className="hub-subtitle">Daily golf puzzles</p>
       </header>
+
+      <NewsTicker headlines={headlines} />
 
       <div className="hub-grid">
         {GAMES.map((game) =>
