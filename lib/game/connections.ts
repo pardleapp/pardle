@@ -1,56 +1,48 @@
 /**
- * Pardle: Connections — golf edition.
+ * Pardle: Connections — golf edition (V2).
  *
- * 16 golfers per puzzle, hidden in 4 categories of 4 each. The
- * categories are auto-generated from the GOLFERS dataset attributes
- * (country, majors, age, Ryder Cup, PGA wins) so we get an endless
- * supply of daily puzzles with zero hand-curation.
+ * The V1 generator built categories from orthogonal attribute axes
+ * (country × majors × age × Ryder Cup), which meant every famous player
+ * satisfied multiple categories at once. The puzzle had no single
+ * "correct" answer because Rory could equally well be "Northern Irish",
+ * "5+ Ryder Cups", "Multi-major winner", or "In their 30s" — all true.
  *
- * Each puzzle has one category per difficulty tier — yellow (easy)
- * through purple (tricky) — mirroring NYT Connections' colour
- * convention so the visual cue is familiar.
+ * V2 fixes this with two changes:
  *
- * Generation is deterministic per day: same day = same puzzle for
- * every player worldwide.
+ *   1. Categories come from a hand-curated library of specific,
+ *      discrete groupings (won the Masters, surname starts with M,
+ *      from Australia, etc.) — see connections-library.ts.
+ *
+ *   2. STRICT non-overlap is enforced per puzzle. After picking 4
+ *      categories, we verify that each category has ≥4 members
+ *      that don't appear in any of the other 3 categories' full
+ *      member lists. Then we pick those non-overlapping members so
+ *      every chosen golfer belongs to EXACTLY ONE category for this
+ *      puzzle. Rory could be the "Northern Irish" answer one day and
+ *      the "5+ Ryder Cups" answer another, but never both in the
+ *      same puzzle.
+ *
+ * Generation remains deterministic per UTC day via Mulberry32 seeded
+ * from dayNumber.
  */
 
-import type { Golfer } from "./types";
 import { GOLFERS } from "@/lib/data/golfers";
+import { CATEGORY_LIBRARY, type CategoryDef } from "./connections-library";
+import {
+  type ConnectionsCategory,
+  type ConnectionsPuzzle,
+  DIFFICULTY_ORDER,
+  type ConnectionsDifficulty,
+} from "./connections-types";
 
-export type ConnectionsDifficulty = "yellow" | "green" | "blue" | "purple";
-export const DIFFICULTY_ORDER: ConnectionsDifficulty[] = [
-  "yellow",
-  "green",
-  "blue",
-  "purple",
-];
+export type {
+  ConnectionsCategory,
+  ConnectionsPuzzle,
+  ConnectionsDifficulty,
+} from "./connections-types";
+export { DIFFICULTY_ORDER } from "./connections-types";
 
-export interface ConnectionsCategory {
-  label: string;
-  difficulty: ConnectionsDifficulty;
-  /** golfer ids in this group */
-  memberIds: string[];
-}
-
-export interface ConnectionsItem {
-  id: string;
-  name: string;
-}
-
-export interface ConnectionsPuzzle {
-  dayNumber: number;
-  items: ConnectionsItem[]; // 16, shuffled
-  categories: ConnectionsCategory[]; // 4, ordered yellow → purple
-}
-
-interface CandidateGroup {
-  difficulty: ConnectionsDifficulty;
-  label: string;
-  memberIds: string[];
-}
-
-// Mulberry32 — small, fast, deterministic PRNG. We seed it from the
-// day index so today's puzzle is identical for everyone, every device.
+// Mulberry32 — small, fast, deterministic PRNG.
 function seededRandom(seed: number): () => number {
   let a = (seed >>> 0) || 1;
   return () => {
@@ -71,177 +63,140 @@ function shuffle<T>(arr: readonly T[], rand: () => number): T[] {
   return out;
 }
 
-function buildCandidates(): CandidateGroup[] {
-  const out: CandidateGroup[] = [];
-
-  // YELLOW (easy) — same country. Most universally recognisable signal.
-  const byCountry = new Map<string, Golfer[]>();
-  for (const g of GOLFERS) {
-    const arr = byCountry.get(g.country) || [];
-    arr.push(g);
-    byCountry.set(g.country, arr);
-  }
-  for (const [country, golfers] of byCountry) {
-    if (golfers.length >= 4) {
-      out.push({
-        difficulty: "yellow",
-        label: `${country}`,
-        memberIds: golfers.map((g) => g.id),
-      });
+/**
+ * Given 4 chosen categories, return the per-category list of members
+ * that ONLY belong to that category (not in any of the other 3's full
+ * member lists). Returns null if any category has fewer than 4 unique
+ * members — puzzle invalid.
+ */
+function uniqueMembersPerCategory(
+  chosen: CategoryDef[],
+): string[][] | null {
+  const fullSets = chosen.map((c) => new Set(c.memberIds));
+  const result: string[][] = [];
+  for (let i = 0; i < chosen.length; i++) {
+    const own = chosen[i];
+    const uniqueToThis: string[] = [];
+    for (const id of own.memberIds) {
+      let appearsElsewhere = false;
+      for (let j = 0; j < chosen.length; j++) {
+        if (j === i) continue;
+        if (fullSets[j].has(id)) {
+          appearsElsewhere = true;
+          break;
+        }
+      }
+      if (!appearsElsewhere) uniqueToThis.push(id);
     }
+    if (uniqueToThis.length < 4) return null;
+    result.push(uniqueToThis);
   }
-
-  // GREEN (medium) — majors band. Top players' major counts are
-  // well-known; rookies and unproven pros sit in the 0-major bucket.
-  const noMajors = GOLFERS.filter((g) => g.majors === 0).map((g) => g.id);
-  const oneMajor = GOLFERS.filter((g) => g.majors === 1).map((g) => g.id);
-  const twoOrThree = GOLFERS.filter((g) => g.majors >= 2 && g.majors <= 3).map(
-    (g) => g.id,
-  );
-  const fourPlus = GOLFERS.filter((g) => g.majors >= 4).map((g) => g.id);
-  if (noMajors.length >= 4) {
-    out.push({
-      difficulty: "green",
-      label: "Yet to win a major",
-      memberIds: noMajors,
-    });
-  }
-  if (oneMajor.length >= 4) {
-    out.push({
-      difficulty: "green",
-      label: "One major win",
-      memberIds: oneMajor,
-    });
-  }
-  if (twoOrThree.length >= 4) {
-    out.push({
-      difficulty: "green",
-      label: "Two or three majors",
-      memberIds: twoOrThree,
-    });
-  }
-  if (fourPlus.length >= 4) {
-    out.push({
-      difficulty: "green",
-      label: "Four or more majors",
-      memberIds: fourPlus,
-    });
-  }
-
-  // BLUE (hard) — age decade. Requires knowing how old each pro is.
-  const ages: { label: string; min: number; max: number }[] = [
-    { label: "In their 20s", min: 20, max: 29 },
-    { label: "In their 30s", min: 30, max: 39 },
-    { label: "In their 40s", min: 40, max: 49 },
-    { label: "50 and over", min: 50, max: 200 },
-  ];
-  for (const { label, min, max } of ages) {
-    const ids = GOLFERS.filter((g) => g.age >= min && g.age <= max).map(
-      (g) => g.id,
-    );
-    if (ids.length >= 4) {
-      out.push({ difficulty: "blue", label, memberIds: ids });
-    }
-  }
-
-  // PURPLE (very hard) — niche / surprising categories. Players often
-  // don't realise who's a Ryder Cup veteran vs a rookie, or that some
-  // top names are continentally ineligible for the Cup at all.
-  const ryderVets = GOLFERS.filter(
-    (g) => g.ryderCup !== null && g.ryderCup >= 5,
-  ).map((g) => g.id);
-  if (ryderVets.length >= 4) {
-    out.push({
-      difficulty: "purple",
-      label: "Five-plus Ryder Cups",
-      memberIds: ryderVets,
-    });
-  }
-  const ryderRookies = GOLFERS.filter(
-    (g) => g.ryderCup !== null && g.ryderCup >= 1 && g.ryderCup <= 2,
-  ).map((g) => g.id);
-  if (ryderRookies.length >= 4) {
-    out.push({
-      difficulty: "purple",
-      label: "One or two Ryder Cup appearances",
-      memberIds: ryderRookies,
-    });
-  }
-  const ryderIneligible = GOLFERS.filter((g) => g.ryderCup === null).map(
-    (g) => g.id,
-  );
-  if (ryderIneligible.length >= 4) {
-    out.push({
-      difficulty: "purple",
-      label: "Ineligible for the Ryder Cup",
-      memberIds: ryderIneligible,
-    });
-  }
-  const tourLegends = GOLFERS.filter((g) => g.pgaTourWins >= 20).map(
-    (g) => g.id,
-  );
-  if (tourLegends.length >= 4) {
-    out.push({
-      difficulty: "purple",
-      label: "Twenty-plus PGA Tour wins",
-      memberIds: tourLegends,
-    });
-  }
-
-  return out;
+  return result;
 }
 
 export function generatePuzzle(dayNumber: number): ConnectionsPuzzle {
-  const candidates = buildCandidates();
-  const byDifficulty: Record<ConnectionsDifficulty, CandidateGroup[]> = {
+  const byDifficulty: Record<ConnectionsDifficulty, CategoryDef[]> = {
     yellow: [],
     green: [],
     blue: [],
     purple: [],
   };
-  for (const c of candidates) byDifficulty[c.difficulty].push(c);
+  for (const c of CATEGORY_LIBRARY) byDifficulty[c.difficulty].push(c);
 
-  // Try up to N seed offsets — if the first picked categories leave no
-  // valid combination of 4 in a downstream difficulty (because the
-  // golfer pool was exhausted), reshuffle and try again.
-  for (let attempt = 0; attempt < 30; attempt++) {
-    const rand = seededRandom(dayNumber * 1009 + attempt);
-    const used = new Set<string>();
-    const chosen: ConnectionsCategory[] = [];
-
-    for (const diff of DIFFICULTY_ORDER) {
-      const shuffled = shuffle(byDifficulty[diff], rand);
-      let picked: ConnectionsCategory | null = null;
-      for (const candidate of shuffled) {
-        const available = candidate.memberIds.filter((id) => !used.has(id));
-        if (available.length >= 4) {
-          const members = shuffle(available, rand).slice(0, 4);
-          picked = {
-            difficulty: diff,
-            label: candidate.label,
-            memberIds: members,
-          };
-          for (const id of members) used.add(id);
-          break;
-        }
-      }
-      if (!picked) break;
-      chosen.push(picked);
-    }
-
-    if (chosen.length === 4) {
-      const byId = new Map(GOLFERS.map((g) => [g.id, g] as const));
-      const allIds = chosen.flatMap((c) => c.memberIds);
-      const items = shuffle(allIds, rand).map((id) => {
-        const g = byId.get(id);
-        if (!g) throw new Error(`Unknown golfer id: ${id}`);
-        return { id, name: g.name };
-      });
-      return { dayNumber, items, categories: chosen };
+  // Sanity-check the library has at least one category per difficulty.
+  for (const d of DIFFICULTY_ORDER) {
+    if (byDifficulty[d].length === 0) {
+      throw new Error(
+        `Connections category library missing entries for difficulty: ${d}`,
+      );
     }
   }
 
+  // Try up to N seed offsets until we find a 4-tuple with strict
+  // non-overlap. Library is sized so this usually succeeds in 1-2
+  // attempts; the loop is a safety net.
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const rand = seededRandom(dayNumber * 1009 + attempt);
+
+    // For each difficulty, shuffle candidates and walk through them
+    // in order, picking the first that doesn't break non-overlap.
+    const chosen: CategoryDef[] = [];
+    let aborted = false;
+    for (const diff of DIFFICULTY_ORDER) {
+      const shuffled = shuffle(byDifficulty[diff], rand);
+      let picked: CategoryDef | null = null;
+      for (const candidate of shuffled) {
+        const others = new Set(
+          chosen.flatMap((c) => c.memberIds),
+        );
+        const availableInCandidate = candidate.memberIds.filter(
+          (id) => !others.has(id),
+        );
+        if (availableInCandidate.length < 4) continue;
+        // Tentatively accept — final non-overlap check happens
+        // below across all 4 categories together.
+        picked = candidate;
+        break;
+      }
+      if (!picked) {
+        aborted = true;
+        break;
+      }
+      chosen.push(picked);
+    }
+    if (aborted || chosen.length !== 4) continue;
+
+    const uniqueMembers = uniqueMembersPerCategory(chosen);
+    if (!uniqueMembers) continue;
+
+    // Pick 4 members per category (seeded shuffle). Guaranteed
+    // non-overlapping because uniqueMembersPerCategory removed any
+    // golfer that appeared in another category's full list.
+    const finalCategories: ConnectionsCategory[] = chosen.map((c, i) => {
+      const members = shuffle(uniqueMembers[i], rand).slice(0, 4);
+      return {
+        label: c.label,
+        difficulty: c.difficulty,
+        memberIds: members,
+      };
+    });
+
+    // Sanity check: every member appears in exactly one category.
+    const seen = new Set<string>();
+    for (const cat of finalCategories) {
+      for (const id of cat.memberIds) {
+        if (seen.has(id)) {
+          // Shouldn't happen given uniqueMembersPerCategory, but
+          // belt-and-braces — skip this attempt if it does.
+          aborted = true;
+          break;
+        }
+        seen.add(id);
+      }
+      if (aborted) break;
+    }
+    if (aborted) continue;
+
+    const byId = new Map(GOLFERS.map((g) => [g.id, g] as const));
+    const allIds = finalCategories.flatMap((c) => c.memberIds);
+    const items = shuffle(allIds, rand).map((id) => {
+      const g = byId.get(id);
+      if (!g) {
+        throw new Error(
+          `Connections category references unknown golfer id: ${id}`,
+        );
+      }
+      return { id, name: g.name };
+    });
+
+    return {
+      dayNumber,
+      items,
+      categories: finalCategories,
+    };
+  }
+
   throw new Error(
-    `Could not generate a Connections puzzle for day ${dayNumber}`,
+    `Could not generate a Connections puzzle for day ${dayNumber} after 200 attempts`,
   );
 }
