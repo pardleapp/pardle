@@ -206,14 +206,20 @@ body {
 }
 
 /* Hard-mode 5-column layout: country flag (narrow), par (narrow),
-   direction (widest — shows "NE 624mi"), type (medium), year (medium). */
-.guess-cells-hard5 {
+   direction (widest — shows "NE 624mi"), type (medium), year (medium).
+   Selectors are chained (.guess-cells.guess-cells-hard5) so they beat
+   the base .guess-cells / .header-row rules in app/globals.css that
+   define a 6-equal-col template for the Pros grid — without the
+   higher specificity, those bases (which appear later in the file)
+   override these and the header columns drift out of alignment with
+   the cells below them on mobile. */
+.guess-cells.guess-cells-hard5 {
   display: grid;
   grid-template-columns: 0.4fr 0.4fr 1.2fr 0.9fr 0.6fr;
   gap: 4px;
 }
 
-.header-row-hard5 {
+.header-row.header-row-hard5 {
   display: grid;
   grid-template-columns: 0.4fr 0.4fr 1.2fr 0.9fr 0.6fr;
   gap: 4px;
@@ -226,13 +232,13 @@ body {
   padding: 0 0 4px;
 }
 
-.header-row-hard5 span {
+.header-row.header-row-hard5 span {
   text-align: center;
   align-self: center;
   line-height: 1.15;
 }
 
-.guess-cells-1 {
+.guess-cells.guess-cells-1 {
   display: grid;
   grid-template-columns: 1fr;
   gap: 4px;
