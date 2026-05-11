@@ -64,6 +64,10 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "ian-woosnam",
       "lee-westwood",
       "aaron-rai",
+      "tommy-fleetwood",
+      "luke-donald",
+      "ian-poulter",
+      "paul-casey",
     ],
   },
   {
@@ -86,6 +90,10 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "ernie-els",
       "justin-rose",
       "erik-van-rooyen",
+      "louis-oosthuizen",
+      "charl-schwartzel",
+      "trevor-immelman",
+      "retief-goosen",
     ],
   },
   {
@@ -228,6 +236,17 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "davis-love-iii",
     ],
   },
+  {
+    id: "g-majors-2010",
+    label: "Won a major in 2010",
+    difficulty: "green",
+    memberIds: [
+      "phil-mickelson", // Masters
+      "graeme-mcdowell", // US Open
+      "louis-oosthuizen", // Open
+      "martin-kaymer", // PGA Championship
+    ],
+  },
 
   // Broader event categories — wider pools so the assembler always
   // has slack to fill green even when several year-specific cats
@@ -248,6 +267,35 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "bubba-watson",
       "josé-maría-olazábal",
       "scottie-scheffler",
+    ],
+  },
+  {
+    id: "g-open-championship-winners",
+    label: "Won the Open Championship",
+    difficulty: "green",
+    memberIds: [
+      "rory-mcilroy",
+      "jordan-spieth",
+      "cameron-smith",
+      "henrik-stenson",
+      "brian-harman",
+      "shane-lowry",
+      "xander-schauffele",
+      "tom-watson",
+      "padraig-harrington",
+      "stewart-cink",
+      "john-daly",
+      "sandy-lyle",
+      "louis-oosthuizen",
+      "francesco-molinari",
+      "zach-johnson",
+      "ernie-els",
+      "phil-mickelson",
+      "tiger-woods",
+      "greg-norman",
+      "nick-faldo",
+      "lee-trevino",
+      "gary-player",
     ],
   },
   {
@@ -358,6 +406,9 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "stewart-cink", // 2009 Open vs Watson
       "padraig-harrington", // 2007 Open vs Garcia
       "mark-calcavecchia", // 1989 Open
+      "mike-weir", // 2003 Masters vs Mattiace
+      "martin-kaymer", // 2010 PGA vs Bubba Watson
+      "retief-goosen", // 2001 US Open vs Mark Brooks
     ],
   },
   {
@@ -428,6 +479,7 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "justin-thomas",
       "brooks-koepka",
       "scottie-scheffler",
+      "luke-donald", // held #1 for 56 weeks in 2011-12
     ],
   },
   {
@@ -494,6 +546,7 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "josé-maría-olazábal",
       "padraig-harrington",
       "colin-montgomerie",
+      "luke-donald", // 2023 + 2025
     ],
   },
   {
@@ -501,10 +554,11 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
     label: "Won an Olympic medal in golf",
     difficulty: "blue",
     memberIds: [
-      "justin-rose",
-      "henrik-stenson",
-      "xander-schauffele",
-      "hideki-matsuyama",
+      "justin-rose", // gold 2016
+      "henrik-stenson", // silver 2016
+      "xander-schauffele", // gold 2020, 2024
+      "hideki-matsuyama", // bronze 2024
+      "tommy-fleetwood", // silver 2024
     ],
   },
   {
@@ -613,6 +667,7 @@ export const CATEGORY_LIBRARY: CategoryDef[] = [
       "sepp-straka",
       "robert-macintyre",
       "justin-rose",
+      "tommy-fleetwood",
     ],
   },
   {
