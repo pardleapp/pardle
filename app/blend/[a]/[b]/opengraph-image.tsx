@@ -9,9 +9,10 @@ import { PGA_TOUR_IDS } from "@/lib/data/pga-tour-ids";
 // what unfurls in their post.
 
 export const runtime = "edge";
-// 1-week cache — blends are deterministic from the IDs so we can let
-// Vercel + Cloudinary's CDN serve repeats free.
-export const revalidate = 60 * 60 * 24 * 7;
+// 1-week cache (604800s) — blends are deterministic from the IDs so we
+// let Vercel + Cloudinary's CDN serve repeats. Next requires a literal
+// here, not an expression, so no multiplication.
+export const revalidate = 604800;
 export const alt = "Pardle Blend";
 export const size = { width: 1200, height: 1200 };
 export const contentType = "image/png";
