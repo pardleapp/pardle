@@ -3,11 +3,19 @@ import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import { todayDayNumber } from "@/lib/day-index";
 import {
+  GAME_VARIANTS,
   readPerGameStats,
   STATS_GAMES,
   type GameDayStats,
   type StatsGameId,
 } from "@/lib/stats-backend";
+import { VariantStatsCard } from "./_components/VariantStatsCard";
+
+const VARIANT_LABELS: Record<string, string> = {
+  easy: "Easy",
+  medium: "Medium",
+  hard: "Hard",
+};
 
 // Re-fetch from Redis every 2 minutes — fresh enough that the page
 // feels alive, cheap enough that we comfortably stay inside Upstash's
@@ -61,16 +69,27 @@ export default async function TodayStatsPage() {
     STATS_GAMES.map((g) => [g, todayDayNumber(g)]),
   ) as Record<StatsGameId, number>;
   const allStats = await readPerGameStats(days);
-  const statsByGame = new Map(allStats.map((s) => [s.game, s]));
 
-  // Sort by popularity (most played first) so the most engaged game
-  // leads the page.
-  const results = STATS_GAMES.map((game) => ({
-    meta: GAME_META[game],
-    stats: statsByGame.get(game)!,
-  })).sort((a, b) => b.stats.total - a.stats.total);
+  // Group stats by game so variant games (trivia easy/med/hard) get one
+  // entry that holds all variants together. Single-variant games keep
+  // a one-element list.
+  type GameGroup = {
+    game: StatsGameId;
+    meta: typeof GAME_META[StatsGameId];
+    stats: GameDayStats[];
+    totalAcross: number;
+  };
+  const grouped: GameGroup[] = STATS_GAMES.map((game) => {
+    const stats = allStats.filter((s) => s.game === game);
+    return {
+      game,
+      meta: GAME_META[game],
+      stats,
+      totalAcross: stats.reduce((sum, s) => sum + s.total, 0),
+    };
+  }).sort((a, b) => b.totalAcross - a.totalAcross);
 
-  const totalPlays = results.reduce((sum, r) => sum + r.stats.total, 0);
+  const totalPlays = grouped.reduce((sum, g) => sum + g.totalAcross, 0);
 
   return (
     <main className="container today-stats">
@@ -101,7 +120,48 @@ export default async function TodayStatsPage() {
             {totalPlays === 1 ? "" : "s"} solved today across {BRAND.name}.
           </p>
 
-          {results.map(({ meta, stats }) => {
+          {grouped.map(({ game, meta, stats: variantStats }) => {
+            const variants = GAME_VARIANTS[game];
+            // Multi-variant game (e.g. trivia easy/medium/hard) — render
+            // the dedicated client component with a tab toggle.
+            if (variants && variants.length > 1) {
+              const initial =
+                variantStats
+                  .slice()
+                  .sort((a, b) => b.total - a.total)[0]?.variant ??
+                variants[0];
+              return (
+                <VariantStatsCard
+                  key={game}
+                  game={game}
+                  meta={meta}
+                  initialVariantId={initial}
+                  variants={variants.map((vId) => {
+                    const found = variantStats.find((s) => s.variant === vId);
+                    return {
+                      id: vId,
+                      label: VARIANT_LABELS[vId] ?? vId,
+                      stats:
+                        found ?? {
+                          game,
+                          variant: vId,
+                          total: 0,
+                          wins: 0,
+                          distribution: {},
+                        },
+                    };
+                  })}
+                />
+              );
+            }
+
+            // Single-variant game — same inline rendering as before.
+            const stats = variantStats[0] ?? {
+              game,
+              total: 0,
+              wins: 0,
+              distribution: {} as Record<string, number>,
+            };
             const wr = winRate(stats);
             const avg = averageScore(stats);
             const distMax = distributionMax(stats);

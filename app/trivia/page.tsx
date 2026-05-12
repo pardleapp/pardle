@@ -202,11 +202,12 @@ export default function TriviaPage() {
     );
     void recordPlayClient({
       game: "trivia",
+      variant: difficulty,
       day: dayNumber,
       isWin: correct >= 6,
       score: correct,
     });
-  }, [isFinished, dayNumber, answers, daily.questions]);
+  }, [isFinished, dayNumber, answers, daily.questions, difficulty]);
 
   function pickAnswer(optionIndex: number) {
     if (hasAnswered || isFinished) return;

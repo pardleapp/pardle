@@ -9,6 +9,7 @@ export const runtime = "edge";
 
 interface RecordPayload {
   game: StatsGameId;
+  variant?: string;
   day: number;
   userToken: string;
   isWin: boolean;
@@ -18,9 +19,16 @@ interface RecordPayload {
 function isValidPayload(body: unknown): body is RecordPayload {
   if (!body || typeof body !== "object") return false;
   const b = body as Record<string, unknown>;
+  const variantOk =
+    b.variant === undefined ||
+    (typeof b.variant === "string" &&
+      b.variant.length > 0 &&
+      b.variant.length <= 24 &&
+      /^[a-z0-9_-]+$/.test(b.variant));
   return (
     typeof b.game === "string" &&
     (STATS_GAMES as readonly string[]).includes(b.game) &&
+    variantOk &&
     typeof b.day === "number" &&
     Number.isInteger(b.day) &&
     b.day >= 0 &&

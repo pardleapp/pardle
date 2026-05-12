@@ -108,6 +108,82 @@ body {
   transform: translateY(-1px);
 }
 
+.today-card-variant {
+  /* No hover transform for the variant card — it's not a link, it's
+     a tab-toggled stats panel. */
+}
+.today-card-variant:hover {
+  transform: none;
+}
+
+.today-variant-toggle {
+  display: flex;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 4px;
+  border-radius: 999px;
+  margin: -2px 0 2px;
+}
+
+.today-variant-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.today-variant-btn-active {
+  /* Background + colour overridden inline so the accent matches the
+     game's tile colour. */
+}
+
+.today-variant-count {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.today-variant-btn-active .today-variant-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
+}
+
+.today-variant-cta {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.today-variant-cta:hover {
+  color: var(--text);
+}
+
+@media (prefers-color-scheme: dark) {
+  .today-variant-toggle {
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .today-variant-count {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
 .today-card-head {
   display: flex;
   align-items: center;

@@ -35,8 +35,12 @@ function getUserId(): string {
   }
 }
 
-function postedKey(game: StatsGameId, day: number): string {
-  return `${POSTED_KEY_PREFIX}${game}.${day}`;
+function postedKey(game: StatsGameId, day: number, variant?: string): string {
+  // Variant goes in the local flag too so playing easy and medium on
+  // the same day each post their own record.
+  return variant
+    ? `${POSTED_KEY_PREFIX}${game}.${variant}.${day}`
+    : `${POSTED_KEY_PREFIX}${game}.${day}`;
 }
 
 /**
@@ -46,6 +50,7 @@ function postedKey(game: StatsGameId, day: number): string {
  */
 export async function recordPlayClient(args: {
   game: StatsGameId;
+  variant?: string;
   day: number;
   isWin: boolean;
   score: number;
@@ -54,7 +59,7 @@ export async function recordPlayClient(args: {
   // Client-side flag — saves a network round-trip when re-mounting an
   // already-finished game.
   try {
-    const key = postedKey(args.game, args.day);
+    const key = postedKey(args.game, args.day, args.variant);
     if (window.localStorage.getItem(key) === "1") return;
     window.localStorage.setItem(key, "1");
   } catch {

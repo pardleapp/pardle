@@ -36,8 +36,20 @@ export const STATS_GAMES: readonly StatsGameId[] = [
   "faces",
 ];
 
+/**
+ * Games with multiple modes/difficulties record stats per variant so
+ * /today can filter by Easy/Medium/Hard. Games not in this map are
+ * recorded under a single aggregate key.
+ */
+export const GAME_VARIANTS: Partial<Record<StatsGameId, readonly string[]>> = {
+  trivia: ["easy", "medium", "hard"],
+};
+
 export interface GameDayStats {
   game: StatsGameId;
+  /** Variant the stats are scoped to (e.g. "medium") — undefined when
+   * the game has no variants. */
+  variant?: string;
   total: number;
   wins: number;
   /** Map of score (e.g. "3", "X") -> count. "X" means a loss. */
@@ -49,32 +61,37 @@ export interface DayStats {
   games: GameDayStats[];
 }
 
-function base(game: StatsGameId, day: number): string {
-  return `stats:${game}:${day}`;
+function base(game: StatsGameId, day: number, variant?: string): string {
+  // Variant key appends after day so games without variants keep their
+  // historical keys unchanged. e.g. stats:trivia:5:medium vs stats:pros:5
+  return variant ? `stats:${game}:${day}:${variant}` : `stats:${game}:${day}`;
 }
 
 /**
- * Record a single game completion. Idempotent per (game, day, userToken)
- * for 48 hours, so refreshes / re-mounts don't double-count.
+ * Record a single game completion. Idempotent per (game, variant, day,
+ * userToken) for 48 hours, so refreshes / re-mounts don't double-count.
  *
  * Returns true if this call actually recorded a new play, false if it
  * was deduplicated.
  */
 export async function recordPlay(args: {
   game: StatsGameId;
+  variant?: string;
   day: number;
   userToken: string;
   isWin: boolean;
   score: number; // guesses used for Pros/Holes/Clubs; mistakes used for Connections
 }): Promise<boolean> {
-  const dedupKey = `played:${args.game}:${args.day}:${args.userToken}`;
+  const dedupKey = args.variant
+    ? `played:${args.game}:${args.day}:${args.variant}:${args.userToken}`
+    : `played:${args.game}:${args.day}:${args.userToken}`;
   const setResult = await redis.set(dedupKey, "1", {
     nx: true,
     ex: 60 * 60 * 48, // 48-hour TTL
   });
   if (setResult !== "OK") return false;
 
-  const b = base(args.game, args.day);
+  const b = base(args.game, args.day, args.variant);
   const distKey = args.isWin ? String(args.score) : "X";
 
   const pipeline = redis.pipeline();
@@ -86,9 +103,14 @@ export async function recordPlay(args: {
 }
 
 /**
- * Read aggregated stats for *today* across all four games. Each game
- * has its own launch date so its own day index — pass them in as a
- * map. Single Redis pipeline regardless of game count.
+ * Read aggregated stats for *today* across all games. Each game has its
+ * own launch date so its own day index — pass them in as a map.
+ *
+ * For games with variants (e.g. trivia easy/medium/hard) one entry is
+ * returned per variant. For games without variants, one entry with
+ * `variant: undefined`. Caller groups by `game` and renders accordingly.
+ *
+ * Single Redis pipeline regardless of game/variant count.
  */
 export async function readPerGameStats(
   days: Record<StatsGameId, number>,
@@ -101,9 +123,22 @@ export async function readPerGameStats(
     "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "X",
   ];
 
-  const pipeline = redis.pipeline();
+  // Expand each game into one query per variant (or one with no variant
+  // for variant-less games). Keep parallel arrays so we can re-map the
+  // pipeline results back to the right game/variant.
+  const queries: { game: StatsGameId; variant?: string }[] = [];
   for (const game of STATS_GAMES) {
-    const b = base(game, days[game]);
+    const variants = GAME_VARIANTS[game];
+    if (variants && variants.length > 0) {
+      for (const v of variants) queries.push({ game, variant: v });
+    } else {
+      queries.push({ game });
+    }
+  }
+
+  const pipeline = redis.pipeline();
+  for (const q of queries) {
+    const b = base(q.game, days[q.game], q.variant);
     pipeline.get(`${b}:total`);
     pipeline.get(`${b}:wins`);
     for (const bucket of distBuckets) {
@@ -112,12 +147,12 @@ export async function readPerGameStats(
   }
   const results = (await pipeline.exec()) as (string | number | null)[];
 
-  const games: GameDayStats[] = [];
+  const out: GameDayStats[] = [];
   let cursor = 0;
-  const valuesPerGame = 2 + distBuckets.length;
-  for (const game of STATS_GAMES) {
-    const slice = results.slice(cursor, cursor + valuesPerGame);
-    cursor += valuesPerGame;
+  const valuesPerQuery = 2 + distBuckets.length;
+  for (const q of queries) {
+    const slice = results.slice(cursor, cursor + valuesPerQuery);
+    cursor += valuesPerQuery;
     const total = Number(slice[0] ?? 0);
     const wins = Number(slice[1] ?? 0);
     const distribution: Record<string, number> = {};
@@ -125,8 +160,8 @@ export async function readPerGameStats(
       const count = Number(slice[2 + i] ?? 0);
       if (count > 0) distribution[bucket] = count;
     });
-    games.push({ game, total, wins, distribution });
+    out.push({ game: q.game, variant: q.variant, total, wins, distribution });
   }
 
-  return games;
+  return out;
 }
