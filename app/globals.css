@@ -4416,6 +4416,152 @@ footer {
   filter: brightness(1.08);
 }
 
+/* ---------- /blend/me — selfie blend ---------- */
+
+.blendme-upload {
+  display: block;
+  margin: 8px 0 22px;
+  border: 2px dashed rgba(224, 123, 91, 0.55);
+  border-radius: 18px;
+  padding: 36px 16px;
+  background: rgba(224, 123, 91, 0.05);
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.blendme-upload:hover {
+  background: rgba(224, 123, 91, 0.1);
+  border-color: #E07B5B;
+}
+
+.blendme-upload input {
+  display: none;
+}
+
+.blendme-upload-emoji {
+  font-size: 42px;
+  margin-bottom: 6px;
+}
+
+.blendme-upload-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.blendme-upload-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.blendme-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 0;
+  color: var(--muted);
+}
+
+.blendme-spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid rgba(224, 123, 91, 0.18);
+  border-top-color: #E07B5B;
+  animation: blendme-spin 0.8s linear infinite;
+}
+
+@keyframes blendme-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.blendme-error {
+  text-align: center;
+  padding: 22px;
+  background: rgba(224, 112, 112, 0.08);
+  border: 1px solid rgba(224, 112, 112, 0.3);
+  border-radius: 14px;
+  margin-bottom: 16px;
+}
+
+.blendme-error p {
+  color: #c25a40;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.blendme-picker {
+  margin-bottom: 18px;
+}
+
+.blendme-picker-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.blend-featured-chip-on {
+  background: #E07B5B;
+  color: white;
+  border-color: #E07B5B;
+}
+
+.blendme-result {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto 14px;
+  border-radius: 18px;
+  box-shadow: 0 12px 36px rgba(15, 31, 15, 0.32);
+}
+
+.blendme-reset {
+  display: block;
+  margin: 16px auto 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: inherit;
+}
+
+.blendme-reset:hover {
+  color: var(--text);
+}
+
+.blendme-promo {
+  display: block;
+  margin: 0 0 22px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #E07B5B 0%, #c95a40 100%);
+  color: white;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  text-decoration: none;
+  text-align: center;
+  box-shadow: 0 6px 16px rgba(224, 123, 91, 0.32);
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.blendme-promo:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
 .faces-claim-by {
   font-size: 11px;
   font-weight: 800;

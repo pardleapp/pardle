@@ -1,0 +1,579 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BRAND } from "@/lib/brand";
+import { GOLFERS } from "@/lib/data/golfers";
+import {
+  PGA_TOUR_IDS,
+  pgaTourHeadshotUrlById,
+} from "@/lib/data/pga-tour-ids";
+import type { Golfer } from "@/lib/game/types";
+import { searchableName } from "@/lib/text";
+
+// ── canonical alignment constants — match lib/data/face-alignment.ts ─
+const CANONICAL_EYE_X = 0.5;
+const CANONICAL_EYE_Y = 0.4;
+const CANONICAL_MOUTH_X = 0.5;
+const CANONICAL_MOUTH_Y = 0.62;
+
+// mediapipe FaceMesh landmark indices (refined-landmarks model)
+const LEFT_IRIS = 468;
+const RIGHT_IRIS = 473;
+const MOUTH_LEFT_CORNER = 61;
+const MOUTH_RIGHT_CORNER = 291;
+
+const OUT_SIZE = 600;
+
+interface FaceLm {
+  leftEye: [number, number];
+  rightEye: [number, number];
+  mouth: [number, number];
+}
+
+interface AlignTransform {
+  /** Pixel translation. */
+  tx: number;
+  ty: number;
+  /** Uniform scale around origin (0, 0). */
+  scale: number;
+  /** Rotation in degrees around origin. */
+  rotateDeg: number;
+}
+
+function computeAlignTransform(lm: FaceLm, size: number): AlignTransform {
+  const eyeMidX = (lm.leftEye[0] + lm.rightEye[0]) / 2;
+  const eyeMidY = (lm.leftEye[1] + lm.rightEye[1]) / 2;
+  const dx = lm.mouth[0] - eyeMidX;
+  const dy = lm.mouth[1] - eyeMidY;
+  const measLen = Math.hypot(dx, dy);
+  const canonLen = CANONICAL_MOUTH_Y - CANONICAL_EYE_Y;
+  const scale = canonLen / measLen;
+  const angleMeas = Math.atan2(dy, dx);
+  const angleCanon = Math.atan2(canonLen, 0); // pi/2
+  const rotateRad = angleCanon - angleMeas;
+  const cos = Math.cos(rotateRad);
+  const sin = Math.sin(rotateRad);
+  const eyeRotX = eyeMidX * cos - eyeMidY * sin;
+  const eyeRotY = eyeMidX * sin + eyeMidY * cos;
+  const tx = (CANONICAL_EYE_X - eyeRotX * scale) * size;
+  const ty = (CANONICAL_EYE_Y - eyeRotY * scale) * size;
+  return { tx, ty, scale, rotateDeg: (rotateRad * 180) / Math.PI };
+}
+
+/** Load an image element from a URL (or blob URL) and wait for decode. */
+function loadImage(src: string, crossOrigin = true): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    if (crossOrigin) img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = (e) => reject(e);
+    img.src = src;
+  });
+}
+
+/** Draw `img` onto `ctx` at the aligned position derived from `t`. */
+function drawAligned(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  t: AlignTransform,
+  size: number,
+  alpha: number,
+): void {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  // Canvas applies transforms in source order: translate, rotate, scale.
+  // We want: rotate first (around origin), then scale, then translate —
+  // which means we call translate(tx,ty) → rotate(deg) → scale(s) before
+  // drawing the image at its native size.
+  ctx.translate(t.tx, t.ty);
+  ctx.rotate((t.rotateDeg * Math.PI) / 180);
+  ctx.scale(t.scale, t.scale);
+  ctx.drawImage(img, 0, 0, size, size);
+  ctx.restore();
+}
+
+/** Apply soft-edged elliptical face mask via composite-out trick. */
+function applyOvalMask(ctx: CanvasRenderingContext2D, size: number): void {
+  // Build the mask alpha on a side canvas then use composite-out to
+  // erase the corners.
+  const mask = document.createElement("canvas");
+  mask.width = size;
+  mask.height = size;
+  const mctx = mask.getContext("2d")!;
+  // Dark green BG
+  mctx.fillStyle = "#0f1f0f";
+  mctx.fillRect(0, 0, size, size);
+  // Cut a soft oval hole
+  mctx.globalCompositeOperation = "destination-out";
+  const grad = mctx.createRadialGradient(
+    size / 2,
+    size / 2,
+    size * 0.25,
+    size / 2,
+    size / 2,
+    size * 0.45,
+  );
+  grad.addColorStop(0, "rgba(0,0,0,1)");
+  grad.addColorStop(0.7, "rgba(0,0,0,1)");
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+  mctx.fillStyle = grad;
+  mctx.fillRect(0, 0, size, size);
+  // Composite back over the main canvas
+  ctx.globalCompositeOperation = "destination-over";
+  // Actually we want the mask ON TOP — draw it normally
+  ctx.globalCompositeOperation = "source-over";
+  ctx.drawImage(mask, 0, 0);
+}
+
+interface MediapipeLoaded {
+  faceLandmarker: unknown;
+}
+
+async function loadMediapipe(): Promise<MediapipeLoaded> {
+  // Dynamic import — keeps the ~3MB WASM bundle out of the main JS until
+  // the user actually visits /blend/me.
+  const { FilesetResolver, FaceLandmarker } = await import(
+    "@mediapipe/tasks-vision"
+  );
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm",
+  );
+  const faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath:
+        "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+    },
+    outputFaceBlendshapes: false,
+    runningMode: "IMAGE",
+    numFaces: 1,
+  });
+  return { faceLandmarker };
+}
+
+function extractFaceLm(landmarks: { x: number; y: number }[]): FaceLm | null {
+  const needed = Math.max(
+    LEFT_IRIS,
+    RIGHT_IRIS,
+    MOUTH_LEFT_CORNER,
+    MOUTH_RIGHT_CORNER,
+  );
+  if (landmarks.length <= needed) return null;
+  const le = landmarks[LEFT_IRIS];
+  const re = landmarks[RIGHT_IRIS];
+  const screenLeft: [number, number] =
+    le.x < re.x ? [le.x, le.y] : [re.x, re.y];
+  const screenRight: [number, number] =
+    le.x < re.x ? [re.x, re.y] : [le.x, le.y];
+  const ml = landmarks[MOUTH_LEFT_CORNER];
+  const mr = landmarks[MOUTH_RIGHT_CORNER];
+  const mouth: [number, number] = [(ml.x + mr.x) / 2, (ml.y + mr.y) / 2];
+  return { leftEye: screenLeft, rightEye: screenRight, mouth };
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// UI
+// ──────────────────────────────────────────────────────────────────────
+
+const FEATURED: { id: string; label: string }[] = [
+  { id: "46046", label: "Scheffler" },
+  { id: "28237", label: "McIlroy" },
+  { id: "08793", label: "Tiger" },
+  { id: "01810", label: "Phil" },
+  { id: "47959", label: "Bryson" },
+  { id: "52955", label: "Åberg" },
+];
+
+type Stage = "idle" | "detecting" | "ready" | "rendering" | "error";
+
+export default function BlendMePage() {
+  const [stage, setStage] = useState<Stage>("idle");
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [selfieUrl, setSelfieUrl] = useState<string | null>(null);
+  const [selfieLm, setSelfieLm] = useState<FaceLm | null>(null);
+  const [selectedPro, setSelectedPro] = useState<string | null>(null);
+  const [blendUrl, setBlendUrl] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Eligible pros to blend with — those with PGA Tour IDs (so we have
+  // a Cloudinary headshot we can fetch).
+  const pool = useMemo(
+    () => GOLFERS.filter((g) => PGA_TOUR_IDS[g.id] !== undefined),
+    [],
+  );
+  const searchMatches = useMemo(() => {
+    const q = searchableName(searchInput.trim());
+    if (!q) return [];
+    return pool
+      .filter((g) => searchableName(g.name).includes(q))
+      .slice(0, 6);
+  }, [pool, searchInput]);
+
+  const selectedProName = useMemo(() => {
+    if (!selectedPro) return null;
+    const slug = Object.entries(PGA_TOUR_IDS).find(
+      ([, v]) => v === selectedPro,
+    )?.[0];
+    if (!slug) return null;
+    return GOLFERS.find((g) => g.id === slug)?.name ?? null;
+  }, [selectedPro]);
+
+  // ── handle selfie upload ───────────────────────────────────────────
+  async function handleFile(file: File) {
+    setErrMsg(null);
+    setBlendUrl(null);
+    setSelectedPro(null);
+    const url = URL.createObjectURL(file);
+    setSelfieUrl(url);
+    setStage("detecting");
+    try {
+      const img = await loadImage(url, false);
+      const { faceLandmarker } = await loadMediapipe();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = (faceLandmarker as any).detect(img);
+      if (!result.faceLandmarks || result.faceLandmarks.length === 0) {
+        setErrMsg(
+          "Couldn't find a face in that photo. Try a clearer head-on selfie.",
+        );
+        setStage("error");
+        return;
+      }
+      const lm = extractFaceLm(result.faceLandmarks[0]);
+      if (!lm) {
+        setErrMsg("Face detected but landmarks incomplete. Try another photo.");
+        setStage("error");
+        return;
+      }
+      setSelfieLm(lm);
+      setStage("ready");
+    } catch (e) {
+      console.error(e);
+      setErrMsg("Something went wrong loading the face detector. Try again.");
+      setStage("error");
+    }
+  }
+
+  // ── render blend whenever a pro is picked ──────────────────────────
+  useEffect(() => {
+    if (!selectedPro || !selfieUrl || !selfieLm || stage !== "ready") return;
+    let cancelled = false;
+    setStage("rendering");
+    (async () => {
+      try {
+        // Pro headshot
+        const proImg = await loadImage(
+          pgaTourHeadshotUrlById(selectedPro, 600),
+        );
+        // Re-detect landmarks for the pro so we use the same browser-
+        // detected positions as the selfie. Slightly slower than reading
+        // from our pre-computed JSON, but guarantees consistency.
+        const { faceLandmarker } = await loadMediapipe();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const proResult = (faceLandmarker as any).detect(proImg);
+        if (!proResult.faceLandmarks?.length) {
+          throw new Error("pro landmark detection failed");
+        }
+        const proLm = extractFaceLm(proResult.faceLandmarks[0]);
+        if (!proLm) throw new Error("pro landmarks incomplete");
+
+        // Reload the selfie image element (still available via blob URL)
+        const selfieImg = await loadImage(selfieUrl, false);
+
+        if (cancelled) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        canvas.width = OUT_SIZE;
+        canvas.height = OUT_SIZE;
+        const ctx = canvas.getContext("2d")!;
+        ctx.clearRect(0, 0, OUT_SIZE, OUT_SIZE);
+        ctx.fillStyle = "#0f1f0f";
+        ctx.fillRect(0, 0, OUT_SIZE, OUT_SIZE);
+
+        const proT = computeAlignTransform(proLm, OUT_SIZE);
+        const selfieT = computeAlignTransform(selfieLm, OUT_SIZE);
+
+        // Render at full opacity each, layered. Filter: contrast +
+        // saturate to bump the blend feel.
+        ctx.filter = "contrast(1.05) saturate(1.06)";
+        drawAligned(ctx, proImg, proT, 600, 1);
+        drawAligned(ctx, selfieImg, selfieT, selfieImg.width, 0.5);
+        ctx.filter = "none";
+
+        // Soft elliptical face mask using a clip-via-mask trick.
+        const mask = document.createElement("canvas");
+        mask.width = OUT_SIZE;
+        mask.height = OUT_SIZE;
+        const mctx = mask.getContext("2d")!;
+        const grad = mctx.createRadialGradient(
+          OUT_SIZE / 2,
+          OUT_SIZE / 2,
+          OUT_SIZE * 0.3,
+          OUT_SIZE / 2,
+          OUT_SIZE / 2,
+          OUT_SIZE * 0.48,
+        );
+        grad.addColorStop(0, "rgba(15,31,15,0)");
+        grad.addColorStop(0.6, "rgba(15,31,15,0)");
+        grad.addColorStop(1, "rgba(15,31,15,1)");
+        mctx.fillStyle = grad;
+        mctx.fillRect(0, 0, OUT_SIZE, OUT_SIZE);
+        ctx.drawImage(mask, 0, 0);
+
+        // pardle.app watermark — small, bottom-right, low opacity
+        ctx.fillStyle = "rgba(255, 214, 74, 0.85)";
+        ctx.font = "bold 22px system-ui, sans-serif";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "bottom";
+        ctx.fillText("pardle.app/blend", OUT_SIZE - 18, OUT_SIZE - 14);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+        if (!cancelled) {
+          setBlendUrl(dataUrl);
+          setStage("ready");
+        }
+      } catch (e) {
+        if (cancelled) return;
+        console.error(e);
+        setErrMsg(
+          "Couldn't render the blend. Try a different photo or another pro.",
+        );
+        setStage("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPro, selfieUrl, selfieLm, stage]);
+
+  function downloadBlend() {
+    if (!blendUrl) return;
+    const a = document.createElement("a");
+    a.href = blendUrl;
+    a.download = `pardle-blend-${selectedPro ?? "me"}.jpg`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  async function shareBlend() {
+    if (!blendUrl) return;
+    const nav = navigator as Navigator & {
+      share?: (data: ShareData) => Promise<void>;
+      canShare?: (data: ShareData) => boolean;
+    };
+    try {
+      const blob = await (await fetch(blendUrl)).blob();
+      const file = new File([blob], "pardle-blend.jpg", { type: "image/jpeg" });
+      const data: ShareData = {
+        files: [file],
+        text: `I blended myself with ${selectedProName ?? "a pro"} on pardle.app/blend 👇`,
+      };
+      if (nav.canShare?.(data) && nav.share) {
+        await nav.share(data);
+        return;
+      }
+    } catch {
+      // fall through to copy
+    }
+    // Fallback: copy a text invite, user can paste anywhere
+    try {
+      await navigator.clipboard.writeText(
+        `Made this on ${BRAND.url}/blend/me — try yours.`,
+      );
+    } catch {
+      // ignore
+    }
+  }
+
+  function reset() {
+    if (selfieUrl) URL.revokeObjectURL(selfieUrl);
+    setSelfieUrl(null);
+    setSelfieLm(null);
+    setSelectedPro(null);
+    setBlendUrl(null);
+    setStage("idle");
+    setErrMsg(null);
+    setSearchInput("");
+  }
+
+  // ── render ─────────────────────────────────────────────────────────
+  return (
+    <main className="container blend-landing">
+      <header className="brand">
+        <Link className="brand-back" href="/blend" aria-label="Blend tool">
+          ←
+        </Link>
+        <h1>{BRAND.name}</h1>
+        <p className="subtitle">Blend yourself with a pro</p>
+      </header>
+
+      <p className="blend-intro">
+        Upload a head-on selfie and pick a PGA pro. Your face never leaves
+        this browser — the detection and blending all run locally.
+      </p>
+
+      {/* Step 1: upload */}
+      {!selfieUrl && (
+        <label className="blendme-upload">
+          <input
+            type="file"
+            accept="image/*"
+            capture="user"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleFile(f);
+            }}
+          />
+          <div className="blendme-upload-inner">
+            <div className="blendme-upload-emoji">📸</div>
+            <div className="blendme-upload-title">Choose your selfie</div>
+            <div className="blendme-upload-sub">
+              JPG, PNG or HEIC · face-on works best
+            </div>
+          </div>
+        </label>
+      )}
+
+      {/* Detecting state */}
+      {stage === "detecting" && (
+        <div className="blendme-status">
+          <div className="blendme-spinner" />
+          <p>Finding your face…</p>
+        </div>
+      )}
+
+      {/* Error state */}
+      {stage === "error" && errMsg && (
+        <div className="blendme-error">
+          <p>{errMsg}</p>
+          <button className="blend-make" onClick={reset}>
+            Try another photo
+          </button>
+        </div>
+      )}
+
+      {/* Picker + result */}
+      {selfieUrl && selfieLm && stage !== "detecting" && stage !== "error" && (
+        <>
+          {!blendUrl && (
+            <div className="blendme-picker">
+              <p className="blendme-picker-label">Blend with…</p>
+              <div className="blend-featured-chips">
+                {FEATURED.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    className={`blend-featured-chip ${
+                      selectedPro === f.id ? "blend-featured-chip-on" : ""
+                    }`}
+                    onClick={() => setSelectedPro(f.id)}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <div className="input-area" style={{ marginTop: 10 }}>
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="Or search any pro..."
+                  autoComplete="off"
+                  autoCapitalize="words"
+                />
+                {searchMatches.length > 0 && (
+                  <ul className="suggestions">
+                    {searchMatches.map((g) => (
+                      <li
+                        key={g.id}
+                        onClick={() => {
+                          setSelectedPro(PGA_TOUR_IDS[g.id]!);
+                          setSearchInput("");
+                        }}
+                      >
+                        {g.name}{" "}
+                        <span className="suggestion-country">{g.country}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Result */}
+          {stage === "rendering" && (
+            <div className="blendme-status">
+              <div className="blendme-spinner" />
+              <p>Blending…</p>
+            </div>
+          )}
+
+          {blendUrl && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                className="blendme-result"
+                src={blendUrl}
+                alt="Your blend"
+              />
+              {selectedProName && (
+                <div className="blend-names">
+                  <span>You</span>
+                  <span className="blend-x">×</span>
+                  <span>{selectedProName}</span>
+                </div>
+              )}
+              <div className="blend-actions">
+                <button className="blend-save" onClick={downloadBlend}>
+                  Save image
+                </button>
+                <button className="blend-tweet" onClick={shareBlend}>
+                  Share
+                </button>
+                <button
+                  className="blend-make"
+                  onClick={() => {
+                    setBlendUrl(null);
+                    setSelectedPro(null);
+                  }}
+                >
+                  Try another pro
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Hidden canvas used to compose the blend */}
+          <canvas
+            ref={canvasRef}
+            style={{ display: "none" }}
+            width={OUT_SIZE}
+            height={OUT_SIZE}
+          />
+
+          <button className="blendme-reset" onClick={reset}>
+            ← Start with a different selfie
+          </button>
+        </>
+      )}
+
+      <div className="blend-cta">
+        <p className="blend-cta-text">
+          Like the blend? Try the daily golf puzzle.
+        </p>
+        <Link href="/faces" className="blend-cta-btn">
+          Play today&apos;s Faces →
+        </Link>
+      </div>
+
+      <footer>
+        <p>
+          {BRAND.domain} · Selfie processed locally, never uploaded to a
+          server.
+        </p>
+      </footer>
+    </main>
+  );
+}

@@ -171,8 +171,8 @@ export default async function HubHome() {
         )}
       </Link>
 
-      <Link href="/blend" className="hub-tool-link">
-        🎭 Blend any two pros into one face →
+      <Link href="/blend/me" className="hub-tool-link">
+        📸 Blend yourself with a PGA pro →
       </Link>
 
       <footer className="hub-footer">

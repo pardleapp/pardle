@@ -141,6 +141,10 @@ export default function BlendPicker() {
         Same recipe as our daily puzzle at <Link href="/faces">/faces</Link>.
       </p>
 
+      <Link href="/blend/me" className="blendme-promo">
+        📸 New: blend yourself with a pro →
+      </Link>
+
       <div className="blend-picker">
         <PickerInput
           label="Pro 1"
