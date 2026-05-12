@@ -1860,14 +1860,27 @@ body {
 
 .hub-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
-  margin-bottom: 28px;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+/* When the game count is odd, the last card spans both columns so it
+   doesn't sit alone half-empty. With 5 games today, Faces ends up as
+   a full-width feature tile at the bottom. */
+.hub-card:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 
 @media (min-width: 640px) {
   .hub-grid {
     grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  /* On desktop the 3-col grid already lays out cleanly, no need for
+     the lonely-last-card spanning trick. */
+  .hub-card:last-child:nth-child(odd) {
+    grid-column: auto;
   }
 }
 
@@ -1878,12 +1891,18 @@ body {
   background: var(--bg);
   border: 2px solid var(--border);
   border-radius: 14px;
-  padding: 20px 18px 18px;
+  padding: 14px 12px 12px;
   text-decoration: none;
   color: var(--text);
   position: relative;
   transition: transform 0.15s ease-out, border-color 0.15s, box-shadow 0.15s;
   overflow: hidden;
+}
+
+@media (min-width: 640px) {
+  .hub-card {
+    padding: 20px 18px 18px;
+  }
 }
 
 .hub-card::before {
@@ -1909,48 +1928,80 @@ body {
 
 .hub-card-tag {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  padding: 4px 9px;
+  top: 8px;
+  right: 8px;
+  padding: 3px 7px;
   border-radius: 999px;
   background: var(--accent);
   color: white;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.5px;
   line-height: 1;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 
+@media (min-width: 640px) {
+  .hub-card-tag {
+    top: 12px;
+    right: 12px;
+    padding: 4px 9px;
+    font-size: 10px;
+    letter-spacing: 0.6px;
+  }
+}
+
 .hub-card-emoji {
-  font-size: 36px;
-  margin-bottom: 8px;
-  margin-top: 6px;
+  font-size: 28px;
+  margin-bottom: 4px;
+  margin-top: 2px;
 }
 
 .hub-card-name {
-  font-size: 22px;
+  font-size: 17px;
   font-weight: 800;
   letter-spacing: -0.3px;
-  margin-bottom: 6px;
+  margin-bottom: 3px;
 }
 
 .hub-card-blurb {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
-  line-height: 1.4;
-  margin-bottom: 10px;
+  line-height: 1.35;
+  margin-bottom: 8px;
 }
 
 .hub-card-stats {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   color: var(--accent);
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   opacity: 0.9;
+}
+
+@media (min-width: 640px) {
+  .hub-card-emoji {
+    font-size: 36px;
+    margin-bottom: 8px;
+    margin-top: 6px;
+  }
+  .hub-card-name {
+    font-size: 22px;
+    margin-bottom: 6px;
+  }
+  .hub-card-blurb {
+    font-size: 13px;
+    line-height: 1.4;
+    margin-bottom: 10px;
+  }
+  .hub-card-stats {
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    margin: 0 0 12px;
+  }
 }
 
 .hub-stats-link {
@@ -2161,11 +2212,17 @@ body {
 }
 
 .hub-card-cta {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--accent);
   letter-spacing: 0.2px;
   margin-top: auto;
+}
+
+@media (min-width: 640px) {
+  .hub-card-cta {
+    font-size: 14px;
+  }
 }
 
 .hub-card-status {
