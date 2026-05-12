@@ -85,6 +85,7 @@ const GAMES: GameTile[] = [
   },
 ];
 
+
 function tileStyle(accent: string): CSSProperties {
   return { "--accent": accent } as CSSProperties;
 }
@@ -168,6 +169,10 @@ export default async function HubHome() {
         {totalToday > 0 && (
           <span className="hub-stats-link-count">{totalToday} today</span>
         )}
+      </Link>
+
+      <Link href="/blend" className="hub-tool-link">
+        🎭 Blend any two pros into one face →
       </Link>
 
       <footer className="hub-footer">

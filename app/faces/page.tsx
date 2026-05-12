@@ -406,6 +406,9 @@ export default function FacesPage() {
             <Link className="faces-back" href="/faces/duel">
               ⚔️ Race friends in a Faces Duel →
             </Link>
+            <Link className="faces-back" href="/blend">
+              🎭 Blend any two pros →
+            </Link>
             <Link className="faces-back" href="/">
               ← Play another game
             </Link>

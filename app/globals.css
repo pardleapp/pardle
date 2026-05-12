@@ -2131,6 +2131,24 @@ body {
   border-radius: 999px;
 }
 
+.hub-tool-link {
+  display: block;
+  margin: -8px 0 22px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: rgba(224, 123, 91, 0.08);
+  border: 1px solid rgba(224, 123, 91, 0.3);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  text-decoration: none;
+  text-align: center;
+}
+
+.hub-tool-link:hover {
+  background: rgba(224, 123, 91, 0.14);
+}
+
 /* ---------- First-visit welcome modal ---------- */
 
 .welcome-overlay {
@@ -4093,6 +4111,274 @@ footer {
   flex-direction: column;
   gap: 6px;
   margin-top: 14px;
+}
+
+/* ---------- /blend (public tool) ---------- */
+
+.blend-landing {
+  gap: 0;
+}
+
+.blend-intro {
+  text-align: center;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 4px 0 18px;
+  padding: 0 8px;
+}
+
+.blend-intro a {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.blend-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.blend-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.blend-pick-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-left: 4px;
+}
+
+.blend-pick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(224, 123, 91, 0.1);
+  border: 2px solid #E07B5B;
+  border-radius: 14px;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.blend-pick-chip img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center 20%;
+}
+
+.blend-pick-chip span {
+  flex: 1;
+}
+
+.blend-pick-clear {
+  background: rgba(0, 0, 0, 0.06);
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  color: var(--muted);
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.blend-pick-clear:hover {
+  background: rgba(0, 0, 0, 0.12);
+  color: var(--text);
+}
+
+.blend-go {
+  margin-top: 4px;
+  padding: 14px 24px;
+  border: none;
+  border-radius: 12px;
+  background: #E07B5B;
+  color: white;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(224, 123, 91, 0.32);
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.blend-go:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.blend-go:disabled {
+  background: var(--border);
+  color: var(--muted);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.blend-featured {
+  margin-bottom: 28px;
+}
+
+.blend-featured-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.blend-featured-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.blend-featured-chip {
+  padding: 8px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  background: rgba(224, 123, 91, 0.08);
+  color: #E07B5B;
+  border: 1px solid rgba(224, 123, 91, 0.4);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.blend-featured-chip:hover {
+  background: rgba(224, 123, 91, 0.18);
+  transform: translateY(-1px);
+}
+
+.blend-stage-static {
+  /* Reuse .faces-stage layout — slightly more padding around it on this
+     standalone page so it sits prominently. */
+  margin-top: 6px;
+}
+
+.blend-names {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: -4px 0 16px;
+  flex-wrap: wrap;
+}
+
+.blend-x {
+  color: #E07B5B;
+  font-weight: 900;
+}
+
+.blend-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.blend-save {
+  display: inline-block;
+  background: #E07B5B;
+  color: white;
+  border: none;
+  font-weight: 800;
+  font-size: 15px;
+  padding: 11px 22px;
+  border-radius: 10px;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(224, 123, 91, 0.28);
+}
+
+.blend-save:hover {
+  filter: brightness(1.08);
+}
+
+.blend-tweet {
+  display: inline-block;
+  background: #1DA1F2;
+  color: white;
+  border: none;
+  font-weight: 800;
+  font-size: 15px;
+  padding: 11px 22px;
+  border-radius: 10px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.blend-tweet:hover {
+  filter: brightness(1.08);
+}
+
+.blend-make {
+  display: inline-block;
+  background: transparent;
+  color: var(--text);
+  border: 2px solid var(--border);
+  font-weight: 700;
+  font-size: 15px;
+  padding: 9px 20px;
+  border-radius: 10px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.blend-make:hover {
+  border-color: var(--text);
+}
+
+.blend-cta {
+  text-align: center;
+  padding: 18px 16px;
+  background: rgba(224, 123, 91, 0.06);
+  border: 1px solid rgba(224, 123, 91, 0.25);
+  border-radius: 14px;
+  margin-bottom: 16px;
+}
+
+.blend-cta-text {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.blend-cta-btn {
+  display: inline-block;
+  background: #E07B5B;
+  color: white;
+  font-weight: 800;
+  font-size: 15px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  text-decoration: none;
+}
+
+.blend-cta-btn:hover {
+  filter: brightness(1.08);
 }
 
 .faces-claim-by {
