@@ -98,7 +98,9 @@ export const PGA_TOUR_IDS: Record<string, string> = {
   "nick-dunlap": "59866",
   "vijay-singh": "06567",
   "zach-johnson": "24024",
-  "francesco-molinari": "32366",
+  // francesco-molinari: removed pending ID verification — 32366 turned
+  // out to be Kevin Chappell, which caused the game to reveal the
+  // wrong pro. Re-add when verified.
 };
 
 /**
