@@ -49,10 +49,14 @@ CLOUDINARY = (
     "headshots_{id}.png"
 )
 
-# mediapipe FaceMesh landmark indices for the eye centres.
-# These approximate the iris centre on each side.
-LEFT_EYE_IDX = 468  # left iris centre
-RIGHT_EYE_IDX = 473  # right iris centre
+# mediapipe FaceMesh landmark indices.
+# Iris centres (require refine_landmarks / new task model with iris on):
+LEFT_EYE_IDX = 468
+RIGHT_EYE_IDX = 473
+# Mouth corners — averaged to get the mouth-line midpoint, which is a
+# more stable second reference than lip-vertical-centre for blending.
+MOUTH_LEFT_IDX = 61
+MOUTH_RIGHT_IDX = 291
 
 
 def read_pga_ids() -> dict[str, str]:
@@ -79,37 +83,57 @@ def fetch_image(pid: str) -> Image.Image | None:
 
 
 def extract_eyes(img: Image.Image, detector) -> dict | None:
-    """Return normalised eye-centre coords + inter-eye distance, or None
-    if mediapipe couldn't find a face."""
+    """Return normalised eye centres + mouth midpoint + their separations,
+    or None if mediapipe couldn't find a face."""
     arr = np.array(img)
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=arr)
     res = detector.detect(mp_image)
     if not res.face_landmarks:
         return None
     lm = res.face_landmarks[0]
-    if len(lm) <= max(LEFT_EYE_IDX, RIGHT_EYE_IDX):
+    needed = max(LEFT_EYE_IDX, RIGHT_EYE_IDX, MOUTH_LEFT_IDX, MOUTH_RIGHT_IDX)
+    if len(lm) <= needed:
         return None
     le = lm[LEFT_EYE_IDX]
     re = lm[RIGHT_EYE_IDX]
-    # mediapipe returns x,y already normalised to image dims (0..1).
-    # The "left eye" in mediapipe is anatomically the subject's left,
-    # so it appears on the RIGHT side of the image. We name them by
-    # screen position to keep render-time code intuitive.
+    # mediapipe's "left eye" is anatomically the subject's left, so it
+    # appears on the RIGHT of the image. We name by screen position.
     if le.x < re.x:
         screen_left = (le.x, le.y)
         screen_right = (re.x, re.y)
     else:
         screen_left = (re.x, re.y)
         screen_right = (le.x, le.y)
-    dx = screen_right[0] - screen_left[0]
-    dy = screen_right[1] - screen_left[1]
-    distance = float(np.hypot(dx, dy))
-    angle_deg = float(np.degrees(np.arctan2(dy, dx)))
+
+    # Mouth midpoint — average of the two corners. More stable than a
+    # single lip landmark across head poses.
+    ml = lm[MOUTH_LEFT_IDX]
+    mr = lm[MOUTH_RIGHT_IDX]
+    mouth = ((ml.x + mr.x) / 2, (ml.y + mr.y) / 2)
+
+    eye_dx = screen_right[0] - screen_left[0]
+    eye_dy = screen_right[1] - screen_left[1]
+    eye_distance = float(np.hypot(eye_dx, eye_dy))
+    eye_angle_deg = float(np.degrees(np.arctan2(eye_dy, eye_dx)))
+
+    # Vector from eye-midpoint to mouth-midpoint — captures vertical
+    # face length so two-point alignment can scale Phil-vs-Tiger
+    # consistently regardless of inter-eye distance.
+    eye_mid_x = (screen_left[0] + screen_right[0]) / 2
+    eye_mid_y = (screen_left[1] + screen_right[1]) / 2
+    em_dx = mouth[0] - eye_mid_x
+    em_dy = mouth[1] - eye_mid_y
+    eye_mouth_distance = float(np.hypot(em_dx, em_dy))
+    eye_mouth_angle_deg = float(np.degrees(np.arctan2(em_dy, em_dx)))
+
     return {
         "leftEye": [round(screen_left[0], 4), round(screen_left[1], 4)],
         "rightEye": [round(screen_right[0], 4), round(screen_right[1], 4)],
-        "distance": round(distance, 4),
-        "angle": round(angle_deg, 2),
+        "mouth": [round(mouth[0], 4), round(mouth[1], 4)],
+        "distance": round(eye_distance, 4),
+        "angle": round(eye_angle_deg, 2),
+        "eyeMouthDistance": round(eye_mouth_distance, 4),
+        "eyeMouthAngle": round(eye_mouth_angle_deg, 2),
     }
 
 

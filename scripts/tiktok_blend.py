@@ -32,8 +32,9 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
 # Canonical alignment params — match lib/data/face-alignment.ts.
 CANONICAL_EYE_X = 0.5
-CANONICAL_EYE_Y = 0.43
-CANONICAL_DISTANCE = 0.2
+CANONICAL_EYE_Y = 0.40
+CANONICAL_MOUTH_X = 0.5
+CANONICAL_MOUTH_Y = 0.62
 
 _ALIGN_CACHE: dict | None = None
 
@@ -51,21 +52,35 @@ def load_alignment() -> dict:
 
 
 def align_image(img: Image.Image, player_id: str) -> Image.Image:
+    import math
+
     aligns = load_alignment().get(player_id)
     if not aligns:
         return img
     w, h = img.size
     eye_mid_x = (aligns["leftEye"][0] + aligns["rightEye"][0]) / 2
     eye_mid_y = (aligns["leftEye"][1] + aligns["rightEye"][1]) / 2
-    scale = CANONICAL_DISTANCE / aligns["distance"]
-    angle = -aligns["angle"]
+    mouth_x, mouth_y = aligns["mouth"]
+
+    dx = mouth_x - eye_mid_x
+    dy = mouth_y - eye_mid_y
+    meas_len = math.hypot(dx, dy)
+    canon_len = CANONICAL_MOUTH_Y - CANONICAL_EYE_Y
+    scale = canon_len / meas_len
+
+    rotate_rad = math.atan2(canon_len, 0) - math.atan2(dy, dx)
+    cos_r = math.cos(rotate_rad)
+    sin_r = math.sin(rotate_rad)
+    eye_rot_x = eye_mid_x * cos_r - eye_mid_y * sin_r
+    eye_rot_y = eye_mid_x * sin_r + eye_mid_y * cos_r
+    tx = int((CANONICAL_EYE_X - eye_rot_x * scale) * w)
+    ty = int((CANONICAL_EYE_Y - eye_rot_y * scale) * h)
+
     new_w = int(w * scale)
     new_h = int(h * scale)
     scaled = img.resize((new_w, new_h), Image.LANCZOS)
-    if abs(angle) > 0.1:
-        scaled = scaled.rotate(angle, resample=Image.BICUBIC, expand=False)
-    tx = int((CANONICAL_EYE_X - eye_mid_x * scale) * w)
-    ty = int((CANONICAL_EYE_Y - eye_mid_y * scale) * h)
+    if abs(math.degrees(rotate_rad)) > 0.1:
+        scaled = scaled.rotate(-math.degrees(rotate_rad), resample=Image.BICUBIC, expand=False)
     canvas = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     canvas.paste(scaled, (tx, ty), scaled if scaled.mode == "RGBA" else None)
     return canvas

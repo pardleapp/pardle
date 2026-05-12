@@ -22,28 +22,32 @@
 import rawJson from "./face-alignment.json";
 
 interface FaceAlignment {
-  /** Eye centre on the SCREEN-LEFT (subject's right), x/y normalised [0,1]. */
   leftEye: number[];
-  /** Eye centre on the SCREEN-RIGHT (subject's left). */
   rightEye: number[];
-  /** Distance between the two eye centres, normalised. */
+  mouth: number[];
+  /** Inter-eye distance (legacy single-reference fit, unused by the
+   *  two-point fit but kept in JSON for tooling / debugging). */
   distance: number;
-  /** Head tilt in degrees. Positive = right eye lower than left. */
   angle: number;
+  /** Distance from eye-midpoint to mouth midpoint, normalised. */
+  eyeMouthDistance: number;
+  /** Angle of the eye->mouth vector (degrees, ~90 for upright). */
+  eyeMouthAngle: number;
 }
 
-// JSON import infers arrays as number[] not tuples — we accept that
-// and validate the length at access time below.
+// JSON import infers arrays as number[] not tuples — accept and rely
+// on the offline extractor always writing exactly two values.
 const FACE_ALIGNMENT = rawJson as Record<string, FaceAlignment>;
 
-// Canonical screen position the eyes should land at after alignment.
-// Eye Y at ~43% from the top puts the bridge of the nose roughly at
-// the visual centre, which is what a clean portrait crop looks like.
-// Inter-eye distance of 0.20 (20% of stage width) is the median across
-// our pool so most pros need only a small scale tweak.
+// Canonical layout: eye-midpoint and mouth-midpoint pinned at fixed
+// screen positions. With two reference points anchored, both eye-line
+// and face-height land where we want — Phil-vs-Tiger no longer have
+// different jaw lengths in the blend.
 const CANONICAL_EYE_X = 0.5;
-const CANONICAL_EYE_Y = 0.43;
-const CANONICAL_DISTANCE = 0.2;
+const CANONICAL_EYE_Y = 0.40;
+const CANONICAL_MOUTH_X = 0.5;
+const CANONICAL_MOUTH_Y = 0.62;
+const CANONICAL_EYE_MOUTH_DISTANCE = CANONICAL_MOUTH_Y - CANONICAL_EYE_Y; // 0.22
 
 export interface AlignedTransform {
   /** Inline CSS `transform` value, e.g. "translate(8px, -4px) scale(1.12) rotate(-1.5deg)". */
@@ -69,20 +73,46 @@ export function alignmentTransform(
   const a = FACE_ALIGNMENT[pgaTourId];
   if (!a) return null;
 
+  // Two anchor points: eye-midpoint and mouth-midpoint. We compute the
+  // similarity transform (translate + uniform scale + rotation around
+  // origin) that maps measured -> canonical for these two points.
   const eyeMidX = (a.leftEye[0] + a.rightEye[0]) / 2;
   const eyeMidY = (a.leftEye[1] + a.rightEye[1]) / 2;
-  const measuredD = a.distance;
+  const mouthX = a.mouth[0];
+  const mouthY = a.mouth[1];
 
-  const scale = CANONICAL_DISTANCE / measuredD;
-  const rotateDeg = -a.angle;
+  // Measured eye->mouth vector and its canonical equivalent (0, ~0.22).
+  const dxMeas = mouthX - eyeMidX;
+  const dyMeas = mouthY - eyeMidY;
+  const measLen = Math.hypot(dxMeas, dyMeas);
+  const dxCanon = CANONICAL_MOUTH_X - CANONICAL_EYE_X; // = 0
+  const dyCanon = CANONICAL_MOUTH_Y - CANONICAL_EYE_Y; // = CANONICAL_EYE_MOUTH_DISTANCE
+  const canonLen = Math.hypot(dxCanon, dyCanon);
 
-  // With transform-origin (0, 0), CSS applies transforms right-to-left:
-  // rotate first, then scale, then translate. After rotate + scale the
-  // eye midpoint sits at (eyeMid * scale); translate moves it onto the
-  // canonical canvas position. Small rotation's effect on midpoint
-  // position is negligible at the tilts we see (max ~5°).
-  const txPct = (CANONICAL_EYE_X - eyeMidX * scale) * 100;
-  const tyPct = (CANONICAL_EYE_Y - eyeMidY * scale) * 100;
+  // Scale = canonical length / measured length. This is the unique scale
+  // that makes the two anchor distances equal.
+  const scale = canonLen / measLen;
+
+  // Rotation = angle(canon) - angle(meas). For our canonical vector
+  // pointing straight down, angle = 90°. We want to rotate the measured
+  // vector to match — which de-tilts any head lean using both eye AND
+  // mouth as references, more robust than the eye-line angle alone.
+  const angleMeas = Math.atan2(dyMeas, dxMeas);
+  const angleCanon = Math.atan2(dyCanon, dxCanon);
+  const rotateRad = angleCanon - angleMeas;
+  const rotateDeg = (rotateRad * 180) / Math.PI;
+
+  // Translate places the eye-midpoint at canonical position. CSS applies
+  // transforms right-to-left with origin (0,0): rotate first (around 0,0),
+  // then scale, then translate. After rotate + scale around the origin,
+  // the measured eye-midpoint sits at scale * R(eyeMid) where R is the
+  // rotation matrix.
+  const cos = Math.cos(rotateRad);
+  const sin = Math.sin(rotateRad);
+  const eyeMidRotX = eyeMidX * cos - eyeMidY * sin;
+  const eyeMidRotY = eyeMidX * sin + eyeMidY * cos;
+  const txPct = (CANONICAL_EYE_X - eyeMidRotX * scale) * 100;
+  const tyPct = (CANONICAL_EYE_Y - eyeMidRotY * scale) * 100;
 
   return {
     transform: `translate(${txPct.toFixed(2)}%, ${tyPct.toFixed(2)}%) scale(${scale.toFixed(4)}) rotate(${rotateDeg.toFixed(2)}deg)`,

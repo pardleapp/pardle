@@ -3763,10 +3763,25 @@ footer {
   box-shadow: 0 8px 28px rgba(15, 31, 15, 0.25);
   filter: contrast(1.05) saturate(1.06);
   transition: transform 0.25s ease, filter 0.25s ease;
+  /* Oval mask centred on the face zone — clips out hats, hair, and
+     shoulders that don't blend cleanly. After this the eye-aligned
+     stacked images show only the central face triangle, which is
+     where alignment is actually accurate. The vertical ellipse is
+     slightly off-centre downward to match where faces typically sit
+     after our canonical eye-Y position. */
+  -webkit-mask-image: radial-gradient(
+    ellipse 48% 60% at 50% 50%,
+    rgba(0, 0, 0, 1) 70%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 48% 60% at 50% 50%,
+    rgba(0, 0, 0, 1) 70%,
+    rgba(0, 0, 0, 0) 100%
+  );
   /* Block long-press image preview on iOS / Android, which would
      otherwise pop one layer of the stack to fullscreen and reveal that
-     pro on its own — answer leak. user-select + touch-callout also
-     stop the text-selection menu appearing on the names later. */
+     pro on its own. */
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
@@ -3786,6 +3801,10 @@ footer {
 
 .faces-stage-over {
   filter: none;
+  /* Drop the oval mask once the round is over — we want both faces
+     shown clearly on the reveal, not clipped at the ellipse edge. */
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 /* When the round is over, the two stacked images animate apart into

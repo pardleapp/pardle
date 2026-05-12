@@ -2,9 +2,15 @@
   "01810": {
     "angle": 0.09,
     "distance": 0.1528,
+    "eyeMouthAngle": 90.54,
+    "eyeMouthDistance": 0.1809,
     "leftEye": [
       0.4396,
       0.4395
+    ],
+    "mouth": [
+      0.5143,
+      0.6204
     ],
     "rightEye": [
       0.5924,
@@ -14,9 +20,15 @@
   "06567": {
     "angle": -2.32,
     "distance": 0.178,
+    "eyeMouthAngle": 88.87,
+    "eyeMouthDistance": 0.1834,
     "leftEye": [
       0.4401,
       0.4522
+    ],
+    "mouth": [
+      0.5326,
+      0.632
     ],
     "rightEye": [
       0.618,
@@ -26,9 +38,15 @@
   "08793": {
     "angle": -0.94,
     "distance": 0.1748,
+    "eyeMouthAngle": 89.17,
+    "eyeMouthDistance": 0.178,
     "leftEye": [
       0.4235,
       0.43
+    ],
+    "mouth": [
+      0.5135,
+      0.6065
     ],
     "rightEye": [
       0.5983,
@@ -38,9 +56,15 @@
   "22405": {
     "angle": 0.7,
     "distance": 0.1945,
+    "eyeMouthAngle": 88.45,
+    "eyeMouthDistance": 0.1756,
     "leftEye": [
       0.4086,
       0.4283
+    ],
+    "mouth": [
+      0.5106,
+      0.605
     ],
     "rightEye": [
       0.603,
@@ -50,9 +74,15 @@
   "24024": {
     "angle": 0.48,
     "distance": 0.2139,
+    "eyeMouthAngle": 92.35,
+    "eyeMouthDistance": 0.1935,
     "leftEye": [
       0.4003,
       0.4161
+    ],
+    "mouth": [
+      0.4993,
+      0.6103
     ],
     "rightEye": [
       0.6142,
@@ -62,9 +92,15 @@
   "24502": {
     "angle": -0.54,
     "distance": 0.1801,
+    "eyeMouthAngle": 88.83,
+    "eyeMouthDistance": 0.1825,
     "leftEye": [
       0.4156,
       0.4348
+    ],
+    "mouth": [
+      0.5093,
+      0.6164
     ],
     "rightEye": [
       0.5956,
@@ -74,9 +110,15 @@
   "25493": {
     "angle": 0.94,
     "distance": 0.1685,
+    "eyeMouthAngle": 90.52,
+    "eyeMouthDistance": 0.1705,
     "leftEye": [
       0.4283,
       0.4195
+    ],
+    "mouth": [
+      0.5109,
+      0.5914
     ],
     "rightEye": [
       0.5967,
@@ -86,9 +128,15 @@
   "25900": {
     "angle": 4.32,
     "distance": 0.187,
+    "eyeMouthAngle": 92.89,
+    "eyeMouthDistance": 0.1897,
     "leftEye": [
       0.4187,
       0.3818
+    ],
+    "mouth": [
+      0.5024,
+      0.5783
     ],
     "rightEye": [
       0.6052,
@@ -98,9 +146,15 @@
   "27349": {
     "angle": -1.52,
     "distance": 0.1969,
+    "eyeMouthAngle": 89.8,
+    "eyeMouthDistance": 0.2072,
     "leftEye": [
       0.4013,
       0.4218
+    ],
+    "mouth": [
+      0.5004,
+      0.6265
     ],
     "rightEye": [
       0.5981,
@@ -110,9 +164,15 @@
   "27644": {
     "angle": -0.67,
     "distance": 0.1864,
+    "eyeMouthAngle": 88.0,
+    "eyeMouthDistance": 0.1818,
     "leftEye": [
       0.409,
       0.4045
+    ],
+    "mouth": [
+      0.5086,
+      0.5852
     ],
     "rightEye": [
       0.5955,
@@ -122,9 +182,15 @@
   "28089": {
     "angle": -0.99,
     "distance": 0.1839,
+    "eyeMouthAngle": 88.73,
+    "eyeMouthDistance": 0.18,
     "leftEye": [
       0.4174,
       0.4192
+    ],
+    "mouth": [
+      0.5133,
+      0.5975
     ],
     "rightEye": [
       0.6012,
@@ -134,9 +200,15 @@
   "28237": {
     "angle": -0.04,
     "distance": 0.184,
+    "eyeMouthAngle": 89.71,
+    "eyeMouthDistance": 0.1823,
     "leftEye": [
       0.4059,
       0.4226
+    ],
+    "mouth": [
+      0.4988,
+      0.6048
     ],
     "rightEye": [
       0.5899,
@@ -146,9 +218,15 @@
   "29221": {
     "angle": 0.33,
     "distance": 0.1781,
+    "eyeMouthAngle": 88.97,
+    "eyeMouthDistance": 0.1757,
     "leftEye": [
       0.4185,
       0.4325
+    ],
+    "mouth": [
+      0.5107,
+      0.6086
     ],
     "rightEye": [
       0.5966,
@@ -158,9 +236,15 @@
   "29725": {
     "angle": 0.87,
     "distance": 0.1794,
+    "eyeMouthAngle": 88.69,
+    "eyeMouthDistance": 0.1811,
     "leftEye": [
       0.423,
       0.3978
+    ],
+    "mouth": [
+      0.5168,
+      0.5803
     ],
     "rightEye": [
       0.6024,
@@ -170,9 +254,15 @@
   "29936": {
     "angle": -0.13,
     "distance": 0.1692,
+    "eyeMouthAngle": 91.78,
+    "eyeMouthDistance": 0.1529,
     "leftEye": [
       0.4354,
       0.4103
+    ],
+    "mouth": [
+      0.5153,
+      0.563
     ],
     "rightEye": [
       0.6047,
@@ -182,9 +272,15 @@
   "30911": {
     "angle": -1.44,
     "distance": 0.1887,
+    "eyeMouthAngle": 89.15,
+    "eyeMouthDistance": 0.1866,
     "leftEye": [
       0.4148,
       0.4021
+    ],
+    "mouth": [
+      0.5119,
+      0.5863
     ],
     "rightEye": [
       0.6034,
@@ -194,9 +290,15 @@
   "30925": {
     "angle": 0.25,
     "distance": 0.1602,
+    "eyeMouthAngle": 90.64,
+    "eyeMouthDistance": 0.1697,
     "leftEye": [
       0.4307,
       0.4431
+    ],
+    "mouth": [
+      0.5089,
+      0.6132
     ],
     "rightEye": [
       0.5909,
@@ -206,9 +308,15 @@
   "30926": {
     "angle": -0.49,
     "distance": 0.1899,
+    "eyeMouthAngle": 91.25,
+    "eyeMouthDistance": 0.1853,
     "leftEye": [
       0.4088,
       0.4151
+    ],
+    "mouth": [
+      0.4997,
+      0.5996
     ],
     "rightEye": [
       0.5987,
@@ -218,9 +326,15 @@
   "32102": {
     "angle": 0.65,
     "distance": 0.1808,
+    "eyeMouthAngle": 88.85,
+    "eyeMouthDistance": 0.1724,
     "leftEye": [
       0.4198,
       0.4262
+    ],
+    "mouth": [
+      0.5136,
+      0.5995
     ],
     "rightEye": [
       0.6006,
@@ -230,9 +344,15 @@
   "32839": {
     "angle": -1.24,
     "distance": 0.1743,
+    "eyeMouthAngle": 88.48,
+    "eyeMouthDistance": 0.1959,
     "leftEye": [
       0.4134,
       0.4281
+    ],
+    "mouth": [
+      0.5057,
+      0.622
     ],
     "rightEye": [
       0.5877,
@@ -242,9 +362,15 @@
   "33141": {
     "angle": 0.07,
     "distance": 0.1891,
+    "eyeMouthAngle": 89.48,
+    "eyeMouthDistance": 0.1805,
     "leftEye": [
       0.4201,
       0.4316
+    ],
+    "mouth": [
+      0.5163,
+      0.6122
     ],
     "rightEye": [
       0.6092,
@@ -254,9 +380,15 @@
   "33204": {
     "angle": 0.37,
     "distance": 0.1782,
+    "eyeMouthAngle": 90.71,
+    "eyeMouthDistance": 0.1786,
     "leftEye": [
       0.4205,
       0.4246
+    ],
+    "mouth": [
+      0.5074,
+      0.6038
     ],
     "rightEye": [
       0.5987,
@@ -266,9 +398,15 @@
   "33399": {
     "angle": -0.41,
     "distance": 0.1799,
+    "eyeMouthAngle": 90.03,
+    "eyeMouthDistance": 0.1914,
     "leftEye": [
       0.4268,
       0.4159
+    ],
+    "mouth": [
+      0.5167,
+      0.6067
     ],
     "rightEye": [
       0.6067,
@@ -278,9 +416,15 @@
   "33448": {
     "angle": -4.52,
     "distance": 0.1904,
+    "eyeMouthAngle": 84.9,
+    "eyeMouthDistance": 0.1776,
     "leftEye": [
       0.4039,
       0.4338
+    ],
+    "mouth": [
+      0.5146,
+      0.6032
     ],
     "rightEye": [
       0.5938,
@@ -290,9 +434,15 @@
   "33968": {
     "angle": -1.4,
     "distance": 0.1891,
+    "eyeMouthAngle": 87.76,
+    "eyeMouthDistance": 0.2021,
     "leftEye": [
       0.4119,
       0.4146
+    ],
+    "mouth": [
+      0.5143,
+      0.6142
     ],
     "rightEye": [
       0.6009,
@@ -302,9 +452,15 @@
   "34046": {
     "angle": -2.18,
     "distance": 0.1975,
+    "eyeMouthAngle": 89.31,
+    "eyeMouthDistance": 0.1915,
     "leftEye": [
       0.4128,
       0.4185
+    ],
+    "mouth": [
+      0.5138,
+      0.6062
     ],
     "rightEye": [
       0.6101,
@@ -314,9 +470,15 @@
   "34076": {
     "angle": -2.28,
     "distance": 0.1789,
+    "eyeMouthAngle": 88.1,
+    "eyeMouthDistance": 0.1951,
     "leftEye": [
       0.4152,
       0.4065
+    ],
+    "mouth": [
+      0.511,
+      0.5979
     ],
     "rightEye": [
       0.594,
@@ -326,9 +488,15 @@
   "34098": {
     "angle": 1.24,
     "distance": 0.1776,
+    "eyeMouthAngle": 92.34,
+    "eyeMouthDistance": 0.1892,
     "leftEye": [
       0.4213,
       0.4191
+    ],
+    "mouth": [
+      0.5024,
+      0.6101
     ],
     "rightEye": [
       0.5989,
@@ -338,9 +506,15 @@
   "34099": {
     "angle": -0.18,
     "distance": 0.1741,
+    "eyeMouthAngle": 89.06,
+    "eyeMouthDistance": 0.186,
     "leftEye": [
       0.4208,
       0.4336
+    ],
+    "mouth": [
+      0.5109,
+      0.6192
     ],
     "rightEye": [
       0.5949,
@@ -350,9 +524,15 @@
   "34256": {
     "angle": -0.34,
     "distance": 0.1748,
+    "eyeMouthAngle": 88.07,
+    "eyeMouthDistance": 0.1893,
     "leftEye": [
       0.4144,
       0.4181
+    ],
+    "mouth": [
+      0.5082,
+      0.6067
     ],
     "rightEye": [
       0.5892,
@@ -362,9 +542,15 @@
   "35450": {
     "angle": 0.88,
     "distance": 0.1812,
+    "eyeMouthAngle": 88.49,
+    "eyeMouthDistance": 0.1758,
     "leftEye": [
       0.4119,
       0.4206
+    ],
+    "mouth": [
+      0.5072,
+      0.5977
     ],
     "rightEye": [
       0.5931,
@@ -374,9 +560,15 @@
   "35461": {
     "angle": -1.16,
     "distance": 0.2093,
+    "eyeMouthAngle": 88.03,
+    "eyeMouthDistance": 0.1879,
     "leftEye": [
       0.3943,
       0.4237
+    ],
+    "mouth": [
+      0.5054,
+      0.6094
     ],
     "rightEye": [
       0.6036,
@@ -386,9 +578,15 @@
   "35506": {
     "angle": -0.32,
     "distance": 0.1998,
+    "eyeMouthAngle": 88.4,
+    "eyeMouthDistance": 0.1941,
     "leftEye": [
       0.4124,
       0.4148
+    ],
+    "mouth": [
+      0.5177,
+      0.6082
     ],
     "rightEye": [
       0.6122,
@@ -398,9 +596,15 @@
   "35532": {
     "angle": 0.22,
     "distance": 0.1823,
+    "eyeMouthAngle": 89.75,
+    "eyeMouthDistance": 0.1921,
     "leftEye": [
       0.4108,
       0.4166
+    ],
+    "mouth": [
+      0.5028,
+      0.609
     ],
     "rightEye": [
       0.5931,
@@ -410,9 +614,15 @@
   "36689": {
     "angle": -0.62,
     "distance": 0.1742,
+    "eyeMouthAngle": 87.64,
+    "eyeMouthDistance": 0.1966,
     "leftEye": [
       0.4123,
       0.408
+    ],
+    "mouth": [
+      0.5075,
+      0.6035
     ],
     "rightEye": [
       0.5865,
@@ -422,9 +632,15 @@
   "36799": {
     "angle": 0.02,
     "distance": 0.1676,
+    "eyeMouthAngle": 90.42,
+    "eyeMouthDistance": 0.1817,
     "leftEye": [
       0.4192,
       0.4156
+    ],
+    "mouth": [
+      0.5017,
+      0.5973
     ],
     "rightEye": [
       0.5869,
@@ -434,9 +650,15 @@
   "37378": {
     "angle": -0.52,
     "distance": 0.198,
+    "eyeMouthAngle": 90.44,
+    "eyeMouthDistance": 0.2076,
     "leftEye": [
       0.4112,
       0.4142
+    ],
+    "mouth": [
+      0.5086,
+      0.6209
     ],
     "rightEye": [
       0.6092,
@@ -446,9 +668,15 @@
   "37455": {
     "angle": 0.37,
     "distance": 0.1804,
+    "eyeMouthAngle": 89.8,
+    "eyeMouthDistance": 0.2137,
     "leftEye": [
       0.4231,
       0.4229
+    ],
+    "mouth": [
+      0.514,
+      0.6372
     ],
     "rightEye": [
       0.6035,
@@ -458,9 +686,15 @@
   "39546": {
     "angle": -1.52,
     "distance": 0.1968,
+    "eyeMouthAngle": 89.87,
+    "eyeMouthDistance": 0.1966,
     "leftEye": [
       0.4053,
       0.4168
+    ],
+    "mouth": [
+      0.5041,
+      0.6108
     ],
     "rightEye": [
       0.602,
@@ -470,9 +704,15 @@
   "39971": {
     "angle": 0.92,
     "distance": 0.1743,
+    "eyeMouthAngle": 89.37,
+    "eyeMouthDistance": 0.1929,
     "leftEye": [
       0.4141,
       0.4197
+    ],
+    "mouth": [
+      0.5033,
+      0.6139
     ],
     "rightEye": [
       0.5883,
@@ -482,9 +722,15 @@
   "39977": {
     "angle": 0.62,
     "distance": 0.1841,
+    "eyeMouthAngle": 91.09,
+    "eyeMouthDistance": 0.197,
     "leftEye": [
       0.415,
       0.3994
+    ],
+    "mouth": [
+      0.5033,
+      0.5973
     ],
     "rightEye": [
       0.5991,
@@ -494,9 +740,15 @@
   "40006": {
     "angle": 1.33,
     "distance": 0.1755,
+    "eyeMouthAngle": 91.08,
+    "eyeMouthDistance": 0.1831,
     "leftEye": [
       0.4193,
       0.3988
+    ],
+    "mouth": [
+      0.5036,
+      0.5839
     ],
     "rightEye": [
       0.5948,
@@ -506,9 +758,15 @@
   "40098": {
     "angle": -1.51,
     "distance": 0.1747,
+    "eyeMouthAngle": 88.4,
+    "eyeMouthDistance": 0.184,
     "leftEye": [
       0.4179,
       0.4291
+    ],
+    "mouth": [
+      0.5104,
+      0.6107
     ],
     "rightEye": [
       0.5926,
@@ -518,9 +776,15 @@
   "45157": {
     "angle": 0.25,
     "distance": 0.1898,
+    "eyeMouthAngle": 89.63,
+    "eyeMouthDistance": 0.1921,
     "leftEye": [
       0.409,
       0.4195
+    ],
+    "mouth": [
+      0.5051,
+      0.6121
     ],
     "rightEye": [
       0.5988,
@@ -530,9 +794,15 @@
   "46046": {
     "angle": -0.1,
     "distance": 0.1873,
+    "eyeMouthAngle": 90.36,
+    "eyeMouthDistance": 0.1901,
     "leftEye": [
       0.425,
       0.4141
+    ],
+    "mouth": [
+      0.5175,
+      0.604
     ],
     "rightEye": [
       0.6123,
@@ -542,9 +812,15 @@
   "46414": {
     "angle": 3.77,
     "distance": 0.186,
+    "eyeMouthAngle": 93.44,
+    "eyeMouthDistance": 0.1749,
     "leftEye": [
       0.4235,
       0.4208
+    ],
+    "mouth": [
+      0.5058,
+      0.6014
     ],
     "rightEye": [
       0.6091,
@@ -554,9 +830,15 @@
   "46442": {
     "angle": -2.87,
     "distance": 0.1916,
+    "eyeMouthAngle": 87.36,
+    "eyeMouthDistance": 0.1858,
     "leftEye": [
       0.3999,
       0.437
+    ],
+    "mouth": [
+      0.5042,
+      0.6178
     ],
     "rightEye": [
       0.5913,
@@ -566,9 +848,15 @@
   "46717": {
     "angle": 0.08,
     "distance": 0.2103,
+    "eyeMouthAngle": 87.7,
+    "eyeMouthDistance": 0.199,
     "leftEye": [
       0.3934,
       0.4234
+    ],
+    "mouth": [
+      0.5066,
+      0.6223
     ],
     "rightEye": [
       0.6037,
@@ -578,9 +866,15 @@
   "46970": {
     "angle": -1.06,
     "distance": 0.1865,
+    "eyeMouthAngle": 89.14,
+    "eyeMouthDistance": 0.1839,
     "leftEye": [
       0.4146,
       0.4235
+    ],
+    "mouth": [
+      0.5105,
+      0.6056
     ],
     "rightEye": [
       0.6011,
@@ -590,9 +884,15 @@
   "47347": {
     "angle": -2.34,
     "distance": 0.2006,
+    "eyeMouthAngle": 88.19,
+    "eyeMouthDistance": 0.1861,
     "leftEye": [
       0.3928,
       0.4148
+    ],
+    "mouth": [
+      0.4989,
+      0.5967
     ],
     "rightEye": [
       0.5932,
@@ -602,9 +902,15 @@
   "47483": {
     "angle": 0.37,
     "distance": 0.1763,
+    "eyeMouthAngle": 92.39,
+    "eyeMouthDistance": 0.1716,
     "leftEye": [
       0.424,
       0.4345
+    ],
+    "mouth": [
+      0.5051,
+      0.6065
     ],
     "rightEye": [
       0.6004,
@@ -614,9 +920,15 @@
   "47504": {
     "angle": 0.06,
     "distance": 0.1863,
+    "eyeMouthAngle": 91.12,
+    "eyeMouthDistance": 0.1935,
     "leftEye": [
       0.4205,
       0.4116
+    ],
+    "mouth": [
+      0.5099,
+      0.6052
     ],
     "rightEye": [
       0.6068,
@@ -626,9 +938,15 @@
   "47959": {
     "angle": -1.01,
     "distance": 0.1923,
+    "eyeMouthAngle": 89.01,
+    "eyeMouthDistance": 0.1856,
     "leftEye": [
       0.4011,
       0.4212
+    ],
+    "mouth": [
+      0.5004,
+      0.605
     ],
     "rightEye": [
       0.5934,
@@ -638,9 +956,15 @@
   "47995": {
     "angle": -0.26,
     "distance": 0.183,
+    "eyeMouthAngle": 87.49,
+    "eyeMouthDistance": 0.1739,
     "leftEye": [
       0.4052,
       0.4272
+    ],
+    "mouth": [
+      0.5043,
+      0.6004
     ],
     "rightEye": [
       0.5882,
@@ -650,9 +974,15 @@
   "48081": {
     "angle": 0.36,
     "distance": 0.1941,
+    "eyeMouthAngle": 90.04,
+    "eyeMouthDistance": 0.194,
     "leftEye": [
       0.4158,
       0.4145
+    ],
+    "mouth": [
+      0.5126,
+      0.6091
     ],
     "rightEye": [
       0.6098,
@@ -662,9 +992,15 @@
   "48117": {
     "angle": -0.71,
     "distance": 0.1802,
+    "eyeMouthAngle": 89.68,
+    "eyeMouthDistance": 0.2015,
     "leftEye": [
       0.4171,
       0.4185
+    ],
+    "mouth": [
+      0.5083,
+      0.6189
     ],
     "rightEye": [
       0.5973,
@@ -674,9 +1010,15 @@
   "49771": {
     "angle": 0.78,
     "distance": 0.1909,
+    "eyeMouthAngle": 90.18,
+    "eyeMouthDistance": 0.1981,
     "leftEye": [
       0.4122,
       0.4207
+    ],
+    "mouth": [
+      0.507,
+      0.6201
     ],
     "rightEye": [
       0.6031,
@@ -686,9 +1028,15 @@
   "49960": {
     "angle": 0.62,
     "distance": 0.1896,
+    "eyeMouthAngle": 89.13,
+    "eyeMouthDistance": 0.1716,
     "leftEye": [
       0.4175,
       0.4213
+    ],
+    "mouth": [
+      0.5149,
+      0.5939
     ],
     "rightEye": [
       0.6071,
@@ -698,9 +1046,15 @@
   "50525": {
     "angle": -0.86,
     "distance": 0.1743,
+    "eyeMouthAngle": 89.63,
+    "eyeMouthDistance": 0.1765,
     "leftEye": [
       0.4154,
       0.4305
+    ],
+    "mouth": [
+      0.5037,
+      0.6057
     ],
     "rightEye": [
       0.5897,
@@ -710,9 +1064,15 @@
   "51634": {
     "angle": -0.51,
     "distance": 0.2031,
+    "eyeMouthAngle": 91.46,
+    "eyeMouthDistance": 0.2035,
     "leftEye": [
       0.4123,
       0.4237
+    ],
+    "mouth": [
+      0.5086,
+      0.6262
     ],
     "rightEye": [
       0.6153,
@@ -722,9 +1082,15 @@
   "51766": {
     "angle": 1.13,
     "distance": 0.189,
+    "eyeMouthAngle": 87.69,
+    "eyeMouthDistance": 0.1858,
     "leftEye": [
       0.4109,
       0.4262
+    ],
+    "mouth": [
+      0.5129,
+      0.6137
     ],
     "rightEye": [
       0.5999,
@@ -734,9 +1100,15 @@
   "52215": {
     "angle": 4.36,
     "distance": 0.1627,
+    "eyeMouthAngle": 91.36,
+    "eyeMouthDistance": 0.1784,
     "leftEye": [
       0.4216,
       0.4303
+    ],
+    "mouth": [
+      0.4985,
+      0.6148
     ],
     "rightEye": [
       0.5838,
@@ -746,9 +1118,15 @@
   "52453": {
     "angle": -2.98,
     "distance": 0.2019,
+    "eyeMouthAngle": 86.78,
+    "eyeMouthDistance": 0.1938,
     "leftEye": [
       0.4068,
       0.4311
+    ],
+    "mouth": [
+      0.5185,
+      0.6193
     ],
     "rightEye": [
       0.6084,
@@ -758,9 +1136,15 @@
   "52955": {
     "angle": 0.41,
     "distance": 0.1977,
+    "eyeMouthAngle": 90.32,
+    "eyeMouthDistance": 0.1952,
     "leftEye": [
       0.4109,
       0.4097
+    ],
+    "mouth": [
+      0.5087,
+      0.6055
     ],
     "rightEye": [
       0.6087,
@@ -770,9 +1154,15 @@
   "54591": {
     "angle": -0.02,
     "distance": 0.2017,
+    "eyeMouthAngle": 91.28,
+    "eyeMouthDistance": 0.1784,
     "leftEye": [
       0.406,
       0.4255
+    ],
+    "mouth": [
+      0.5029,
+      0.6039
     ],
     "rightEye": [
       0.6077,
@@ -782,9 +1172,15 @@
   "55182": {
     "angle": -0.23,
     "distance": 0.1662,
+    "eyeMouthAngle": 90.83,
+    "eyeMouthDistance": 0.192,
     "leftEye": [
       0.4238,
       0.4242
+    ],
+    "mouth": [
+      0.5041,
+      0.6158
     ],
     "rightEye": [
       0.59,
@@ -794,9 +1190,15 @@
   "56630": {
     "angle": 1.02,
     "distance": 0.1881,
+    "eyeMouthAngle": 91.17,
+    "eyeMouthDistance": 0.1939,
     "leftEye": [
       0.4137,
       0.4068
+    ],
+    "mouth": [
+      0.5038,
+      0.6024
     ],
     "rightEye": [
       0.6018,
@@ -806,9 +1208,15 @@
   "57366": {
     "angle": 0.61,
     "distance": 0.1882,
+    "eyeMouthAngle": 90.79,
+    "eyeMouthDistance": 0.191,
     "leftEye": [
       0.4144,
       0.4188
+    ],
+    "mouth": [
+      0.5059,
+      0.6107
     ],
     "rightEye": [
       0.6026,
@@ -818,9 +1226,15 @@
   "58168": {
     "angle": 1.13,
     "distance": 0.1838,
+    "eyeMouthAngle": 90.0,
+    "eyeMouthDistance": 0.1873,
     "leftEye": [
       0.418,
       0.423
+    ],
+    "mouth": [
+      0.5099,
+      0.6121
     ],
     "rightEye": [
       0.6017,
@@ -830,9 +1244,15 @@
   "59866": {
     "angle": -0.28,
     "distance": 0.191,
+    "eyeMouthAngle": 89.03,
+    "eyeMouthDistance": 0.1815,
     "leftEye": [
       0.4108,
       0.4166
+    ],
+    "mouth": [
+      0.5093,
+      0.5976
     ],
     "rightEye": [
       0.6018,
