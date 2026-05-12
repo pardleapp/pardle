@@ -137,8 +137,6 @@ def frame_blend(blend_img: Image.Image) -> Image.Image:
     hero = blend_img.copy()
     hero = hero.resize((780, 780), Image.LANCZOS)
     paste_centered_block(bg, hero, W // 2, 1000)
-
-    draw_centered(draw, "pardle.app/faces", 1700, font(64), fill=(255, 214, 74))
     return bg
 
 
@@ -176,11 +174,13 @@ def frame_reveal(t: float, a: Image.Image, b: Image.Image) -> Image.Image:
     draw = ImageDraw.Draw(bg)
     draw_centered(draw, "Can you name", 280, font(72))
     draw_centered(draw, "them both?", 380, font(72))
-    draw_centered(draw, "pardle.app/faces", 1700, font(64), fill=(255, 214, 74))
     return bg
 
 
 def frame_outro(name_a: str, name_b: str, a: Image.Image, b: Image.Image) -> Image.Image:
+    """Final reveal — brand-only CTA, no clickable-looking URL so the
+    video doesn't trigger TikTok's external-link demotion filter. The
+    link lives in the bio + pinned comment instead."""
     bg = background()
     draw = ImageDraw.Draw(bg)
 
@@ -198,8 +198,8 @@ def frame_outro(name_a: str, name_b: str, a: Image.Image, b: Image.Image) -> Ima
     bbox = draw.textbbox((0, 0), name_b, font=name_font)
     draw.text((W // 2 + 220 - (bbox[2] - bbox[0]) / 2, 1020), name_b, font=name_font, fill=(255, 255, 255))
 
-    draw_centered(draw, "5 more daily on", 1380, font(56))
-    draw_centered(draw, "pardle.app/faces", 1470, font(80), fill=(255, 214, 74))
+    draw_centered(draw, "6 more daily", 1380, font(64))
+    draw_centered(draw, "PARDLE", 1490, font(112), fill=ACCENT)
     return bg
 
 
