@@ -42,7 +42,7 @@ BG_BOTTOM = (44, 90, 40)
 
 CLOUDINARY = (
     "https://pga-tour-res.cloudinary.com/image/upload/"
-    "c_fill,g_face:center,h_600,w_600,q_auto,f_auto/"
+    "c_thumb,g_face,z_0.75,h_600,w_600,q_auto,f_auto/"
     "headshots_{id}.png"
 )
 

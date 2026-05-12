@@ -16,7 +16,7 @@ from io import BytesIO
 
 CLOUDINARY = (
     "https://pga-tour-res.cloudinary.com/image/upload/"
-    "c_fill,g_face:center,h_400,w_400,q_auto,f_auto/"
+    "c_thumb,g_face,z_0.75,h_400,w_400,q_auto,f_auto/"
     "headshots_{id}.png"
 )
 

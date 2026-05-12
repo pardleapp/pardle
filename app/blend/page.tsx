@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BRAND } from "@/lib/brand";
 import { GOLFERS } from "@/lib/data/golfers";
-import { PGA_TOUR_IDS } from "@/lib/data/pga-tour-ids";
+import { PGA_TOUR_IDS, pgaTourHeadshotUrlById } from "@/lib/data/pga-tour-ids";
 import type { Golfer } from "@/lib/game/types";
 import { searchableName } from "@/lib/text";
 
@@ -54,7 +54,7 @@ function PickerInput({ label, selected, onSelect, excludeId }: PickerInputProps)
         <div className="blend-pick-chip">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={`https://pga-tour-res.cloudinary.com/image/upload/c_fill,g_face:center,h_120,w_120,q_auto,f_auto/headshots_${PGA_TOUR_IDS[selected.id]}.png`}
+            src={pgaTourHeadshotUrlById(PGA_TOUR_IDS[selected.id]!, 120)}
             alt={selected.name}
           />
           <span>{selected.name}</span>

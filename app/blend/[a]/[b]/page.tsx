@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import { GOLFERS } from "@/lib/data/golfers";
-import { PGA_TOUR_IDS } from "@/lib/data/pga-tour-ids";
+import {
+  PGA_TOUR_IDS,
+  pgaTourHeadshotUrlById,
+} from "@/lib/data/pga-tour-ids";
 
 interface Params {
   params: Promise<{ a: string; b: string }>;
@@ -30,8 +33,7 @@ export default async function BlendLanding({ params }: Params) {
   const { a, b } = await params;
   const nameA = nameForId(a);
   const nameB = nameForId(b);
-  const cloudinary = (id: string) =>
-    `https://pga-tour-res.cloudinary.com/image/upload/c_fill,g_face:center,h_600,w_600,q_auto,f_auto/headshots_${id}.png`;
+  const cloudinary = (id: string) => pgaTourHeadshotUrlById(id, 600);
   const ogUrl = `${BRAND.url}/blend/${a}/${b}/opengraph-image`;
   const pageUrl = `${BRAND.url}/blend/${a}/${b}`;
   const tweetText =

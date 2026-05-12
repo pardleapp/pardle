@@ -103,12 +103,33 @@ export const PGA_TOUR_IDS: Record<string, string> = {
   // wrong pro. Re-add when verified.
 };
 
+/** Cloudinary transform tuned for face-blending consistency.
+ *
+ * c_thumb,g_face — thumbnail mode that detects the face AND scales it
+ *   to fill the output. Unlike c_fill which preserves the original
+ *   face size, c_thumb normalises face size so a tight headshot and a
+ *   3/4-body shot end up with similarly-sized faces in the output.
+ * z_0.75 — pull back slightly so we keep a little forehead + chin
+ *   context. Pure c_thumb sometimes crops too tight on prominent
+ *   features (large nose, etc.) which makes the blend look weird.
+ */
+const CLOUDINARY_TRANSFORM = "c_thumb,g_face,z_0.75,q_auto,f_auto";
+
 /**
  * Returns the PGA Tour Cloudinary headshot URL for a golfer, or null
  * if we don't have a PGA Tour ID for them.
  */
-export function pgaTourHeadshotUrl(golferId: string): string | null {
+export function pgaTourHeadshotUrl(
+  golferId: string,
+  size = 400,
+): string | null {
   const id = PGA_TOUR_IDS[golferId];
   if (!id) return null;
-  return `https://pga-tour-res.cloudinary.com/image/upload/c_fill,g_face:center,h_400,w_400,q_auto,f_auto/headshots_${id}.png`;
+  return `https://pga-tour-res.cloudinary.com/image/upload/${CLOUDINARY_TRANSFORM},h_${size},w_${size}/headshots_${id}.png`;
+}
+
+/** Same transform but addressed by raw PGA Tour ID rather than our slug.
+ *  Used in places that already have the numeric ID (blend tool, scripts). */
+export function pgaTourHeadshotUrlById(id: string, size = 400): string {
+  return `https://pga-tour-res.cloudinary.com/image/upload/${CLOUDINARY_TRANSFORM},h_${size},w_${size}/headshots_${id}.png`;
 }

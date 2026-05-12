@@ -1,6 +1,9 @@
 import { ImageResponse } from "next/og";
 import { GOLFERS } from "@/lib/data/golfers";
-import { PGA_TOUR_IDS } from "@/lib/data/pga-tour-ids";
+import {
+  PGA_TOUR_IDS,
+  pgaTourHeadshotUrlById,
+} from "@/lib/data/pga-tour-ids";
 
 // Public blend tool — a/b are PGA Tour player IDs. Renders a 1200x1200
 // PNG with the two faces stacked at 1.0 and 0.5 opacity. Same recipe
@@ -22,7 +25,7 @@ interface Params {
 }
 
 function headshot(id: string): string {
-  return `https://pga-tour-res.cloudinary.com/image/upload/c_fill,g_face:center,h_900,w_900,q_auto,f_auto/headshots_${id}.png`;
+  return pgaTourHeadshotUrlById(id, 900);
 }
 
 function nameForId(id: string): string | null {
