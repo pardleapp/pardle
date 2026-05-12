@@ -167,14 +167,51 @@ function filterDayOffset(filter: TourFilter): number {
   return h;
 }
 
-function pickMysteryCourse(
-  filter: TourFilter,
-  difficulty: Difficulty,
-): Course {
+/** Raw rotation pick — what the filter would land on with no collision
+ * avoidance. Kept separate so the collision-aware wrapper below can
+ * call it for any filter without recursion. */
+function rawRotationPick(filter: TourFilter, difficulty: Difficulty): Course {
   const pool = coursePool(filter, difficulty);
   if (pool.length === 0) return COURSES[0];
   const dayIdx = dayIndexToday() + filterDayOffset(filter);
   const safe = ((dayIdx % pool.length) + pool.length) % pool.length;
+  return pool[safe];
+}
+
+/**
+ * Today's mystery for a given filter, made distinct from every other
+ * filter's pick. Open venues etc. appear in multiple pools so the raw
+ * rotation can collide by chance ("All" and "DPW" landing on the same
+ * course on the same day). For specific filters (PGA, DPW), if the
+ * rotation pick is already used by another filter, advance to the
+ * next-best course in that pool. "All" is the canonical headline pick
+ * and never gets bumped.
+ */
+function pickMysteryCourse(
+  filter: TourFilter,
+  difficulty: Difficulty,
+): Course {
+  if (filter === "all") {
+    return rawRotationPick("all", difficulty);
+  }
+  // Build the set of course ids already claimed by earlier-priority
+  // filters today: "all" first, then any specific filter listed before
+  // this one in PRIORITY.
+  const PRIORITY: TourFilter[] = ["all", "PGA", "DPW"];
+  const myIdx = PRIORITY.indexOf(filter);
+  const used = new Set<string>();
+  for (let i = 0; i < myIdx; i++) {
+    used.add(rawRotationPick(PRIORITY[i], difficulty).id);
+  }
+  const pool = coursePool(filter, difficulty);
+  if (pool.length === 0) return COURSES[0];
+  const dayIdx = dayIndexToday() + filterDayOffset(filter);
+  let safe = ((dayIdx % pool.length) + pool.length) % pool.length;
+  let attempts = 0;
+  while (used.has(pool[safe].id) && attempts < pool.length) {
+    safe = (safe + 1) % pool.length;
+    attempts++;
+  }
   return pool[safe];
 }
 
