@@ -133,3 +133,15 @@ export function pgaTourHeadshotUrl(
 export function pgaTourHeadshotUrlById(id: string, size = 400): string {
   return `https://pga-tour-res.cloudinary.com/image/upload/${CLOUDINARY_TRANSFORM},h_${size},w_${size}/headshots_${id}.png`;
 }
+
+/**
+ * Path to the pre-rendered Delaunay-morphed blend for a given pair.
+ * Files are produced offline by scripts/generate_morphed_blends.py and
+ * stored canonically with the lexicographically-smaller ID first.
+ * Caller should still gracefully handle a 404 (e.g. when a new pro is
+ * added before the next batch is regenerated).
+ */
+export function morphedBlendUrl(idA: string, idB: string): string {
+  const [a, b] = [idA, idB].sort();
+  return `/blends/${a}_${b}.jpg`;
+}

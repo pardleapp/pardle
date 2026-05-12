@@ -24,7 +24,7 @@ import { recordPlayClient } from "@/lib/stats-client";
 import { encodeGridFaces, encodeShareCard } from "@/lib/share-card";
 import { searchableName } from "@/lib/text";
 import { alignmentTransform } from "@/lib/data/face-alignment";
-import { PGA_TOUR_IDS } from "@/lib/data/pga-tour-ids";
+import { morphedBlendUrl, PGA_TOUR_IDS } from "@/lib/data/pga-tour-ids";
 
 const GAME_ID = "faces";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 11);
@@ -503,7 +503,32 @@ export default function FacesPage() {
             }`}
             onContextMenu={(e) => e.preventDefault()}
           >
-            {headshotUrl(currentPuzzle.left) && (() => {
+            {/*
+             * Three rendering modes for the stage:
+             *  1. Default: a single pre-rendered Delaunay-morphed JPEG.
+             *     This is the "wow" view — looks like one coherent face.
+             *  2. Hint active (one solved, hunting the other): fall back
+             *     to the stacked-images approach with tuned opacities
+             *     so we can fade the solved face down and emphasise the
+             *     unsolved one.
+             *  3. Puzzle over: stacked images so the unblend reveal
+             *     animation can split them apart.
+             */}
+            {!puzzleOver && !hintActive && (() => {
+              const idA = PGA_TOUR_IDS[currentPuzzle.left.id];
+              const idB = PGA_TOUR_IDS[currentPuzzle.right.id];
+              if (!idA || !idB) return null;
+              return (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={morphedBlendUrl(idA, idB)}
+                  alt=""
+                  draggable={false}
+                  className="faces-img faces-img-morph"
+                />
+              );
+            })()}
+            {(puzzleOver || hintActive) && headshotUrl(currentPuzzle.left) && (() => {
               const align = alignmentTransform(
                 PGA_TOUR_IDS[currentPuzzle.left.id] ?? "",
               );
@@ -528,7 +553,7 @@ export default function FacesPage() {
                 />
               );
             })()}
-            {headshotUrl(currentPuzzle.right) && (() => {
+            {(puzzleOver || hintActive) && headshotUrl(currentPuzzle.right) && (() => {
               const align = alignmentTransform(
                 PGA_TOUR_IDS[currentPuzzle.right.id] ?? "",
               );

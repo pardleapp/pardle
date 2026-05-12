@@ -35,9 +35,11 @@ interface PublicRoundState {
 }
 
 interface PublicRound {
+  /** Pre-rendered Delaunay-morph JPEG for the blend view. */
+  morphImage: string | null;
   leftImage: string | null;
   rightImage: string | null;
-  /** Pre-computed CSS transform for eye alignment (server-side). */
+  /** Pre-computed CSS transform for eye alignment (used as fallback). */
   leftAlign: string | null;
   rightAlign: string | null;
   leftName: string | null;
@@ -508,32 +510,34 @@ export default function FacesDuelRoom() {
               }`}
               onContextMenu={(e) => e.preventDefault()}
             >
-              {round.leftImage && (
+              {/* Default: single pre-rendered morph image. On reveal,
+                  the two source headshots fade in for the unblend
+                  animation. */}
+              {!resolved && round.morphImage && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={round.morphImage}
+                  alt=""
+                  draggable={false}
+                  className="faces-img faces-img-morph"
+                />
+              )}
+              {resolved && round.leftImage && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={round.leftImage}
                   alt=""
                   draggable={false}
                   className="faces-img faces-img-base"
-                  style={
-                    round.leftAlign && !resolved
-                      ? { transform: round.leftAlign, transformOrigin: "0 0" }
-                      : undefined
-                  }
                 />
               )}
-              {round.rightImage && (
+              {resolved && round.rightImage && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={round.rightImage}
                   alt=""
                   draggable={false}
                   className="faces-img faces-img-overlay"
-                  style={
-                    round.rightAlign && !resolved
-                      ? { transform: round.rightAlign, transformOrigin: "0 0" }
-                      : undefined
-                  }
                 />
               )}
             </div>

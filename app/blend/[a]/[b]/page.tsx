@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
-import { alignmentTransform } from "@/lib/data/face-alignment";
 import { GOLFERS } from "@/lib/data/golfers";
 import {
+  morphedBlendUrl,
   PGA_TOUR_IDS,
-  pgaTourHeadshotUrlById,
 } from "@/lib/data/pga-tour-ids";
 
 interface Params {
@@ -34,7 +33,7 @@ export default async function BlendLanding({ params }: Params) {
   const { a, b } = await params;
   const nameA = nameForId(a);
   const nameB = nameForId(b);
-  const cloudinary = (id: string) => pgaTourHeadshotUrlById(id, 600);
+  const blendImg = morphedBlendUrl(a, b);
   const ogUrl = `${BRAND.url}/blend/${a}/${b}/opengraph-image`;
   const pageUrl = `${BRAND.url}/blend/${a}/${b}`;
   const tweetText =
@@ -53,43 +52,13 @@ export default async function BlendLanding({ params }: Params) {
         <p className="subtitle">Blend</p>
       </header>
 
-      <div className="faces-stage blend-stage-static">
-        {(() => {
-          const alignA = alignmentTransform(a);
-          const alignB = alignmentTransform(b);
-          return (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={cloudinary(a)}
-                alt=""
-                className="faces-img faces-img-base"
-                style={
-                  alignA
-                    ? {
-                        transform: alignA.transform,
-                        transformOrigin: alignA.transformOrigin,
-                      }
-                    : undefined
-                }
-              />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={cloudinary(b)}
-                alt=""
-                className="faces-img faces-img-overlay"
-                style={
-                  alignB
-                    ? {
-                        transform: alignB.transform,
-                        transformOrigin: alignB.transformOrigin,
-                      }
-                    : undefined
-                }
-              />
-            </>
-          );
-        })()}
+      <div className="faces-stage blend-stage-static blend-stage-morph">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={blendImg}
+          alt={nameA && nameB ? `${nameA} blended with ${nameB}` : "Blend"}
+          className="faces-img faces-img-morph"
+        />
       </div>
 
       {nameA && nameB && (

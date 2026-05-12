@@ -1,10 +1,7 @@
 import { ImageResponse } from "next/og";
-import { alignmentTransform } from "@/lib/data/face-alignment";
+import { BRAND } from "@/lib/brand";
 import { GOLFERS } from "@/lib/data/golfers";
-import {
-  PGA_TOUR_IDS,
-  pgaTourHeadshotUrlById,
-} from "@/lib/data/pga-tour-ids";
+import { morphedBlendUrl, PGA_TOUR_IDS } from "@/lib/data/pga-tour-ids";
 
 // Public blend tool — a/b are PGA Tour player IDs. Renders a 1200x1200
 // PNG with the two faces stacked at 1.0 and 0.5 opacity. Same recipe
@@ -25,10 +22,6 @@ interface Params {
   params: Promise<{ a: string; b: string }>;
 }
 
-function headshot(id: string): string {
-  return pgaTourHeadshotUrlById(id, 900);
-}
-
 function nameForId(id: string): string | null {
   const slug = Object.entries(PGA_TOUR_IDS).find(([, v]) => v === id)?.[0];
   if (!slug) return null;
@@ -39,8 +32,10 @@ export default async function BlendOg({ params }: Params) {
   const { a, b } = await params;
   const nameA = nameForId(a);
   const nameB = nameForId(b);
-  const alignA = alignmentTransform(a);
-  const alignB = alignmentTransform(b);
+  // The pre-rendered morph lives at /blends/{a}_{b}.jpg in our public
+  // dir. Reference via the absolute URL so the edge-rendered OG image
+  // can fetch it.
+  const morphSrc = `${BRAND.url}${morphedBlendUrl(a, b)}`;
 
   return new ImageResponse(
     (
@@ -75,58 +70,30 @@ export default async function BlendOg({ params }: Params) {
           <span>BLEND</span>
         </div>
 
-        {/* The blend stage — two headshots stacked, opacity 1 / 0.5 */}
+        {/* The blend is a pre-rendered Delaunay-morph JPEG generated
+            offline. Just hot-link it; the same file the /blend tool
+            page shows. */}
         <div
           style={{
             display: "flex",
-            position: "relative",
             width: 900,
             height: 900,
             borderRadius: 24,
             overflow: "hidden",
             background: "#0f1f0f",
             boxShadow: "0 16px 60px rgba(0, 0, 0, 0.45)",
-            filter: "contrast(1.05) saturate(1.06)",
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={headshot(a)}
+            src={morphSrc}
             alt=""
             width={900}
             height={900}
             style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
               width: 900,
               height: 900,
               objectFit: "cover",
-              opacity: 1,
-              ...(alignA && {
-                transform: alignA.transform,
-                transformOrigin: alignA.transformOrigin,
-              }),
-            }}
-          />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={headshot(b)}
-            alt=""
-            width={900}
-            height={900}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: 900,
-              height: 900,
-              objectFit: "cover",
-              opacity: 0.5,
-              ...(alignB && {
-                transform: alignB.transform,
-                transformOrigin: alignB.transformOrigin,
-              }),
             }}
           />
         </div>

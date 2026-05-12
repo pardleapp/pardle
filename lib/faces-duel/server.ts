@@ -13,7 +13,7 @@
 
 import { Redis } from "@upstash/redis";
 import { alignmentTransform } from "@/lib/data/face-alignment";
-import { PGA_TOUR_IDS } from "@/lib/data/pga-tour-ids";
+import { morphedBlendUrl, PGA_TOUR_IDS } from "@/lib/data/pga-tour-ids";
 import { headshotUrl, matchesGolfer, pickPuzzleSet } from "@/lib/game/faces";
 import type { FacesPuzzle } from "@/lib/game/faces";
 import {
@@ -282,14 +282,17 @@ export function publicRoomView(room: FacesDuelRoom) {
     rounds: puzzles.map((puz, i) => {
       const r = room.rounds[i];
       const reveal = r.resolved || i < room.currentRoundIndex;
-      // Pre-computed alignment transforms — sent as opaque CSS strings
-      // so they don't leak which pro is which, but the client can apply
-      // them directly to the stacked imgs for an eye-aligned blend.
-      const leftAlign = alignmentTransform(PGA_TOUR_IDS[puz.left.id] ?? "");
-      const rightAlign = alignmentTransform(
-        PGA_TOUR_IDS[puz.right.id] ?? "",
-      );
+      // Pre-rendered Delaunay-morph URL — single image, full quality.
+      // We also still send per-face source images + alignment transforms
+      // so the client can show the unblend reveal animation once the
+      // round is resolved.
+      const idA = PGA_TOUR_IDS[puz.left.id];
+      const idB = PGA_TOUR_IDS[puz.right.id];
+      const morphImage = idA && idB ? morphedBlendUrl(idA, idB) : null;
+      const leftAlign = alignmentTransform(idA ?? "");
+      const rightAlign = alignmentTransform(idB ?? "");
       return {
+        morphImage,
         leftImage: headshotUrl(puz.left),
         rightImage: headshotUrl(puz.right),
         leftAlign: leftAlign?.transform ?? null,
