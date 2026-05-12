@@ -496,12 +496,14 @@ export default function FacesPage() {
             className={`faces-stage ${wrongFlash ? "faces-stage-wrong" : ""} ${
               puzzleOver ? "faces-stage-over" : ""
             }`}
+            onContextMenu={(e) => e.preventDefault()}
           >
             {headshotUrl(currentPuzzle.left) && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={headshotUrl(currentPuzzle.left)!}
                 alt=""
+                draggable={false}
                 className="faces-img faces-img-base"
                 style={puzzleOver ? undefined : { opacity: baseOpacity }}
               />
@@ -511,6 +513,7 @@ export default function FacesPage() {
               <img
                 src={headshotUrl(currentPuzzle.right)!}
                 alt=""
+                draggable={false}
                 className="faces-img faces-img-overlay"
                 style={puzzleOver ? undefined : { opacity: overlayOpacity }}
               />

@@ -503,12 +503,14 @@ export default function FacesDuelRoom() {
               className={`faces-stage ${wrongFlash ? "faces-stage-wrong" : ""} ${
                 resolved ? "faces-stage-over" : ""
               }`}
+              onContextMenu={(e) => e.preventDefault()}
             >
               {round.leftImage && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={round.leftImage}
                   alt=""
+                  draggable={false}
                   className="faces-img faces-img-base"
                 />
               )}
@@ -517,6 +519,7 @@ export default function FacesDuelRoom() {
                 <img
                   src={round.rightImage}
                   alt=""
+                  draggable={false}
                   className="faces-img faces-img-overlay"
                 />
               )}

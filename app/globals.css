@@ -3745,6 +3745,13 @@ footer {
   box-shadow: 0 8px 28px rgba(15, 31, 15, 0.25);
   filter: contrast(1.05) saturate(1.06);
   transition: transform 0.25s ease, filter 0.25s ease;
+  /* Block long-press image preview on iOS / Android, which would
+     otherwise pop one layer of the stack to fullscreen and reveal that
+     pro on its own — answer leak. user-select + touch-callout also
+     stop the text-selection menu appearing on the names later. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .faces-stage-wrong {
@@ -3785,6 +3792,13 @@ footer {
   object-fit: cover;
   object-position: center 20%;
   transition: opacity 0.55s ease, transform 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+  /* No interaction allowed on the stacked layers — block drag preview,
+     touch callout, and pointer events so neither layer can be popped
+     out individually. */
+  pointer-events: none;
+  -webkit-user-drag: none;
+  user-drag: none;
+  -webkit-touch-callout: none;
 }
 
 .faces-img-base {
