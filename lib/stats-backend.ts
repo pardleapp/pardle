@@ -25,10 +25,12 @@ export type StatsGameId =
   | "trivia"
   | "faces";
 
+// Note: "clubs" is intentionally absent — the Clubhouses tile is hidden
+// from the hub and we don't show it on /today either. The type still
+// includes it so the /clubs page can still record plays via direct link.
 export const STATS_GAMES: readonly StatsGameId[] = [
   "pros",
   "holes",
-  "clubs",
   "connections",
   "trivia",
   "faces",

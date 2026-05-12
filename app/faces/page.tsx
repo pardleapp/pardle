@@ -21,6 +21,7 @@ import {
 } from "@/lib/streak";
 import { NotifySignup } from "@/lib/notify-signup";
 import { recordPlayClient } from "@/lib/stats-client";
+import { searchableName } from "@/lib/text";
 
 const GAME_ID = "faces";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 11);
@@ -159,9 +160,9 @@ export default function FacesPage() {
 
   const matches = useMemo(() => {
     if (!currentState || !currentPuzzle) return [];
-    const q = input.trim().toLowerCase();
+    const q = searchableName(input.trim());
     if (!q || puzzleOver) return [];
-    return GOLFERS.filter((g) => g.name.toLowerCase().includes(q))
+    return GOLFERS.filter((g) => searchableName(g.name).includes(q))
       .filter((g) => !currentState.solved.includes(g.id))
       .slice(0, 6);
   }, [input, currentState, currentPuzzle, puzzleOver]);
@@ -455,7 +456,7 @@ export default function FacesPage() {
                 src={headshotUrl(currentPuzzle.left)!}
                 alt=""
                 className="faces-img faces-img-base"
-                style={{ opacity: baseOpacity }}
+                style={puzzleOver ? undefined : { opacity: baseOpacity }}
               />
             )}
             {headshotUrl(currentPuzzle.right) && (
@@ -464,7 +465,7 @@ export default function FacesPage() {
                 src={headshotUrl(currentPuzzle.right)!}
                 alt=""
                 className="faces-img faces-img-overlay"
-                style={{ opacity: overlayOpacity }}
+                style={puzzleOver ? undefined : { opacity: overlayOpacity }}
               />
             )}
             {rightFlash && (

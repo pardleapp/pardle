@@ -30,6 +30,8 @@ import {
 import { NotifySignup } from "@/lib/notify-signup";
 import { encodeGridPros, encodeShareCard } from "@/lib/share-card";
 import { recordPlayClient } from "@/lib/stats-client";
+import { searchableName } from "@/lib/text";
+import { pgaTourHeadshotUrl } from "@/lib/data/pga-tour-ids";
 
 const GAME_ID = "pros";
 
@@ -266,16 +268,25 @@ function PlayerWalker({ golfer }: { golfer: Golfer }) {
             </g>
           </svg>
 
-          {/* Player's actual face sits on top of the body as the head */}
+          {/* Player's actual face sits on top of the body as the head.
+              Prefer PGA Tour Cloudinary (face-cropped, always loads
+              consistently) over the Wikipedia thumbnail. Falls back to
+              the country flag only if neither is available. */}
           <div className="walker-head">
-            {golfer.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={golfer.imageUrl} alt={golfer.name} />
-            ) : (
-              <div className="walker-head-placeholder">
-                {flagFor(golfer.countryCode)}
-              </div>
-            )}
+            {(() => {
+              const url = pgaTourHeadshotUrl(golfer.id) ?? golfer.imageUrl;
+              if (!url) {
+                return (
+                  <div className="walker-head-placeholder">
+                    {flagFor(golfer.countryCode)}
+                  </div>
+                );
+              }
+              return (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={url} alt={golfer.name} />
+              );
+            })()}
             <div className="walker-tear" aria-hidden="true" />
           </div>
         </div>
@@ -598,9 +609,9 @@ export default function Page() {
   }, [isOver, isWin, dayNumber, guesses.length]);
 
   const matches = useMemo(() => {
-    const q = input.trim().toLowerCase();
+    const q = searchableName(input.trim());
     if (!q) return [];
-    return GOLFERS.filter((g) => g.name.toLowerCase().includes(q))
+    return GOLFERS.filter((g) => searchableName(g.name).includes(q))
       .filter((g) => !guesses.some((gu) => gu.golfer.id === g.id))
       .slice(0, 6);
   }, [input, guesses]);

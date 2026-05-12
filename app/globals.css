@@ -3578,6 +3578,20 @@ footer {
   filter: none;
 }
 
+/* When the round is over, the two stacked images animate apart into
+   side-by-side panels — each face revealed cleanly at half-size in its
+   own half of the stage. Opacity overrides inline styles set in JSX
+   (which are removed at puzzleOver). */
+.faces-stage-over .faces-img-base {
+  transform: translateX(-25%) scale(0.5);
+  opacity: 1;
+}
+
+.faces-stage-over .faces-img-overlay {
+  transform: translateX(25%) scale(0.5);
+  opacity: 1;
+}
+
 .faces-img {
   position: absolute;
   inset: 0;
@@ -3585,7 +3599,7 @@ footer {
   height: 100%;
   object-fit: cover;
   object-position: center 20%;
-  transition: opacity 0.55s ease;
+  transition: opacity 0.55s ease, transform 0.65s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .faces-img-base {

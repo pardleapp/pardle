@@ -37,6 +37,7 @@ import {
 import { NotifySignup } from "@/lib/notify-signup";
 import { encodeGridPros, encodeShareCard } from "@/lib/share-card";
 import { recordPlayClient } from "@/lib/stats-client";
+import { searchableName } from "@/lib/text";
 
 const GAME_ID = "holes";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 10);
@@ -407,14 +408,14 @@ export default function HolesPage() {
   }, [isOver, isWin, dayNumber, scoreCount]);
 
   const matches = useMemo(() => {
-    const q = courseInput.trim().toLowerCase();
+    const q = searchableName(courseInput.trim());
     if (!q) return [];
     const pool = coursePool(tourFilter);
     return pool
       .filter(
         (c) =>
-          c.name.toLowerCase().includes(q) ||
-          c.shortName.toLowerCase().includes(q),
+          searchableName(c.name).includes(q) ||
+          searchableName(c.shortName).includes(q),
       )
       .slice(0, 6);
   }, [courseInput, tourFilter]);
@@ -446,7 +447,7 @@ export default function HolesPage() {
   }
 
   const hardMatches = useMemo(() => {
-    const q = hardCourseInput.trim().toLowerCase();
+    const q = searchableName(hardCourseInput.trim());
     if (!q) return [];
     const pool = coursePool(tourFilter);
     const alreadyGuessed = new Set(hardCourseGuesses.map((g) => g.course.id));
@@ -454,8 +455,8 @@ export default function HolesPage() {
       .filter(
         (c) =>
           !alreadyGuessed.has(c.id) &&
-          (c.name.toLowerCase().includes(q) ||
-            c.shortName.toLowerCase().includes(q)),
+          (searchableName(c.name).includes(q) ||
+            searchableName(c.shortName).includes(q)),
       )
       .slice(0, 6);
   }, [hardCourseInput, tourFilter, hardCourseGuesses]);

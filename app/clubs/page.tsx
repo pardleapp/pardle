@@ -30,6 +30,7 @@ import {
 import { NotifySignup } from "@/lib/notify-signup";
 import { encodeGridPros, encodeShareCard } from "@/lib/share-card";
 import { recordPlayClient } from "@/lib/stats-client";
+import { searchableName } from "@/lib/text";
 
 const GAME_ID = "clubs";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 11);
@@ -259,7 +260,7 @@ export default function ClubsPage() {
   }, [isOver, isWin, dayNumber, scoreCount]);
 
   const matches = useMemo(() => {
-    const q = courseInput.trim().toLowerCase();
+    const q = searchableName(courseInput.trim());
     if (!q) return [];
     const pool = coursePool(tourFilter);
     const alreadyGuessed = new Set(guesses.map((g) => g.course.id));
@@ -267,8 +268,8 @@ export default function ClubsPage() {
       .filter(
         (c) =>
           !alreadyGuessed.has(c.id) &&
-          (c.name.toLowerCase().includes(q) ||
-            c.shortName.toLowerCase().includes(q)),
+          (searchableName(c.name).includes(q) ||
+            searchableName(c.shortName).includes(q)),
       )
       .slice(0, 6);
   }, [courseInput, tourFilter, guesses]);

@@ -9,6 +9,7 @@ import {
   saveChallengerName,
 } from "@/lib/challenge";
 import { GOLFERS } from "@/lib/data/golfers";
+import { searchableName } from "@/lib/text";
 
 const PLAYER_TOKEN_KEY = "pardle.facesDuel.playerToken";
 const MAX_PLAYERS = 4;
@@ -279,9 +280,9 @@ export default function FacesDuelRoom() {
 
   // Live autocomplete for the input — matches over GOLFERS to help typing.
   const matches = useMemo(() => {
-    const q = guess.trim().toLowerCase();
+    const q = searchableName(guess.trim());
     if (!q) return [];
-    return GOLFERS.filter((g) => g.name.toLowerCase().includes(q)).slice(0, 6);
+    return GOLFERS.filter((g) => searchableName(g.name).includes(q)).slice(0, 6);
   }, [guess]);
 
   if (fetchError === "not_found") {

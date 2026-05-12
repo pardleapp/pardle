@@ -19,6 +19,9 @@ export const metadata: Metadata = {
   description: "How well the rest of the world did on today's Pardle games.",
 };
 
+// "clubs" stays in the record as a stub so the StatsGameId Record type
+// is satisfied, but it never renders — STATS_GAMES doesn't include it,
+// so the iteration in this page skips it entirely.
 const GAME_META: Record<
   StatsGameId,
   { name: string; emoji: string; accent: string; maxScore: number }
