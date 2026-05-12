@@ -111,6 +111,17 @@ export default function TriviaChallengePage() {
     });
   }
 
+  // -2 = "I gave up". Counted as wrong against scoring but distinct
+  // from a real pick.
+  function giveUp() {
+    if (hasAnswered || isFinished) return;
+    setAnswers((prev) => {
+      const next = prev.slice();
+      next[currentIndex] = -2;
+      return next;
+    });
+  }
+
   function goNext() {
     setCurrentIndex((i) => i + 1);
   }
@@ -361,22 +372,44 @@ export default function TriviaChallengePage() {
             })}
           </div>
 
+          {!hasAnswered && (
+            <button
+              type="button"
+              className="trivia-giveup-btn"
+              onClick={giveUp}
+            >
+              I don&apos;t know — show me
+            </button>
+          )}
+
           {hasAnswered && (() => {
             const myWasCorrect = myAnswer === currentQ.correctIndex;
+            const myGaveUp = myAnswer === -2;
             const theirAnswer = payload.a[currentIndex];
             const theirCorrect = theirAnswer === currentQ.correctIndex;
             const theirText =
               theirAnswer === -1
                 ? `${payload.p || "They"} didn't answer this one.`
-                : theirCorrect
-                  ? `${payload.p || "They"} also got it right.`
-                  : `${payload.p || "They"} picked ${String.fromCharCode(65 + theirAnswer)} — wrong.`;
+                : theirAnswer === -2
+                  ? `${payload.p || "They"} gave up too.`
+                  : theirCorrect
+                    ? `${payload.p || "They"} also got it right.`
+                    : `${payload.p || "They"} picked ${String.fromCharCode(65 + theirAnswer)} — wrong.`;
 
             return (
               <div className="trivia-reveal">
                 {myWasCorrect ? (
                   <p className="trivia-reveal-text trivia-reveal-correct">
                     Correct!
+                  </p>
+                ) : myGaveUp ? (
+                  <p className="trivia-reveal-text trivia-reveal-wrong">
+                    No worries — it was{" "}
+                    <strong>
+                      {String.fromCharCode(65 + currentQ.correctIndex)}.{" "}
+                      {currentQ.options[currentQ.correctIndex]}
+                    </strong>
+                    .
                   </p>
                 ) : (
                   <p className="trivia-reveal-text trivia-reveal-wrong">

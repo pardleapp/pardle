@@ -227,6 +227,24 @@ export default function TriviaPage() {
     });
   }
 
+  // -2 is the "gave up" sentinel — distinct from -1 (not answered) and
+  // 0-3 (a real pick). correctCount only counts real correct picks, so
+  // a give-up scores 0 just like a wrong answer.
+  function giveUp() {
+    if (hasAnswered || isFinished) return;
+    setAnswers((prev) => {
+      const next = prev.slice();
+      next[currentIndex] = -2;
+      saveDayState({
+        dayNumber,
+        difficulty,
+        currentIndex,
+        answers: next,
+      });
+      return next;
+    });
+  }
+
   function goNext() {
     setCurrentIndex((i) => {
       const next = i + 1;
@@ -461,11 +479,30 @@ export default function TriviaPage() {
             })}
           </div>
 
+          {!hasAnswered && (
+            <button
+              type="button"
+              className="trivia-giveup-btn"
+              onClick={giveUp}
+            >
+              I don&apos;t know — show me
+            </button>
+          )}
+
           {hasAnswered && (
             <div className="trivia-reveal">
               {playerAnswer === currentQ.correctIndex ? (
                 <p className="trivia-reveal-text trivia-reveal-correct">
                   Correct!
+                </p>
+              ) : playerAnswer === -2 ? (
+                <p className="trivia-reveal-text trivia-reveal-wrong">
+                  No worries — it was{" "}
+                  <strong>
+                    {String.fromCharCode(65 + currentQ.correctIndex)}.{" "}
+                    {currentQ.options[currentQ.correctIndex]}
+                  </strong>
+                  .
                 </p>
               ) : (
                 <p className="trivia-reveal-text trivia-reveal-wrong">

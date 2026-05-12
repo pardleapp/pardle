@@ -241,6 +241,14 @@ export default function FacesPage() {
     mutateCurrent((p) => ({ ...p, hintUsed: true }));
   }
 
+  function giveUp() {
+    if (!currentState || puzzleOver) return;
+    // Forfeit the puzzle: cap wrongCount so puzzleOver flips true.
+    // Any already-solved face stays solved; the unsolved one reveals
+    // via the existing slot/recap logic.
+    mutateCurrent((p) => ({ ...p, wrongCount: TOTAL_GUESSES }));
+  }
+
   function advancePuzzle() {
     if (!day) return;
     const next: PersistedDayState = {
@@ -580,6 +588,16 @@ export default function FacesPage() {
                 </ul>
               )}
             </div>
+          )}
+
+          {!puzzleOver && (
+            <button
+              type="button"
+              className="faces-giveup-btn"
+              onClick={giveUp}
+            >
+              I give up — show me
+            </button>
           )}
 
           {currentState && currentState.history.length > 0 && (
