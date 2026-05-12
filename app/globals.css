@@ -3504,6 +3504,39 @@ input[type=text]:focus {
   background: var(--grey);
 }
 
+.modal-save {
+  display: block;
+  background: transparent;
+  color: var(--green);
+  border: 2px solid var(--green);
+  padding: 11px 22px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  width: 100%;
+  font-family: inherit;
+  text-decoration: none;
+  text-align: center;
+  letter-spacing: 0.5px;
+  margin-top: 8px;
+  transition: background 0.15s;
+  box-sizing: border-box;
+}
+
+.modal-save:hover {
+  background: rgba(123, 174, 63, 0.1);
+}
+
+.modal-lose .modal-save {
+  color: var(--muted);
+  border-color: var(--grey);
+}
+
+.modal-lose .modal-save:hover {
+  background: rgba(120, 124, 126, 0.1);
+}
+
 .modal-close {
   position: absolute;
   top: 12px;
@@ -4067,6 +4100,14 @@ footer {
   margin-bottom: 14px;
 }
 
+.faces-share-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
 .faces-share {
   display: inline-block;
   background: var(--green);
@@ -4077,11 +4118,28 @@ footer {
   padding: 10px 22px;
   border-radius: 10px;
   cursor: pointer;
-  margin-right: 8px;
 }
 
 .faces-share:hover {
   filter: brightness(1.08);
+}
+
+.faces-save {
+  display: inline-block;
+  background: transparent;
+  color: var(--green);
+  border: 2px solid var(--green);
+  font-weight: 700;
+  font-size: 15px;
+  padding: 8px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.faces-save:hover {
+  background: rgba(123, 174, 63, 0.1);
 }
 
 .faces-back {

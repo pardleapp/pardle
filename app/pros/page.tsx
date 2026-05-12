@@ -88,11 +88,11 @@ function placeholderPercentile(guessCount: number): number | null {
   return PLACEHOLDER_PERCENTILE[guessCount] ?? null;
 }
 
-function buildShareText(
+function buildShare(
   guesses: GuessReveal[],
   dayNumber: number,
   won: boolean,
-): string {
+): { text: string; url: string } {
   const result = won ? `${guesses.length}/${MAX_GUESSES}` : `X/${MAX_GUESSES}`;
   const grid = guesses
     .map((g) =>
@@ -106,8 +106,6 @@ function buildShareText(
       ].join(""),
     )
     .join("\n");
-  // Token URL whose OG preview is a PNG of the result — when pasted
-  // in WhatsApp/iMessage/etc, the link unfurls into a branded card.
   const encodedGrid = encodeGridPros(
     guesses.map((g) => [
       g.country.state,
@@ -124,7 +122,11 @@ function buildShareText(
     s: result,
     r: encodedGrid,
   });
-  return `${BRAND.name} #${dayNumber} ${result}\n${grid}\n${BRAND.url}/r/${token}`;
+  const url = `${BRAND.url}/r/${token}`;
+  return {
+    text: `${BRAND.name} #${dayNumber} ${result}\n${grid}\n${url}`,
+    url,
+  };
 }
 
 function flagFor(countryCode: string): string {
@@ -416,10 +418,12 @@ function ResultModal({
 }) {
   const [copied, setCopied] = useState(false);
   const [challengeCopied, setChallengeCopied] = useState(false);
-  const shareText = useMemo(
-    () => buildShareText(guesses, dayNumber, isWin),
+  const share = useMemo(
+    () => buildShare(guesses, dayNumber, isWin),
     [guesses, dayNumber, isWin],
   );
+  const shareText = share.text;
+  const shareUrl = share.url;
 
   const myScore: ChallengeScore = isWin ? guesses.length : "X";
   const friendName = challenge?.challengerName || "your friend";
@@ -547,6 +551,14 @@ function ResultModal({
         <button className="modal-share" onClick={handleShare}>
           {copied ? "Copied!" : "Share result"}
         </button>
+        <a
+          className="modal-save"
+          href={`${shareUrl}/opengraph-image`}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          Save image
+        </a>
         <button className="modal-challenge" onClick={handleChallenge}>
           {challengeCopied ? "Challenge copied!" : "Challenge a friend"}
         </button>

@@ -21,6 +21,7 @@ import {
 } from "@/lib/streak";
 import { NotifySignup } from "@/lib/notify-signup";
 import { recordPlayClient } from "@/lib/stats-client";
+import { encodeGridFaces, encodeShareCard } from "@/lib/share-card";
 import { searchableName } from "@/lib/text";
 
 const GAME_ID = "faces";
@@ -102,6 +103,33 @@ function totalCorrect(state: PersistedDayState): number {
   return state.puzzles.reduce((acc, p) => acc + p.solved.length, 0);
 }
 
+/** Builds the share-card URL for the player's Faces result. The URL
+ * unfurls into a branded PNG (rendered by app/r/[token]/opengraph-image)
+ * on iMessage / WhatsApp / Twitter, and is also the target of the
+ * "Save image" button so users can download a tweet-ready PNG. */
+function buildShareUrl(
+  dayNumber: number,
+  puzzles: FacesPuzzle[],
+  state: PersistedDayState,
+): string {
+  const gridRows: ("G" | "K")[][] = puzzles.map((puz, i) => {
+    const s = state.puzzles[i];
+    return [
+      s.solved.includes(puz.left.id) ? "G" : "K",
+      s.solved.includes(puz.right.id) ? "G" : "K",
+    ];
+  });
+  const correct = totalCorrect(state);
+  const score = correct === 0 ? "X" : `${correct}/${PROS_PER_DAY}`;
+  const token = encodeShareCard({
+    g: "faces",
+    d: dayNumber,
+    s: score,
+    r: encodeGridFaces(gridRows),
+  });
+  return `${BRAND.url}/r/${token}`;
+}
+
 /** Share grid: one row per puzzle, 2 squares each (left / right pro). */
 function buildShareText(
   dayNumber: number,
@@ -117,7 +145,8 @@ function buildShareText(
       return l + r;
     })
     .join("\n");
-  return `${BRAND.name} Faces #${dayNumber} ${correct}/${PROS_PER_DAY}\n${rows}\n${BRAND.url}/faces`;
+  const url = buildShareUrl(dayNumber, puzzles, state);
+  return `${BRAND.name} Faces #${dayNumber} ${correct}/${PROS_PER_DAY}\n${rows}\n${url}`;
 }
 
 export default function FacesPage() {
@@ -360,9 +389,19 @@ export default function FacesPage() {
             })}
           </div>
 
-          <button className="faces-share" onClick={handleShare}>
-            {shareCopied ? "Copied!" : "Share result"}
-          </button>
+          <div className="faces-share-row">
+            <button className="faces-share" onClick={handleShare}>
+              {shareCopied ? "Copied!" : "Share result"}
+            </button>
+            <a
+              className="faces-save"
+              href={`${buildShareUrl(dayNumber, puzzles, day)}/opengraph-image`}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              Save image
+            </a>
+          </div>
           <div className="faces-result-links">
             <Link className="faces-back" href="/faces/duel">
               ⚔️ Race friends in a Faces Duel →

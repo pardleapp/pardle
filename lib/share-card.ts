@@ -25,7 +25,12 @@
  * which is harmless: the URL still drives traffic to pardle.app.
  */
 
-export type ShareGameId = "pros" | "holes" | "clubs" | "connections";
+export type ShareGameId =
+  | "pros"
+  | "holes"
+  | "clubs"
+  | "connections"
+  | "faces";
 
 export interface ShareCardPayload {
   g: ShareGameId;
@@ -46,6 +51,14 @@ export function encodeGridPros(rows: CellStatePros[][]): string {
 
 export function encodeGridConnections(rows: CellStateConn[][]): string {
   return rows.map((row) => row.map((c) => STATE_CONN[c]).join("")).join("|");
+}
+
+/**
+ * Faces grid: 6 rows of 2 cells. Each cell is "G" (pro named) or "K"
+ * (missed). The order in each row matches puzzle.left then puzzle.right.
+ */
+export function encodeGridFaces(rows: ("G" | "K")[][]): string {
+  return rows.map((row) => row.join("")).join("|");
 }
 
 function toBase64Url(str: string): string {
@@ -95,6 +108,8 @@ export function shareGameTitle(g: ShareGameId): string {
       return "Clubhouses";
     case "connections":
       return "Connections";
+    case "faces":
+      return "Faces";
   }
 }
 
@@ -109,6 +124,8 @@ export function shareGameAccent(g: ShareGameId): string {
       return "#E0A85B";
     case "connections":
       return "#B388D6";
+    case "faces":
+      return "#E07B5B";
   }
 }
 
