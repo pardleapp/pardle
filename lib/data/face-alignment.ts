@@ -23,15 +23,17 @@ import rawJson from "./face-alignment.json";
 
 interface FaceAlignment {
   /** Eye centre on the SCREEN-LEFT (subject's right), x/y normalised [0,1]. */
-  leftEye: [number, number];
+  leftEye: number[];
   /** Eye centre on the SCREEN-RIGHT (subject's left). */
-  rightEye: [number, number];
+  rightEye: number[];
   /** Distance between the two eye centres, normalised. */
   distance: number;
   /** Head tilt in degrees. Positive = right eye lower than left. */
   angle: number;
 }
 
+// JSON import infers arrays as number[] not tuples — we accept that
+// and validate the length at access time below.
 const FACE_ALIGNMENT = rawJson as Record<string, FaceAlignment>;
 
 // Canonical screen position the eyes should land at after alignment.
