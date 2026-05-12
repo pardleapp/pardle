@@ -147,9 +147,15 @@ describe("revealGuess", () => {
     expect(result.ryderCup).toEqual({ state: "green", arrow: null });
   });
 
-  it("ryderCup: grey when one eligible, one ineligible", () => {
+  it("ryderCup: grey with down-arrow when guess eligible, mystery ineligible", () => {
+    // SCOTTIE=2, CAM_SMITH=null. null treated as 0 for direction.
     const result = revealGuess(SCOTTIE, CAM_SMITH);
-    expect(result.ryderCup).toEqual({ state: "grey", arrow: null });
+    expect(result.ryderCup).toEqual({ state: "grey", arrow: "down" });
+  });
+
+  it("ryderCup: grey with up-arrow when guess ineligible, mystery eligible", () => {
+    const result = revealGuess(CAM_SMITH, SCOTTIE);
+    expect(result.ryderCup).toEqual({ state: "grey", arrow: "up" });
   });
 
   it("ryderCup: green + no arrow on exact match", () => {

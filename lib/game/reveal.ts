@@ -41,12 +41,17 @@ function ryderCupReveal(
 ): AttributeReveal {
   // null = ineligible (player from a non-USA, non-European country).
   // Two ineligible players match exactly (both N/A).
-  // One ineligible + one eligible never matches.
   if (guess.ryderCup === null && mystery.ryderCup === null) {
     return { state: "green", arrow: null };
   }
+  // One ineligible + one eligible: grey to flag the categorical
+  // mismatch, but still emit a direction arrow (treating null as 0) so
+  // the player gets a useful nudge about magnitude — same as every
+  // other numeric column.
   if (guess.ryderCup === null || mystery.ryderCup === null) {
-    return { state: "grey", arrow: null };
+    const diff = (mystery.ryderCup ?? 0) - (guess.ryderCup ?? 0);
+    const arrow = diff === 0 ? null : diff > 0 ? "up" : "down";
+    return { state: "grey", arrow };
   }
   return numericReveal(guess.ryderCup, mystery.ryderCup, 0, 1, 2);
 }
