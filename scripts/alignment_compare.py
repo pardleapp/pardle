@@ -8,10 +8,51 @@ Run: python scripts/alignment_compare.py
 
 from __future__ import annotations
 
+import json
 import urllib.request
 from io import BytesIO
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
+
+CANONICAL_EYE_X = 0.5
+CANONICAL_EYE_Y = 0.43
+CANONICAL_DISTANCE = 0.2
+
+_ALIGN = None
+
+
+def alignment() -> dict:
+    global _ALIGN
+    if _ALIGN is None:
+        try:
+            _ALIGN = json.loads(
+                Path("lib/data/face-alignment.json").read_text(encoding="utf-8")
+            )
+        except FileNotFoundError:
+            _ALIGN = {}
+    return _ALIGN
+
+
+def align_image(img: Image.Image, pid: str) -> Image.Image:
+    a = alignment().get(pid)
+    if not a:
+        return img
+    w, h = img.size
+    eye_mid_x = (a["leftEye"][0] + a["rightEye"][0]) / 2
+    eye_mid_y = (a["leftEye"][1] + a["rightEye"][1]) / 2
+    scale = CANONICAL_DISTANCE / a["distance"]
+    angle = -a["angle"]
+    new_w = int(w * scale)
+    new_h = int(h * scale)
+    scaled = img.resize((new_w, new_h), Image.LANCZOS)
+    if abs(angle) > 0.1:
+        scaled = scaled.rotate(angle, resample=Image.BICUBIC, expand=False)
+    tx = int((CANONICAL_EYE_X - eye_mid_x * scale) * w)
+    ty = int((CANONICAL_EYE_Y - eye_mid_y * scale) * h)
+    canvas = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    canvas.paste(scaled, (tx, ty), scaled if scaled.mode == "RGBA" else None)
+    return canvas
 
 PAIRS = [
     ("46046", "28237", "Scheffler × Rory"),       # similar build, baseline
@@ -64,13 +105,13 @@ def main() -> None:
     for r, (a_id, b_id, label) in enumerate(PAIRS):
         print(f"  {label}")
         y = pad + r * (cell + label_h + pad)
-        # Old
-        a_old = fetch(OLD_TPL.format(id=a_id))
-        b_old = fetch(OLD_TPL.format(id=b_id))
+        # Old: just Cloudinary c_thumb, no alignment
+        a_old = fetch(NEW_TPL.format(id=a_id))
+        b_old = fetch(NEW_TPL.format(id=b_id))
         bl_old = blend(a_old, b_old)
-        # New
-        a_new = fetch(NEW_TPL.format(id=a_id))
-        b_new = fetch(NEW_TPL.format(id=b_id))
+        # New: with face-landmark alignment
+        a_new = align_image(a_old.copy(), a_id)
+        b_new = align_image(b_old.copy(), b_id)
         bl_new = blend(a_new, b_new)
 
         for i, img in enumerate([a_old, bl_old, b_old, a_new, bl_new, b_new]):
@@ -79,7 +120,7 @@ def main() -> None:
 
         # Label across the row's bottom
         ty = y + cell + 8
-        draw.text((pad, ty), f"OLD  c_fill,g_face:center   ←  →   NEW  c_thumb,g_face,z_0.75   ({label})",
+        draw.text((pad, ty), f"NO ALIGNMENT  <-->  EYE-ALIGNED   ({label})",
                   font=small, fill=(255, 255, 255))
 
     canvas.save("alignment_compare.png")

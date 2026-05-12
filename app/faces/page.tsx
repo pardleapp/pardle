@@ -23,6 +23,8 @@ import { NotifySignup } from "@/lib/notify-signup";
 import { recordPlayClient } from "@/lib/stats-client";
 import { encodeGridFaces, encodeShareCard } from "@/lib/share-card";
 import { searchableName } from "@/lib/text";
+import { alignmentTransform } from "@/lib/data/face-alignment";
+import { PGA_TOUR_IDS } from "@/lib/data/pga-tour-ids";
 
 const GAME_ID = "faces";
 const LAUNCH_DATE_UTC = Date.UTC(2026, 4, 11);
@@ -501,26 +503,56 @@ export default function FacesPage() {
             }`}
             onContextMenu={(e) => e.preventDefault()}
           >
-            {headshotUrl(currentPuzzle.left) && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={headshotUrl(currentPuzzle.left)!}
-                alt=""
-                draggable={false}
-                className="faces-img faces-img-base"
-                style={puzzleOver ? undefined : { opacity: baseOpacity }}
-              />
-            )}
-            {headshotUrl(currentPuzzle.right) && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={headshotUrl(currentPuzzle.right)!}
-                alt=""
-                draggable={false}
-                className="faces-img faces-img-overlay"
-                style={puzzleOver ? undefined : { opacity: overlayOpacity }}
-              />
-            )}
+            {headshotUrl(currentPuzzle.left) && (() => {
+              const align = alignmentTransform(
+                PGA_TOUR_IDS[currentPuzzle.left.id] ?? "",
+              );
+              return (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={headshotUrl(currentPuzzle.left)!}
+                  alt=""
+                  draggable={false}
+                  className="faces-img faces-img-base"
+                  style={
+                    puzzleOver
+                      ? undefined
+                      : {
+                          opacity: baseOpacity,
+                          ...(align && {
+                            transform: align.transform,
+                            transformOrigin: align.transformOrigin,
+                          }),
+                        }
+                  }
+                />
+              );
+            })()}
+            {headshotUrl(currentPuzzle.right) && (() => {
+              const align = alignmentTransform(
+                PGA_TOUR_IDS[currentPuzzle.right.id] ?? "",
+              );
+              return (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={headshotUrl(currentPuzzle.right)!}
+                  alt=""
+                  draggable={false}
+                  className="faces-img faces-img-overlay"
+                  style={
+                    puzzleOver
+                      ? undefined
+                      : {
+                          opacity: overlayOpacity,
+                          ...(align && {
+                            transform: align.transform,
+                            transformOrigin: align.transformOrigin,
+                          }),
+                        }
+                  }
+                />
+              );
+            })()}
             {rightFlash && (
               <div className="faces-flash-right">Got one! ✓</div>
             )}

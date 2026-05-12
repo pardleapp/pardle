@@ -12,6 +12,8 @@
  */
 
 import { Redis } from "@upstash/redis";
+import { alignmentTransform } from "@/lib/data/face-alignment";
+import { PGA_TOUR_IDS } from "@/lib/data/pga-tour-ids";
 import { headshotUrl, matchesGolfer, pickPuzzleSet } from "@/lib/game/faces";
 import type { FacesPuzzle } from "@/lib/game/faces";
 import {
@@ -280,9 +282,18 @@ export function publicRoomView(room: FacesDuelRoom) {
     rounds: puzzles.map((puz, i) => {
       const r = room.rounds[i];
       const reveal = r.resolved || i < room.currentRoundIndex;
+      // Pre-computed alignment transforms — sent as opaque CSS strings
+      // so they don't leak which pro is which, but the client can apply
+      // them directly to the stacked imgs for an eye-aligned blend.
+      const leftAlign = alignmentTransform(PGA_TOUR_IDS[puz.left.id] ?? "");
+      const rightAlign = alignmentTransform(
+        PGA_TOUR_IDS[puz.right.id] ?? "",
+      );
       return {
         leftImage: headshotUrl(puz.left),
         rightImage: headshotUrl(puz.right),
+        leftAlign: leftAlign?.transform ?? null,
+        rightAlign: rightAlign?.transform ?? null,
         leftName: reveal ? puz.left.name : null,
         rightName: reveal ? puz.right.name : null,
         leftId: reveal ? puz.left.id : null,

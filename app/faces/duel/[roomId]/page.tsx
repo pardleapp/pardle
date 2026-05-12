@@ -37,6 +37,9 @@ interface PublicRoundState {
 interface PublicRound {
   leftImage: string | null;
   rightImage: string | null;
+  /** Pre-computed CSS transform for eye alignment (server-side). */
+  leftAlign: string | null;
+  rightAlign: string | null;
   leftName: string | null;
   rightName: string | null;
   leftId: string | null;
@@ -512,6 +515,11 @@ export default function FacesDuelRoom() {
                   alt=""
                   draggable={false}
                   className="faces-img faces-img-base"
+                  style={
+                    round.leftAlign && !resolved
+                      ? { transform: round.leftAlign, transformOrigin: "0 0" }
+                      : undefined
+                  }
                 />
               )}
               {round.rightImage && (
@@ -521,6 +529,11 @@ export default function FacesDuelRoom() {
                   alt=""
                   draggable={false}
                   className="faces-img faces-img-overlay"
+                  style={
+                    round.rightAlign && !resolved
+                      ? { transform: round.rightAlign, transformOrigin: "0 0" }
+                      : undefined
+                  }
                 />
               )}
             </div>

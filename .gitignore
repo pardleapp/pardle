@@ -54,3 +54,7 @@ __pycache__/
 /tiktok_*.mp4
 /*_blend.png
 /*_blend_solo.png
+/alignment_compare.png
+
+# mediapipe model cached by scripts/extract_face_alignment.py (auto-downloaded)
+/scripts/.face_landmarker.task

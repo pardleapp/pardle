@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
+import { alignmentTransform } from "@/lib/data/face-alignment";
 import { GOLFERS } from "@/lib/data/golfers";
 import {
   PGA_TOUR_IDS,
@@ -53,18 +54,42 @@ export default async function BlendLanding({ params }: Params) {
       </header>
 
       <div className="faces-stage blend-stage-static">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={cloudinary(a)}
-          alt=""
-          className="faces-img faces-img-base"
-        />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={cloudinary(b)}
-          alt=""
-          className="faces-img faces-img-overlay"
-        />
+        {(() => {
+          const alignA = alignmentTransform(a);
+          const alignB = alignmentTransform(b);
+          return (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={cloudinary(a)}
+                alt=""
+                className="faces-img faces-img-base"
+                style={
+                  alignA
+                    ? {
+                        transform: alignA.transform,
+                        transformOrigin: alignA.transformOrigin,
+                      }
+                    : undefined
+                }
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={cloudinary(b)}
+                alt=""
+                className="faces-img faces-img-overlay"
+                style={
+                  alignB
+                    ? {
+                        transform: alignB.transform,
+                        transformOrigin: alignB.transformOrigin,
+                      }
+                    : undefined
+                }
+              />
+            </>
+          );
+        })()}
       </div>
 
       {nameA && nameB && (

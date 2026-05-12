@@ -8,17 +8,68 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import sys
 import urllib.request
+from io import BytesIO
+from pathlib import Path
 
 from PIL import Image, ImageEnhance
-from io import BytesIO
 
 CLOUDINARY = (
     "https://pga-tour-res.cloudinary.com/image/upload/"
     "c_thumb,g_face,z_0.75,h_400,w_400,q_auto,f_auto/"
     "headshots_{id}.png"
 )
+
+# Canonical alignment params — match lib/data/face-alignment.ts so the
+# Python output matches what the web renders.
+CANONICAL_EYE_X = 0.5
+CANONICAL_EYE_Y = 0.43
+CANONICAL_DISTANCE = 0.2
+
+_ALIGN_CACHE: dict | None = None
+
+
+def load_alignment() -> dict:
+    global _ALIGN_CACHE
+    if _ALIGN_CACHE is None:
+        try:
+            _ALIGN_CACHE = json.loads(
+                Path("lib/data/face-alignment.json").read_text(encoding="utf-8"),
+            )
+        except FileNotFoundError:
+            _ALIGN_CACHE = {}
+    return _ALIGN_CACHE
+
+
+def align_image(img: Image.Image, player_id: str) -> Image.Image:
+    """Apply translate+scale+rotate to land this pro's eyes on the
+    canonical canvas position. Returns the transformed image at the
+    same size as input (canvas is the rendered output, transform
+    happens in canvas-space)."""
+    aligns = load_alignment().get(player_id)
+    if not aligns:
+        return img
+    w, h = img.size
+    eye_mid_x = (aligns["leftEye"][0] + aligns["rightEye"][0]) / 2
+    eye_mid_y = (aligns["leftEye"][1] + aligns["rightEye"][1]) / 2
+    scale = CANONICAL_DISTANCE / aligns["distance"]
+    angle = -aligns["angle"]  # degrees, negative because PIL rotates counter-clockwise
+
+    # 1. Scale around (0,0). PIL doesn't do this directly; use resize.
+    new_w = int(w * scale)
+    new_h = int(h * scale)
+    scaled = img.resize((new_w, new_h), Image.LANCZOS)
+    # 2. Rotate around image centre.
+    if abs(angle) > 0.1:
+        scaled = scaled.rotate(angle, resample=Image.BICUBIC, expand=False)
+    # 3. Paste at translate offset so eye-mid lands at canonical position.
+    tx = int((CANONICAL_EYE_X - eye_mid_x * scale) * w)
+    ty = int((CANONICAL_EYE_Y - eye_mid_y * scale) * h)
+    canvas = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    canvas.paste(scaled, (tx, ty), scaled if scaled.mode == "RGBA" else None)
+    return canvas
 
 
 def fetch(player_id: str) -> Image.Image:
@@ -29,8 +80,8 @@ def fetch(player_id: str) -> Image.Image:
     )
     with urllib.request.urlopen(req, timeout=15) as r:
         data = r.read()
-    img = Image.open(BytesIO(data)).convert("RGBA")
-    return img.resize((400, 400), Image.LANCZOS)
+    img = Image.open(BytesIO(data)).convert("RGBA").resize((400, 400), Image.LANCZOS)
+    return align_image(img, player_id)
 
 
 def blend(a: Image.Image, b: Image.Image) -> Image.Image:

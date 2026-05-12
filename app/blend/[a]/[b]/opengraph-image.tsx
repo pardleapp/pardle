@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { alignmentTransform } from "@/lib/data/face-alignment";
 import { GOLFERS } from "@/lib/data/golfers";
 import {
   PGA_TOUR_IDS,
@@ -38,6 +39,8 @@ export default async function BlendOg({ params }: Params) {
   const { a, b } = await params;
   const nameA = nameForId(a);
   const nameB = nameForId(b);
+  const alignA = alignmentTransform(a);
+  const alignB = alignmentTransform(b);
 
   return new ImageResponse(
     (
@@ -100,6 +103,10 @@ export default async function BlendOg({ params }: Params) {
               height: 900,
               objectFit: "cover",
               opacity: 1,
+              ...(alignA && {
+                transform: alignA.transform,
+                transformOrigin: alignA.transformOrigin,
+              }),
             }}
           />
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -116,6 +123,10 @@ export default async function BlendOg({ params }: Params) {
               height: 900,
               objectFit: "cover",
               opacity: 0.5,
+              ...(alignB && {
+                transform: alignB.transform,
+                transformOrigin: alignB.transformOrigin,
+              }),
             }}
           />
         </div>

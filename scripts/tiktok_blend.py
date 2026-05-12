@@ -20,13 +20,55 @@ Requires: pip install pillow imageio imageio-ffmpeg
 
 from __future__ import annotations
 
+import json
 import sys
 import urllib.request
 from io import BytesIO
+from pathlib import Path
 
 import imageio.v2 as imageio
 import numpy as np
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
+
+# Canonical alignment params — match lib/data/face-alignment.ts.
+CANONICAL_EYE_X = 0.5
+CANONICAL_EYE_Y = 0.43
+CANONICAL_DISTANCE = 0.2
+
+_ALIGN_CACHE: dict | None = None
+
+
+def load_alignment() -> dict:
+    global _ALIGN_CACHE
+    if _ALIGN_CACHE is None:
+        try:
+            _ALIGN_CACHE = json.loads(
+                Path("lib/data/face-alignment.json").read_text(encoding="utf-8"),
+            )
+        except FileNotFoundError:
+            _ALIGN_CACHE = {}
+    return _ALIGN_CACHE
+
+
+def align_image(img: Image.Image, player_id: str) -> Image.Image:
+    aligns = load_alignment().get(player_id)
+    if not aligns:
+        return img
+    w, h = img.size
+    eye_mid_x = (aligns["leftEye"][0] + aligns["rightEye"][0]) / 2
+    eye_mid_y = (aligns["leftEye"][1] + aligns["rightEye"][1]) / 2
+    scale = CANONICAL_DISTANCE / aligns["distance"]
+    angle = -aligns["angle"]
+    new_w = int(w * scale)
+    new_h = int(h * scale)
+    scaled = img.resize((new_w, new_h), Image.LANCZOS)
+    if abs(angle) > 0.1:
+        scaled = scaled.rotate(angle, resample=Image.BICUBIC, expand=False)
+    tx = int((CANONICAL_EYE_X - eye_mid_x * scale) * w)
+    ty = int((CANONICAL_EYE_Y - eye_mid_y * scale) * h)
+    canvas = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    canvas.paste(scaled, (tx, ty), scaled if scaled.mode == "RGBA" else None)
+    return canvas
 
 # ---- video config ----
 W, H = 1080, 1920
@@ -53,8 +95,8 @@ def fetch_headshot(pid: str) -> Image.Image:
     req = urllib.request.Request(url, headers={"User-Agent": "pardle-tiktok"})
     with urllib.request.urlopen(req, timeout=15) as r:
         data = r.read()
-    img = Image.open(BytesIO(data)).convert("RGBA")
-    return img.resize((600, 600), Image.LANCZOS)
+    img = Image.open(BytesIO(data)).convert("RGBA").resize((600, 600), Image.LANCZOS)
+    return align_image(img, pid)
 
 
 def background() -> Image.Image:
