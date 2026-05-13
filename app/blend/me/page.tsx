@@ -170,6 +170,54 @@ function warpFace(
   return c;
 }
 
+/** Draw the source image onto a `size x size` canvas with the face
+ *  centred and filling `fillFactor` of the canvas. No warp / no colour
+ *  transfer / no enhance / no sharpen — used as the "100% you" and
+ *  "100% pro" extremes of the blend slider. Face position matches
+ *  roughly where the morph puts the face so the slider transition
+ *  feels continuous. */
+function fitFaceToCanvas(
+  src: HTMLImageElement | HTMLCanvasElement,
+  landmarks: number[][],
+  size: number,
+  fillFactor = 0.78,
+): HTMLCanvasElement {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const idx of FACE_OVAL_INDICES) {
+    const p = landmarks[idx];
+    if (!p) continue;
+    if (p[0] < minX) minX = p[0];
+    if (p[0] > maxX) maxX = p[0];
+    if (p[1] < minY) minY = p[1];
+    if (p[1] > maxY) maxY = p[1];
+  }
+  const sw = src.width;
+  const sh = src.height;
+  const faceWpx = (maxX - minX) * sw;
+  const faceHpx = (maxY - minY) * sh;
+  const drawScale = Math.min(
+    (fillFactor * size) / faceWpx,
+    (fillFactor * size) / faceHpx,
+  );
+  const drawnW = sw * drawScale;
+  const drawnH = sh * drawScale;
+  const faceCxPx = ((minX + maxX) / 2) * sw;
+  const faceCyPx = ((minY + maxY) / 2) * sh;
+  const offsetX = size / 2 - faceCxPx * drawScale;
+  const offsetY = size / 2 - faceCyPx * drawScale;
+  const c = document.createElement("canvas");
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext("2d")!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(src, offsetX, offsetY, drawnW, drawnH);
+  return c;
+}
+
 /** Scale + centre the given landmarks so the FACE_OVAL bounding box
  *  fills `fillFactor` of the canvas. Source landmarks are unchanged;
  *  this only runs on the TARGET geometry to make the morphed face
@@ -575,6 +623,9 @@ export default function BlendMePage() {
   const userCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const proCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const faceMaskRef = useRef<HTMLCanvasElement | null>(null);
+  /** Unprocessed originals shown at the slider extremes. */
+  const userOriginalRef = useRef<HTMLCanvasElement | null>(null);
+  const proOriginalRef = useRef<HTMLCanvasElement | null>(null);
   /** The displayed canvas. Slider redraws this with the new alpha. */
   const outCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -606,7 +657,7 @@ export default function BlendMePage() {
 
   useEffect(() => {
     console.log(
-      "%c[blend/me] build v11 — interactive blend slider",
+      "%c[blend/me] build v12 — slider extremes show raw photo",
       "color: #E07B5B; font-weight: bold",
     );
     getDetector().catch((e) => console.error("mediapipe preload failed", e));
@@ -619,6 +670,8 @@ export default function BlendMePage() {
     userCanvasRef.current = null;
     proCanvasRef.current = null;
     faceMaskRef.current = null;
+    userOriginalRef.current = null;
+    proOriginalRef.current = null;
     const url = URL.createObjectURL(file);
     setSelfieUrl(url);
     setStage("detecting");
@@ -665,12 +718,21 @@ export default function BlendMePage() {
       out.width = OUT_SIZE;
       out.height = OUT_SIZE;
       ctx.clearRect(0, 0, OUT_SIZE, OUT_SIZE);
-      // Pro at full opacity, then user on top at `ratio` — net mix is
-      // ratio*user + (1-ratio)*pro.
-      ctx.drawImage(proCanvas, 0, 0);
-      ctx.globalAlpha = ratio;
-      ctx.drawImage(userCanvas, 0, 0);
-      ctx.globalAlpha = 1;
+      // Slider extremes: show the ORIGINAL photo — no warp, no LAB
+      // transfer, no sharpening. Just the photo, with the same
+      // framing (mask / vignette / title / watermark) as the morph.
+      if (ratio >= 1 && userOriginalRef.current) {
+        ctx.drawImage(userOriginalRef.current, 0, 0);
+      } else if (ratio <= 0 && proOriginalRef.current) {
+        ctx.drawImage(proOriginalRef.current, 0, 0);
+      } else {
+        // Pro at full opacity, then user on top at `ratio` — net mix
+        // is ratio*user + (1-ratio)*pro.
+        ctx.drawImage(proCanvas, 0, 0);
+        ctx.globalAlpha = ratio;
+        ctx.drawImage(userCanvas, 0, 0);
+        ctx.globalAlpha = 1;
+      }
       // Mask + BG + vignette + title + watermark.
       applyFaceOvalMask(ctx, faceMask, OUT_SIZE);
       applyVignette(ctx, OUT_SIZE);
@@ -798,6 +860,24 @@ export default function BlendMePage() {
         userCanvasRef.current = userCanvas;
         proCanvasRef.current = proCanvas;
         faceMaskRef.current = faceMask;
+        // Build the "100% you" / "100% pro" originals — face-centred
+        // versions of the raw photos with no processing applied. Used
+        // at the slider extremes. Note we use selfieRaw (downscaled
+        // but NOT soft-blurred) so what the user sees is genuinely
+        // their photo.
+        userOriginalRef.current = fitFaceToCanvas(
+          selfieRaw,
+          selfieLm,
+          OUT_SIZE,
+          0.78,
+        );
+        proOriginalRef.current = fitFaceToCanvas(
+          proImg,
+          proLm,
+          OUT_SIZE,
+          0.78,
+        );
+        log("originals fitted");
         // First composite at default ratio. The output canvas is
         // rendered in the DOM, so this paints to what the user sees.
         if (outCanvasRef.current) {
@@ -896,6 +976,8 @@ export default function BlendMePage() {
     userCanvasRef.current = null;
     proCanvasRef.current = null;
     faceMaskRef.current = null;
+    userOriginalRef.current = null;
+    proOriginalRef.current = null;
   }
 
   function tryAnotherPro() {
@@ -905,6 +987,8 @@ export default function BlendMePage() {
     userCanvasRef.current = null;
     proCanvasRef.current = null;
     faceMaskRef.current = null;
+    userOriginalRef.current = null;
+    proOriginalRef.current = null;
   }
 
   return (
