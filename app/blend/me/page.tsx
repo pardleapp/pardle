@@ -279,22 +279,25 @@ export default function BlendMePage() {
     let cancelled = false;
     setStage("rendering");
 
-    // Hard timeout — if anything hangs past 25s, surface an error so
-    // the user isn't stuck looking at a spinner forever.
+    // Hard timeout — surfaces an error if any step gets stuck. Per-step
+    // logs (visible in the browser console) let us pinpoint hangs.
+    const t0 = performance.now();
+    const log = (msg: string) =>
+      console.log(`[blend/me] ${(performance.now() - t0).toFixed(0)}ms ${msg}`);
+    log("render start");
+
     const timeoutId = window.setTimeout(() => {
       if (cancelled) return;
       cancelled = true;
+      console.warn("[blend/me] timed out after 15s — see logs above");
       setErrMsg(
         "Blending took too long. Try a smaller photo or a different pro.",
       );
       setStage("error");
-    }, 25000);
+    }, 15000);
 
     (async () => {
       try {
-        // Read the pro's pre-computed landmarks from the JSON we
-        // already extracted offline. No second mediapipe detect call
-        // — was the 2-min hang.
         const proAlign = PRO_ALIGNMENT[selectedPro];
         if (!proAlign) throw new Error(`no alignment data for ${selectedPro}`);
         const proLm: FaceLm = {
@@ -302,19 +305,29 @@ export default function BlendMePage() {
           rightEye: [proAlign.rightEye[0], proAlign.rightEye[1]],
           mouth: [proAlign.mouth[0], proAlign.mouth[1]],
         };
+        log(`have pro landmarks for ${selectedPro}`);
 
-        // Cache-bust the URL with a query param so any earlier
-        // non-CORS cached load gets refetched WITH CORS headers —
-        // otherwise canvas.toDataURL throws SecurityError on a
-        // tainted canvas.
-        const proImg = await loadImage(
-          pgaTourHeadshotUrlById(selectedPro, 600) + "?cors=1",
+        // Race the pro image fetch against a 10s deadline. If Cloudinary
+        // is slow, we want to error out cleanly rather than hang.
+        const proImgPromise = loadImage(
+          pgaTourHeadshotUrlById(selectedPro, 600),
         );
+        const proImg = (await Promise.race([
+          proImgPromise,
+          new Promise((_, rej) =>
+            setTimeout(() => rej(new Error("pro image fetch timed out")), 10000),
+          ),
+        ])) as HTMLImageElement;
+        log("pro image loaded");
+
         const selfieImg = await loadImage(selfieUrl, false);
+        log("selfie image loaded");
 
         if (cancelled) return;
         const canvas = canvasRef.current;
-        if (!canvas) return;
+        if (!canvas) {
+          throw new Error("canvas ref missing");
+        }
         canvas.width = OUT_SIZE;
         canvas.height = OUT_SIZE;
         const ctx = canvas.getContext("2d")!;
@@ -329,6 +342,7 @@ export default function BlendMePage() {
         drawAligned(ctx, proImg, proT, 600, 1);
         drawAligned(ctx, selfieImg, selfieT, selfieImg.width, 0.5);
         ctx.filter = "none";
+        log("canvas drawn");
 
         // Soft elliptical face mask using a clip-via-mask trick.
         const mask = document.createElement("canvas");
@@ -358,6 +372,7 @@ export default function BlendMePage() {
         ctx.fillText("pardle.app/blend", OUT_SIZE - 18, OUT_SIZE - 14);
 
         const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+        log("jpeg encoded");
         if (!cancelled) {
           window.clearTimeout(timeoutId);
           setBlendUrl(dataUrl);
@@ -366,9 +381,14 @@ export default function BlendMePage() {
       } catch (e) {
         if (cancelled) return;
         window.clearTimeout(timeoutId);
-        console.error(e);
+        console.error("[blend/me] render failed:", e);
+        const msg = e instanceof Error ? e.message : String(e);
         setErrMsg(
-          "Couldn't render the blend. Try a different photo or another pro.",
+          msg.includes("timed out")
+            ? "The pro photo took too long to load. Try a different pro."
+            : msg.includes("SecurityError") || msg.includes("tainted")
+              ? "Browser blocked the image (CORS). Try refreshing the page."
+              : "Couldn't render the blend. Try a different photo or another pro.",
         );
         setStage("error");
       }
