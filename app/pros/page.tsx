@@ -31,7 +31,7 @@ import { NotifySignup } from "@/lib/notify-signup";
 import { encodeGridPros, encodeShareCard } from "@/lib/share-card";
 import { recordPlayClient } from "@/lib/stats-client";
 import { searchableName } from "@/lib/text";
-import { pgaTourHeadshotUrl } from "@/lib/data/pga-tour-ids";
+import { PGA_TOUR_IDS, pgaTourHeadshotUrl } from "@/lib/data/pga-tour-ids";
 
 const GAME_ID = "pros";
 
