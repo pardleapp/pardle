@@ -83,10 +83,28 @@ function loadImage(src: string, crossOrigin = true): Promise<HTMLImageElement> {
   });
 }
 
+/**
+ * Downscale an image element to a max dimension on a temporary canvas.
+ * 4000+px iPhone selfies blow up canvas drawImage / toDataURL — drawing
+ * them at full size synchronously locks the main thread for minutes
+ * and starves the timeout callback. Bring everything down to ~1200px
+ * before any further work.
+ */
+function downscale(img: HTMLImageElement, maxDim = 1200): HTMLCanvasElement {
+  const ratio = Math.min(1, maxDim / Math.max(img.width, img.height));
+  const w = Math.round(img.width * ratio);
+  const h = Math.round(img.height * ratio);
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  c.getContext("2d")!.drawImage(img, 0, 0, w, h);
+  return c;
+}
+
 /** Draw `img` onto `ctx` at the aligned position derived from `t`. */
 function drawAligned(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
+  img: HTMLImageElement | HTMLCanvasElement,
   t: AlignTransform,
   size: number,
   alpha: number,
@@ -249,8 +267,11 @@ export default function BlendMePage() {
     setStage("detecting");
     try {
       const img = await loadImage(url, false);
+      // Downscale right away. 4000px+ iPhone selfies hang mediapipe AND
+      // the canvas pipeline; ~1200px is plenty for face detection.
+      const small = downscale(img, 1200);
       const detector = await getDetector();
-      const result = detector.detect(img);
+      const result = detector.detect(small);
       if (!result.faceLandmarks || result.faceLandmarks.length === 0) {
         setErrMsg(
           "Couldn't find a face in that photo. Try a clearer head-on photo.",
@@ -321,7 +342,14 @@ export default function BlendMePage() {
         log("pro image loaded");
 
         const selfieImg = await loadImage(selfieUrl, false);
-        log("selfie image loaded");
+        log(`selfie image loaded (${selfieImg.width}x${selfieImg.height})`);
+
+        // Downscale the selfie BEFORE feeding to canvas. A 4032x3024
+        // iPhone shot will lock the main thread for minutes on
+        // drawImage + toDataURL. ~1200px is way more than the 600px
+        // output stage needs.
+        const selfieSmall = downscale(selfieImg, 1200);
+        log(`selfie downscaled to ${selfieSmall.width}x${selfieSmall.height}`);
 
         if (cancelled) return;
         const canvas = canvasRef.current;
@@ -338,9 +366,15 @@ export default function BlendMePage() {
         const proT = computeAlignTransform(proLm, OUT_SIZE);
         const selfieT = computeAlignTransform(selfieLm, OUT_SIZE);
 
+        // Always draw both at OUT_SIZE. The alignment maths assume the
+        // source image occupies a `size x size` patch — drawing the
+        // selfie at its native 4000px+ width broke that AND was the
+        // root cause of the canvas hang. drawImage handles the resize
+        // internally; we keep the canvas at 600x600 so toDataURL is
+        // also fast.
         ctx.filter = "contrast(1.05) saturate(1.06)";
-        drawAligned(ctx, proImg, proT, 600, 1);
-        drawAligned(ctx, selfieImg, selfieT, selfieImg.width, 0.5);
+        drawAligned(ctx, proImg, proT, OUT_SIZE, 1);
+        drawAligned(ctx, selfieSmall, selfieT, OUT_SIZE, 0.5);
         ctx.filter = "none";
         log("canvas drawn");
 
