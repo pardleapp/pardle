@@ -484,7 +484,7 @@ export default function FacesPage() {
         )}
       </header>
 
-      <Link href="/faces/duel" className="trivia-duel-cta">
+      <Link href="/faces/duel" className="trivia-duel-cta faces-duel-cta">
         ⚔️ Or race a friend in a live Faces Duel →
       </Link>
 
@@ -689,7 +689,6 @@ export default function FacesPage() {
                 placeholder="Type a player's name..."
                 autoComplete="off"
                 autoCapitalize="words"
-                autoFocus
               />
               {matches.length > 0 && (
                 <ul className="suggestions">
