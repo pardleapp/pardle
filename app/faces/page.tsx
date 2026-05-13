@@ -309,12 +309,32 @@ export default function FacesPage() {
   async function handleShare() {
     if (!puzzles || !day || dayNumber == null) return;
     const text = buildShareText(dayNumber, puzzles, day);
+    const shareUrl = buildShareUrl(dayNumber, puzzles, day);
     const nav = navigator as Navigator & {
-      share?: (data: { text: string }) => Promise<void>;
+      share?: (data: ShareData) => Promise<void>;
+      canShare?: (data: ShareData) => boolean;
     };
+    try {
+      const res = await fetch(`${shareUrl}/opengraph-image`, {
+        cache: "force-cache",
+      });
+      if (res.ok && nav.share) {
+        const blob = await res.blob();
+        const file = new File([blob], `pardle-faces-${dayNumber}.png`, {
+          type: blob.type || "image/png",
+        });
+        const payload: ShareData = { files: [file], text, url: shareUrl };
+        if (nav.canShare?.(payload)) {
+          await nav.share(payload);
+          return;
+        }
+      }
+    } catch {
+      // fall through
+    }
     if (nav.share) {
       try {
-        await nav.share({ text });
+        await nav.share({ text, url: shareUrl });
         return;
       } catch {
         // fall through
@@ -395,14 +415,6 @@ export default function FacesPage() {
             <button className="faces-share" onClick={handleShare}>
               {shareCopied ? "Copied!" : "Share result"}
             </button>
-            <a
-              className="faces-save"
-              href={`${buildShareUrl(dayNumber, puzzles, day)}/opengraph-image`}
-              target="_blank"
-              rel="noreferrer noopener"
-            >
-              Save image
-            </a>
           </div>
           <div className="faces-result-links">
             <Link className="faces-back" href="/faces/duel">

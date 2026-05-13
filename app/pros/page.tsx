@@ -458,11 +458,37 @@ function ResultModal({
 
   async function handleShare() {
     const nav = navigator as Navigator & {
-      share?: (data: { text: string }) => Promise<void>;
+      share?: (data: ShareData) => Promise<void>;
+      canShare?: (data: ShareData) => boolean;
     };
+    // Try to share the share-card PNG as an actual attached image so
+    // it lands in WhatsApp / iMessage as a picture, not just a link.
+    // Falls through to plain text share, then clipboard.
+    try {
+      const res = await fetch(`${shareUrl}/opengraph-image`, {
+        cache: "force-cache",
+      });
+      if (res.ok && nav.share) {
+        const blob = await res.blob();
+        const file = new File([blob], `pardle-${dayNumber}.png`, {
+          type: blob.type || "image/png",
+        });
+        const payload: ShareData = {
+          files: [file],
+          text: shareText,
+          url: shareUrl,
+        };
+        if (nav.canShare?.(payload)) {
+          await nav.share(payload);
+          return;
+        }
+      }
+    } catch {
+      // fall through to text-only share
+    }
     if (nav.share) {
       try {
-        await nav.share({ text: shareText });
+        await nav.share({ text: shareText, url: shareUrl });
         return;
       } catch {
         // fall through to clipboard
@@ -576,14 +602,6 @@ function ResultModal({
         <button className="modal-share" onClick={handleShare}>
           {copied ? "Copied!" : "Share result"}
         </button>
-        <a
-          className="modal-save"
-          href={`${shareUrl}/opengraph-image`}
-          target="_blank"
-          rel="noreferrer noopener"
-        >
-          Save image
-        </a>
         <button className="modal-challenge" onClick={handleChallenge}>
           {challengeCopied ? "Challenge copied!" : "Challenge a friend"}
         </button>
