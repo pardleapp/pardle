@@ -3,13 +3,24 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BRAND } from "@/lib/brand";
+import faceAlignmentRaw from "@/lib/data/face-alignment.json";
 import { GOLFERS } from "@/lib/data/golfers";
 import {
   PGA_TOUR_IDS,
   pgaTourHeadshotUrlById,
 } from "@/lib/data/pga-tour-ids";
-import type { Golfer } from "@/lib/game/types";
 import { searchableName } from "@/lib/text";
+
+interface ProAlignment {
+  leftEye: number[];
+  rightEye: number[];
+  mouth: number[];
+  distance: number;
+  angle: number;
+  eyeMouthDistance: number;
+  eyeMouthAngle: number;
+}
+const PRO_ALIGNMENT = faceAlignmentRaw as Record<string, ProAlignment>;
 
 // ── canonical alignment constants — match lib/data/face-alignment.ts ─
 const CANONICAL_EYE_X = 0.5;
@@ -126,29 +137,33 @@ function applyOvalMask(ctx: CanvasRenderingContext2D, size: number): void {
   ctx.drawImage(mask, 0, 0);
 }
 
-interface MediapipeLoaded {
-  faceLandmarker: unknown;
-}
+// Module-level singleton — load mediapipe + the FaceLandmarker model
+// exactly once per page session. The promise is created on first call;
+// subsequent callers await the same promise.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _detectorPromise: Promise<any> | null = null;
 
-async function loadMediapipe(): Promise<MediapipeLoaded> {
-  // Dynamic import — keeps the ~3MB WASM bundle out of the main JS until
-  // the user actually visits /blend/me.
-  const { FilesetResolver, FaceLandmarker } = await import(
-    "@mediapipe/tasks-vision"
-  );
-  const vision = await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm",
-  );
-  const faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-    baseOptions: {
-      modelAssetPath:
-        "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-    },
-    outputFaceBlendshapes: false,
-    runningMode: "IMAGE",
-    numFaces: 1,
-  });
-  return { faceLandmarker };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getDetector(): Promise<any> {
+  if (_detectorPromise) return _detectorPromise;
+  _detectorPromise = (async () => {
+    const { FilesetResolver, FaceLandmarker } = await import(
+      "@mediapipe/tasks-vision"
+    );
+    const vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm",
+    );
+    return FaceLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath:
+          "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+      },
+      outputFaceBlendshapes: false,
+      runningMode: "IMAGE",
+      numFaces: 1,
+    });
+  })();
+  return _detectorPromise;
 }
 
 function extractFaceLm(landmarks: { x: number; y: number }[]): FaceLm | null {
@@ -219,7 +234,12 @@ export default function BlendMePage() {
     return GOLFERS.find((g) => g.id === slug)?.name ?? null;
   }, [selectedPro]);
 
-  // ── handle selfie upload ───────────────────────────────────────────
+  // Pre-load mediapipe on mount — by the time the user uploads a
+  // selfie, the model is already cached and detection is instant.
+  useEffect(() => {
+    getDetector().catch((e) => console.error("mediapipe preload failed", e));
+  }, []);
+
   async function handleFile(file: File) {
     setErrMsg(null);
     setBlendUrl(null);
@@ -229,12 +249,11 @@ export default function BlendMePage() {
     setStage("detecting");
     try {
       const img = await loadImage(url, false);
-      const { faceLandmarker } = await loadMediapipe();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = (faceLandmarker as any).detect(img);
+      const detector = await getDetector();
+      const result = detector.detect(img);
       if (!result.faceLandmarks || result.faceLandmarks.length === 0) {
         setErrMsg(
-          "Couldn't find a face in that photo. Try a clearer head-on selfie.",
+          "Couldn't find a face in that photo. Try a clearer head-on photo.",
         );
         setStage("error");
         return;
@@ -259,25 +278,38 @@ export default function BlendMePage() {
     if (!selectedPro || !selfieUrl || !selfieLm || stage !== "ready") return;
     let cancelled = false;
     setStage("rendering");
+
+    // Hard timeout — if anything hangs past 25s, surface an error so
+    // the user isn't stuck looking at a spinner forever.
+    const timeoutId = window.setTimeout(() => {
+      if (cancelled) return;
+      cancelled = true;
+      setErrMsg(
+        "Blending took too long. Try a smaller photo or a different pro.",
+      );
+      setStage("error");
+    }, 25000);
+
     (async () => {
       try {
-        // Pro headshot
-        const proImg = await loadImage(
-          pgaTourHeadshotUrlById(selectedPro, 600),
-        );
-        // Re-detect landmarks for the pro so we use the same browser-
-        // detected positions as the selfie. Slightly slower than reading
-        // from our pre-computed JSON, but guarantees consistency.
-        const { faceLandmarker } = await loadMediapipe();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const proResult = (faceLandmarker as any).detect(proImg);
-        if (!proResult.faceLandmarks?.length) {
-          throw new Error("pro landmark detection failed");
-        }
-        const proLm = extractFaceLm(proResult.faceLandmarks[0]);
-        if (!proLm) throw new Error("pro landmarks incomplete");
+        // Read the pro's pre-computed landmarks from the JSON we
+        // already extracted offline. No second mediapipe detect call
+        // — was the 2-min hang.
+        const proAlign = PRO_ALIGNMENT[selectedPro];
+        if (!proAlign) throw new Error(`no alignment data for ${selectedPro}`);
+        const proLm: FaceLm = {
+          leftEye: [proAlign.leftEye[0], proAlign.leftEye[1]],
+          rightEye: [proAlign.rightEye[0], proAlign.rightEye[1]],
+          mouth: [proAlign.mouth[0], proAlign.mouth[1]],
+        };
 
-        // Reload the selfie image element (still available via blob URL)
+        // Cache-bust the URL with a query param so any earlier
+        // non-CORS cached load gets refetched WITH CORS headers —
+        // otherwise canvas.toDataURL throws SecurityError on a
+        // tainted canvas.
+        const proImg = await loadImage(
+          pgaTourHeadshotUrlById(selectedPro, 600) + "?cors=1",
+        );
         const selfieImg = await loadImage(selfieUrl, false);
 
         if (cancelled) return;
@@ -293,8 +325,6 @@ export default function BlendMePage() {
         const proT = computeAlignTransform(proLm, OUT_SIZE);
         const selfieT = computeAlignTransform(selfieLm, OUT_SIZE);
 
-        // Render at full opacity each, layered. Filter: contrast +
-        // saturate to bump the blend feel.
         ctx.filter = "contrast(1.05) saturate(1.06)";
         drawAligned(ctx, proImg, proT, 600, 1);
         drawAligned(ctx, selfieImg, selfieT, selfieImg.width, 0.5);
@@ -329,11 +359,13 @@ export default function BlendMePage() {
 
         const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
         if (!cancelled) {
+          window.clearTimeout(timeoutId);
           setBlendUrl(dataUrl);
           setStage("ready");
         }
       } catch (e) {
         if (cancelled) return;
+        window.clearTimeout(timeoutId);
         console.error(e);
         setErrMsg(
           "Couldn't render the blend. Try a different photo or another pro.",
@@ -343,6 +375,7 @@ export default function BlendMePage() {
     })();
     return () => {
       cancelled = true;
+      window.clearTimeout(timeoutId);
     };
   }, [selectedPro, selfieUrl, selfieLm, stage]);
 
@@ -413,13 +446,13 @@ export default function BlendMePage() {
         this browser — the detection and blending all run locally.
       </p>
 
-      {/* Step 1: upload */}
+      {/* Step 1: upload — accept gallery OR camera. No `capture` so
+          mobile lets the user choose between Camera and Photo Library. */}
       {!selfieUrl && (
         <label className="blendme-upload">
           <input
             type="file"
             accept="image/*"
-            capture="user"
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) handleFile(f);
@@ -427,9 +460,11 @@ export default function BlendMePage() {
           />
           <div className="blendme-upload-inner">
             <div className="blendme-upload-emoji">📸</div>
-            <div className="blendme-upload-title">Choose your selfie</div>
+            <div className="blendme-upload-title">
+              Upload a photo or take a selfie
+            </div>
             <div className="blendme-upload-sub">
-              JPG, PNG or HEIC · face-on works best
+              Tap to choose from your camera roll or shoot one now
             </div>
           </div>
         </label>
