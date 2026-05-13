@@ -358,24 +358,21 @@ export default function BlendMePage() {
         }
         canvas.width = OUT_SIZE;
         canvas.height = OUT_SIZE;
+        log("canvas sized");
         const ctx = canvas.getContext("2d")!;
         ctx.clearRect(0, 0, OUT_SIZE, OUT_SIZE);
         ctx.fillStyle = "#0f1f0f";
         ctx.fillRect(0, 0, OUT_SIZE, OUT_SIZE);
+        log("bg filled");
 
         const proT = computeAlignTransform(proLm, OUT_SIZE);
         const selfieT = computeAlignTransform(selfieLm, OUT_SIZE);
 
-        // Always draw both at OUT_SIZE. The alignment maths assume the
-        // source image occupies a `size x size` patch — drawing the
-        // selfie at its native 4000px+ width broke that AND was the
-        // root cause of the canvas hang. drawImage handles the resize
-        // internally; we keep the canvas at 600x600 so toDataURL is
-        // also fast.
-        ctx.filter = "contrast(1.05) saturate(1.06)";
+        // No ctx.filter — iOS Safari hangs hard on it. We accept a
+        // slightly less punchy result rather than risk the freeze.
         drawAligned(ctx, proImg, proT, OUT_SIZE, 1);
+        log("pro drawn");
         drawAligned(ctx, selfieSmall, selfieT, OUT_SIZE, 0.5);
-        ctx.filter = "none";
         log("canvas drawn");
 
         // Soft elliptical face mask using a clip-via-mask trick.
@@ -397,6 +394,7 @@ export default function BlendMePage() {
         mctx.fillStyle = grad;
         mctx.fillRect(0, 0, OUT_SIZE, OUT_SIZE);
         ctx.drawImage(mask, 0, 0);
+        log("mask applied");
 
         // pardle.app watermark — small, bottom-right, low opacity
         ctx.fillStyle = "rgba(255, 214, 74, 0.85)";
