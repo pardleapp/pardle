@@ -1006,8 +1006,7 @@ export default function BlendMePage() {
       </header>
 
       <p className="blend-intro">
-        Upload a head-on selfie and pick a PGA pro. Your face never leaves
-        this browser — detection and morphing all run locally.
+        Upload a head-on selfie and pick a PGA pro.
       </p>
 
       {!selfieUrl && (
