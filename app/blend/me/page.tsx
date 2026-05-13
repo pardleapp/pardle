@@ -1117,11 +1117,11 @@ export default function BlendMePage() {
             <>
               <div className="blendme-slider-block">
                 <div className="blendme-slider-ends">
-                  <span className="blendme-slider-end blendme-slider-end-me">
-                    You
-                  </span>
                   <span className="blendme-slider-end">
                     {selectedProName ?? "Pro"}
+                  </span>
+                  <span className="blendme-slider-end blendme-slider-end-me">
+                    You
                   </span>
                 </div>
                 <input
