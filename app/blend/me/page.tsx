@@ -1028,8 +1028,15 @@ export default function BlendMePage() {
 
           {composeReady && (
             <>
-              <div className="blendme-slider-row">
-                <span className="blendme-slider-label">You</span>
+              <div className="blendme-slider-block">
+                <div className="blendme-slider-ends">
+                  <span className="blendme-slider-end blendme-slider-end-me">
+                    You
+                  </span>
+                  <span className="blendme-slider-end">
+                    {selectedProName ?? "Pro"}
+                  </span>
+                </div>
                 <input
                   type="range"
                   min="0"
@@ -1042,14 +1049,11 @@ export default function BlendMePage() {
                   className="blendme-slider"
                   aria-label="Blend ratio"
                 />
-                <span className="blendme-slider-label">
-                  {selectedProName ?? "Pro"}
-                </span>
-              </div>
-              <div className="blendme-slider-pct">
-                {Math.round(blendRatio * 100)}% you ·{" "}
-                {100 - Math.round(blendRatio * 100)}%{" "}
-                {selectedProName?.split(" ").slice(-1)[0] ?? "pro"}
+                <div className="blendme-slider-pct">
+                  {Math.round(blendRatio * 100)}% you ·{" "}
+                  {100 - Math.round(blendRatio * 100)}%{" "}
+                  {selectedProName?.split(" ").slice(-1)[0] ?? "pro"}
+                </div>
               </div>
 
               <div className="blend-actions">
