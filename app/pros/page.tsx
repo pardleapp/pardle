@@ -607,12 +607,27 @@ export default function Page() {
   const isLose = !isWin && guesses.length >= MAX_GUESSES;
   const isOver = isWin || isLose;
 
-  /** Hint text revealed after 4 wrong guesses. Last-name initial is
-   *  the simplest useful nudge that isn't already in the reveal grid. */
+  /** Hint text revealed after 4 wrong guesses. We give INITIALS (e.g.
+   *  R.M.) rather than just first-letter-of-last-name — that way the
+   *  player can't dump the initial into the autocomplete dropdown and
+   *  get a list. They have to mentally filter to pros whose first AND
+   *  last names start with the two letters, which is much closer to
+   *  "trivia-style hint" than "free answer". */
   const hintText = useMemo(() => {
-    const parts = mystery.name.trim().split(/\s+/);
-    const lastName = parts[parts.length - 1];
-    return `Last name starts with “${lastName[0].toUpperCase()}”`;
+    const SUFFIXES = new Set([
+      "jr", "jr.", "sr", "sr.", "ii", "iii", "iv",
+    ]);
+    const parts = mystery.name
+      .trim()
+      .split(/\s+/)
+      .filter((p) => !SUFFIXES.has(p.toLowerCase()));
+    if (parts.length === 0) return "";
+    if (parts.length === 1) {
+      return `Their initial is ${parts[0][0].toUpperCase()}.`;
+    }
+    const first = parts[0][0].toUpperCase();
+    const last = parts[parts.length - 1][0].toUpperCase();
+    return `Their initials are ${first}.${last}.`;
   }, [mystery]);
   const hintAvailable = !isOver && guesses.length >= 4;
 
