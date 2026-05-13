@@ -934,30 +934,34 @@ export default function BlendMePage() {
   }
 
   async function shareBlend() {
-    const url = currentBlendDataUrl();
-    if (!url) return;
+    const dataUrl = currentBlendDataUrl();
+    if (!dataUrl) return;
     const nav = navigator as Navigator & {
       share?: (data: ShareData) => Promise<void>;
       canShare?: (data: ShareData) => boolean;
     };
+    // Always use the full https:// URL — WhatsApp / iMessage / Twitter
+    // auto-detect URLs starting with the protocol and make them
+    // tappable. Bare "pardle.app/..." appears as plain text.
+    const shareUrl = `${BRAND.url}/blend/me`;
+    const shareText = `I blended myself with ${selectedProName ?? "a pro"} — try yours at ${shareUrl}`;
     try {
-      const blob = await (await fetch(url)).blob();
+      const blob = await (await fetch(dataUrl)).blob();
       const file = new File([blob], "pardle-blend.jpg", { type: "image/jpeg" });
       const data: ShareData = {
         files: [file],
-        text: `I blended myself with ${selectedProName ?? "a pro"} on pardle.app/blend 👇`,
+        text: shareText,
+        url: shareUrl,
       };
       if (nav.canShare?.(data) && nav.share) {
         await nav.share(data);
         return;
       }
     } catch {
-      // fall through
+      // fall through to clipboard
     }
     try {
-      await navigator.clipboard.writeText(
-        `Made this on ${BRAND.url}/blend/me — try yours.`,
-      );
+      await navigator.clipboard.writeText(shareText);
     } catch {
       // ignore
     }

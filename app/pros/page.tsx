@@ -59,11 +59,24 @@ function rotationOffset(): number {
   return h;
 }
 
+/** Pool of pros eligible to be today's mystery. Filtered to those we
+ *  have at least one face image for (PGA Tour Cloudinary headshot OR
+ *  Wikipedia thumbnail) so the win-screen walker never falls back to
+ *  a flag placeholder. Golfers without any image source are skipped
+ *  in the rotation but still kept in GOLFERS for autocomplete /
+ *  attribute reveals on other guesses. */
+function prosRotationPool(): Golfer[] {
+  return GOLFERS.filter(
+    (g) => PGA_TOUR_IDS[g.id] !== undefined || g.imageUrl !== null,
+  );
+}
+
 function pickMysteryGolfer(): Golfer {
+  const pool = prosRotationPool();
   const dayIndex = dayIndexToday() + rotationOffset();
   const safeIndex =
-    ((dayIndex % GOLFERS.length) + GOLFERS.length) % GOLFERS.length;
-  return GOLFERS[safeIndex];
+    ((dayIndex % pool.length) + pool.length) % pool.length;
+  return pool[safeIndex];
 }
 
 function stateToEmoji(state: CellState): string {
@@ -151,6 +164,34 @@ function heightDisplay(cm: number): string {
 function Arrow({ arrow }: { arrow: AttributeReveal["arrow"] }) {
   if (!arrow) return null;
   return <span className="arrow">{arrow === "up" ? "▲" : "▼"}</span>;
+}
+
+/** Walker face image with multi-source fallback. Tries PGA Tour
+ *  Cloudinary headshot first (always face-cropped), falls back to
+ *  Wikipedia, then to the country flag only if both fail. */
+function WalkerFace({ golfer }: { golfer: Golfer }) {
+  const sources: string[] = [];
+  const cloud = pgaTourHeadshotUrl(golfer.id);
+  if (cloud) sources.push(cloud);
+  if (golfer.imageUrl) sources.push(golfer.imageUrl);
+
+  const [sourceIdx, setSourceIdx] = useState(0);
+
+  if (sourceIdx >= sources.length) {
+    return (
+      <div className="walker-head-placeholder">
+        {flagFor(golfer.countryCode)}
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={sources[sourceIdx]}
+      alt={golfer.name}
+      onError={() => setSourceIdx((i) => i + 1)}
+    />
+  );
 }
 
 const CONFETTI_COLORS = ["#7BAE3F", "#B5D332", "#E8C547", "#5BA0E0", "#E07B5B"];
@@ -270,25 +311,8 @@ function PlayerWalker({ golfer }: { golfer: Golfer }) {
             </g>
           </svg>
 
-          {/* Player's actual face sits on top of the body as the head.
-              Prefer PGA Tour Cloudinary (face-cropped, always loads
-              consistently) over the Wikipedia thumbnail. Falls back to
-              the country flag only if neither is available. */}
           <div className="walker-head">
-            {(() => {
-              const url = pgaTourHeadshotUrl(golfer.id) ?? golfer.imageUrl;
-              if (!url) {
-                return (
-                  <div className="walker-head-placeholder">
-                    {flagFor(golfer.countryCode)}
-                  </div>
-                );
-              }
-              return (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={url} alt={golfer.name} />
-              );
-            })()}
+            <WalkerFace golfer={golfer} />
             <div className="walker-tear" aria-hidden="true" />
           </div>
         </div>
@@ -577,10 +601,20 @@ export default function Page() {
   const [stats, setStats] = useState<PardleStats | null>(null);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [challenge, setChallenge] = useState<ChallengePayload | null>(null);
+  const [hintRevealed, setHintRevealed] = useState(false);
 
   const isWin = guesses.some((g) => g.isWin);
   const isLose = !isWin && guesses.length >= MAX_GUESSES;
   const isOver = isWin || isLose;
+
+  /** Hint text revealed after 4 wrong guesses. Last-name initial is
+   *  the simplest useful nudge that isn't already in the reveal grid. */
+  const hintText = useMemo(() => {
+    const parts = mystery.name.trim().split(/\s+/);
+    const lastName = parts[parts.length - 1];
+    return `Last name starts with “${lastName[0].toUpperCase()}”`;
+  }, [mystery]);
+  const hintAvailable = !isOver && guesses.length >= 4;
 
   // Initialise stats, check tutorial, decode any incoming challenge link.
   useEffect(() => {
@@ -741,6 +775,27 @@ export default function Page() {
           </div>
         ))}
       </div>
+
+      {hintAvailable && (
+        <div className="pros-hint-row">
+          {hintRevealed ? (
+            <div className="pros-hint-text">
+              <span className="pros-hint-emoji" aria-hidden="true">
+                💡
+              </span>
+              {hintText}
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="pros-hint-btn"
+              onClick={() => setHintRevealed(true)}
+            >
+              💡 Need a hint?
+            </button>
+          )}
+        </div>
+      )}
 
       {!isOver && (
         <div className="input-area">

@@ -4006,6 +4006,49 @@ footer {
   margin: 2px 0 6px;
 }
 
+/* ---------- /pros hint (after 4 guesses) ---------- */
+
+.pros-hint-row {
+  margin: 8px 0 12px;
+}
+
+.pros-hint-btn {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--green);
+  background: rgba(123, 174, 63, 0.12);
+  color: var(--green);
+  font-weight: 700;
+  font-size: 14px;
+  font-family: inherit;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.pros-hint-btn:hover {
+  background: rgba(123, 174, 63, 0.2);
+  transform: translateY(-1px);
+}
+
+.pros-hint-text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(232, 197, 71, 0.14);
+  border: 1px solid rgba(232, 197, 71, 0.45);
+  color: var(--text);
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.pros-hint-emoji {
+  font-size: 18px;
+}
+
 .faces-giveup-btn {
   display: block;
   margin: 8px auto 0;
