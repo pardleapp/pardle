@@ -2765,6 +2765,7 @@ input[type=text]:focus {
   border-radius: 8px;
   max-height: 280px;
   overflow-y: auto;
+  z-index: 30;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   z-index: 10;
 }
@@ -2786,6 +2787,18 @@ input[type=text]:focus {
 .suggestions li:hover,
 .suggestions li:active {
   background: #f6f7f8;
+}
+
+@media (max-width: 768px) {
+  /* On phones the input sits near the bottom of the viewport after
+     the game UI above it, so a downward-opening dropdown ends up
+     off-screen. Flip it upward so suggestions stay visible. */
+  .suggestions {
+    top: auto;
+    bottom: calc(100% + 4px);
+    max-height: 220px;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+  }
 }
 
 .suggestion-country {

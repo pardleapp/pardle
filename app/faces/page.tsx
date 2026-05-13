@@ -450,11 +450,11 @@ export default function FacesPage() {
   let baseOpacity = 1;
   let overlayOpacity = 0.5;
   if (hintActive && isLeftSolved) {
-    baseOpacity = 0.55;
-    overlayOpacity = 0.62;
+    baseOpacity = 0.75;
+    overlayOpacity = 0.55;
   } else if (hintActive && isRightSolved) {
-    baseOpacity = 1;
-    overlayOpacity = 0.25;
+    baseOpacity = 0.9;
+    overlayOpacity = 0.4;
   }
   const canUseHint =
     !!currentState &&
