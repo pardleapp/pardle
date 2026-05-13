@@ -11,18 +11,19 @@ const SIZE = 1080;
 
 // A scripted Pros result: brutal start, builds slowly, finally solved
 // on guess 6. Tells the "today is hard" story visually in one glance.
+// 6 columns (country, age, height, majors, wins, Ryder Cups) × 6 guesses.
 const GRID: string[][] = [
-  ["K", "K", "K", "W", "K", "K", "K"],
-  ["K", "W", "K", "Y", "K", "K", "W"],
-  ["K", "W", "Y", "W", "K", "K", "G"],
-  ["G", "K", "Y", "W", "Y", "K", "G"],
-  ["G", "W", "G", "W", "Y", "W", "G"],
-  ["G", "G", "G", "G", "G", "G", "G"],
+  ["K", "K", "K", "K", "K", "W"],
+  ["K", "W", "K", "Y", "K", "K"],
+  ["G", "K", "Y", "W", "K", "G"],
+  ["G", "K", "Y", "W", "Y", "G"],
+  ["G", "W", "G", "W", "Y", "G"],
+  ["G", "G", "G", "G", "G", "G"],
 ];
 
 export async function GET() {
-  const cellPx = 96;
-  const cellGap = 10;
+  const cellPx = 116;
+  const cellGap = 12;
 
   return new ImageResponse(
     (
