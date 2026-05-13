@@ -165,7 +165,9 @@ export default async function HubHome() {
       </div>
 
       <Link href="/today" className="hub-stats-link">
-        See how the world&apos;s playing →
+        <span className="hub-stats-link-label">
+          See how the world&apos;s playing →
+        </span>
         {totalToday > 0 && (
           <span className="hub-stats-link-count">{totalToday} today</span>
         )}
