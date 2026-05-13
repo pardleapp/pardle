@@ -47,6 +47,30 @@ function downscale(img: HTMLImageElement, maxDim = 1200): HTMLCanvasElement {
   return c;
 }
 
+/** Mild skin-smoothing on the user selfie by downscaling 2x then back
+ *  up with browser bicubic. Effectively a soft Gaussian blur. Hides
+ *  the small noise / blemishes / harsh shadows that make raw selfies
+ *  look worse than studio shots, without losing the structure that
+ *  mediapipe needs to detect landmarks. Standard beauty-app trick. */
+function softenSelfie(src: HTMLCanvasElement, factor = 1.7): HTMLCanvasElement {
+  const small = document.createElement("canvas");
+  small.width = Math.max(64, Math.round(src.width / factor));
+  small.height = Math.max(64, Math.round(src.height / factor));
+  const sctx = small.getContext("2d")!;
+  sctx.imageSmoothingEnabled = true;
+  sctx.imageSmoothingQuality = "high";
+  sctx.drawImage(src, 0, 0, small.width, small.height);
+
+  const out = document.createElement("canvas");
+  out.width = src.width;
+  out.height = src.height;
+  const octx = out.getContext("2d")!;
+  octx.imageSmoothingEnabled = true;
+  octx.imageSmoothingQuality = "high";
+  octx.drawImage(small, 0, 0, out.width, out.height);
+  return out;
+}
+
 /** Affine transform matrix that maps source triangle to dest triangle.
  *  Returns [a, b, c, d, e, f] for canvas setTransform: x'=a*x+c*y+e. */
 function getAffineTransform(
@@ -212,7 +236,8 @@ function buildFaceMask(
   return mask;
 }
 
-/** Composite a built face mask onto the output canvas + fill BG. */
+/** Composite the built face mask + a polished gradient background +
+ *  subtle vignette. Magazine-cover composition the user wants to share. */
 function applyFaceOvalMask(
   ctx: CanvasRenderingContext2D,
   mask: HTMLCanvasElement,
@@ -220,10 +245,68 @@ function applyFaceOvalMask(
 ): void {
   ctx.globalCompositeOperation = "destination-in";
   ctx.drawImage(mask, 0, 0);
+
+  // Radial gradient BG: slightly lighter at the centre, deep dark
+  // green at the edges. Draws the eye to the face.
   ctx.globalCompositeOperation = "destination-over";
-  ctx.fillStyle = "#0f1f0f";
+  const bg = ctx.createRadialGradient(
+    size / 2,
+    size / 2,
+    size * 0.1,
+    size / 2,
+    size / 2,
+    size * 0.75,
+  );
+  bg.addColorStop(0, "#1a3a1a");
+  bg.addColorStop(0.6, "#0f1f0f");
+  bg.addColorStop(1, "#040a04");
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, size, size);
+
   ctx.globalCompositeOperation = "source-over";
+}
+
+/** Soft corner vignette so eyes are pulled to the face. Applied at the
+ *  end of the pipeline so it darkens the FINAL composition. */
+function applyVignette(ctx: CanvasRenderingContext2D, size: number): void {
+  const v = ctx.createRadialGradient(
+    size / 2,
+    size / 2,
+    size * 0.35,
+    size / 2,
+    size / 2,
+    size * 0.72,
+  );
+  v.addColorStop(0, "rgba(0, 0, 0, 0)");
+  v.addColorStop(1, "rgba(0, 0, 0, 0.55)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, size, size);
+}
+
+/** Magazine-style title bar at the top: "YOU × PRO NAME" centred in
+ *  the brand accent, with a thin underline. */
+function drawTitle(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  proName: string,
+): void {
+  const text = `YOU × ${proName.toUpperCase()}`;
+  const fontSize = Math.round(size * 0.045);
+  ctx.font = `900 ${fontSize}px system-ui, -apple-system, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+  ctx.fillText(text, size / 2, Math.round(size * 0.05));
+  // thin separator underline
+  const tw = ctx.measureText(text).width;
+  const ly = Math.round(size * 0.05) + fontSize + Math.round(size * 0.012);
+  ctx.fillStyle = "#E07B5B";
+  ctx.fillRect(
+    (size - tw * 0.4) / 2,
+    ly,
+    tw * 0.4,
+    Math.max(2, Math.round(size * 0.004)),
+  );
 }
 
 // ── sRGB <-> CIELAB conversion (D65) ──────────────────────────────
@@ -510,7 +593,7 @@ export default function BlendMePage() {
 
   useEffect(() => {
     console.log(
-      "%c[blend/me] build v9 — LAB colour transfer + unsharp mask",
+      "%c[blend/me] build v10 — smoothing + 60/40 + composition",
       "color: #E07B5B; font-weight: bold",
     );
     getDetector().catch((e) => console.error("mediapipe preload failed", e));
@@ -590,8 +673,12 @@ export default function BlendMePage() {
         log("pro image loaded");
 
         const selfieImg = await loadImage(selfieUrl, false);
-        const selfieSmall = downscale(selfieImg, 1200);
-        log(`selfie ready ${selfieSmall.width}x${selfieSmall.height}`);
+        const selfieRaw = downscale(selfieImg, 1200);
+        // Soft beauty blur to hide selfie noise / micro blemishes /
+        // patchy lighting BEFORE the morph. Restores skin texture
+        // later via unsharp mask. Standard beauty-app pipeline.
+        const selfieSmall = softenSelfie(selfieRaw, 1.7);
+        log(`selfie softened ${selfieSmall.width}x${selfieSmall.height}`);
 
         if (cancelled) return;
 
@@ -648,11 +735,14 @@ export default function BlendMePage() {
         out.width = OUT_SIZE;
         out.height = OUT_SIZE;
         const outCtx = out.getContext("2d")!;
+        // 60/40 user-biased blend — keeps the user clearly recognisable
+        // in the result. People share photos that LOOK LIKE THEM with
+        // pro features mixed in, not generic averaged faces.
         outCtx.drawImage(proCanvas, 0, 0);
-        outCtx.globalAlpha = 0.5;
+        outCtx.globalAlpha = 0.6;
         outCtx.drawImage(userCanvas, 0, 0);
         outCtx.globalAlpha = 1;
-        log("blended");
+        log("blended (60/40 user)");
 
         applyFaceOvalMask(outCtx, faceMask, OUT_SIZE);
         log("mask applied");
@@ -665,9 +755,22 @@ export default function BlendMePage() {
 
         // Unsharp-mask sharpening to compensate for the alpha-blend
         // softening of high-frequency detail. Eyes, lashes, and skin
-        // texture come back from the airbrushed-looking 50/50 blend.
-        sharpen(out, 0.35);
+        // texture come back from the airbrushed-looking blend.
+        sharpen(out, 0.4);
         log("sharpened");
+
+        // Soft vignette around the face so the viewer's eye lands on
+        // the merge.
+        applyVignette(outCtx, OUT_SIZE);
+        log("vignette applied");
+
+        // Magazine-cover title overlay — "YOU × <PRO>" with a coral
+        // underline. Gives the share a designed look rather than a
+        // raw screenshot feel.
+        if (selectedProName) {
+          drawTitle(outCtx, OUT_SIZE, selectedProName);
+          log("title drawn");
+        }
 
         outCtx.fillStyle = "rgba(255, 214, 74, 0.9)";
         outCtx.font = `bold ${Math.round(OUT_SIZE * 0.038)}px system-ui, sans-serif`;
