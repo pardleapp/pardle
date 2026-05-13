@@ -254,7 +254,13 @@ export default function BlendMePage() {
 
   // Pre-load mediapipe on mount — by the time the user uploads a
   // selfie, the model is already cached and detection is instant.
+  // Also prints a build marker so we can sanity-check the deploy is
+  // current when troubleshooting from a screenshot.
   useEffect(() => {
+    console.log(
+      "%c[blend/me] build v5 (granular logs + filter dropped)",
+      "color: #E07B5B; font-weight: bold",
+    );
     getDetector().catch((e) => console.error("mediapipe preload failed", e));
   }, []);
 
