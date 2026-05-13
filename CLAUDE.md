@@ -2,6 +2,10 @@
 
 Daily Wordle-style golf game. Players get 6 guesses to identify a mystery PGA/LIV/LPGA pro. Each guess reveals match-state on attributes (country, age bracket, height, majors won, career wins, turned-pro decade, OWGR tier) with directional arrows for numeric ones.
 
+## Audience: mobile-first
+
+**85% of users are on mobile.** Always optimise UI/UX for phone screens first — touch targets (≥44px), thumb reach, portrait layouts, iOS Safari quirks, share-sheet integration. Desktop is a fallback view, not the primary design target. Test every visible change in a phone-sized viewport before declaring it done.
+
 ## Current phase: web MVP, iOS deferred
 
 Web-first launch at **pardle.app**. Validate the game is fun with the user + 20+ friends for at least a week before spending $99 on Apple Developer enrollment. Web version stays permanent post-iOS as a friction-free viral entry point.
