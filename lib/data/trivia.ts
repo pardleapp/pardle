@@ -463,10 +463,10 @@ export const TRIVIA_QUESTIONS: TriviaQuestion[] = [
   {
     id: "m-rory-majors",
     q: "How many major championships has Rory McIlroy won?",
-    options: ["3", "4", "5", "6"],
+    options: ["4", "5", "6", "7"],
     correct: 2,
     difficulty: "medium",
-    fact: "Including the 2025 Masters that completed his career grand slam.",
+    fact: "His 2025 Masters completed the career grand slam.",
   },
   {
     id: "m-tiger-pga-wins",
