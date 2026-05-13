@@ -301,10 +301,15 @@ export default function BlendMePage() {
   }
 
   // ── render blend whenever a pro is picked ──────────────────────────
+  // IMPORTANT: don't include `stage` in the deps array. Setting stage
+  // to "rendering" inside the effect would re-fire it and the cleanup
+  // would set cancelled=true, making the async work exit silently right
+  // before drawing to canvas. That bug ate hours of debugging.
   useEffect(() => {
-    if (!selectedPro || !selfieUrl || !selfieLm || stage !== "ready") return;
+    if (!selectedPro || !selfieUrl || !selfieLm) return;
+    if (stage === "detecting" || stage === "error") return;
+    if (blendUrl) return; // already rendered for this pick
     let cancelled = false;
-    setStage("rendering");
 
     // Hard timeout — surfaces an error if any step gets stuck. Per-step
     // logs (visible in the browser console) let us pinpoint hangs.
@@ -435,7 +440,8 @@ export default function BlendMePage() {
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [selectedPro, selfieUrl, selfieLm, stage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPro, selfieUrl, selfieLm, blendUrl]);
 
   function downloadBlend() {
     if (!blendUrl) return;
@@ -596,7 +602,7 @@ export default function BlendMePage() {
           )}
 
           {/* Result */}
-          {stage === "rendering" && (
+          {selectedPro && !blendUrl && stage !== "error" && (
             <div className="blendme-status">
               <div className="blendme-spinner" />
               <p>Blending…</p>
