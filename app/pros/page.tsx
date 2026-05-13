@@ -32,6 +32,7 @@ import { encodeGridPros, encodeShareCard } from "@/lib/share-card";
 import { recordPlayClient } from "@/lib/stats-client";
 import { searchableName } from "@/lib/text";
 import { PGA_TOUR_IDS, pgaTourHeadshotUrl } from "@/lib/data/pga-tour-ids";
+import { PRO_HINTS } from "@/lib/data/pro-hints";
 
 const GAME_ID = "pros";
 
@@ -607,27 +608,26 @@ export default function Page() {
   const isLose = !isWin && guesses.length >= MAX_GUESSES;
   const isOver = isWin || isLose;
 
-  /** Hint text revealed after 4 wrong guesses. We give INITIALS (e.g.
-   *  R.M.) rather than just first-letter-of-last-name — that way the
-   *  player can't dump the initial into the autocomplete dropdown and
-   *  get a list. They have to mentally filter to pros whose first AND
-   *  last names start with the two letters, which is much closer to
-   *  "trivia-style hint" than "free answer". */
+  /** Hint text revealed after 4 wrong guesses. Hand-written trivia is
+   *  preferred (lib/data/pro-hints.ts). For pros without a manual hint
+   *  yet, falls back to a soft "continent + era" nudge that's not
+   *  derivable from the reveal grid alone. */
   const hintText = useMemo(() => {
-    const SUFFIXES = new Set([
-      "jr", "jr.", "sr", "sr.", "ii", "iii", "iv",
-    ]);
-    const parts = mystery.name
-      .trim()
-      .split(/\s+/)
-      .filter((p) => !SUFFIXES.has(p.toLowerCase()));
-    if (parts.length === 0) return "";
-    if (parts.length === 1) {
-      return `Their initial is ${parts[0][0].toUpperCase()}.`;
-    }
-    const first = parts[0][0].toUpperCase();
-    const last = parts[parts.length - 1][0].toUpperCase();
-    return `Their initials are ${first}.${last}.`;
+    const manual = PRO_HINTS[mystery.id];
+    if (manual) return manual;
+    // Fallback: rough continent name (the flag tells the player the
+    // country, but spelling out the continent in words is a softer
+    // anchor for fans who recognise regions but not specific flags).
+    const CONTINENT_NAME: Record<string, string> = {
+      NA: "North America",
+      SA: "South America",
+      EU: "Europe",
+      AS: "Asia",
+      AF: "Africa",
+      OC: "Oceania",
+    };
+    const region = CONTINENT_NAME[mystery.continent] ?? "the world";
+    return `Plays out of ${region}.`;
   }, [mystery]);
   const hintAvailable = !isOver && guesses.length >= 4;
 
