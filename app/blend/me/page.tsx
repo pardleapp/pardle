@@ -226,15 +226,54 @@ function applyFaceOvalMask(
   ctx.globalCompositeOperation = "source-over";
 }
 
-/** Reinhard colour transfer in RGB: shift `target` canvas's pixel
- *  distribution to match `reference` canvas. Computes mean & std per
- *  channel using only pixels marked as face in `mask`, then for each
- *  pixel in target applies (v - tMean) * (rStd / tStd) + rMean.
- *
- *  Result: a selfie shot in warm tungsten / blue daylight / underexposed
- *  light blends seamlessly with the pro's neutral studio shot. Without
- *  this the colour mismatch makes the blend look like two separate
- *  faces stitched together. */
+// ── sRGB <-> CIELAB conversion (D65) ──────────────────────────────
+// LAB separates L (luminance) from A/B (colour). Doing Reinhard
+// transfer in LAB matches skin TONE without flattening the user's
+// natural lighting/shading. Much better than RGB.
+function srgbToLin(c: number): number {
+  const f = c / 255;
+  return f > 0.04045 ? Math.pow((f + 0.055) / 1.055, 2.4) : f / 12.92;
+}
+function linToSrgb(c: number): number {
+  const f = c > 0.0031308 ? 1.055 * Math.pow(c, 1 / 2.4) - 0.055 : 12.92 * c;
+  return Math.max(0, Math.min(255, Math.round(f * 255)));
+}
+function rgbToLab(r: number, g: number, b: number): [number, number, number] {
+  const lr = srgbToLin(r);
+  const lg = srgbToLin(g);
+  const lb = srgbToLin(b);
+  // sRGB → XYZ (D65)
+  let X = lr * 0.4124564 + lg * 0.3575761 + lb * 0.1804375;
+  let Y = lr * 0.2126729 + lg * 0.7151522 + lb * 0.0721750;
+  let Z = lr * 0.0193339 + lg * 0.1191920 + lb * 0.9503041;
+  // Normalise to D65 white
+  X /= 0.95047;
+  Z /= 1.08883;
+  const f = (t: number) => (t > 0.008856 ? Math.pow(t, 1 / 3) : 7.787 * t + 16 / 116);
+  const fX = f(X);
+  const fY = f(Y);
+  const fZ = f(Z);
+  return [116 * fY - 16, 500 * (fX - fY), 200 * (fY - fZ)];
+}
+function labToRgb(L: number, A: number, B: number): [number, number, number] {
+  const fY = (L + 16) / 116;
+  const fX = A / 500 + fY;
+  const fZ = fY - B / 200;
+  const fi = (t: number) => (t > 0.206896 ? t * t * t : (t - 16 / 116) / 7.787);
+  const X = 0.95047 * fi(fX);
+  const Y = fi(fY);
+  const Z = 1.08883 * fi(fZ);
+  const lr = X * 3.2404542 + Y * -1.5371385 + Z * -0.4985314;
+  const lg = X * -0.9692660 + Y * 1.8760108 + Z * 0.0415560;
+  const lb = X * 0.0556434 + Y * -0.2040259 + Z * 1.0572252;
+  return [linToSrgb(lr), linToSrgb(lg), linToSrgb(lb)];
+}
+
+/** Reinhard colour transfer in CIELAB: shift target's pixel
+ *  distribution to match reference, in a space where luminance and
+ *  chroma are separated. Result is much more natural than RGB
+ *  transfer — a warm phone selfie gets the pro's neutral white
+ *  balance without flattening the user's own lighting. */
 function colorHarmonize(
   target: HTMLCanvasElement,
   reference: HTMLCanvasElement,
@@ -251,53 +290,106 @@ function colorHarmonize(
   const rData = rImg.data;
   const mData = mImg.data;
 
-  // Compute mean / std over face-masked pixels for each channel.
+  // Convert face-pixels to LAB and accumulate per-channel stats.
   const tSum = [0, 0, 0];
   const tSumSq = [0, 0, 0];
   const rSum = [0, 0, 0];
   const rSumSq = [0, 0, 0];
   let count = 0;
-  for (let i = 0; i < tData.length; i += 4) {
-    // Need both source pixels to be present AND mask to be solid.
-    if (mData[i + 3] < 200) continue;
-    if (tData[i + 3] === 0 || rData[i + 3] === 0) continue;
-    for (let ch = 0; ch < 3; ch++) {
-      const tv = tData[i + ch];
-      const rv = rData[i + ch];
-      tSum[ch] += tv;
-      tSumSq[ch] += tv * tv;
-      rSum[ch] += rv;
-      rSumSq[ch] += rv * rv;
-    }
-    count++;
-  }
-  if (count < 100) return; // not enough face pixels to compute stats
-
-  const tMean: number[] = [];
-  const tStd: number[] = [];
-  const rMean: number[] = [];
-  const rStd: number[] = [];
-  for (let ch = 0; ch < 3; ch++) {
-    tMean[ch] = tSum[ch] / count;
-    rMean[ch] = rSum[ch] / count;
-    tStd[ch] = Math.sqrt(Math.max(1, tSumSq[ch] / count - tMean[ch] * tMean[ch]));
-    rStd[ch] = Math.sqrt(Math.max(1, rSumSq[ch] / count - rMean[ch] * rMean[ch]));
-  }
-
-  // Don't over-correct — clamp the scale factor so an under-lit photo
-  // doesn't get amplified to a noisy mess. 0.6-1.6x is plenty.
-  const scaleClamp = (s: number) => Math.max(0.6, Math.min(1.6, s));
-
-  // Apply transfer to target pixels.
+  // Cache LAB values for target so we don't convert twice.
+  const tLab = new Float32Array(tData.length);
   for (let i = 0; i < tData.length; i += 4) {
     if (tData[i + 3] === 0) continue;
-    for (let ch = 0; ch < 3; ch++) {
-      const scale = scaleClamp(rStd[ch] / tStd[ch]);
-      const v = (tData[i + ch] - tMean[ch]) * scale + rMean[ch];
-      tData[i + ch] = Math.max(0, Math.min(255, Math.round(v)));
-    }
+    const [L, A, B] = rgbToLab(tData[i], tData[i + 1], tData[i + 2]);
+    tLab[i] = L;
+    tLab[i + 1] = A;
+    tLab[i + 2] = B;
+    if (mData[i + 3] < 200) continue;
+    if (rData[i + 3] === 0) continue;
+    tSum[0] += L; tSum[1] += A; tSum[2] += B;
+    tSumSq[0] += L * L; tSumSq[1] += A * A; tSumSq[2] += B * B;
+    const [rL, rA, rB] = rgbToLab(rData[i], rData[i + 1], rData[i + 2]);
+    rSum[0] += rL; rSum[1] += rA; rSum[2] += rB;
+    rSumSq[0] += rL * rL; rSumSq[1] += rA * rA; rSumSq[2] += rB * rB;
+    count++;
+  }
+  if (count < 100) return;
+
+  const tMean = tSum.map((s) => s / count);
+  const rMean = rSum.map((s) => s / count);
+  const tStd = tSumSq.map((sq, i) =>
+    Math.sqrt(Math.max(0.5, sq / count - tMean[i] * tMean[i])),
+  );
+  const rStd = rSumSq.map((sq, i) =>
+    Math.sqrt(Math.max(0.5, sq / count - rMean[i] * rMean[i])),
+  );
+
+  // Clamp transfer strength so we don't amplify noise on a poor selfie.
+  // L (luminance): 0.7-1.3 — preserve user's own lighting shape.
+  // A/B (chroma): 0.4-1.8 — more aggressive on colour cast correction.
+  const clamps: [number, number][] = [
+    [0.7, 1.3],
+    [0.4, 1.8],
+    [0.4, 1.8],
+  ];
+
+  for (let i = 0; i < tData.length; i += 4) {
+    if (tData[i + 3] === 0) continue;
+    const L = tLab[i];
+    const A = tLab[i + 1];
+    const B = tLab[i + 2];
+    const newL =
+      (L - tMean[0]) *
+        Math.max(clamps[0][0], Math.min(clamps[0][1], rStd[0] / tStd[0])) +
+      rMean[0];
+    const newA =
+      (A - tMean[1]) *
+        Math.max(clamps[1][0], Math.min(clamps[1][1], rStd[1] / tStd[1])) +
+      rMean[1];
+    const newB =
+      (B - tMean[2]) *
+        Math.max(clamps[2][0], Math.min(clamps[2][1], rStd[2] / tStd[2])) +
+      rMean[2];
+    const [r, g, b] = labToRgb(newL, newA, newB);
+    tData[i] = r;
+    tData[i + 1] = g;
+    tData[i + 2] = b;
   }
   tctx.putImageData(tImg, 0, 0);
+}
+
+/** Unsharp mask sharpening via 3x3 kernel. Compensates for the slight
+ *  high-frequency softening that any alpha-blend introduces — without
+ *  it the result looks airbrushed. */
+function sharpen(canvas: HTMLCanvasElement, amount: number): void {
+  const ctx = canvas.getContext("2d")!;
+  const w = canvas.width;
+  const h = canvas.height;
+  const img = ctx.getImageData(0, 0, w, h);
+  const src = new Uint8ClampedArray(img.data);
+  const dst = img.data;
+  const wt = amount / 9; // weight per 8-neighbour
+  const ct = 1 + amount * 8 / 9; // centre weight to keep mass = 1
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = (y * w + x) * 4;
+      if (src[i + 3] === 0) continue;
+      for (let ch = 0; ch < 3; ch++) {
+        const sum =
+          src[((y - 1) * w + (x - 1)) * 4 + ch] +
+          src[((y - 1) * w + x) * 4 + ch] +
+          src[((y - 1) * w + (x + 1)) * 4 + ch] +
+          src[(y * w + (x - 1)) * 4 + ch] +
+          src[(y * w + (x + 1)) * 4 + ch] +
+          src[((y + 1) * w + (x - 1)) * 4 + ch] +
+          src[((y + 1) * w + x) * 4 + ch] +
+          src[((y + 1) * w + (x + 1)) * 4 + ch];
+        const v = src[i + ch] * ct - sum * wt;
+        dst[i + ch] = Math.max(0, Math.min(255, Math.round(v)));
+      }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
 }
 
 /** Pixel-level contrast + saturation bump. Replaces the ctx.filter
@@ -418,7 +510,7 @@ export default function BlendMePage() {
 
   useEffect(() => {
     console.log(
-      "%c[blend/me] build v8 — 800px + colour harmonize + enhance",
+      "%c[blend/me] build v9 — LAB colour transfer + unsharp mask",
       "color: #E07B5B; font-weight: bold",
     );
     getDetector().catch((e) => console.error("mediapipe preload failed", e));
@@ -570,6 +662,12 @@ export default function BlendMePage() {
         // because ctx.filter hangs iOS Safari.
         enhanceBlend(out, 1.08, 1.1);
         log("enhanced");
+
+        // Unsharp-mask sharpening to compensate for the alpha-blend
+        // softening of high-frequency detail. Eyes, lashes, and skin
+        // texture come back from the airbrushed-looking 50/50 blend.
+        sharpen(out, 0.35);
+        log("sharpened");
 
         outCtx.fillStyle = "rgba(255, 214, 74, 0.9)";
         outCtx.font = `bold ${Math.round(OUT_SIZE * 0.038)}px system-ui, sans-serif`;
