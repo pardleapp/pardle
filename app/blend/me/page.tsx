@@ -14,7 +14,7 @@ import { searchableName } from "@/lib/text";
 
 const PRO_LANDMARKS = faceLandmarksRaw as Record<string, number[][]>;
 
-const OUT_SIZE = 600;
+const OUT_SIZE = 800;
 
 // mediapipe FACEMESH_FACE_OVAL — closed loop of indices tracing the
 // jawline + hairline. Used to mask the morph to just the face area.
@@ -180,22 +180,23 @@ function normalizeTargetLandmarks(
   ]);
 }
 
-/** Composite a soft-edged face-shaped mask onto the output canvas so
- *  everything outside the average face polygon fades into the BG. */
-function applyFaceOvalMask(
-  ctx: CanvasRenderingContext2D,
+/** Build a face-oval alpha mask as a separate canvas. White inside the
+ *  averaged face polygon, transparent outside, with a soft blurred
+ *  edge. Used both for colour-stat sampling (which pixels are face?)
+ *  AND for the final composite. shadowBlur instead of ctx.filter so
+ *  iOS Safari doesn't hang. */
+function buildFaceMask(
   dstLm: number[][],
   size: number,
-): void {
+): HTMLCanvasElement {
   const mask = document.createElement("canvas");
   mask.width = size;
   mask.height = size;
   const mctx = mask.getContext("2d")!;
   mctx.fillStyle = "white";
-  // shadowBlur on the fill softens the polygon edge — safe on iOS
-  // Safari (unlike ctx.filter which hangs).
   mctx.shadowColor = "white";
-  mctx.shadowBlur = Math.floor(size * 0.04);
+  // 6% of canvas — soft enough that the face-to-BG edge is invisible.
+  mctx.shadowBlur = Math.floor(size * 0.06);
   mctx.beginPath();
   for (let i = 0; i < FACE_OVAL_INDICES.length; i++) {
     const idx = FACE_OVAL_INDICES[i];
@@ -208,13 +209,126 @@ function applyFaceOvalMask(
   }
   mctx.closePath();
   mctx.fill();
+  return mask;
+}
 
+/** Composite a built face mask onto the output canvas + fill BG. */
+function applyFaceOvalMask(
+  ctx: CanvasRenderingContext2D,
+  mask: HTMLCanvasElement,
+  size: number,
+): void {
   ctx.globalCompositeOperation = "destination-in";
   ctx.drawImage(mask, 0, 0);
   ctx.globalCompositeOperation = "destination-over";
   ctx.fillStyle = "#0f1f0f";
   ctx.fillRect(0, 0, size, size);
   ctx.globalCompositeOperation = "source-over";
+}
+
+/** Reinhard colour transfer in RGB: shift `target` canvas's pixel
+ *  distribution to match `reference` canvas. Computes mean & std per
+ *  channel using only pixels marked as face in `mask`, then for each
+ *  pixel in target applies (v - tMean) * (rStd / tStd) + rMean.
+ *
+ *  Result: a selfie shot in warm tungsten / blue daylight / underexposed
+ *  light blends seamlessly with the pro's neutral studio shot. Without
+ *  this the colour mismatch makes the blend look like two separate
+ *  faces stitched together. */
+function colorHarmonize(
+  target: HTMLCanvasElement,
+  reference: HTMLCanvasElement,
+  mask: HTMLCanvasElement,
+  size: number,
+): void {
+  const tctx = target.getContext("2d")!;
+  const rctx = reference.getContext("2d")!;
+  const mctx = mask.getContext("2d")!;
+  const tImg = tctx.getImageData(0, 0, size, size);
+  const rImg = rctx.getImageData(0, 0, size, size);
+  const mImg = mctx.getImageData(0, 0, size, size);
+  const tData = tImg.data;
+  const rData = rImg.data;
+  const mData = mImg.data;
+
+  // Compute mean / std over face-masked pixels for each channel.
+  const tSum = [0, 0, 0];
+  const tSumSq = [0, 0, 0];
+  const rSum = [0, 0, 0];
+  const rSumSq = [0, 0, 0];
+  let count = 0;
+  for (let i = 0; i < tData.length; i += 4) {
+    // Need both source pixels to be present AND mask to be solid.
+    if (mData[i + 3] < 200) continue;
+    if (tData[i + 3] === 0 || rData[i + 3] === 0) continue;
+    for (let ch = 0; ch < 3; ch++) {
+      const tv = tData[i + ch];
+      const rv = rData[i + ch];
+      tSum[ch] += tv;
+      tSumSq[ch] += tv * tv;
+      rSum[ch] += rv;
+      rSumSq[ch] += rv * rv;
+    }
+    count++;
+  }
+  if (count < 100) return; // not enough face pixels to compute stats
+
+  const tMean: number[] = [];
+  const tStd: number[] = [];
+  const rMean: number[] = [];
+  const rStd: number[] = [];
+  for (let ch = 0; ch < 3; ch++) {
+    tMean[ch] = tSum[ch] / count;
+    rMean[ch] = rSum[ch] / count;
+    tStd[ch] = Math.sqrt(Math.max(1, tSumSq[ch] / count - tMean[ch] * tMean[ch]));
+    rStd[ch] = Math.sqrt(Math.max(1, rSumSq[ch] / count - rMean[ch] * rMean[ch]));
+  }
+
+  // Don't over-correct — clamp the scale factor so an under-lit photo
+  // doesn't get amplified to a noisy mess. 0.6-1.6x is plenty.
+  const scaleClamp = (s: number) => Math.max(0.6, Math.min(1.6, s));
+
+  // Apply transfer to target pixels.
+  for (let i = 0; i < tData.length; i += 4) {
+    if (tData[i + 3] === 0) continue;
+    for (let ch = 0; ch < 3; ch++) {
+      const scale = scaleClamp(rStd[ch] / tStd[ch]);
+      const v = (tData[i + ch] - tMean[ch]) * scale + rMean[ch];
+      tData[i + ch] = Math.max(0, Math.min(255, Math.round(v)));
+    }
+  }
+  tctx.putImageData(tImg, 0, 0);
+}
+
+/** Pixel-level contrast + saturation bump. Replaces the ctx.filter
+ *  approach which hangs iOS Safari. */
+function enhanceBlend(
+  canvas: HTMLCanvasElement,
+  contrast: number,
+  saturation: number,
+): void {
+  const ctx = canvas.getContext("2d")!;
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] === 0) continue;
+    let r = d[i];
+    let g = d[i + 1];
+    let b = d[i + 2];
+    // Contrast around 128.
+    r = (r - 128) * contrast + 128;
+    g = (g - 128) * contrast + 128;
+    b = (b - 128) * contrast + 128;
+    // Saturation around the perceptual grey of the pixel.
+    const grey = r * 0.299 + g * 0.587 + b * 0.114;
+    r = grey + (r - grey) * saturation;
+    g = grey + (g - grey) * saturation;
+    b = grey + (b - grey) * saturation;
+    d[i] = Math.max(0, Math.min(255, Math.round(r)));
+    d[i + 1] = Math.max(0, Math.min(255, Math.round(g)));
+    d[i + 2] = Math.max(0, Math.min(255, Math.round(b)));
+  }
+  ctx.putImageData(img, 0, 0);
 }
 
 // ── mediapipe loader (singleton) ────────────────────────────────────
@@ -304,7 +418,7 @@ export default function BlendMePage() {
 
   useEffect(() => {
     console.log(
-      "%c[blend/me] build v7 — Delaunay morph + face-fill + seam fix",
+      "%c[blend/me] build v8 — 800px + colour harmonize + enhance",
       "color: #E07B5B; font-weight: bold",
     );
     getDetector().catch((e) => console.error("mediapipe preload failed", e));
@@ -427,6 +541,17 @@ export default function BlendMePage() {
         );
         log("pro face warped");
 
+        // Build the face mask once — used both for colour-stat sampling
+        // (which pixels count as "face"?) and for the final composite.
+        const faceMask = buildFaceMask(target, OUT_SIZE);
+        log("face mask built");
+
+        // Match the user's colour distribution to the pro's BEFORE
+        // blending. Eliminates the seam between a warm phone selfie
+        // and the pro's neutral studio shot.
+        colorHarmonize(userCanvas, proCanvas, faceMask, OUT_SIZE);
+        log("colour harmonised");
+
         const out = document.createElement("canvas");
         out.width = OUT_SIZE;
         out.height = OUT_SIZE;
@@ -437,14 +562,24 @@ export default function BlendMePage() {
         outCtx.globalAlpha = 1;
         log("blended");
 
-        applyFaceOvalMask(outCtx, target, OUT_SIZE);
+        applyFaceOvalMask(outCtx, faceMask, OUT_SIZE);
         log("mask applied");
 
-        outCtx.fillStyle = "rgba(255, 214, 74, 0.85)";
-        outCtx.font = "bold 22px system-ui, sans-serif";
+        // Pixel-level contrast + saturation — same "punch" the offline
+        // pro x pro pipeline applies via OpenCV. Done in pixel space
+        // because ctx.filter hangs iOS Safari.
+        enhanceBlend(out, 1.08, 1.1);
+        log("enhanced");
+
+        outCtx.fillStyle = "rgba(255, 214, 74, 0.9)";
+        outCtx.font = `bold ${Math.round(OUT_SIZE * 0.038)}px system-ui, sans-serif`;
         outCtx.textAlign = "right";
         outCtx.textBaseline = "bottom";
-        outCtx.fillText("pardle.app/blend", OUT_SIZE - 18, OUT_SIZE - 14);
+        outCtx.fillText(
+          "pardle.app/blend",
+          OUT_SIZE - Math.round(OUT_SIZE * 0.03),
+          OUT_SIZE - Math.round(OUT_SIZE * 0.025),
+        );
 
         const dataUrl = out.toDataURL("image/jpeg", 0.9);
         log("jpeg encoded");
