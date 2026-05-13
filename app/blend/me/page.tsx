@@ -1,9 +1,10 @@
 "use client";
 
+import Delaunator from "delaunator";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BRAND } from "@/lib/brand";
-import faceAlignmentRaw from "@/lib/data/face-alignment.json";
+import faceLandmarksRaw from "@/lib/data/face-landmarks.json";
 import { GOLFERS } from "@/lib/data/golfers";
 import {
   PGA_TOUR_IDS,
@@ -11,68 +12,20 @@ import {
 } from "@/lib/data/pga-tour-ids";
 import { searchableName } from "@/lib/text";
 
-interface ProAlignment {
-  leftEye: number[];
-  rightEye: number[];
-  mouth: number[];
-  distance: number;
-  angle: number;
-  eyeMouthDistance: number;
-  eyeMouthAngle: number;
-}
-const PRO_ALIGNMENT = faceAlignmentRaw as Record<string, ProAlignment>;
-
-// ── canonical alignment constants — match lib/data/face-alignment.ts ─
-const CANONICAL_EYE_X = 0.5;
-const CANONICAL_EYE_Y = 0.4;
-const CANONICAL_MOUTH_X = 0.5;
-const CANONICAL_MOUTH_Y = 0.62;
-
-// mediapipe FaceMesh landmark indices (refined-landmarks model)
-const LEFT_IRIS = 468;
-const RIGHT_IRIS = 473;
-const MOUTH_LEFT_CORNER = 61;
-const MOUTH_RIGHT_CORNER = 291;
+const PRO_LANDMARKS = faceLandmarksRaw as Record<string, number[][]>;
 
 const OUT_SIZE = 600;
 
-interface FaceLm {
-  leftEye: [number, number];
-  rightEye: [number, number];
-  mouth: [number, number];
-}
+// mediapipe FACEMESH_FACE_OVAL — closed loop of indices tracing the
+// jawline + hairline. Used to mask the morph to just the face area.
+const FACE_OVAL_INDICES = [
+  10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397,
+  365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58,
+  132, 93, 234, 127, 162, 21, 54, 103, 67, 109,
+];
 
-interface AlignTransform {
-  /** Pixel translation. */
-  tx: number;
-  ty: number;
-  /** Uniform scale around origin (0, 0). */
-  scale: number;
-  /** Rotation in degrees around origin. */
-  rotateDeg: number;
-}
+// ── helpers ────────────────────────────────────────────────────────
 
-function computeAlignTransform(lm: FaceLm, size: number): AlignTransform {
-  const eyeMidX = (lm.leftEye[0] + lm.rightEye[0]) / 2;
-  const eyeMidY = (lm.leftEye[1] + lm.rightEye[1]) / 2;
-  const dx = lm.mouth[0] - eyeMidX;
-  const dy = lm.mouth[1] - eyeMidY;
-  const measLen = Math.hypot(dx, dy);
-  const canonLen = CANONICAL_MOUTH_Y - CANONICAL_EYE_Y;
-  const scale = canonLen / measLen;
-  const angleMeas = Math.atan2(dy, dx);
-  const angleCanon = Math.atan2(canonLen, 0); // pi/2
-  const rotateRad = angleCanon - angleMeas;
-  const cos = Math.cos(rotateRad);
-  const sin = Math.sin(rotateRad);
-  const eyeRotX = eyeMidX * cos - eyeMidY * sin;
-  const eyeRotY = eyeMidX * sin + eyeMidY * cos;
-  const tx = (CANONICAL_EYE_X - eyeRotX * scale) * size;
-  const ty = (CANONICAL_EYE_Y - eyeRotY * scale) * size;
-  return { tx, ty, scale, rotateDeg: (rotateRad * 180) / Math.PI };
-}
-
-/** Load an image element from a URL (or blob URL) and wait for decode. */
 function loadImage(src: string, crossOrigin = true): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -83,13 +36,6 @@ function loadImage(src: string, crossOrigin = true): Promise<HTMLImageElement> {
   });
 }
 
-/**
- * Downscale an image element to a max dimension on a temporary canvas.
- * 4000+px iPhone selfies blow up canvas drawImage / toDataURL — drawing
- * them at full size synchronously locks the main thread for minutes
- * and starves the timeout callback. Bring everything down to ~1200px
- * before any further work.
- */
 function downscale(img: HTMLImageElement, maxDim = 1200): HTMLCanvasElement {
   const ratio = Math.min(1, maxDim / Math.max(img.width, img.height));
   const w = Math.round(img.width * ratio);
@@ -101,63 +47,123 @@ function downscale(img: HTMLImageElement, maxDim = 1200): HTMLCanvasElement {
   return c;
 }
 
-/** Draw `img` onto `ctx` at the aligned position derived from `t`. */
-function drawAligned(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement | HTMLCanvasElement,
-  t: AlignTransform,
-  size: number,
-  alpha: number,
-): void {
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  // Canvas applies transforms in source order: translate, rotate, scale.
-  // We want: rotate first (around origin), then scale, then translate —
-  // which means we call translate(tx,ty) → rotate(deg) → scale(s) before
-  // drawing the image at its native size.
-  ctx.translate(t.tx, t.ty);
-  ctx.rotate((t.rotateDeg * Math.PI) / 180);
-  ctx.scale(t.scale, t.scale);
-  ctx.drawImage(img, 0, 0, size, size);
-  ctx.restore();
+/** Affine transform matrix that maps source triangle to dest triangle.
+ *  Returns [a, b, c, d, e, f] for canvas setTransform: x'=a*x+c*y+e. */
+function getAffineTransform(
+  src: number[][],
+  dst: number[][],
+): number[] | null {
+  const [sx1, sy1] = src[0];
+  const [sx2, sy2] = src[1];
+  const [sx3, sy3] = src[2];
+  const [dx1, dy1] = dst[0];
+  const [dx2, dy2] = dst[1];
+  const [dx3, dy3] = dst[2];
+  const det = sx1 * (sy2 - sy3) + sx2 * (sy3 - sy1) + sx3 * (sy1 - sy2);
+  if (Math.abs(det) < 1e-10) return null;
+  const inv = 1 / det;
+  return [
+    (dx1 * (sy2 - sy3) + dx2 * (sy3 - sy1) + dx3 * (sy1 - sy2)) * inv,
+    (dy1 * (sy2 - sy3) + dy2 * (sy3 - sy1) + dy3 * (sy1 - sy2)) * inv,
+    (dx1 * (sx3 - sx2) + dx2 * (sx1 - sx3) + dx3 * (sx2 - sx1)) * inv,
+    (dy1 * (sx3 - sx2) + dy2 * (sx1 - sx3) + dy3 * (sx2 - sx1)) * inv,
+    (dx1 * (sx2 * sy3 - sx3 * sy2) +
+      dx2 * (sx3 * sy1 - sx1 * sy3) +
+      dx3 * (sx1 * sy2 - sx2 * sy1)) *
+      inv,
+    (dy1 * (sx2 * sy3 - sx3 * sy2) +
+      dy2 * (sx3 * sy1 - sx1 * sy3) +
+      dy3 * (sx1 * sy2 - sx2 * sy1)) *
+      inv,
+  ];
 }
 
-/** Apply soft-edged elliptical face mask via composite-out trick. */
-function applyOvalMask(ctx: CanvasRenderingContext2D, size: number): void {
-  // Build the mask alpha on a side canvas then use composite-out to
-  // erase the corners.
+/** Warp `img` so its landmarks `srcLm` land where `dstLm` are, using
+ *  the given triangulation. Returns an offscreen canvas of `size x size`. */
+function warpFace(
+  img: HTMLImageElement | HTMLCanvasElement,
+  srcLm: number[][],
+  dstLm: number[][],
+  triangles: Uint32Array,
+  size: number,
+): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext("2d")!;
+  const iw = img.width;
+  const ih = img.height;
+  for (let t = 0; t < triangles.length; t += 3) {
+    const i1 = triangles[t];
+    const i2 = triangles[t + 1];
+    const i3 = triangles[t + 2];
+    if (!srcLm[i1] || !srcLm[i2] || !srcLm[i3]) continue;
+    if (!dstLm[i1] || !dstLm[i2] || !dstLm[i3]) continue;
+    const src = [
+      [srcLm[i1][0] * iw, srcLm[i1][1] * ih],
+      [srcLm[i2][0] * iw, srcLm[i2][1] * ih],
+      [srcLm[i3][0] * iw, srcLm[i3][1] * ih],
+    ];
+    const dst = [
+      [dstLm[i1][0] * size, dstLm[i1][1] * size],
+      [dstLm[i2][0] * size, dstLm[i2][1] * size],
+      [dstLm[i3][0] * size, dstLm[i3][1] * size],
+    ];
+    const m = getAffineTransform(src, dst);
+    if (!m) continue;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(dst[0][0], dst[0][1]);
+    ctx.lineTo(dst[1][0], dst[1][1]);
+    ctx.lineTo(dst[2][0], dst[2][1]);
+    ctx.closePath();
+    ctx.clip();
+    ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+  }
+  return c;
+}
+
+/** Composite a soft-edged face-shaped mask onto the output canvas so
+ *  everything outside the average face polygon fades into the BG. */
+function applyFaceOvalMask(
+  ctx: CanvasRenderingContext2D,
+  dstLm: number[][],
+  size: number,
+): void {
   const mask = document.createElement("canvas");
   mask.width = size;
   mask.height = size;
   const mctx = mask.getContext("2d")!;
-  // Dark green BG
-  mctx.fillStyle = "#0f1f0f";
-  mctx.fillRect(0, 0, size, size);
-  // Cut a soft oval hole
-  mctx.globalCompositeOperation = "destination-out";
-  const grad = mctx.createRadialGradient(
-    size / 2,
-    size / 2,
-    size * 0.25,
-    size / 2,
-    size / 2,
-    size * 0.45,
-  );
-  grad.addColorStop(0, "rgba(0,0,0,1)");
-  grad.addColorStop(0.7, "rgba(0,0,0,1)");
-  grad.addColorStop(1, "rgba(0,0,0,0)");
-  mctx.fillStyle = grad;
-  mctx.fillRect(0, 0, size, size);
-  // Composite back over the main canvas
-  ctx.globalCompositeOperation = "destination-over";
-  // Actually we want the mask ON TOP — draw it normally
-  ctx.globalCompositeOperation = "source-over";
+  mctx.fillStyle = "white";
+  // shadowBlur on the fill softens the polygon edge — safe on iOS
+  // Safari (unlike ctx.filter which hangs).
+  mctx.shadowColor = "white";
+  mctx.shadowBlur = Math.floor(size * 0.04);
+  mctx.beginPath();
+  for (let i = 0; i < FACE_OVAL_INDICES.length; i++) {
+    const idx = FACE_OVAL_INDICES[i];
+    const p = dstLm[idx];
+    if (!p) continue;
+    const px = p[0] * size;
+    const py = p[1] * size;
+    if (i === 0) mctx.moveTo(px, py);
+    else mctx.lineTo(px, py);
+  }
+  mctx.closePath();
+  mctx.fill();
+
+  ctx.globalCompositeOperation = "destination-in";
   ctx.drawImage(mask, 0, 0);
+  ctx.globalCompositeOperation = "destination-over";
+  ctx.fillStyle = "#0f1f0f";
+  ctx.fillRect(0, 0, size, size);
+  ctx.globalCompositeOperation = "source-over";
 }
 
-// Module-level singleton — load mediapipe + the FaceLandmarker model
-// exactly once per page session. The promise is created on first call;
-// subsequent callers await the same promise.
+// ── mediapipe loader (singleton) ────────────────────────────────────
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _detectorPromise: Promise<any> | null = null;
 
@@ -184,24 +190,11 @@ function getDetector(): Promise<any> {
   return _detectorPromise;
 }
 
-function extractFaceLm(landmarks: { x: number; y: number }[]): FaceLm | null {
-  const needed = Math.max(
-    LEFT_IRIS,
-    RIGHT_IRIS,
-    MOUTH_LEFT_CORNER,
-    MOUTH_RIGHT_CORNER,
-  );
-  if (landmarks.length <= needed) return null;
-  const le = landmarks[LEFT_IRIS];
-  const re = landmarks[RIGHT_IRIS];
-  const screenLeft: [number, number] =
-    le.x < re.x ? [le.x, le.y] : [re.x, re.y];
-  const screenRight: [number, number] =
-    le.x < re.x ? [re.x, re.y] : [le.x, le.y];
-  const ml = landmarks[MOUTH_LEFT_CORNER];
-  const mr = landmarks[MOUTH_RIGHT_CORNER];
-  const mouth: [number, number] = [(ml.x + mr.x) / 2, (ml.y + mr.y) / 2];
-  return { leftEye: screenLeft, rightEye: screenRight, mouth };
+function extractAllLandmarks(
+  lm: { x: number; y: number }[],
+): number[][] | null {
+  if (lm.length < 478) return null;
+  return lm.slice(0, 478).map((p) => [p.x, p.y]);
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -217,22 +210,24 @@ const FEATURED: { id: string; label: string }[] = [
   { id: "52955", label: "Åberg" },
 ];
 
-type Stage = "idle" | "detecting" | "ready" | "rendering" | "error";
+type Stage = "idle" | "detecting" | "ready" | "error";
 
 export default function BlendMePage() {
   const [stage, setStage] = useState<Stage>("idle");
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [selfieUrl, setSelfieUrl] = useState<string | null>(null);
-  const [selfieLm, setSelfieLm] = useState<FaceLm | null>(null);
+  const [selfieLm, setSelfieLm] = useState<number[][] | null>(null);
   const [selectedPro, setSelectedPro] = useState<string | null>(null);
   const [blendUrl, setBlendUrl] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Eligible pros to blend with — those with PGA Tour IDs (so we have
-  // a Cloudinary headshot we can fetch).
   const pool = useMemo(
-    () => GOLFERS.filter((g) => PGA_TOUR_IDS[g.id] !== undefined),
+    () =>
+      GOLFERS.filter(
+        (g) =>
+          PGA_TOUR_IDS[g.id] !== undefined &&
+          PRO_LANDMARKS[PGA_TOUR_IDS[g.id]!],
+      ),
     [],
   );
   const searchMatches = useMemo(() => {
@@ -252,13 +247,9 @@ export default function BlendMePage() {
     return GOLFERS.find((g) => g.id === slug)?.name ?? null;
   }, [selectedPro]);
 
-  // Pre-load mediapipe on mount — by the time the user uploads a
-  // selfie, the model is already cached and detection is instant.
-  // Also prints a build marker so we can sanity-check the deploy is
-  // current when troubleshooting from a screenshot.
   useEffect(() => {
     console.log(
-      "%c[blend/me] build v5 (granular logs + filter dropped)",
+      "%c[blend/me] build v6 — full Delaunay morph",
       "color: #E07B5B; font-weight: bold",
     );
     getDetector().catch((e) => console.error("mediapipe preload failed", e));
@@ -273,8 +264,6 @@ export default function BlendMePage() {
     setStage("detecting");
     try {
       const img = await loadImage(url, false);
-      // Downscale right away. 4000px+ iPhone selfies hang mediapipe AND
-      // the canvas pipeline; ~1200px is plenty for face detection.
       const small = downscale(img, 1200);
       const detector = await getDetector();
       const result = detector.detect(small);
@@ -285,7 +274,7 @@ export default function BlendMePage() {
         setStage("error");
         return;
       }
-      const lm = extractFaceLm(result.faceLandmarks[0]);
+      const lm = extractAllLandmarks(result.faceLandmarks[0]);
       if (!lm) {
         setErrMsg("Face detected but landmarks incomplete. Try another photo.");
         setStage("error");
@@ -300,47 +289,34 @@ export default function BlendMePage() {
     }
   }
 
-  // ── render blend whenever a pro is picked ──────────────────────────
-  // IMPORTANT: don't include `stage` in the deps array. Setting stage
-  // to "rendering" inside the effect would re-fire it and the cleanup
-  // would set cancelled=true, making the async work exit silently right
-  // before drawing to canvas. That bug ate hours of debugging.
   useEffect(() => {
     if (!selectedPro || !selfieUrl || !selfieLm) return;
     if (stage === "detecting" || stage === "error") return;
-    if (blendUrl) return; // already rendered for this pick
+    if (blendUrl) return;
     let cancelled = false;
-
-    // Hard timeout — surfaces an error if any step gets stuck. Per-step
-    // logs (visible in the browser console) let us pinpoint hangs.
     const t0 = performance.now();
     const log = (msg: string) =>
       console.log(`[blend/me] ${(performance.now() - t0).toFixed(0)}ms ${msg}`);
-    log("render start");
+    log("morph start");
 
     const timeoutId = window.setTimeout(() => {
       if (cancelled) return;
       cancelled = true;
-      console.warn("[blend/me] timed out after 15s — see logs above");
+      console.warn("[blend/me] timed out after 20s");
       setErrMsg(
-        "Blending took too long. Try a smaller photo or a different pro.",
+        "Morph took too long. Try a smaller photo or a different pro.",
       );
       setStage("error");
-    }, 15000);
+    }, 20000);
 
     (async () => {
       try {
-        const proAlign = PRO_ALIGNMENT[selectedPro];
-        if (!proAlign) throw new Error(`no alignment data for ${selectedPro}`);
-        const proLm: FaceLm = {
-          leftEye: [proAlign.leftEye[0], proAlign.leftEye[1]],
-          rightEye: [proAlign.rightEye[0], proAlign.rightEye[1]],
-          mouth: [proAlign.mouth[0], proAlign.mouth[1]],
-        };
-        log(`have pro landmarks for ${selectedPro}`);
+        const proLm = PRO_LANDMARKS[selectedPro];
+        if (!proLm || proLm.length < 478) {
+          throw new Error("missing pro landmarks");
+        }
+        log(`have ${proLm.length} pro landmarks`);
 
-        // Race the pro image fetch against a 10s deadline. If Cloudinary
-        // is slow, we want to error out cleanly rather than hang.
         const proImgPromise = loadImage(
           pgaTourHeadshotUrlById(selectedPro, 600),
         );
@@ -353,89 +329,85 @@ export default function BlendMePage() {
         log("pro image loaded");
 
         const selfieImg = await loadImage(selfieUrl, false);
-        log(`selfie image loaded (${selfieImg.width}x${selfieImg.height})`);
-
-        // Downscale the selfie BEFORE feeding to canvas. A 4032x3024
-        // iPhone shot will lock the main thread for minutes on
-        // drawImage + toDataURL. ~1200px is way more than the 600px
-        // output stage needs.
         const selfieSmall = downscale(selfieImg, 1200);
-        log(`selfie downscaled to ${selfieSmall.width}x${selfieSmall.height}`);
+        log(`selfie ready ${selfieSmall.width}x${selfieSmall.height}`);
 
         if (cancelled) return;
-        const canvas = canvasRef.current;
-        if (!canvas) {
-          throw new Error("canvas ref missing");
+
+        // Average the two landmark sets to get the morph target.
+        const target = selfieLm.map((p, i) => [
+          (p[0] + proLm[i][0]) / 2,
+          (p[1] + proLm[i][1]) / 2,
+        ]);
+        log("target geometry built");
+
+        // Delaunay over the target landmark positions (in pixel coords).
+        const flat = new Float64Array(target.length * 2);
+        for (let i = 0; i < target.length; i++) {
+          flat[i * 2] = target[i][0] * OUT_SIZE;
+          flat[i * 2 + 1] = target[i][1] * OUT_SIZE;
         }
-        canvas.width = OUT_SIZE;
-        canvas.height = OUT_SIZE;
-        log("canvas sized");
-        const ctx = canvas.getContext("2d")!;
-        ctx.clearRect(0, 0, OUT_SIZE, OUT_SIZE);
-        ctx.fillStyle = "#0f1f0f";
-        ctx.fillRect(0, 0, OUT_SIZE, OUT_SIZE);
-        log("bg filled");
+        const delaunay = new Delaunator(flat);
+        const triangles = delaunay.triangles;
+        log(`triangulation: ${triangles.length / 3} triangles`);
 
-        const proT = computeAlignTransform(proLm, OUT_SIZE);
-        const selfieT = computeAlignTransform(selfieLm, OUT_SIZE);
-
-        // No ctx.filter — iOS Safari hangs hard on it. We accept a
-        // slightly less punchy result rather than risk the freeze.
-        drawAligned(ctx, proImg, proT, OUT_SIZE, 1);
-        log("pro drawn");
-        drawAligned(ctx, selfieSmall, selfieT, OUT_SIZE, 0.5);
-        log("canvas drawn");
-
-        // Soft elliptical face mask using a clip-via-mask trick.
-        const mask = document.createElement("canvas");
-        mask.width = OUT_SIZE;
-        mask.height = OUT_SIZE;
-        const mctx = mask.getContext("2d")!;
-        const grad = mctx.createRadialGradient(
-          OUT_SIZE / 2,
-          OUT_SIZE / 2,
-          OUT_SIZE * 0.3,
-          OUT_SIZE / 2,
-          OUT_SIZE / 2,
-          OUT_SIZE * 0.48,
+        const userCanvas = warpFace(
+          selfieSmall,
+          selfieLm,
+          target,
+          triangles,
+          OUT_SIZE,
         );
-        grad.addColorStop(0, "rgba(15,31,15,0)");
-        grad.addColorStop(0.6, "rgba(15,31,15,0)");
-        grad.addColorStop(1, "rgba(15,31,15,1)");
-        mctx.fillStyle = grad;
-        mctx.fillRect(0, 0, OUT_SIZE, OUT_SIZE);
-        ctx.drawImage(mask, 0, 0);
+        log("user face warped");
+
+        const proCanvas = warpFace(
+          proImg,
+          proLm,
+          target,
+          triangles,
+          OUT_SIZE,
+        );
+        log("pro face warped");
+
+        const out = document.createElement("canvas");
+        out.width = OUT_SIZE;
+        out.height = OUT_SIZE;
+        const outCtx = out.getContext("2d")!;
+        outCtx.drawImage(proCanvas, 0, 0);
+        outCtx.globalAlpha = 0.5;
+        outCtx.drawImage(userCanvas, 0, 0);
+        outCtx.globalAlpha = 1;
+        log("blended");
+
+        applyFaceOvalMask(outCtx, target, OUT_SIZE);
         log("mask applied");
 
-        // pardle.app watermark — small, bottom-right, low opacity
-        ctx.fillStyle = "rgba(255, 214, 74, 0.85)";
-        ctx.font = "bold 22px system-ui, sans-serif";
-        ctx.textAlign = "right";
-        ctx.textBaseline = "bottom";
-        ctx.fillText("pardle.app/blend", OUT_SIZE - 18, OUT_SIZE - 14);
+        outCtx.fillStyle = "rgba(255, 214, 74, 0.85)";
+        outCtx.font = "bold 22px system-ui, sans-serif";
+        outCtx.textAlign = "right";
+        outCtx.textBaseline = "bottom";
+        outCtx.fillText("pardle.app/blend", OUT_SIZE - 18, OUT_SIZE - 14);
 
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+        const dataUrl = out.toDataURL("image/jpeg", 0.9);
         log("jpeg encoded");
         if (!cancelled) {
           window.clearTimeout(timeoutId);
           setBlendUrl(dataUrl);
-          setStage("ready");
         }
       } catch (e) {
         if (cancelled) return;
         window.clearTimeout(timeoutId);
-        console.error("[blend/me] render failed:", e);
+        console.error("[blend/me] morph failed:", e);
         const msg = e instanceof Error ? e.message : String(e);
         setErrMsg(
           msg.includes("timed out")
             ? "The pro photo took too long to load. Try a different pro."
-            : msg.includes("SecurityError") || msg.includes("tainted")
-              ? "Browser blocked the image (CORS). Try refreshing the page."
-              : "Couldn't render the blend. Try a different photo or another pro.",
+            : "Couldn't render the blend. Try a different photo or another pro.",
         );
         setStage("error");
       }
     })();
+
     return () => {
       cancelled = true;
       window.clearTimeout(timeoutId);
@@ -471,9 +443,8 @@ export default function BlendMePage() {
         return;
       }
     } catch {
-      // fall through to copy
+      // fall through
     }
-    // Fallback: copy a text invite, user can paste anywhere
     try {
       await navigator.clipboard.writeText(
         `Made this on ${BRAND.url}/blend/me — try yours.`,
@@ -494,7 +465,6 @@ export default function BlendMePage() {
     setSearchInput("");
   }
 
-  // ── render ─────────────────────────────────────────────────────────
   return (
     <main className="container blend-landing">
       <header className="brand">
@@ -507,11 +477,9 @@ export default function BlendMePage() {
 
       <p className="blend-intro">
         Upload a head-on selfie and pick a PGA pro. Your face never leaves
-        this browser — the detection and blending all run locally.
+        this browser — detection and morphing all run locally.
       </p>
 
-      {/* Step 1: upload — accept gallery OR camera. No `capture` so
-          mobile lets the user choose between Camera and Photo Library. */}
       {!selfieUrl && (
         <label className="blendme-upload">
           <input
@@ -534,7 +502,6 @@ export default function BlendMePage() {
         </label>
       )}
 
-      {/* Detecting state */}
       {stage === "detecting" && (
         <div className="blendme-status">
           <div className="blendme-spinner" />
@@ -542,7 +509,6 @@ export default function BlendMePage() {
         </div>
       )}
 
-      {/* Error state */}
       {stage === "error" && errMsg && (
         <div className="blendme-error">
           <p>{errMsg}</p>
@@ -552,7 +518,6 @@ export default function BlendMePage() {
         </div>
       )}
 
-      {/* Picker + result */}
       {selfieUrl && selfieLm && stage !== "detecting" && stage !== "error" && (
         <>
           {!blendUrl && (
@@ -601,11 +566,10 @@ export default function BlendMePage() {
             </div>
           )}
 
-          {/* Result */}
           {selectedPro && !blendUrl && (
             <div className="blendme-status">
               <div className="blendme-spinner" />
-              <p>Blending…</p>
+              <p>Morphing your face into the pro&apos;s…</p>
             </div>
           )}
 
@@ -643,14 +607,6 @@ export default function BlendMePage() {
               </div>
             </>
           )}
-
-          {/* Hidden canvas used to compose the blend */}
-          <canvas
-            ref={canvasRef}
-            style={{ display: "none" }}
-            width={OUT_SIZE}
-            height={OUT_SIZE}
-          />
 
           <button className="blendme-reset" onClick={reset}>
             ← Start with a different selfie
