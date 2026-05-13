@@ -78,6 +78,21 @@ function getAffineTransform(
   ];
 }
 
+/** Expand a triangle outward from its centroid by `amount` pixels.
+ *  Used so adjacent triangle clips overlap a hair — otherwise the clip
+ *  antialiasing leaves visible seams along every shared edge. */
+function expandTriangle(tri: number[][], amount: number): number[][] {
+  const cx = (tri[0][0] + tri[1][0] + tri[2][0]) / 3;
+  const cy = (tri[0][1] + tri[1][1] + tri[2][1]) / 3;
+  return tri.map((p) => {
+    const dx = p[0] - cx;
+    const dy = p[1] - cy;
+    const len = Math.hypot(dx, dy);
+    if (len < 0.01) return p;
+    return [p[0] + (dx / len) * amount, p[1] + (dy / len) * amount];
+  });
+}
+
 /** Warp `img` so its landmarks `srcLm` land where `dstLm` are, using
  *  the given triangulation. Returns an offscreen canvas of `size x size`. */
 function warpFace(
@@ -91,6 +106,8 @@ function warpFace(
   c.width = size;
   c.height = size;
   const ctx = c.getContext("2d")!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   const iw = img.width;
   const ih = img.height;
   for (let t = 0; t < triangles.length; t += 3) {
@@ -111,11 +128,15 @@ function warpFace(
     ];
     const m = getAffineTransform(src, dst);
     if (!m) continue;
+    // Affine is computed from the ORIGINAL triangle pair so pixel
+    // mapping stays accurate. Only the clip is expanded — neighbours
+    // overlap by ~1px, hiding the antialiased seams.
+    const clipDst = expandTriangle(dst, 0.7);
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(dst[0][0], dst[0][1]);
-    ctx.lineTo(dst[1][0], dst[1][1]);
-    ctx.lineTo(dst[2][0], dst[2][1]);
+    ctx.moveTo(clipDst[0][0], clipDst[0][1]);
+    ctx.lineTo(clipDst[1][0], clipDst[1][1]);
+    ctx.lineTo(clipDst[2][0], clipDst[2][1]);
     ctx.closePath();
     ctx.clip();
     ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
@@ -123,6 +144,40 @@ function warpFace(
     ctx.restore();
   }
   return c;
+}
+
+/** Scale + centre the given landmarks so the FACE_OVAL bounding box
+ *  fills `fillFactor` of the canvas. Source landmarks are unchanged;
+ *  this only runs on the TARGET geometry to make the morphed face
+ *  fill the output. Without it the averaged user-x-pro face sits at
+ *  whatever (often small) size their photo crops average to. */
+function normalizeTargetLandmarks(
+  lm: number[][],
+  fillFactor: number,
+): number[][] {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const idx of FACE_OVAL_INDICES) {
+    const p = lm[idx];
+    if (!p) continue;
+    if (p[0] < minX) minX = p[0];
+    if (p[0] > maxX) maxX = p[0];
+    if (p[1] < minY) minY = p[1];
+    if (p[1] > maxY) maxY = p[1];
+  }
+  const w = maxX - minX;
+  const h = maxY - minY;
+  if (!isFinite(w) || !isFinite(h) || w <= 0 || h <= 0) return lm;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  // Uniform scale to preserve face aspect ratio.
+  const scale = Math.min(fillFactor / w, fillFactor / h);
+  return lm.map((p) => [
+    (p[0] - cx) * scale + 0.5,
+    (p[1] - cy) * scale + 0.5,
+  ]);
 }
 
 /** Composite a soft-edged face-shaped mask onto the output canvas so
@@ -249,7 +304,7 @@ export default function BlendMePage() {
 
   useEffect(() => {
     console.log(
-      "%c[blend/me] build v6 — full Delaunay morph",
+      "%c[blend/me] build v7 — Delaunay morph + face-fill + seam fix",
       "color: #E07B5B; font-weight: bold",
     );
     getDetector().catch((e) => console.error("mediapipe preload failed", e));
@@ -334,12 +389,15 @@ export default function BlendMePage() {
 
         if (cancelled) return;
 
-        // Average the two landmark sets to get the morph target.
-        const target = selfieLm.map((p, i) => [
+        // Average the two landmark sets, then re-scale so the FACE_OVAL
+        // fills ~78% of the canvas. Without this the output face ends
+        // up small (user photos typically frame face at ~30% of frame).
+        const avgLm = selfieLm.map((p, i) => [
           (p[0] + proLm[i][0]) / 2,
           (p[1] + proLm[i][1]) / 2,
         ]);
-        log("target geometry built");
+        const target = normalizeTargetLandmarks(avgLm, 0.78);
+        log("target geometry built (face filled to 78%)");
 
         // Delaunay over the target landmark positions (in pixel coords).
         const flat = new Float64Array(target.length * 2);
