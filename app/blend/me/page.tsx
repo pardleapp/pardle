@@ -562,8 +562,21 @@ export default function BlendMePage() {
   const [selfieUrl, setSelfieUrl] = useState<string | null>(null);
   const [selfieLm, setSelfieLm] = useState<number[][] | null>(null);
   const [selectedPro, setSelectedPro] = useState<string | null>(null);
-  const [blendUrl, setBlendUrl] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
+  /** Blend ratio: 0 = 100% pro, 1 = 100% user. Default 0.6 matches the
+   *  previous 60/40 user-bias. Driven by the slider. */
+  const [blendRatio, setBlendRatio] = useState(0.6);
+  /** True once the expensive morph has produced cached components and
+   *  the slider can be displayed. */
+  const [composeReady, setComposeReady] = useState(false);
+
+  // Cached components reused across slider drags — none of these
+  // change when the slider moves, so we never re-warp during dragging.
+  const userCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const proCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const faceMaskRef = useRef<HTMLCanvasElement | null>(null);
+  /** The displayed canvas. Slider redraws this with the new alpha. */
+  const outCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const pool = useMemo(
     () =>
@@ -593,7 +606,7 @@ export default function BlendMePage() {
 
   useEffect(() => {
     console.log(
-      "%c[blend/me] build v10 — smoothing + 60/40 + composition",
+      "%c[blend/me] build v11 — interactive blend slider",
       "color: #E07B5B; font-weight: bold",
     );
     getDetector().catch((e) => console.error("mediapipe preload failed", e));
@@ -601,8 +614,11 @@ export default function BlendMePage() {
 
   async function handleFile(file: File) {
     setErrMsg(null);
-    setBlendUrl(null);
+    setComposeReady(false);
     setSelectedPro(null);
+    userCanvasRef.current = null;
+    proCanvasRef.current = null;
+    faceMaskRef.current = null;
     const url = URL.createObjectURL(file);
     setSelfieUrl(url);
     setStage("detecting");
@@ -633,10 +649,48 @@ export default function BlendMePage() {
     }
   }
 
+  /** Re-render the output canvas at the given blend ratio. Cheap — no
+   *  warping, just composite the two cached canvases at alpha and
+   *  apply the final composition layers. Safe to call on every slider
+   *  input event. */
+  const compositeAtRatio = useMemo(() => {
+    return (ratio: number) => {
+      const userCanvas = userCanvasRef.current;
+      const proCanvas = proCanvasRef.current;
+      const faceMask = faceMaskRef.current;
+      const out = outCanvasRef.current;
+      if (!userCanvas || !proCanvas || !faceMask || !out) return;
+      const ctx = out.getContext("2d");
+      if (!ctx) return;
+      out.width = OUT_SIZE;
+      out.height = OUT_SIZE;
+      ctx.clearRect(0, 0, OUT_SIZE, OUT_SIZE);
+      // Pro at full opacity, then user on top at `ratio` — net mix is
+      // ratio*user + (1-ratio)*pro.
+      ctx.drawImage(proCanvas, 0, 0);
+      ctx.globalAlpha = ratio;
+      ctx.drawImage(userCanvas, 0, 0);
+      ctx.globalAlpha = 1;
+      // Mask + BG + vignette + title + watermark.
+      applyFaceOvalMask(ctx, faceMask, OUT_SIZE);
+      applyVignette(ctx, OUT_SIZE);
+      if (selectedProName) drawTitle(ctx, OUT_SIZE, selectedProName);
+      ctx.fillStyle = "rgba(255, 214, 74, 0.9)";
+      ctx.font = `bold ${Math.round(OUT_SIZE * 0.038)}px system-ui, sans-serif`;
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(
+        "pardle.app/blend",
+        OUT_SIZE - Math.round(OUT_SIZE * 0.03),
+        OUT_SIZE - Math.round(OUT_SIZE * 0.025),
+      );
+    };
+  }, [selectedProName]);
+
   useEffect(() => {
     if (!selectedPro || !selfieUrl || !selfieLm) return;
     if (stage === "detecting" || stage === "error") return;
-    if (blendUrl) return;
+    if (composeReady) return; // already rendered for this pick
     let cancelled = false;
     const t0 = performance.now();
     const log = (msg: string) =>
@@ -721,72 +775,38 @@ export default function BlendMePage() {
         log("pro face warped");
 
         // Build the face mask once — used both for colour-stat sampling
-        // (which pixels count as "face"?) and for the final composite.
+        // and for the final composite at every slider position.
         const faceMask = buildFaceMask(target, OUT_SIZE);
         log("face mask built");
 
         // Match the user's colour distribution to the pro's BEFORE
-        // blending. Eliminates the seam between a warm phone selfie
-        // and the pro's neutral studio shot.
+        // any blending. Eliminates the seam between a warm phone
+        // selfie and the pro's neutral studio shot.
         colorHarmonize(userCanvas, proCanvas, faceMask, OUT_SIZE);
         log("colour harmonised");
 
-        const out = document.createElement("canvas");
-        out.width = OUT_SIZE;
-        out.height = OUT_SIZE;
-        const outCtx = out.getContext("2d")!;
-        // 60/40 user-biased blend — keeps the user clearly recognisable
-        // in the result. People share photos that LOOK LIKE THEM with
-        // pro features mixed in, not generic averaged faces.
-        outCtx.drawImage(proCanvas, 0, 0);
-        outCtx.globalAlpha = 0.6;
-        outCtx.drawImage(userCanvas, 0, 0);
-        outCtx.globalAlpha = 1;
-        log("blended (60/40 user)");
+        // Pre-enhance and sharpen BOTH component canvases so the live
+        // slider preview is fast — just compositing, no per-pixel ops
+        // on each drag.
+        enhanceBlend(userCanvas, 1.08, 1.1);
+        enhanceBlend(proCanvas, 1.08, 1.1);
+        sharpen(userCanvas, 0.4);
+        sharpen(proCanvas, 0.4);
+        log("enhanced + sharpened components");
 
-        applyFaceOvalMask(outCtx, faceMask, OUT_SIZE);
-        log("mask applied");
-
-        // Pixel-level contrast + saturation — same "punch" the offline
-        // pro x pro pipeline applies via OpenCV. Done in pixel space
-        // because ctx.filter hangs iOS Safari.
-        enhanceBlend(out, 1.08, 1.1);
-        log("enhanced");
-
-        // Unsharp-mask sharpening to compensate for the alpha-blend
-        // softening of high-frequency detail. Eyes, lashes, and skin
-        // texture come back from the airbrushed-looking blend.
-        sharpen(out, 0.4);
-        log("sharpened");
-
-        // Soft vignette around the face so the viewer's eye lands on
-        // the merge.
-        applyVignette(outCtx, OUT_SIZE);
-        log("vignette applied");
-
-        // Magazine-cover title overlay — "YOU × <PRO>" with a coral
-        // underline. Gives the share a designed look rather than a
-        // raw screenshot feel.
-        if (selectedProName) {
-          drawTitle(outCtx, OUT_SIZE, selectedProName);
-          log("title drawn");
+        if (cancelled) return;
+        userCanvasRef.current = userCanvas;
+        proCanvasRef.current = proCanvas;
+        faceMaskRef.current = faceMask;
+        // First composite at default ratio. The output canvas is
+        // rendered in the DOM, so this paints to what the user sees.
+        if (outCanvasRef.current) {
+          compositeAtRatio(blendRatio);
+          log("first composite");
         }
-
-        outCtx.fillStyle = "rgba(255, 214, 74, 0.9)";
-        outCtx.font = `bold ${Math.round(OUT_SIZE * 0.038)}px system-ui, sans-serif`;
-        outCtx.textAlign = "right";
-        outCtx.textBaseline = "bottom";
-        outCtx.fillText(
-          "pardle.app/blend",
-          OUT_SIZE - Math.round(OUT_SIZE * 0.03),
-          OUT_SIZE - Math.round(OUT_SIZE * 0.025),
-        );
-
-        const dataUrl = out.toDataURL("image/jpeg", 0.9);
-        log("jpeg encoded");
         if (!cancelled) {
           window.clearTimeout(timeoutId);
-          setBlendUrl(dataUrl);
+          setComposeReady(true);
         }
       } catch (e) {
         if (cancelled) return;
@@ -807,26 +827,41 @@ export default function BlendMePage() {
       window.clearTimeout(timeoutId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPro, selfieUrl, selfieLm, blendUrl]);
+  }, [selectedPro, selfieUrl, selfieLm, composeReady]);
+
+  // Re-composite whenever the slider moves OR when the cached
+  // components first become ready.
+  useEffect(() => {
+    if (composeReady) compositeAtRatio(blendRatio);
+  }, [blendRatio, composeReady, compositeAtRatio]);
+
+  function currentBlendDataUrl(): string | null {
+    const out = outCanvasRef.current;
+    if (!out) return null;
+    return out.toDataURL("image/jpeg", 0.92);
+  }
 
   function downloadBlend() {
-    if (!blendUrl) return;
+    const url = currentBlendDataUrl();
+    if (!url) return;
     const a = document.createElement("a");
-    a.href = blendUrl;
-    a.download = `pardle-blend-${selectedPro ?? "me"}.jpg`;
+    a.href = url;
+    const pct = Math.round(blendRatio * 100);
+    a.download = `pardle-blend-${selectedPro ?? "me"}-${pct}user.jpg`;
     document.body.appendChild(a);
     a.click();
     a.remove();
   }
 
   async function shareBlend() {
-    if (!blendUrl) return;
+    const url = currentBlendDataUrl();
+    if (!url) return;
     const nav = navigator as Navigator & {
       share?: (data: ShareData) => Promise<void>;
       canShare?: (data: ShareData) => boolean;
     };
     try {
-      const blob = await (await fetch(blendUrl)).blob();
+      const blob = await (await fetch(url)).blob();
       const file = new File([blob], "pardle-blend.jpg", { type: "image/jpeg" });
       const data: ShareData = {
         files: [file],
@@ -853,10 +888,23 @@ export default function BlendMePage() {
     setSelfieUrl(null);
     setSelfieLm(null);
     setSelectedPro(null);
-    setBlendUrl(null);
+    setComposeReady(false);
+    setBlendRatio(0.6);
     setStage("idle");
     setErrMsg(null);
     setSearchInput("");
+    userCanvasRef.current = null;
+    proCanvasRef.current = null;
+    faceMaskRef.current = null;
+  }
+
+  function tryAnotherPro() {
+    setSelectedPro(null);
+    setComposeReady(false);
+    setBlendRatio(0.6);
+    userCanvasRef.current = null;
+    proCanvasRef.current = null;
+    faceMaskRef.current = null;
   }
 
   return (
@@ -914,7 +962,7 @@ export default function BlendMePage() {
 
       {selfieUrl && selfieLm && stage !== "detecting" && stage !== "error" && (
         <>
-          {!blendUrl && (
+          {!composeReady && (
             <div className="blendme-picker">
               <p className="blendme-picker-label">Blend with…</p>
               <div className="blend-featured-chips">
@@ -960,28 +1008,50 @@ export default function BlendMePage() {
             </div>
           )}
 
-          {selectedPro && !blendUrl && (
+          {selectedPro && !composeReady && (
             <div className="blendme-status">
               <div className="blendme-spinner" />
               <p>Morphing your face into the pro&apos;s…</p>
             </div>
           )}
 
-          {blendUrl && (
+          {/* Canvas is rendered in the DOM whether or not a blend is
+              ready — the render useEffect needs a valid ref BEFORE
+              it can paint into it. We hide it until composeReady. */}
+          <canvas
+            ref={outCanvasRef}
+            width={OUT_SIZE}
+            height={OUT_SIZE}
+            className={`blendme-result ${composeReady ? "" : "blendme-result-hidden"}`}
+            aria-label="Your blend"
+          />
+
+          {composeReady && (
             <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                className="blendme-result"
-                src={blendUrl}
-                alt="Your blend"
-              />
-              {selectedProName && (
-                <div className="blend-names">
-                  <span>You</span>
-                  <span className="blend-x">×</span>
-                  <span>{selectedProName}</span>
-                </div>
-              )}
+              <div className="blendme-slider-row">
+                <span className="blendme-slider-label">You</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={Math.round(blendRatio * 100)}
+                  onChange={(e) =>
+                    setBlendRatio(Number(e.target.value) / 100)
+                  }
+                  className="blendme-slider"
+                  aria-label="Blend ratio"
+                />
+                <span className="blendme-slider-label">
+                  {selectedProName ?? "Pro"}
+                </span>
+              </div>
+              <div className="blendme-slider-pct">
+                {Math.round(blendRatio * 100)}% you ·{" "}
+                {100 - Math.round(blendRatio * 100)}%{" "}
+                {selectedProName?.split(" ").slice(-1)[0] ?? "pro"}
+              </div>
+
               <div className="blend-actions">
                 <button className="blend-save" onClick={downloadBlend}>
                   Save image
@@ -989,13 +1059,7 @@ export default function BlendMePage() {
                 <button className="blend-tweet" onClick={shareBlend}>
                   Share
                 </button>
-                <button
-                  className="blend-make"
-                  onClick={() => {
-                    setBlendUrl(null);
-                    setSelectedPro(null);
-                  }}
-                >
+                <button className="blend-make" onClick={tryAnotherPro}>
                   Try another pro
                 </button>
               </div>
