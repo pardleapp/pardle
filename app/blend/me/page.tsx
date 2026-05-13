@@ -602,7 +602,7 @@ export default function BlendMePage() {
           )}
 
           {/* Result */}
-          {selectedPro && !blendUrl && stage !== "error" && (
+          {selectedPro && !blendUrl && (
             <div className="blendme-status">
               <div className="blendme-spinner" />
               <p>Blending…</p>
