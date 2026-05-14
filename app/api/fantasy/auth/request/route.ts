@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { BRAND } from "@/lib/brand";
-import { mintMagicToken } from "@/lib/fantasy/auth";
+import { mintMagicToken, sanitizeNext } from "@/lib/fantasy/auth";
 import { magicLinkEmail, sendEmail } from "@/lib/fantasy/email";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -14,7 +14,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * by watching response codes.
  */
 export async function POST(req: Request) {
-  let body: { email?: string } = {};
+  let body: { email?: string; next?: string } = {};
   try {
     body = await req.json();
   } catch {
@@ -25,7 +25,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "bad email" }, { status: 400 });
   }
 
-  const { token, rateLimited } = await mintMagicToken(email);
+  const next = sanitizeNext(body.next);
+  const { token, rateLimited } = await mintMagicToken(email, next);
   if (rateLimited || !token) {
     return NextResponse.json({ ok: true });
   }

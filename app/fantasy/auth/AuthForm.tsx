@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 export default function AuthForm() {
   const params = useSearchParams();
   const error = params.get("error");
+  const next = params.get("next") ?? undefined;
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -18,7 +19,7 @@ export default function AuthForm() {
       await fetch("/api/fantasy/auth/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: email.trim(), next }),
       });
       setSent(true);
     } finally {

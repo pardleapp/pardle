@@ -24,15 +24,16 @@ export async function GET(req: Request) {
     return NextResponse.redirect(`${origin}/fantasy/auth?error=missing`);
   }
 
-  const email = await consumeMagicToken(token);
-  if (!email) {
+  const payload = await consumeMagicToken(token);
+  if (!payload) {
     return NextResponse.redirect(`${origin}/fantasy/auth?error=expired`);
   }
 
-  const user = await upsertUserByEmail(email);
+  const user = await upsertUserByEmail(payload.email);
   const sid = await createSession(user.id);
 
-  const res = NextResponse.redirect(`${origin}/fantasy`);
+  const dest = payload.next ?? "/fantasy";
+  const res = NextResponse.redirect(`${origin}${dest}`);
   res.cookies.set(SESSION_COOKIE, sid, sessionCookieOptions());
   return res;
 }

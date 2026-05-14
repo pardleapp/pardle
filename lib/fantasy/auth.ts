@@ -28,6 +28,8 @@ const RATE_LIMIT_SECONDS = 60;
 interface MagicTokenPayload {
   email: string;
   createdAt: number;
+  /** Internal path to redirect to after successful verify (must start with /). */
+  next?: string;
 }
 
 function tokenKey(t: string): string {
@@ -59,6 +61,7 @@ function randomHex(bytes: number): string {
 /** Returns {token, rateLimited}. If rate-limited, no token is minted. */
 export async function mintMagicToken(
   email: string,
+  next?: string,
 ): Promise<{ token: string | null; rateLimited: boolean }> {
   const lower = email.toLowerCase().trim();
 
@@ -72,22 +75,33 @@ export async function mintMagicToken(
   }
 
   const token = randomHex(32); // 256-bit
-  const payload: MagicTokenPayload = { email: lower, createdAt: Date.now() };
+  const payload: MagicTokenPayload = {
+    email: lower,
+    createdAt: Date.now(),
+    next: sanitizeNext(next),
+  };
   await redis.set(tokenKey(token), payload, { ex: TOKEN_TTL_SECONDS });
   return { token, rateLimited: false };
 }
 
 /**
- * Validates the token and consumes it (one-time use). Returns the email
- * if valid; null if expired/missing.
+ * Validates the token and consumes it (one-time use). Returns the
+ * payload (email + next) if valid; null if expired/missing.
  */
 export async function consumeMagicToken(
   token: string,
-): Promise<string | null> {
+): Promise<MagicTokenPayload | null> {
   const payload = await redis.get<MagicTokenPayload>(tokenKey(token));
   if (!payload) return null;
   await redis.del(tokenKey(token));
-  return payload.email;
+  return payload;
+}
+
+/** Restrict `next` to internal paths (must start with "/" and not "//"). */
+export function sanitizeNext(next?: string): string | undefined {
+  if (!next) return undefined;
+  if (!next.startsWith("/") || next.startsWith("//")) return undefined;
+  return next.slice(0, 200);
 }
 
 // ──────────────────────────────────────────────────────────────────
