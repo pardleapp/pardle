@@ -16,7 +16,7 @@ export type ScoreResult =
   | "double"
   | "triple-plus";
 
-export type FeedEventType = "score" | "position" | "milestone";
+export type FeedEventType = "score" | "shot" | "position" | "milestone";
 
 export interface FeedEvent {
   /** Sortable unique id: `${ts}-${rand}`. */
@@ -34,6 +34,14 @@ export interface FeedEvent {
   par?: number;
   strokes?: number;
   result?: ScoreResult;
+  /** True when the hole was scored with one stroke — a hole-in-one. */
+  ace?: boolean;
+
+  // ── shot events (stuffed approaches) ──
+  /** Distance to the hole after the shot, in inches. */
+  proximityInches?: number;
+  /** Distance of the approach, in yards. */
+  shotYards?: number;
 
   // ── position / milestone events ──
   position?: string; // e.g. "1" | "T2"
@@ -43,6 +51,8 @@ export interface FeedEvent {
   headline: string;
   /** Emoji shown on the row. */
   emoji: string;
+  /** True when this belongs in the "Shots of the Day" highlights reel. */
+  highlight?: boolean;
 }
 
 /** Reaction tallies — stored separately so they update without rewriting the event. */
@@ -153,4 +163,23 @@ export function scoreHeadline(
     case "triple-plus":
       return `${playerName} blows up on ${where}`;
   }
+}
+
+/** Headline + emoji for a hole-in-one — always the loudest row in the feed. */
+export function aceHeadline(playerName: string, hole: number): string {
+  return `${playerName} ACES the ${ordinalHole(hole)} 🎯 HOLE IN ONE`;
+}
+
+/** Headline + emoji for a stuffed-approach shot event. */
+export function shotHeadline(
+  playerName: string,
+  hole: number,
+  par: number,
+  proximityText: string,
+  stiff: boolean,
+): string {
+  const where = `the par-${par} ${ordinalHole(hole)}`;
+  return stiff
+    ? `${playerName} sticks it to ${proximityText} on ${where}`
+    : `${playerName}'s approach to ${proximityText} on ${where}`;
 }

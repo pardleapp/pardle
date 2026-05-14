@@ -28,11 +28,19 @@ import {
   putSnapshot,
 } from "./store";
 import {
+  aceHeadline,
   emojiFor,
   type FeedEvent,
   resultFor,
   scoreHeadline,
+  shotHeadline,
 } from "./types";
+import {
+  formatProximity,
+  parsePlayByPlay,
+  STIFF_THRESHOLD_INCHES,
+  STUFFED_THRESHOLD_INCHES,
+} from "./playbyplay";
 
 /** Player states we don't poll scorecards for. */
 const INACTIVE_STATES = new Set([
@@ -93,7 +101,7 @@ export async function pollAndDiff(
   const scorecards = await getScorecards(tournamentId, activeIds);
 
   // Build the fresh snapshot.
-  const fresh: PollSnapshot = { holes: {}, positions: {} };
+  const fresh: PollSnapshot = { holes: {}, positions: {}, proximityEmitted: [] };
   for (const r of leaderboard) {
     fresh.positions[r.playerId] = r.position;
   }
@@ -141,6 +149,11 @@ export async function pollAndDiff(
         // The feed is highlights only: birdies, eagles, bogeys, blow-ups.
         if (result === "par") continue;
 
+        const ace = strokes === 1;
+        // Highlights reel = aces, albatrosses, eagles.
+        const highlight =
+          ace || result === "albatross" || result === "eagle";
+
         events.push({
           id: newEventId(now),
           tournamentId,
@@ -153,29 +166,83 @@ export async function pollAndDiff(
           par: h.par,
           strokes,
           result,
-          headline: scoreHeadline(playerName, h.holeNumber, result),
-          emoji: emojiFor(result),
+          ace,
+          highlight,
+          headline: ace
+            ? aceHeadline(playerName, h.holeNumber)
+            : scoreHeadline(playerName, h.holeNumber, result),
+          emoji: ace ? "🎯" : emojiFor(result),
         });
       }
     }
   }
 
+  // ── Stuffed-approach "shot" events ──────────────────────────────
+  // Parse each active player's playByPlay; a full-swing approach that
+  // finished on the green inside the threshold is a highlight. Dedup
+  // per (player, round, hole) so it fires once, not every poll.
+  const prevProx = new Set(prev.proximityEmitted ?? []);
+  const freshProx = new Set(prevProx);
+  for (const [pid, sc] of Object.entries(scorecards)) {
+    const parsed = parsePlayByPlay(sc.playByPlay);
+    if (
+      !parsed ||
+      !parsed.fullSwing ||
+      !parsed.onGreen ||
+      parsed.proximityInches == null ||
+      parsed.proximityInches > STUFFED_THRESHOLD_INCHES ||
+      sc.currentHole == null
+    ) {
+      continue;
+    }
+    const round =
+      leaderboard.find((r) => r.playerId === pid)?.currentRound ?? 1;
+    const dedupKey = `${pid}:${round}:${sc.currentHole}`;
+    if (prevProx.has(dedupKey)) continue;
+    freshProx.add(dedupKey);
+
+    const playerName = nameById.get(pid) ?? "Unknown";
+    const holes = sc.rounds[round] ?? [];
+    const par = holes.find((h) => h.holeNumber === sc.currentHole)?.par ?? 4;
+    const stiff = parsed.proximityInches <= STIFF_THRESHOLD_INCHES;
+    const proxText = formatProximity(parsed.proximityInches);
+
+    events.push({
+      id: newEventId(now),
+      tournamentId,
+      ts: now,
+      type: "shot",
+      playerId: pid,
+      playerName,
+      round,
+      hole: sc.currentHole,
+      par,
+      proximityInches: parsed.proximityInches,
+      shotYards: parsed.shotYards ?? undefined,
+      highlight: true,
+      headline: shotHeadline(playerName, sc.currentHole, par, proxText, stiff),
+      emoji: stiff ? "🎯" : "🏌️",
+    });
+  }
+  fresh.proximityEmitted = Array.from(freshProx).slice(-2000);
+
   // Order events so the "most interesting" land last (= top of feed
-  // after LPUSH). Eagles/albatross > big numbers > birdies > the rest.
-  const interest: Record<string, number> = {
-    albatross: 6,
-    eagle: 5,
-    "triple-plus": 4,
-    double: 3,
-    birdie: 2,
-    bogey: 1,
-    par: 0,
+  // after LPUSH). Aces loudest, then albatross/eagle, stuffed shots,
+  // blow-ups, birdies, the rest.
+  const interestOf = (e: FeedEvent): number => {
+    if (e.ace) return 10;
+    if (e.result === "albatross") return 9;
+    if (e.result === "eagle") return 8;
+    if (e.type === "shot") {
+      return (e.proximityInches ?? 99) <= 24 ? 7 : 6;
+    }
+    if (e.result === "triple-plus") return 4;
+    if (e.result === "double") return 3;
+    if (e.result === "birdie") return 2;
+    if (e.result === "bogey") return 1;
+    return 0;
   };
-  events.sort(
-    (a, b) =>
-      (interest[a.result ?? "par"] ?? 0) -
-      (interest[b.result ?? "par"] ?? 0),
-  );
+  events.sort((a, b) => interestOf(a) - interestOf(b));
 
   await putSnapshot(tournamentId, fresh);
   await pushEvents(tournamentId, events);

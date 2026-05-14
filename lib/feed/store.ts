@@ -60,6 +60,12 @@ export interface PollSnapshot {
   holes: Record<string, Record<number, Record<number, string>>>;
   /** playerId → last-seen position string */
   positions: Record<string, string>;
+  /**
+   * Keys `${playerId}:${round}:${hole}` for which we've already emitted
+   * a stuffed-approach "shot" event — stops the same shot re-firing on
+   * every poll while the player lines up the putt.
+   */
+  proximityEmitted?: string[];
 }
 
 export async function getSnapshot(

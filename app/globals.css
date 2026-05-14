@@ -5509,6 +5509,85 @@ footer {
   50% { opacity: 0.35; transform: scale(0.8); }
 }
 
+/* ── Shots of the day reel ─────────────────────────────────────── */
+
+.reel {
+  margin-bottom: 14px;
+}
+
+.reel-title {
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+
+.reel-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  scroll-snap-type: x proximity;
+}
+
+.reel-card {
+  flex: 0 0 200px;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg, white);
+  text-decoration: none;
+  color: var(--text);
+}
+
+.reel-card-ace {
+  border-color: #e8c547;
+  background: linear-gradient(
+    135deg,
+    rgba(232, 197, 71, 0.22) 0%,
+    rgba(232, 197, 71, 0.08) 100%
+  );
+}
+.reel-card-albatross,
+.reel-card-eagle {
+  border-color: rgba(123, 174, 63, 0.6);
+  background: rgba(123, 174, 63, 0.1);
+}
+.reel-card-shot {
+  border-color: rgba(91, 160, 224, 0.5);
+  background: rgba(91, 160, 224, 0.08);
+}
+
+.reel-emoji {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.reel-headline {
+  font-size: 13.5px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.reel-meta {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-weight: 700;
+  margin-top: auto;
+}
+
+@media (prefers-color-scheme: dark) {
+  .reel-card {
+    background: #1f1f20;
+  }
+}
+
 /* ── Leaderboard panel ─────────────────────────────────────────── */
 
 .lb-panel {
