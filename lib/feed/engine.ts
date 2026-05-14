@@ -319,6 +319,13 @@ async function enrichRecentEvents(tournamentId: string): Promise<string> {
   );
   const shotDetails = await getShotDetailsBatch(tournamentId, reqs);
   const keys = Object.keys(shotDetails).length;
+  const totalHoles = Object.values(shotDetails).reduce(
+    (a, hs) => a + hs.length,
+    0,
+  );
+  const e0 = batch[0];
+  const e0key = `${e0.playerId}:${e0.round}`;
+  const e0sample = `e0=${e0key}#${e0.hole} hasKey=${!!shotDetails[e0key]} holes=${shotDetails[e0key]?.length ?? "nil"}`;
 
   let matched = 0;
   let traced = 0;
@@ -370,5 +377,5 @@ async function enrichRecentEvents(tournamentId: string): Promise<string> {
     };
   }
   await putEnrichments(tournamentId, enrichments);
-  return `cand:${candidates.length} batch:${batch.length} keys:${keys} matched:${matched} traced:${traced}`;
+  return `cand:${candidates.length} keys:${keys} totalHoles:${totalHoles} matched:${matched} traced:${traced} | ${e0sample}`;
 }
