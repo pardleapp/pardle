@@ -6,6 +6,7 @@ import {
   acquirePollLock,
   getCachedLeaderboard,
   getCommentCountsBulk,
+  getEnrichments,
   getEvents,
   getReactionsBulk,
   getRecentBursts,
@@ -102,12 +103,14 @@ export async function GET(req: Request) {
     }
   }
 
-  const [events, bursts, leaderboard, polls] = await Promise.all([
-    getEvents(tournament.id, 80),
-    getRecentBursts(tournament.id),
-    getCachedLeaderboard(tournament.id),
-    listPolls(tournament.id),
-  ]);
+  const [events, bursts, leaderboard, polls, enrichments] =
+    await Promise.all([
+      getEvents(tournament.id, 80),
+      getRecentBursts(tournament.id),
+      getCachedLeaderboard(tournament.id),
+      listPolls(tournament.id),
+      getEnrichments(tournament.id),
+    ]);
 
   const ids = events.map((e) => e.id);
   const [reactions, commentCounts] = await Promise.all([
@@ -115,11 +118,20 @@ export async function GET(req: Request) {
     getCommentCountsBulk(ids),
   ]);
 
-  const rows: FeedRow[] = events.map((event) => ({
-    event,
-    reactions: reactions[event.id] ?? { up: 0, down: 0 },
-    commentCount: commentCounts[event.id] ?? 0,
-  }));
+  const rows: FeedRow[] = events.map((event) => {
+    // Apply the shot-detail enrichment overlay if one exists for this
+    // event — gives "3-putts from 40 ft" in place of "doubles the 8th".
+    const enriched = enrichments[event.id];
+    const merged =
+      enriched && enriched.headline
+        ? { ...event, headline: enriched.headline, emoji: enriched.emoji }
+        : event;
+    return {
+      event: merged,
+      reactions: reactions[event.id] ?? { up: 0, down: 0 },
+      commentCount: commentCounts[event.id] ?? 0,
+    };
+  });
 
   // Polls + this visitor's existing choices.
   const pollsWithVotes = await Promise.all(polls.map(pollWithVotes));

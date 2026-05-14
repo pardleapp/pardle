@@ -24,9 +24,13 @@ import {
 import { analyzeHighlightHole, analyzeHole } from "./shot-analysis";
 import {
   cacheLeaderboard,
+  type Enrichment,
+  getEnrichments,
+  getEvents,
   getSnapshot,
   type PollSnapshot,
   pushEvents,
+  putEnrichments,
   putSnapshot,
 } from "./store";
 import {
@@ -232,60 +236,6 @@ export async function pollAndDiff(
   }
   fresh.proximityEmitted = Array.from(freshProx).slice(-2000);
 
-  // ── Enrich blow-ups AND eagles/aces with shot-level detail ──────
-  // One batched shotDetailsV3 fetch feeds both reels: the worst reel
-  // gets "3-putts from 40 ft", the best reel gets "holes out from
-  // 140 yds for eagle". Stuffed-approach "shot" events already carry
-  // their detail from playByPlay, so they're skipped here.
-  const enrichEvents = events.filter(
-    (e) => e.lowlight || (e.type === "score" && e.highlight),
-  );
-  if (enrichEvents.length > 0) {
-    const reqs = Array.from(
-      new Map(
-        enrichEvents.map((e) => [
-          `${e.playerId}:${e.round}`,
-          { playerId: e.playerId, round: e.round },
-        ]),
-      ).values(),
-    );
-    try {
-      const shotDetails = await getShotDetailsBatch(tournamentId, reqs);
-      for (const e of enrichEvents) {
-        if (e.hole == null) continue;
-        const hole = shotDetails[`${e.playerId}:${e.round}`]?.find(
-          (h) => h.holeNumber === e.hole,
-        );
-        if (!hole) continue;
-
-        if (e.lowlight) {
-          const d = analyzeHole(hole.strokes);
-          if (d.verdict) {
-            e.headline = `${e.playerName} ${d.verdict} on the ${ordinalHole(e.hole)}`;
-            e.emoji = d.emoji;
-          }
-        } else if (e.ace) {
-          // Aces: append the tee-shot distance when we have it.
-          const teeDist = hole.strokes[0]?.distance;
-          if (teeDist) {
-            e.headline = `${e.playerName} ACES the ${ordinalHole(e.hole)} from ${teeDist} 🎯`;
-          }
-        } else {
-          // Eagle / albatross — describe how it was finished.
-          const g = analyzeHighlightHole(hole.strokes);
-          if (g.verdict) {
-            const label =
-              e.result === "albatross" ? "ALBATROSS" : "eagle";
-            e.headline = `${e.playerName} ${g.verdict} for ${label} on the ${ordinalHole(e.hole)}`;
-            e.emoji = g.emoji;
-          }
-        }
-      }
-    } catch (err) {
-      console.error("[feed] shot-detail enrichment failed", err);
-    }
-  }
-
   // Order events so the "most interesting" land last (= top of feed
   // after LPUSH). Aces loudest, then albatross/eagle, stuffed shots,
   // blow-ups, birdies, the rest.
@@ -307,9 +257,86 @@ export async function pollAndDiff(
   await putSnapshot(tournamentId, fresh);
   await pushEvents(tournamentId, events);
 
+  // Backfill shot-level detail onto recent events (this poll's + any
+  // still-generic backlog). Runs as an overlay so a transient fetch
+  // failure just retries next poll instead of leaving a permanently
+  // generic headline.
+  try {
+    await enrichRecentEvents(tournamentId);
+  } catch (err) {
+    console.error("[feed] enrichRecentEvents failed", err);
+  }
+
   return {
     newEvents: events,
     seeded: false,
     activePlayers: activeIds.length,
   };
+}
+
+/**
+ * Re-scan recent events and write shot-level headline rewrites into the
+ * enrichment overlay. Picks up events created before this code shipped
+ * and any whose enrichment previously failed. Bounded to 40 events per
+ * poll so the extra orchestrator calls stay small.
+ */
+async function enrichRecentEvents(tournamentId: string): Promise<void> {
+  const [events, done] = await Promise.all([
+    getEvents(tournamentId, 150),
+    getEnrichments(tournamentId),
+  ]);
+
+  const candidates = events.filter(
+    (e) =>
+      e.hole != null &&
+      !done[e.id] &&
+      (e.lowlight || (e.type === "score" && e.highlight)),
+  );
+  if (candidates.length === 0) return;
+
+  const batch = candidates.slice(0, 40);
+  const reqs = Array.from(
+    new Map(
+      batch.map((e) => [
+        `${e.playerId}:${e.round}`,
+        { playerId: e.playerId, round: e.round },
+      ]),
+    ).values(),
+  );
+  const shotDetails = await getShotDetailsBatch(tournamentId, reqs);
+
+  const enrichments: Record<string, Enrichment> = {};
+  for (const e of batch) {
+    const hole = shotDetails[`${e.playerId}:${e.round}`]?.find(
+      (h) => h.holeNumber === e.hole,
+    );
+    // No shot data yet — leave un-enriched so we retry next poll.
+    if (!hole) continue;
+
+    let headline = e.headline;
+    let emoji = e.emoji;
+    if (e.lowlight) {
+      const d = analyzeHole(hole.strokes);
+      if (d.verdict) {
+        headline = `${e.playerName} ${d.verdict} on the ${ordinalHole(e.hole!)}`;
+        emoji = d.emoji;
+      }
+    } else if (e.ace) {
+      const teeDist = hole.strokes[0]?.distance;
+      if (teeDist) {
+        headline = `${e.playerName} ACES the ${ordinalHole(e.hole!)} from ${teeDist} 🎯`;
+      }
+    } else {
+      const g = analyzeHighlightHole(hole.strokes);
+      if (g.verdict) {
+        const label = e.result === "albatross" ? "ALBATROSS" : "eagle";
+        headline = `${e.playerName} ${g.verdict} for ${label} on the ${ordinalHole(e.hole!)}`;
+        emoji = g.emoji;
+      }
+    }
+    // Store even when unchanged — marks the event processed so we
+    // don't re-fetch its shot detail every poll.
+    enrichments[e.id] = { headline, emoji };
+  }
+  await putEnrichments(tournamentId, enrichments);
 }

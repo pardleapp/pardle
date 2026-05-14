@@ -244,6 +244,60 @@ export async function react(
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Enrichment overlay — shot-level headline rewrites, applied at read time
+// ──────────────────────────────────────────────────────────────────
+
+/**
+ * A shot-detail enrichment for one event. Stored separately from the
+ * event so it can be backfilled onto events that were created before
+ * the enrichment ran (or before this feature existed), and so a
+ * transient fetch failure just means "try again next poll" rather than
+ * a permanently-generic headline.
+ *
+ * `headline` empty means "processed, nothing notable" — keeps us from
+ * re-fetching the same event every poll.
+ */
+export interface Enrichment {
+  headline: string;
+  emoji: string;
+}
+
+function enrichKey(t: string) {
+  return `feed:enrich:${t}`;
+}
+
+export async function getEnrichments(
+  tournamentId: string,
+): Promise<Record<string, Enrichment>> {
+  const h = await redis.hgetall<Record<string, Enrichment | string>>(
+    enrichKey(tournamentId),
+  );
+  const out: Record<string, Enrichment> = {};
+  for (const [id, val] of Object.entries(h ?? {})) {
+    try {
+      out[id] =
+        typeof val === "string" ? (JSON.parse(val) as Enrichment) : val;
+    } catch {
+      /* skip malformed */
+    }
+  }
+  return out;
+}
+
+export async function putEnrichments(
+  tournamentId: string,
+  map: Record<string, Enrichment>,
+): Promise<void> {
+  const entries = Object.entries(map);
+  if (entries.length === 0) return;
+  const key = enrichKey(tournamentId);
+  const flat: Record<string, string> = {};
+  for (const [id, e] of entries) flat[id] = JSON.stringify(e);
+  await redis.hset(key, flat);
+  await redis.expire(key, 10 * 24 * 60 * 60);
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Leaderboard cache
 // ──────────────────────────────────────────────────────────────────
 
