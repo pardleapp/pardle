@@ -141,6 +141,18 @@ export default async function HubHome() {
 
       <NewsTicker headlines={headlines} />
 
+      <Link href="/live" className="hub-live-link">
+        <span className="hub-live-badge">
+          <span className="hub-live-badge-dot" /> LIVE
+        </span>
+        <span className="hub-live-text">
+          Shot feed — react to every birdie &amp; blow-up
+        </span>
+        <span className="hub-live-arrow" aria-hidden="true">
+          →
+        </span>
+      </Link>
+
       <div className="hub-grid">
         {GAMES.map((game) =>
           game.status === "live" ? (

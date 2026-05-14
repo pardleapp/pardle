@@ -2151,6 +2151,64 @@ body {
   }
 }
 
+.hub-live-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  background: linear-gradient(
+    135deg,
+    rgba(210, 59, 59, 0.12) 0%,
+    rgba(210, 59, 59, 0.05) 100%
+  );
+  border: 1px solid rgba(210, 59, 59, 0.4);
+  text-decoration: none;
+  color: var(--text);
+}
+
+.hub-live-link:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(210, 59, 59, 0.18) 0%,
+    rgba(210, 59, 59, 0.08) 100%
+  );
+}
+
+.hub-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #d23b3b;
+  flex-shrink: 0;
+}
+
+.hub-live-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d23b3b;
+  animation: feed-pulse 1.6s ease-in-out infinite;
+}
+
+.hub-live-text {
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.hub-live-arrow {
+  font-size: 16px;
+  font-weight: 900;
+  color: #d23b3b;
+  flex-shrink: 0;
+}
+
 .hub-tool-link {
   display: block;
   margin: -8px 0 22px;
