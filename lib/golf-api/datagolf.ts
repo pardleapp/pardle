@@ -134,6 +134,58 @@ export async function getFieldForActiveEvent(
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Pre-tournament predictions — used to rank the field into tiers
+// ──────────────────────────────────────────────────────────────────
+
+interface DGPreTournamentRow {
+  dg_id: number;
+  player_name: string; // "Last, First"
+  country?: string;
+  win?: number;
+  top_5?: number;
+  top_10?: number;
+  top_20?: number;
+  make_cut?: number;
+}
+
+interface DGPreTournamentResponse {
+  baseline?: DGPreTournamentRow[];
+  // DataGolf sometimes nests under baseline_history_fit too; baseline is canonical.
+}
+
+export interface RankedGolfer {
+  dgId: string;
+  name: string;
+  country?: string;
+  /** Win probability (0..1) — the ranking key. */
+  winProb: number;
+  /** 1-based rank within the field, 1 = best. */
+  fieldRank: number;
+}
+
+/**
+ * Field ranked best→worst by DataGolf win probability. This drives the
+ * tier split (A = rank 1–10, B = 11–30, C = 31–60, D = 61+).
+ */
+export async function getFieldRanking(
+  tour: string = "pga",
+): Promise<RankedGolfer[]> {
+  const data = await fetchJson<DGPreTournamentResponse>(
+    `/preds/pre-tournament?tour=${encodeURIComponent(tour)}&odds_format=percent`,
+  );
+  const rows = data.baseline ?? [];
+  return rows
+    .map((r) => ({
+      dgId: String(r.dg_id),
+      name: flipName(r.player_name),
+      country: r.country,
+      winProb: r.win ?? 0,
+    }))
+    .sort((a, b) => b.winProb - a.winProb)
+    .map((g, i) => ({ ...g, fieldRank: i + 1 }));
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Live tournament stats
 // ──────────────────────────────────────────────────────────────────
 
