@@ -10,6 +10,7 @@ import {
   getEvents,
   getReactionsBulk,
   getRecentBursts,
+  markSeenToday,
   touchPresence,
 } from "@/lib/feed/store";
 import {
@@ -49,6 +50,7 @@ export async function GET(req: Request) {
       polls: [],
       myVotes: {},
       watching: 0,
+      seenToday: 0,
       polled: false,
     });
   }
@@ -56,8 +58,10 @@ export async function GET(req: Request) {
   const { tournament, isLive } = active;
 
   let watching = 0;
+  let seenToday = 0;
   if (visitorId) {
     watching = await touchPresence(tournament.id, visitorId);
+    seenToday = await markSeenToday(tournament.id, visitorId);
   }
 
   let polled = false;
@@ -163,6 +167,7 @@ export async function GET(req: Request) {
     polls: pollsWithVotes,
     myVotes,
     watching,
+    seenToday,
     polled,
   });
 }

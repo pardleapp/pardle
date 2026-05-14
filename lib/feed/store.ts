@@ -122,6 +122,22 @@ export async function getWatchingCount(
   return await redis.zcard(key);
 }
 
+/**
+ * Unique visitors who've opened the feed today. A genuine, cumulative
+ * number — every distinct device that's looked, not a thin 45-second
+ * live snapshot. Keyed by UTC date so it rolls over each day.
+ */
+export async function markSeenToday(
+  tournamentId: string,
+  visitorId: string,
+): Promise<number> {
+  const date = new Date().toISOString().slice(0, 10);
+  const key = `feed:seen:${tournamentId}:${date}`;
+  await redis.sadd(key, visitorId);
+  await redis.expire(key, 3 * 24 * 60 * 60);
+  return await redis.scard(key);
+}
+
 // ──────────────────────────────────────────────────────────────────
 // Poll lock — coalesces concurrent viewer-triggered polls
 // ──────────────────────────────────────────────────────────────────

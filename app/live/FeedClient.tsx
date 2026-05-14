@@ -29,6 +29,7 @@ interface FeedResponse {
   polls: PollWithVotes[];
   myVotes: Record<string, string>;
   watching: number;
+  seenToday: number;
   polled: boolean;
 }
 
@@ -220,9 +221,9 @@ export default function FeedClient() {
       <div className="feed-header-row">
         <h2 className="feed-tournament-name">{data.tournament.name}</h2>
         <div className="feed-header-meta">
-          {data.watching > 0 && (
+          {data.seenToday > 0 && (
             <span className="feed-watching">
-              👀 {data.watching} watching
+              👀 {data.seenToday.toLocaleString()} here today
             </span>
           )}
           <span className="feed-live-dot">
