@@ -377,5 +377,8 @@ async function enrichRecentEvents(tournamentId: string): Promise<string> {
     };
   }
   await putEnrichments(tournamentId, enrichments);
-  return `cand:${candidates.length} keys:${keys} totalHoles:${totalHoles} matched:${matched} traced:${traced} | ${e0sample}`;
+  const reqDump = reqs
+    .map((r) => `${r.playerId}:${JSON.stringify(r.round)}`)
+    .join(",");
+  return `cand:${candidates.length} keys:${keys} totalHoles:${totalHoles} matched:${matched} traced:${traced} | ${e0sample} | reqs=${reqDump}`;
 }
