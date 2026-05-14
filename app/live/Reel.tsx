@@ -7,10 +7,11 @@ import {
   type FeedEvent,
   type FeedRow,
   isHighlightEvent as isHighlight,
-  isLowlightEvent as isLowlight,
+  isWorstReelEvent as isLowlight,
 } from "@/lib/feed/types";
 
 // Re-exported so FeedClient can pass them as the reel's `include` filter.
+// `isLowlight` is the Worst-of reel filter — confirmed disasters only.
 export { isHighlight, isLowlight };
 
 interface Props {

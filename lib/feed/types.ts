@@ -55,6 +55,12 @@ export interface FeedEvent {
   highlight?: boolean;
   /** True when this belongs in the "Worst of the Day" blow-up reel. */
   lowlight?: boolean;
+  /**
+   * Set by the enrichment overlay once shot detail confirms a genuine
+   * reaction-worthy disaster (multi-putt or penalty). Only these make
+   * the Worst-of reel — a plain sloppy double does not.
+   */
+  reelWorthy?: boolean;
 }
 
 /**
@@ -70,10 +76,23 @@ export function isHighlightEvent(e: FeedEvent): boolean {
   return false;
 }
 
-/** Whether an event belongs in the "Worst of the day" reel. Same rationale. */
+/**
+ * Whether an event is a candidate for Worst-of enrichment processing —
+ * a double or worse. This decides what the engine *examines*; whether
+ * it actually makes the reel is decided later by `isWorstReelEvent`.
+ */
 export function isLowlightEvent(e: FeedEvent): boolean {
   if (e.lowlight) return true;
   return e.result === "double" || e.result === "triple-plus";
+}
+
+/**
+ * Whether an event actually belongs in the "Worst of the day" reel.
+ * Only confirmed disasters (multi-putts, penalties) — set by the
+ * enrichment overlay once shot detail is in.
+ */
+export function isWorstReelEvent(e: FeedEvent): boolean {
+  return e.reelWorthy === true;
 }
 
 /** Reaction tallies — stored separately so they update without rewriting the event. */

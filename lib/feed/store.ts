@@ -260,12 +260,14 @@ export async function react(
 export interface Enrichment {
   headline: string;
   emoji: string;
+  /** True when shot detail confirmed a reel-worthy disaster. */
+  reelWorthy: boolean;
 }
 
 // Versioned — bump when the enrichment analysis changes so the backlog
 // re-processes against the new logic instead of keeping stale verdicts.
 function enrichKey(t: string) {
-  return `feed:enrich:v3:${t}`;
+  return `feed:enrich:v4:${t}`;
 }
 
 export async function getEnrichments(

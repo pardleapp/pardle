@@ -322,11 +322,15 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
 
     let headline = e.headline;
     let emoji = e.emoji;
+    // reelWorthy: only confirmed disasters (multi-putt / penalty) make
+    // the Worst-of reel. Highlights aren't worst-reel events at all.
+    let reelWorthy = false;
     if (isLowlightEvent(e)) {
-      const d = analyzeHole(hole);
+      const d = analyzeHole(hole.strokes);
       if (d.verdict) {
         headline = `${e.playerName} ${d.verdict} on the ${ordinalHole(e.hole!)}`;
         emoji = d.emoji;
+        reelWorthy = true;
       }
     } else if (e.ace) {
       const teeDist = hole.strokes[0]?.distance;
@@ -343,7 +347,7 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
     }
     // Store even when unchanged — marks the event processed so we
     // don't re-fetch its shot detail every poll.
-    enrichments[e.id] = { headline, emoji };
+    enrichments[e.id] = { headline, emoji, reelWorthy };
   }
   await putEnrichments(tournamentId, enrichments);
 }

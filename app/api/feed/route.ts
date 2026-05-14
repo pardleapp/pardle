@@ -120,12 +120,17 @@ export async function GET(req: Request) {
 
   const rows: FeedRow[] = events.map((event) => {
     // Apply the shot-detail enrichment overlay if one exists for this
-    // event — gives "3-putts from 40 ft" in place of "doubles the 8th".
+    // event — gives "3-putts from 40 ft" in place of "doubles the 8th",
+    // and flags whether it's a genuine Worst-of-reel disaster.
     const enriched = enrichments[event.id];
-    const merged =
-      enriched && enriched.headline
-        ? { ...event, headline: enriched.headline, emoji: enriched.emoji }
-        : event;
+    const merged = enriched
+      ? {
+          ...event,
+          headline: enriched.headline || event.headline,
+          emoji: enriched.emoji || event.emoji,
+          reelWorthy: enriched.reelWorthy,
+        }
+      : event;
     return {
       event: merged,
       reactions: reactions[event.id] ?? { up: 0, down: 0 },
