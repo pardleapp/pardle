@@ -274,6 +274,105 @@ export async function getScorecards(
   return Object.assign({}, ...results);
 }
 
+// ──────────────────────────────────────────────────────────────────
+// Shot details — per-stroke data for disaster detection
+// ──────────────────────────────────────────────────────────────────
+
+export interface PGAStroke {
+  strokeNumber: number;
+  /** "STROKE" | "PENALTY" | "DROP" — drives disaster detection. */
+  strokeType: string;
+  /** e.g. "OGR" (on green), "OTB" (tee box), "OFW" (fairway), "ORO" (rough). */
+  fromLocationCode: string;
+  toLocationCode: string;
+  /** Display distance of the stroke, e.g. "299 yds" or "50 ft 10 in.". */
+  distance: string;
+  playByPlay: string;
+}
+
+export interface PGAShotHole {
+  holeNumber: number;
+  par: number;
+  score: string;
+  strokes: PGAStroke[];
+}
+
+interface ShotDetailNode {
+  holes?: {
+    holeNumber: number;
+    par: number;
+    score: string;
+    strokes?: {
+      strokeNumber: number;
+      strokeType: string;
+      fromLocationCode: string;
+      toLocationCode: string;
+      distance: string;
+      playByPlay: string;
+    }[];
+  }[];
+}
+
+/**
+ * Batch-fetch shot-by-shot detail for a set of (playerId, round) pairs.
+ * Used sparingly — only for players who just carded a blow-up — so the
+ * extra orchestrator load stays small.
+ */
+export async function getShotDetailsBatch(
+  tournamentId: string,
+  requests: { playerId: string; round: number }[],
+): Promise<Record<string, PGAShotHole[]>> {
+  if (requests.length === 0) return {};
+
+  const chunks: { playerId: string; round: number }[][] = [];
+  for (let i = 0; i < requests.length; i += CHUNK_SIZE) {
+    chunks.push(requests.slice(i, i + CHUNK_SIZE));
+  }
+
+  const fetchChunk = async (
+    chunk: { playerId: string; round: number }[],
+  ): Promise<Record<string, PGAShotHole[]>> => {
+    const aliases = chunk
+      .map(
+        ({ playerId, round }) =>
+          `s${playerId}_${round}: shotDetailsV3(tournamentId: "${tournamentId}", playerId: "${playerId}", round: ${round}) {
+             holes {
+               holeNumber par score
+               strokes {
+                 strokeNumber strokeType fromLocationCode toLocationCode
+                 distance playByPlay
+               }
+             }
+           }`,
+      )
+      .join("\n");
+    const data = await gql<Record<string, ShotDetailNode | null>>(
+      `{ ${aliases} }`,
+    );
+    const out: Record<string, PGAShotHole[]> = {};
+    for (const { playerId, round } of chunk) {
+      const node = data?.[`s${playerId}_${round}`] ?? null;
+      out[`${playerId}:${round}`] = (node?.holes ?? []).map((h) => ({
+        holeNumber: h.holeNumber,
+        par: h.par,
+        score: h.score,
+        strokes: (h.strokes ?? []).map((s) => ({
+          strokeNumber: s.strokeNumber,
+          strokeType: s.strokeType,
+          fromLocationCode: s.fromLocationCode,
+          toLocationCode: s.toLocationCode,
+          distance: s.distance,
+          playByPlay: s.playByPlay,
+        })),
+      }));
+    }
+    return out;
+  };
+
+  const results = await Promise.all(chunks.map(fetchChunk));
+  return Object.assign({}, ...results);
+}
+
 function normalizeScorecard(
   playerId: string,
   node: ScorecardNode | null,

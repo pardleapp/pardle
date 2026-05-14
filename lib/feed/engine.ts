@@ -19,7 +19,9 @@ import "server-only";
 import {
   getLeaderboard,
   getScorecards,
+  getShotDetailsBatch,
 } from "@/lib/golf-api/pgatour";
+import { analyzeHole } from "./shot-analysis";
 import {
   cacheLeaderboard,
   getSnapshot,
@@ -31,6 +33,7 @@ import {
   aceHeadline,
   emojiFor,
   type FeedEvent,
+  ordinalHole,
   resultFor,
   scoreHeadline,
   shotHeadline,
@@ -228,6 +231,38 @@ export async function pollAndDiff(
     });
   }
   fresh.proximityEmitted = Array.from(freshProx).slice(-2000);
+
+  // ── Enrich blow-ups with shot-level detail ──────────────────────
+  // For each double-or-worse this poll, pull the player's shot-by-shot
+  // data and rewrite the headline with what actually went wrong — a
+  // 3-putt, a 4-putt, a penalty — instead of a flat "doubles the 8th".
+  const lowlightEvents = events.filter((e) => e.lowlight);
+  if (lowlightEvents.length > 0) {
+    const reqs = Array.from(
+      new Map(
+        lowlightEvents.map((e) => [
+          `${e.playerId}:${e.round}`,
+          { playerId: e.playerId, round: e.round },
+        ]),
+      ).values(),
+    );
+    try {
+      const shotDetails = await getShotDetailsBatch(tournamentId, reqs);
+      for (const e of lowlightEvents) {
+        if (e.hole == null) continue;
+        const holes = shotDetails[`${e.playerId}:${e.round}`];
+        const hole = holes?.find((h) => h.holeNumber === e.hole);
+        if (!hole) continue;
+        const d = analyzeHole(hole.strokes);
+        if (d.verdict) {
+          e.headline = `${e.playerName} ${d.verdict} on the ${ordinalHole(e.hole)}`;
+          e.emoji = d.emoji;
+        }
+      }
+    } catch (err) {
+      console.error("[feed] shot-detail enrichment failed", err);
+    }
+  }
 
   // Order events so the "most interesting" land last (= top of feed
   // after LPUSH). Aces loudest, then albatross/eagle, stuffed shots,
