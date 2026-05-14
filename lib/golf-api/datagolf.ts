@@ -6,7 +6,9 @@
  *   GET /field-updates          → field for the upcoming tournament
  *   GET /preds/live-tournament-stats   → live per-player round stats
  *
- * Auth is via ?key=... query param. Key lives in DATAGOLF_API_KEY env.
+ * Auth is via ?key=... query param. The key lives in a Vercel env var —
+ * we accept either `DATAGOLF_API_KEY` (conventional) or `DATAGOLF`
+ * (the name currently set on the project).
  * Free tier is rate-limited but generous for our use case (one fetch
  * every 2-5 min during live tournament hours).
  *
@@ -20,7 +22,7 @@ import type { FieldGolfer, GolferRoundScore } from "@/lib/fantasy/types";
 const BASE = "https://feeds.datagolf.com";
 
 function key(): string {
-  const k = process.env.DATAGOLF_API_KEY;
+  const k = process.env.DATAGOLF_API_KEY || process.env.DATAGOLF;
   if (!k) throw new Error("DATAGOLF_API_KEY is not set");
   return k;
 }
