@@ -7,7 +7,7 @@
  * list, and streamed to clients.
  */
 
-import type { ShotTraceSegment } from "./shot-trace";
+import type { ShotTrace } from "./shot-trace";
 
 export type ScoreResult =
   | "albatross"
@@ -64,7 +64,7 @@ export interface FeedEvent {
    */
   reelWorthy?: boolean;
   /** Normalised shot trace for the hole — rendered as an SVG mini-tracer. */
-  trace?: ShotTraceSegment[];
+  trace?: ShotTrace;
 }
 
 /**

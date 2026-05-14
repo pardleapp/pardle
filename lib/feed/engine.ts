@@ -22,7 +22,7 @@ import {
   getShotDetailsBatch,
 } from "@/lib/golf-api/pgatour";
 import { analyzeHighlightHole, analyzeHole } from "./shot-analysis";
-import { extractTrace } from "./shot-trace";
+import { extractTrace, type TraceFocus } from "./shot-trace";
 import {
   cacheLeaderboard,
   type Enrichment,
@@ -327,8 +327,11 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
     // reelWorthy: only confirmed disasters (multi-putt / penalty) make
     // the Worst-of reel. Highlights aren't worst-reel events at all.
     let reelWorthy = false;
+    // `focus` tells the tracer which shot to frame and highlight.
+    let focus: TraceFocus = "auto";
     if (e.type === "shot") {
       // Stuffed approach — keep its playByPlay headline, just add a trace.
+      focus = "approach";
     } else if (isLowlightEvent(e)) {
       const d = analyzeHole(hole.strokes);
       if (d.verdict) {
@@ -336,12 +339,15 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
         emoji = d.emoji;
         reelWorthy = true;
       }
+      if (d.puttCount >= 3) focus = "putt";
     } else if (e.ace) {
+      focus = "holeout";
       const teeDist = hole.strokes[0]?.distance;
       if (teeDist) {
         headline = `${e.playerName} ACES the ${ordinalHole(e.hole!)} from ${teeDist} 🎯`;
       }
     } else {
+      focus = "holeout";
       const g = analyzeHighlightHole(hole.strokes);
       if (g.verdict) {
         const label = e.result === "albatross" ? "ALBATROSS" : "eagle";
@@ -349,14 +355,14 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
         emoji = g.emoji;
       }
     }
-    const trace = extractTrace(hole.strokes);
+    const trace = extractTrace(hole.strokes, focus);
     // Store even when nothing changed — marks the event processed so we
     // don't re-fetch its shot detail every poll.
     enrichments[e.id] = {
       headline,
       emoji,
       reelWorthy,
-      ...(trace.length > 0 ? { trace } : {}),
+      ...(trace.segments.length > 0 ? { trace } : {}),
     };
   }
   await putEnrichments(tournamentId, enrichments);

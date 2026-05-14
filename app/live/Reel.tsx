@@ -69,6 +69,8 @@ export default function Reel({
   onReact,
 }: Props) {
   const items = rows.filter((r) => include(r.event)).slice(0, 24);
+  // Which event's shot trace is expanded into the full-hole overlay.
+  const [expandedTrace, setExpandedTrace] = useState<FeedRow | null>(null);
   if (items.length === 0) return null;
 
   return (
@@ -77,13 +79,25 @@ export default function Reel({
       <div className="reel-scroll">
         {items.map(({ event, reactions }) => {
           const mine = myReactions[event.id];
+          const hasTrace =
+            event.trace && event.trace.segments.length > 0;
           return (
             <div
               key={event.id}
               className={`reel-card reel-card-${cardKind(event)}`}
             >
-              {event.trace && event.trace.length > 0 && (
-                <ShotTracer trace={event.trace} />
+              {hasTrace && (
+                <button
+                  type="button"
+                  className="reel-tracer-btn"
+                  onClick={() =>
+                    setExpandedTrace({ event, reactions, commentCount: 0 })
+                  }
+                  aria-label="See the shot"
+                >
+                  <ShotTracer trace={event.trace!} mode="thumb" />
+                  <span className="reel-tracer-hint">tap to expand ⤢</span>
+                </button>
               )}
               <Link
                 href={`/live/player/${event.playerId}`}
@@ -120,6 +134,33 @@ export default function Reel({
           );
         })}
       </div>
+
+      {expandedTrace && expandedTrace.event.trace && (
+        <div
+          className="tracer-overlay"
+          onClick={() => setExpandedTrace(null)}
+        >
+          <div
+            className="tracer-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ShotTracer trace={expandedTrace.event.trace} mode="full" />
+            <p className="tracer-modal-headline">
+              {expandedTrace.event.headline}
+            </p>
+            <p className="tracer-modal-meta">
+              R{expandedTrace.event.round} · the whole hole
+            </p>
+            <button
+              type="button"
+              className="tracer-modal-close"
+              onClick={() => setExpandedTrace(null)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
