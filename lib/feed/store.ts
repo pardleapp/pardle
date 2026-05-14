@@ -262,8 +262,10 @@ export interface Enrichment {
   emoji: string;
 }
 
+// Versioned — bump when the enrichment analysis changes so the backlog
+// re-processes against the new logic instead of keeping stale verdicts.
 function enrichKey(t: string) {
-  return `feed:enrich:${t}`;
+  return `feed:enrich:v2:${t}`;
 }
 
 export async function getEnrichments(

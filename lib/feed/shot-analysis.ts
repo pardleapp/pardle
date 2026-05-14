@@ -92,15 +92,30 @@ export function analyzeHighlightHole(strokes: PGAStroke[]): HoleGlory {
   return { verdict: null, emoji: "🦅" };
 }
 
-export function analyzeHole(strokes: PGAStroke[]): HoleDisaster {
+export function analyzeHole(
+  strokes: PGAStroke[],
+  par: number,
+): HoleDisaster {
   const putts = strokes.filter(isPutt);
   const penalties = strokes.filter(isPenalty);
   const puttCount = putts.length;
   const penaltyCount = penalties.length;
   const firstPuttDistance = putts[0]?.distance ?? null;
 
+  // Strokes taken to reach the green = strokes before the first putt.
+  // If the player never putted (holed out from off the green) treat
+  // the whole hole as "to green".
+  const firstPuttIdx = strokes.findIndex(isPutt);
+  const strokesToGreen =
+    firstPuttIdx === -1 ? strokes.length : firstPuttIdx;
+  // A green should be reached in (par - 2). Two+ strokes over that is
+  // a genuine scramble — chunked it around, couldn't find the putting
+  // surface.
+  const greenOverage = strokesToGreen - Math.max(1, par - 2);
+
   // Pick the single most dramatic storyline. Penalties usually trump
-  // putting woes; a 4-putt trumps a single penalty.
+  // putting woes; a 4-putt trumps a single penalty; a bad scramble is
+  // the catch-all for the rest.
   let verdict: string | null = null;
   let emoji = "💥";
 
@@ -120,6 +135,9 @@ export function analyzeHole(strokes: PGAStroke[]): HoleDisaster {
       ? `3-putts from ${firstPuttDistance}`
       : "3-putts";
     emoji = "😬";
+  } else if (greenOverage >= 2) {
+    verdict = "can't find the green";
+    emoji = "😖";
   }
 
   return {
