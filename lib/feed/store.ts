@@ -25,7 +25,10 @@ import {
 const redis = Redis.fromEnv();
 
 const REACTED_TTL = 24 * 60 * 60;
-const POLL_LOCK_SECONDS = 45;
+// Coalesce window for viewer-triggered polls. Short enough that the
+// feed feels live, long enough that 100 concurrent viewers still only
+// trigger one real PGA Tour fetch per window.
+const POLL_LOCK_SECONDS = 25;
 
 function eventsKey(t: string) {
   return `feed:events:${t}`;

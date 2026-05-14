@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FeedRow } from "@/lib/feed/types";
 import CommentThread from "./CommentThread";
 
-const REFRESH_MS = 20_000;
+const REFRESH_MS = 15_000;
 const AUTHOR_KEY_STORAGE = "pardle_feed_author";
 
 interface FeedResponse {
@@ -224,7 +224,8 @@ export default function FeedClient() {
       )}
 
       <p className="feed-footnote">
-        Auto-refreshes every 20s · scores via PGA Tour, ~1–2 min behind live TV
+        Live PGA Tour scoring · auto-refreshes every 15s · usually within
+        ~30s of the course
       </p>
     </section>
   );
