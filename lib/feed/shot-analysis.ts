@@ -72,6 +72,12 @@ export interface HoleGlory {
    * promotes an ordinary birdie into the Shots-of-the-day reel.
    */
   great: boolean;
+  /**
+   * Which kind of great finish — drives the tracer's framing. A long
+   * putt zooms to the green; a hole-out shows the whole hole so the
+   * distance reads.
+   */
+  kind: "holeout" | "longputt" | null;
 }
 
 /**
@@ -82,7 +88,7 @@ export interface HoleGlory {
  */
 export function analyzeHighlightHole(strokes: PGAStroke[]): HoleGlory {
   if (strokes.length === 0)
-    return { verdict: null, emoji: "🦅", great: false };
+    return { verdict: null, emoji: "🦅", great: false, kind: null };
   const holing = strokes[strokes.length - 1];
 
   // Holed from anywhere but the green — a hole-out. The rarest thrill.
@@ -91,6 +97,7 @@ export function analyzeHighlightHole(strokes: PGAStroke[]): HoleGlory {
       verdict: `holes out from ${holing.distance}`,
       emoji: "🎯",
       great: true,
+      kind: "holeout",
     };
   }
 
@@ -102,11 +109,12 @@ export function analyzeHighlightHole(strokes: PGAStroke[]): HoleGlory {
         verdict: `drains a ${holing.distance} putt`,
         emoji: "🎯",
         great: true,
+        kind: "longputt",
       };
     }
   }
 
-  return { verdict: null, emoji: "🦅", great: false };
+  return { verdict: null, emoji: "🦅", great: false, kind: null };
 }
 
 /**

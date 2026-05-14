@@ -293,11 +293,12 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
       // albatross / eagle / birdie — eagles & albatrosses are auto-great;
       // a birdie only counts as a "shot of the day" when shot detail
       // shows it was a hole-out or a long putt.
-      focus = "holeout";
       const autoGreat =
         e.result === "albatross" || e.result === "eagle";
       const g = analyzeHighlightHole(hole.strokes);
       reelGreat = autoGreat || g.great;
+      // A long putt zooms to the green; a hole-out shows the whole hole.
+      focus = g.kind === "longputt" ? "putt" : "holeout";
       if (g.verdict) {
         const label =
           e.result === "albatross"
