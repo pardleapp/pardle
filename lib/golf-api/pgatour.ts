@@ -226,10 +226,11 @@ interface ScorecardNode {
 }
 
 const CHUNK_SIZE = 15;
-// Shot-detail queries carry per-stroke coordinates, so each player's
-// payload is far larger than a plain scorecard. Keep these chunks small
-// so the response stays well under the serverless runtime's limits.
-const SHOT_CHUNK_SIZE = 5;
+// Shot-detail queries carry per-stroke coordinates (now two sets each:
+// full-hole + zoomed-green), so each player's payload is far larger
+// than a plain scorecard. Keep these chunks small so the response
+// stays well under the serverless runtime's limits.
+const SHOT_CHUNK_SIZE = 3;
 
 /**
  * Batch-fetch scorecards for a list of player ids. Chunks of 15 are
@@ -301,6 +302,15 @@ export interface PGAStroke {
   fromY: number;
   toX: number;
   toY: number;
+  /**
+   * Same, but on the *zoomed-green* overhead view. Only on-green shots
+   * (putts, the approach that landed) fall inside 0-1 here — off-green
+   * shots come back out of range and are dropped by the tracer.
+   */
+  greenFromX: number;
+  greenFromY: number;
+  greenToX: number;
+  greenToY: number;
 }
 
 export interface PGAShotHole {
@@ -314,18 +324,29 @@ export interface PGAShotHole {
    * Empty string when unavailable.
    */
   holeImage: string;
+  /** Zoomed-green version of the same diagram — used for putt traces. */
+  greenImage: string;
 }
 
 interface CoordNode {
   enhancedX?: number;
   enhancedY?: number;
 }
+interface CoordWrapNode {
+  leftToRightCoords?: {
+    fromCoords?: CoordNode;
+    toCoords?: CoordNode;
+  };
+}
 interface ShotDetailNode {
   holes?: {
     holeNumber: number;
     par: number;
     score: string;
-    enhancedPickle?: { leftToRight?: string | null };
+    enhancedPickle?: {
+      leftToRight?: string | null;
+      greenLeftToRight?: string | null;
+    };
     strokes?: {
       strokeNumber: number;
       strokeType: string;
@@ -333,12 +354,8 @@ interface ShotDetailNode {
       toLocationCode: string;
       distance: string;
       playByPlay: string;
-      overview?: {
-        leftToRightCoords?: {
-          fromCoords?: CoordNode;
-          toCoords?: CoordNode;
-        };
-      };
+      overview?: CoordWrapNode;
+      green?: CoordWrapNode;
     }[];
   }[];
 }
@@ -368,11 +385,17 @@ export async function getShotDetailsBatch(
           `s${playerId}_${round}: shotDetailsV3(tournamentId: "${tournamentId}", playerId: "${playerId}", round: ${round}) {
              holes {
                holeNumber par score
-               enhancedPickle { leftToRight }
+               enhancedPickle { leftToRight greenLeftToRight }
                strokes {
                  strokeNumber strokeType fromLocationCode toLocationCode
                  distance playByPlay
                  overview {
+                   leftToRightCoords {
+                     fromCoords { enhancedX enhancedY }
+                     toCoords { enhancedX enhancedY }
+                   }
+                 }
+                 green {
                    leftToRightCoords {
                      fromCoords { enhancedX enhancedY }
                      toCoords { enhancedX enhancedY }
@@ -394,8 +417,10 @@ export async function getShotDetailsBatch(
         par: h.par,
         score: h.score,
         holeImage: h.enhancedPickle?.leftToRight ?? "",
+        greenImage: h.enhancedPickle?.greenLeftToRight ?? "",
         strokes: (h.strokes ?? []).map((s) => {
           const ltr = s.overview?.leftToRightCoords;
+          const grn = s.green?.leftToRightCoords;
           return {
             strokeNumber: s.strokeNumber,
             strokeType: s.strokeType,
@@ -407,6 +432,10 @@ export async function getShotDetailsBatch(
             fromY: ltr?.fromCoords?.enhancedY ?? -1,
             toX: ltr?.toCoords?.enhancedX ?? -1,
             toY: ltr?.toCoords?.enhancedY ?? -1,
+            greenFromX: grn?.fromCoords?.enhancedX ?? -1,
+            greenFromY: grn?.fromCoords?.enhancedY ?? -1,
+            greenToX: grn?.toCoords?.enhancedX ?? -1,
+            greenToY: grn?.toCoords?.enhancedY ?? -1,
           };
         }),
       }));

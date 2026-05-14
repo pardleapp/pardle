@@ -24,6 +24,11 @@ export interface ShotTrace {
   keyIndex: number;
   /** PGA Tour overhead hole-diagram image URL, drawn behind the trace. */
   holeImage?: string;
+  /**
+   * True when the trace is already framed (the zoomed-green view for
+   * putt stories) — the tracer should show it whole, not zoom further.
+   */
+  fullFrame?: boolean;
 }
 
 /** Which shot the event is "about" — drives which segment is the key one. */
@@ -37,26 +42,29 @@ export function extractTrace(
   strokes: PGAStroke[],
   focus: TraceFocus = "auto",
   holeImage?: string,
+  greenImage?: string,
 ): ShotTrace {
+  // Putt stories are drawn on the zoomed-green diagram with the green
+  // coordinate set; everything else uses the full-hole diagram.
+  const useGreen = focus === "putt";
+
   const segments: ShotTraceSegment[] = [];
   for (const s of strokes) {
-    if (![s.fromX, s.fromY, s.toX, s.toY].every(valid)) continue;
+    const fx = useGreen ? s.greenFromX : s.fromX;
+    const fy = useGreen ? s.greenFromY : s.fromY;
+    const tx = useGreen ? s.greenToX : s.toX;
+    const ty = useGreen ? s.greenToY : s.toY;
+    if (![fx, fy, tx, ty].every(valid)) continue;
     const kind: ShotTraceSegment["kind"] =
       s.strokeNumber === 1
         ? "tee"
         : s.fromLocationCode === "OGR"
         ? "putt"
         : "shot";
-    segments.push({
-      fromX: s.fromX,
-      fromY: s.fromY,
-      toX: s.toX,
-      toY: s.toY,
-      kind,
-    });
+    segments.push({ fromX: fx, fromY: fy, toX: tx, toY: ty, kind });
   }
 
-  const img = holeImage || undefined;
+  const img = (useGreen ? greenImage : holeImage) || undefined;
   if (segments.length === 0) {
     return { segments, keyIndex: -1, holeImage: img };
   }
@@ -78,5 +86,7 @@ export function extractTrace(
     keyIndex = segments.length - 1;
   }
 
-  return { segments, keyIndex, holeImage: img };
+  // Putt traces are drawn on the already-zoomed green diagram, so the
+  // tracer should show them whole rather than zooming in further.
+  return { segments, keyIndex, holeImage: img, fullFrame: useGreen };
 }

@@ -37,8 +37,10 @@ export default function ShotTracer({
   const key = segments[keyI];
 
   // Frame: thumb zooms around the key segment, full shows the hole.
+  // `fullFrame` traces (putt stories on the zoomed-green diagram) are
+  // already framed — show them whole even in thumb mode.
   let vb = { x: 0, y: 0, w: W, h: H };
-  if (mode === "thumb") {
+  if (mode === "thumb" && !trace.fullFrame) {
     let minX = Math.min(key.fromX, key.toX);
     let maxX = Math.max(key.fromX, key.toX);
     let minY = Math.min(key.fromY, key.toY);

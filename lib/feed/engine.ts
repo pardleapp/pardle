@@ -309,7 +309,12 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
         emoji = g.emoji;
       }
     }
-    const trace = extractTrace(hole.strokes, focus, hole.holeImage);
+    const trace = extractTrace(
+      hole.strokes,
+      focus,
+      hole.holeImage,
+      hole.greenImage,
+    );
     // Store even when nothing changed — marks the event processed so we
     // don't re-fetch its shot detail every poll.
     enrichments[e.id] = {
