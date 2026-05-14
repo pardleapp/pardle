@@ -76,6 +76,8 @@ export interface PollResult {
   /** True when this was the first poll (snapshot seeded, no events). */
   seeded: boolean;
   activePlayers: number;
+  /** TEMP diagnostic — traces the enrichment-overlay pass. */
+  enrichDebug?: string;
 }
 
 export async function pollAndDiff(
@@ -263,9 +265,11 @@ export async function pollAndDiff(
   // still-generic backlog). Runs as an overlay so a transient fetch
   // failure just retries next poll instead of leaving a permanently
   // generic headline.
+  let enrichDebug = "not-run";
   try {
-    await enrichRecentEvents(tournamentId);
+    enrichDebug = await enrichRecentEvents(tournamentId);
   } catch (err) {
+    enrichDebug = `error:${err instanceof Error ? err.message : String(err)}`;
     console.error("[feed] enrichRecentEvents failed", err);
   }
 
@@ -273,6 +277,7 @@ export async function pollAndDiff(
     newEvents: events,
     seeded: false,
     activePlayers: activeIds.length,
+    enrichDebug,
   };
 }
 
@@ -282,7 +287,7 @@ export async function pollAndDiff(
  * and any whose enrichment previously failed. Bounded to 40 events per
  * poll so the extra orchestrator calls stay small.
  */
-async function enrichRecentEvents(tournamentId: string): Promise<void> {
+async function enrichRecentEvents(tournamentId: string): Promise<string> {
   const [events, done] = await Promise.all([
     getEvents(tournamentId, 150),
     getEnrichments(tournamentId),
@@ -299,7 +304,7 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
       e.type !== "shot" &&
       (isLowlightEvent(e) || isHighlightEvent(e)),
   );
-  if (candidates.length === 0) return;
+  if (candidates.length === 0) return "cand:0";
 
   const batch = candidates.slice(0, 40);
   const reqs = Array.from(
@@ -311,7 +316,13 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
     ).values(),
   );
   const shotDetails = await getShotDetailsBatch(tournamentId, reqs);
+  const detailKeys = Object.keys(shotDetails).length;
+  const totalHoles = Object.values(shotDetails).reduce(
+    (a, hs) => a + hs.length,
+    0,
+  );
 
+  let holesMatched = 0;
   const enrichments: Record<string, Enrichment> = {};
   for (const e of batch) {
     const hole = shotDetails[`${e.playerId}:${e.round}`]?.find(
@@ -319,6 +330,7 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
     );
     // No shot data yet — leave un-enriched so we retry next poll.
     if (!hole) continue;
+    holesMatched++;
 
     let headline = e.headline;
     let emoji = e.emoji;
@@ -346,4 +358,5 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
     enrichments[e.id] = { headline, emoji };
   }
   await putEnrichments(tournamentId, enrichments);
+  return `cand:${candidates.length} batch:${batch.length} keys:${detailKeys} holes:${totalHoles} matched:${holesMatched} written:${Object.keys(enrichments).length}`;
 }
