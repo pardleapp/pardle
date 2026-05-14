@@ -6,22 +6,12 @@ import { pgaTourHeadshotUrlById } from "@/lib/data/pga-tour-ids";
 import type { FeedEvent, FeedRow } from "@/lib/feed/types";
 
 interface Props {
+  title: string;
   rows: FeedRow[];
+  /** Predicate deciding which events belong in this reel. */
+  include: (e: FeedEvent) => boolean;
   myReactions: Record<string, "up" | "down">;
   onReact: (eventId: string, dir: "up" | "down") => void;
-}
-
-/**
- * A moment belongs in the reel if the engine flagged it OR — for events
- * created before the highlight flag existed — its own fields qualify it
- * (an ace, albatross, eagle, or a stuffed-approach shot event).
- */
-function isHighlight(e: FeedEvent): boolean {
-  if (e.highlight) return true;
-  if (e.ace) return true;
-  if (e.result === "albatross" || e.result === "eagle") return true;
-  if (e.type === "shot") return true;
-  return false;
 }
 
 /** Player headshot with a graceful fallback when no image is available. */
@@ -46,38 +36,40 @@ function ReelAvatar({ playerId }: { playerId: string }) {
   );
 }
 
+/** Per-result tint class for a reel card. */
+function cardKind(e: FeedEvent): string {
+  if (e.ace) return "ace";
+  if (e.type === "shot") return "shot";
+  return e.result ?? "other";
+}
+
 /**
- * "Shots of the Day" — a horizontal reel of the best moments
- * (aces, albatrosses, eagles, stuffed approaches). The headline links
- * to the player card; the 👍 / 👎 buttons react in place, sharing the
- * feed's reaction handler so counts stay in sync everywhere.
+ * A horizontal reel of feed moments. Used twice on /live: "Shots of the
+ * day" (aces / eagles / stuffed approaches) and "Worst of the day"
+ * (doubles and blow-ups). The headline links to the player card; the
+ * 👍 / 👎 buttons share the feed's reaction handler so counts stay in
+ * sync everywhere.
  */
-export default function HighlightsReel({
+export default function Reel({
+  title,
   rows,
+  include,
   myReactions,
   onReact,
 }: Props) {
-  const highlights = rows
-    .filter((r) => isHighlight(r.event))
-    .slice(0, 24);
-  if (highlights.length === 0) return null;
+  const items = rows.filter((r) => include(r.event)).slice(0, 24);
+  if (items.length === 0) return null;
 
   return (
     <section className="reel">
-      <h3 className="reel-title">⛳ Shots of the day</h3>
+      <h3 className="reel-title">{title}</h3>
       <div className="reel-scroll">
-        {highlights.map(({ event, reactions }) => {
+        {items.map(({ event, reactions }) => {
           const mine = myReactions[event.id];
           return (
             <div
               key={event.id}
-              className={`reel-card reel-card-${
-                event.ace
-                  ? "ace"
-                  : event.type === "shot"
-                  ? "shot"
-                  : event.result ?? "other"
-              }`}
+              className={`reel-card reel-card-${cardKind(event)}`}
             >
               <Link
                 href={`/live/player/${event.playerId}`}
@@ -111,4 +103,19 @@ export default function HighlightsReel({
       </div>
     </section>
   );
+}
+
+/** A moment qualifies for the "Shots of the day" reel. */
+export function isHighlight(e: FeedEvent): boolean {
+  if (e.highlight) return true;
+  if (e.ace) return true;
+  if (e.result === "albatross" || e.result === "eagle") return true;
+  if (e.type === "shot") return true;
+  return false;
+}
+
+/** A moment qualifies for the "Worst of the day" reel. */
+export function isLowlight(e: FeedEvent): boolean {
+  if (e.lowlight) return true;
+  return e.result === "double" || e.result === "triple-plus";
 }

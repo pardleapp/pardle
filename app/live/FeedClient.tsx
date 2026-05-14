@@ -9,7 +9,7 @@ import CommentThread from "./CommentThread";
 import { getFollows } from "./FollowButton";
 import LeaderboardPanel from "./LeaderboardPanel";
 import PollPanel from "./PollPanel";
-import HighlightsReel from "./HighlightsReel";
+import Reel, { isHighlight, isLowlight } from "./Reel";
 
 const REFRESH_MS = 15_000;
 const AUTHOR_KEY_STORAGE = "pardle_feed_author";
@@ -231,8 +231,18 @@ export default function FeedClient() {
         </div>
       </div>
 
-      <HighlightsReel
+      <Reel
+        title="⛳ Shots of the day"
         rows={data.rows}
+        include={isHighlight}
+        myReactions={myReactions}
+        onReact={sendReaction}
+      />
+
+      <Reel
+        title="💀 Worst of the day"
+        rows={data.rows}
+        include={isLowlight}
         myReactions={myReactions}
         onReact={sendReaction}
       />

@@ -153,6 +153,8 @@ export async function pollAndDiff(
         // Highlights reel = aces, albatrosses, eagles.
         const highlight =
           ace || result === "albatross" || result === "eagle";
+        // Worst-of reel = doubles and worse (the blow-ups).
+        const lowlight = result === "double" || result === "triple-plus";
 
         events.push({
           id: newEventId(now),
@@ -168,6 +170,7 @@ export async function pollAndDiff(
           result,
           ace,
           highlight,
+          lowlight,
           headline: ace
             ? aceHeadline(playerName, h.holeNumber)
             : scoreHeadline(playerName, h.holeNumber, result),

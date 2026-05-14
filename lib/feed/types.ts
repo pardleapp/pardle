@@ -53,6 +53,8 @@ export interface FeedEvent {
   emoji: string;
   /** True when this belongs in the "Shots of the Day" highlights reel. */
   highlight?: boolean;
+  /** True when this belongs in the "Worst of the Day" blow-up reel. */
+  lowlight?: boolean;
 }
 
 /** Reaction tallies — stored separately so they update without rewriting the event. */

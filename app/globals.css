@@ -5604,6 +5604,14 @@ footer {
   border-color: rgba(91, 160, 224, 0.5);
   background: rgba(91, 160, 224, 0.08);
 }
+.reel-card-double {
+  border-color: rgba(224, 91, 91, 0.5);
+  background: rgba(224, 91, 91, 0.08);
+}
+.reel-card-triple-plus {
+  border-color: rgba(224, 91, 91, 0.75);
+  background: rgba(224, 91, 91, 0.15);
+}
 
 .reel-emoji {
   font-size: 26px;
