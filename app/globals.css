@@ -5509,6 +5509,32 @@ footer {
   50% { opacity: 0.35; transform: scale(0.8); }
 }
 
+.feed-filter-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.feed-filter-btn {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  min-height: 40px;
+}
+
+.feed-filter-on {
+  background: rgba(123, 174, 63, 0.15);
+  border-color: var(--green);
+  color: var(--text);
+}
+
 .feed-list {
   list-style: none;
   margin: 0;
@@ -5516,6 +5542,195 @@ footer {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.feed-body-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.feed-body-link:hover .feed-headline {
+  text-decoration: underline;
+}
+
+/* ── Follow button ─────────────────────────────────────────────── */
+
+.follow-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--muted);
+  white-space: nowrap;
+  min-height: 38px;
+}
+
+.follow-btn-on {
+  background: rgba(232, 197, 71, 0.18);
+  border-color: #e8c547;
+  color: var(--text);
+}
+
+/* ── Player card page ──────────────────────────────────────────── */
+
+.pcard-head {
+  margin: 8px 0 4px;
+}
+
+.pcard-head-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pcard-name {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+
+.pcard-statline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.pcard-stat {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pcard-stat strong {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.pcard-section {
+  margin-top: 20px;
+}
+
+.pcard-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pcard-round {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.pcard-round-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 38px;
+  flex-shrink: 0;
+}
+
+.pcard-round-num {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.pcard-round-topar {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.pcard-holes {
+  display: flex;
+  gap: 3px;
+}
+
+.pcard-cell {
+  width: 22px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.pcard-cell-empty {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--muted);
+}
+.pcard-cell-par {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text);
+}
+.pcard-cell-birdie {
+  background: rgba(123, 174, 63, 0.3);
+  color: #2c5a28;
+}
+.pcard-cell-eagle {
+  background: var(--green);
+  color: white;
+}
+.pcard-cell-bogey {
+  background: rgba(232, 197, 71, 0.4);
+  color: #7a5c00;
+}
+.pcard-cell-double {
+  background: rgba(224, 91, 91, 0.35);
+  color: #8a2a2a;
+}
+
+.pcard-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.pcard-stat-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg, white);
+}
+
+.pcard-stat-num {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.pcard-stat-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+}
+
+@media (prefers-color-scheme: dark) {
+  .pcard-stat-box {
+    background: #1f1f20;
+  }
+  .pcard-cell-empty,
+  .pcard-cell-par {
+    background: rgba(255, 255, 255, 0.07);
+  }
 }
 
 .feed-row {

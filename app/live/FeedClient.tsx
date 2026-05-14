@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Burst } from "@/lib/feed/store";
 import type { FeedRow } from "@/lib/feed/types";
 import CommentThread from "./CommentThread";
+import { getFollows } from "./FollowButton";
 
 const REFRESH_MS = 15_000;
 const AUTHOR_KEY_STORAGE = "pardle_feed_author";
@@ -59,12 +61,26 @@ export default function FeedClient() {
     {},
   );
   const [floaters, setFloaters] = useState<Floater[]>([]);
+  const [filterMode, setFilterMode] = useState<"all" | "following">("all");
+  const [follows, setFollowsState] = useState<string[]>([]);
 
   const authorKey = useRef<string>("");
   const seenBursts = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     authorKey.current = getAuthorKey();
+  }, []);
+
+  // Track followed players — re-read whenever a FollowButton fires the event.
+  useEffect(() => {
+    const sync = () => setFollowsState(getFollows());
+    sync();
+    window.addEventListener("pardle-follows-changed", sync);
+    window.addEventListener("focus", sync);
+    return () => {
+      window.removeEventListener("pardle-follows-changed", sync);
+      window.removeEventListener("focus", sync);
+    };
   }, []);
 
   // ── Floating emoji bursts ──────────────────────────────────────
@@ -186,6 +202,12 @@ export default function FeedClient() {
   }
 
   // ── Live feed ───────────────────────────────────────────────────
+  const followSet = new Set(follows);
+  const visibleRows =
+    filterMode === "following"
+      ? data.rows.filter((r) => followSet.has(r.event.playerId))
+      : data.rows;
+
   return (
     <section className="feed-wrap">
       <div className="feed-header-row">
@@ -202,14 +224,37 @@ export default function FeedClient() {
         </div>
       </div>
 
+      <div className="feed-filter-row">
+        <button
+          type="button"
+          className={`feed-filter-btn ${filterMode === "all" ? "feed-filter-on" : ""}`}
+          onClick={() => setFilterMode("all")}
+        >
+          All shots
+        </button>
+        <button
+          type="button"
+          className={`feed-filter-btn ${filterMode === "following" ? "feed-filter-on" : ""}`}
+          onClick={() => setFilterMode("following")}
+        >
+          ★ Following {follows.length > 0 ? `(${follows.length})` : ""}
+        </button>
+      </div>
+
       {data.rows.length === 0 ? (
         <p className="feed-empty">
           Feed is warming up — first scores will appear here within a
           minute or two of the groups going out.
         </p>
+      ) : filterMode === "following" && visibleRows.length === 0 ? (
+        <p className="feed-empty">
+          {follows.length === 0
+            ? "You're not following anyone yet. Tap a player's name to open their card and follow them."
+            : "No shots from the players you follow yet — they'll show here."}
+        </p>
       ) : (
         <ul className="feed-list">
-          {data.rows.map(({ event, reactions, commentCount }) => {
+          {visibleRows.map(({ event, reactions, commentCount }) => {
             const mine = myReactions[event.id];
             const isOpen = expanded === event.id;
             const count = commentCounts[event.id] ?? commentCount;
@@ -224,12 +269,15 @@ export default function FeedClient() {
                   <span className="feed-emoji" aria-hidden="true">
                     {event.emoji}
                   </span>
-                  <div className="feed-body">
+                  <Link
+                    href={`/live/player/${event.playerId}`}
+                    className="feed-body feed-body-link"
+                  >
                     <p className="feed-headline">{event.headline}</p>
                     <p className="feed-meta">
-                      R{event.round} · {timeAgo(event.ts)}
+                      R{event.round} · {timeAgo(event.ts)} · view card →
                     </p>
-                  </div>
+                  </Link>
                   <div className="feed-actions">
                     <button
                       type="button"
