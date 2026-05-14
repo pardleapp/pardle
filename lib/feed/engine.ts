@@ -323,7 +323,7 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
     let headline = e.headline;
     let emoji = e.emoji;
     if (isLowlightEvent(e)) {
-      const d = analyzeHole(hole.strokes, hole.par);
+      const d = analyzeHole(hole);
       if (d.verdict) {
         headline = `${e.playerName} ${d.verdict} on the ${ordinalHole(e.hole!)}`;
         emoji = d.emoji;

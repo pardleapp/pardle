@@ -9,7 +9,7 @@
  *   - Penalty = stroke with strokeType "PENALTY".
  */
 
-import type { PGAStroke } from "@/lib/golf-api/pgatour";
+import type { PGAShotHole, PGAStroke } from "@/lib/golf-api/pgatour";
 
 export interface HoleDisaster {
   /** Number of putts taken (includes the holed putt). */
@@ -40,6 +40,27 @@ function isPenalty(s: PGAStroke): boolean {
 const NUMBER_WORD = ["zero", "one", "two", "three", "four", "five"];
 function word(n: number): string {
   return NUMBER_WORD[n] ?? String(n);
+}
+
+/** "a 7" / "an 8" — only 8 takes "an". */
+function withArticle(n: number): string {
+  return n === 8 ? `an ${n}` : `a ${n}`;
+}
+
+/**
+ * Which trouble surfaces a ball visited during the hole. "to" location
+ * codes are E + side + surface; the last char is the surface
+ * (B=bunker, N=native/waste, R=rough, I=intermediate, F=fairway, G=green).
+ */
+function visitedSurfaces(strokes: PGAStroke[]): Set<string> {
+  const out = new Set<string>();
+  for (const s of strokes) {
+    const code = (s.toLocationCode || "").toUpperCase();
+    const last = code[code.length - 1];
+    if (last === "B") out.add("bunker");
+    else if (last === "N") out.add("native");
+  }
+  return out;
 }
 
 /** Parse a display distance ("140 yds", "50 ft 10 in.", "17 in") to feet. */
@@ -92,10 +113,9 @@ export function analyzeHighlightHole(strokes: PGAStroke[]): HoleGlory {
   return { verdict: null, emoji: "🦅" };
 }
 
-export function analyzeHole(
-  strokes: PGAStroke[],
-  par: number,
-): HoleDisaster {
+export function analyzeHole(hole: PGAShotHole): HoleDisaster {
+  const { strokes, par } = hole;
+  const score = Number(hole.score);
   const putts = strokes.filter(isPutt);
   const penalties = strokes.filter(isPenalty);
   const puttCount = putts.length;
@@ -109,13 +129,14 @@ export function analyzeHole(
   const strokesToGreen =
     firstPuttIdx === -1 ? strokes.length : firstPuttIdx;
   // A green should be reached in (par - 2). Two+ strokes over that is
-  // a genuine scramble — chunked it around, couldn't find the putting
-  // surface.
+  // a genuine scramble — chunked it around, couldn't find the green.
   const greenOverage = strokesToGreen - Math.max(1, par - 2);
+  const surfaces = visitedSurfaces(strokes);
+  const overPar = Number.isFinite(score) ? score - par : 0;
 
-  // Pick the single most dramatic storyline. Penalties usually trump
-  // putting woes; a 4-putt trumps a single penalty; a bad scramble is
-  // the catch-all for the rest.
+  // Pick the single most dramatic storyline, most specific first:
+  // penalties and putting woes are the surest stories; otherwise the
+  // scramble is coloured by where the ball ended up or the raw number.
   let verdict: string | null = null;
   let emoji = "💥";
 
@@ -136,8 +157,20 @@ export function analyzeHole(
       : "3-putts";
     emoji = "😬";
   } else if (greenOverage >= 2) {
-    verdict = "can't find the green";
-    emoji = "😖";
+    // A genuine scramble — colour it by trouble surface, then severity.
+    if (surfaces.has("native")) {
+      verdict = "lost in the native area";
+      emoji = "🌾";
+    } else if (surfaces.has("bunker")) {
+      verdict = "buried in the bunker";
+      emoji = "🏖️";
+    } else if (overPar >= 3 && Number.isFinite(score)) {
+      verdict = `scrambles to ${withArticle(score)}`;
+      emoji = "😖";
+    } else {
+      verdict = "can't find the green";
+      emoji = "😖";
+    }
   }
 
   return {
