@@ -4955,3 +4955,155 @@ footer {
     border-color: #333;
   }
 }
+
+/* ──────────────────────────────────────────────────────────────── */
+/* Fantasy Golf                                                     */
+/* ──────────────────────────────────────────────────────────────── */
+
+.fantasy-hero {
+  margin: 8px 0 28px;
+  padding: 24px 20px;
+  background: linear-gradient(
+    135deg,
+    rgba(123, 174, 63, 0.08) 0%,
+    rgba(224, 123, 91, 0.08) 100%
+  );
+  border: 1px solid rgba(123, 174, 63, 0.25);
+  border-radius: 14px;
+  text-align: center;
+}
+
+.fantasy-hero-title {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+
+.fantasy-hero-sub {
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text);
+  opacity: 0.85;
+  margin: 0 0 20px;
+}
+
+.fantasy-cta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.fantasy-cta-primary,
+.fantasy-cta-secondary {
+  display: inline-block;
+  padding: 14px 22px;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 15px;
+  text-decoration: none;
+  letter-spacing: 0.3px;
+  min-height: 44px;
+  text-align: center;
+}
+
+.fantasy-cta-primary {
+  background: var(--green);
+  color: white;
+  border: 2px solid var(--green);
+}
+
+.fantasy-cta-primary:hover {
+  filter: brightness(1.05);
+}
+
+.fantasy-cta-secondary {
+  background: transparent;
+  color: var(--green);
+  border: 2px solid var(--green);
+}
+
+.fantasy-cta-secondary:hover {
+  background: rgba(123, 174, 63, 0.1);
+}
+
+.fantasy-section-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 24px 0 12px;
+}
+
+.fantasy-steps {
+  list-style: none;
+  counter-reset: step;
+  padding: 0;
+  margin: 0;
+}
+
+.fantasy-steps li {
+  position: relative;
+  counter-increment: step;
+  padding: 10px 0 10px 44px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.fantasy-steps li:last-child {
+  border-bottom: none;
+}
+
+.fantasy-steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--green);
+  color: white;
+  font-weight: 900;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fantasy-status {
+  margin: 24px 0 8px;
+  padding: 14px 16px;
+  background: rgba(232, 197, 71, 0.12);
+  border: 1px solid rgba(232, 197, 71, 0.4);
+  border-radius: 10px;
+}
+
+.fantasy-status-note {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  margin: 0;
+}
+
+@media (min-width: 480px) {
+  .fantasy-cta-row {
+    flex-direction: row;
+    justify-content: center;
+  }
+  .fantasy-cta-primary,
+  .fantasy-cta-secondary {
+    min-width: 180px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .fantasy-steps li {
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+}
