@@ -226,6 +226,10 @@ interface ScorecardNode {
 }
 
 const CHUNK_SIZE = 15;
+// Shot-detail queries carry per-stroke coordinates, so each player's
+// payload is far larger than a plain scorecard. Keep these chunks small
+// so the response stays well under the serverless runtime's limits.
+const SHOT_CHUNK_SIZE = 5;
 
 /**
  * Batch-fetch scorecards for a list of player ids. Chunks of 15 are
@@ -344,8 +348,8 @@ export async function getShotDetailsBatch(
   if (requests.length === 0) return {};
 
   const chunks: { playerId: string; round: number }[][] = [];
-  for (let i = 0; i < requests.length; i += CHUNK_SIZE) {
-    chunks.push(requests.slice(i, i + CHUNK_SIZE));
+  for (let i = 0; i < requests.length; i += SHOT_CHUNK_SIZE) {
+    chunks.push(requests.slice(i, i + SHOT_CHUNK_SIZE));
   }
 
   const fetchChunk = async (
