@@ -65,13 +65,16 @@ export async function GET(req: Request) {
   }
 
   let polled = false;
+  let enrichDebug = "no-lock";
   if (isLive) {
     const gotLock = await acquirePollLock(tournament.id);
     if (gotLock) {
       try {
-        await pollAndDiff(tournament.id);
+        const r = await pollAndDiff(tournament.id);
         polled = true;
+        enrichDebug = r.enrichDebug ?? "undefined";
       } catch (err) {
+        enrichDebug = `threw:${err instanceof Error ? err.message : String(err)}`;
         console.error("[feed] pollAndDiff failed", err);
       }
       // Seed (or re-seed) the "Who wins?" poll from live win
@@ -170,5 +173,6 @@ export async function GET(req: Request) {
     watching,
     seenToday,
     polled,
+    enrichDebug,
   });
 }
