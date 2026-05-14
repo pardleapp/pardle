@@ -9,7 +9,7 @@ import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
 import LeaderboardPanel from "./LeaderboardPanel";
 import PollPanel from "./PollPanel";
-import Reel, { isHighlight, isLowlight } from "./Reel";
+import Reel from "./Reel";
 
 const REFRESH_MS = 15_000;
 const AUTHOR_KEY_STORAGE = "pardle_feed_author";
@@ -24,6 +24,8 @@ interface FeedResponse {
     startDate: number;
   } | null;
   rows: FeedRow[];
+  bestReel: FeedRow[];
+  worstReel: FeedRow[];
   bursts: Burst[];
   leaderboard: CachedLeaderboardRow[];
   polls: PollWithVotes[];
@@ -234,16 +236,14 @@ export default function FeedClient() {
 
       <Reel
         title="⛳ Shots of the day"
-        rows={data.rows}
-        include={isHighlight}
+        rows={data.bestReel ?? []}
         myReactions={myReactions}
         onReact={sendReaction}
       />
 
       <Reel
         title="💀 Worst of the day"
-        rows={data.rows}
-        include={isLowlight}
+        rows={data.worstReel ?? []}
         myReactions={myReactions}
         onReact={sendReaction}
       />

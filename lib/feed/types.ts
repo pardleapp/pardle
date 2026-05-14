@@ -141,7 +141,9 @@ export interface FeedRow {
   commentCount: number;
 }
 
-export const FEED_MAX_EVENTS = 400; // cap the Redis list — ~a full tournament day
+// Cap the Redis events list. Large enough that the reels (curated from
+// a 400-event window) stay populated across a full round of play.
+export const FEED_MAX_EVENTS = 1000;
 export const COMMENT_MAX_LEN = 280;
 export const COMMENTS_PER_EVENT_CAP = 200;
 

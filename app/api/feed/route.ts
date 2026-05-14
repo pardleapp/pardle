@@ -45,6 +45,8 @@ export async function GET(req: Request) {
     return NextResponse.json({
       tournament: null,
       rows: [],
+      bestReel: [],
+      worstReel: [],
       bursts: [],
       leaderboard: [],
       polls: [],
@@ -107,27 +109,25 @@ export async function GET(req: Request) {
     }
   }
 
-  const [events, bursts, leaderboard, polls, enrichments] =
+  // The main feed shows the last 80 events; the reels are curated from
+  // a much wider window so "shots/worst of the day" stay populated even
+  // as the feed rolls.
+  const [feedEvents, reelSource, bursts, leaderboard, polls, enrichments] =
     await Promise.all([
       getEvents(tournament.id, 80),
+      getEvents(tournament.id, 400),
       getRecentBursts(tournament.id),
       getCachedLeaderboard(tournament.id),
       listPolls(tournament.id),
       getEnrichments(tournament.id),
     ]);
 
-  const ids = events.map((e) => e.id);
-  const [reactions, commentCounts] = await Promise.all([
-    getReactionsBulk(ids),
-    getCommentCountsBulk(ids),
-  ]);
-
-  const rows: FeedRow[] = events.map((event) => {
-    // Apply the shot-detail enrichment overlay if one exists for this
-    // event — gives "3-putts from 40 ft" in place of "doubles the 8th",
-    // and flags whether it's a genuine Worst-of-reel disaster.
+  // Merge the shot-detail enrichment overlay onto an event — gives
+  // "3-putts from 40 ft" in place of "doubles the 8th", the shot
+  // trace, and the reel flags.
+  const mergeEnrichment = (event: FeedRow["event"]) => {
     const enriched = enrichments[event.id];
-    const merged = enriched
+    return enriched
       ? {
           ...event,
           headline: enriched.headline || event.headline,
@@ -137,12 +137,40 @@ export async function GET(req: Request) {
           trace: enriched.trace,
         }
       : event;
-    return {
-      event: merged,
-      reactions: reactions[event.id] ?? { up: 0, down: 0 },
-      commentCount: commentCounts[event.id] ?? 0,
-    };
+  };
+
+  const feedMerged = feedEvents.map(mergeEnrichment);
+  // Filter the wide window FIRST (cheap — just enrichment flags) so the
+  // reaction/comment lookups only run for events actually returned.
+  const bestEvents = reelSource
+    .map(mergeEnrichment)
+    .filter((e) => e.reelGreat === true)
+    .slice(0, 24);
+  const worstEvents = reelSource
+    .map(mergeEnrichment)
+    .filter((e) => e.reelWorthy === true)
+    .slice(0, 24);
+
+  // One reaction/comment lookup for the union of everything returned.
+  const idSet = new Set<string>();
+  for (const e of feedMerged) idSet.add(e.id);
+  for (const e of bestEvents) idSet.add(e.id);
+  for (const e of worstEvents) idSet.add(e.id);
+  const ids = [...idSet];
+  const [reactions, commentCounts] = await Promise.all([
+    getReactionsBulk(ids),
+    getCommentCountsBulk(ids),
+  ]);
+
+  const toRow = (event: FeedRow["event"]): FeedRow => ({
+    event,
+    reactions: reactions[event.id] ?? { up: 0, down: 0 },
+    commentCount: commentCounts[event.id] ?? 0,
   });
+
+  const rows: FeedRow[] = feedMerged.map(toRow);
+  const bestReel: FeedRow[] = bestEvents.map(toRow);
+  const worstReel: FeedRow[] = worstEvents.map(toRow);
 
   // Polls + this visitor's existing choices.
   const pollsWithVotes = await Promise.all(polls.map(pollWithVotes));
@@ -164,6 +192,8 @@ export async function GET(req: Request) {
       startDate: tournament.startDate,
     },
     rows,
+    bestReel,
+    worstReel,
     bursts,
     leaderboard: leaderboard.slice(0, 15),
     polls: pollsWithVotes,

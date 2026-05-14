@@ -5,22 +5,12 @@ import { useState } from "react";
 import { pgaTourHeadshotUrlById } from "@/lib/data/pga-tour-ids";
 import FollowButton from "./FollowButton";
 import ShotTracer from "./ShotTracer";
-import {
-  type FeedEvent,
-  type FeedRow,
-  isBestReelEvent as isHighlight,
-  isWorstReelEvent as isLowlight,
-} from "@/lib/feed/types";
-
-// Re-exported so FeedClient can pass them as the reel's `include` filter.
-// Both are post-enrichment filters — confirmed wow shots / disasters only.
-export { isHighlight, isLowlight };
+import { type FeedEvent, type FeedRow } from "@/lib/feed/types";
 
 interface Props {
   title: string;
+  /** Already-filtered reel rows — the API curates these from a wide window. */
   rows: FeedRow[];
-  /** Predicate deciding which events belong in this reel. */
-  include: (e: FeedEvent) => boolean;
   myReactions: Record<string, "up" | "down">;
   onReact: (eventId: string, dir: "up" | "down") => void;
 }
@@ -56,19 +46,13 @@ function cardKind(e: FeedEvent): string {
 
 /**
  * A horizontal reel of feed moments. Used twice on /live: "Shots of the
- * day" (aces / eagles / stuffed approaches) and "Worst of the day"
- * (doubles and blow-ups). The headline links to the player card; the
- * 👍 / 👎 buttons share the feed's reaction handler so counts stay in
- * sync everywhere.
+ * day" (aces / eagles / hole-outs / long putts) and "Worst of the day"
+ * (multi-putts and penalties). Rows arrive pre-curated from the API's
+ * wide window. The headline links to the player card; the 👍 / 👎
+ * buttons share the feed's reaction handler so counts stay in sync.
  */
-export default function Reel({
-  title,
-  rows,
-  include,
-  myReactions,
-  onReact,
-}: Props) {
-  const items = rows.filter((r) => include(r.event)).slice(0, 24);
+export default function Reel({ title, rows, myReactions, onReact }: Props) {
+  const items = rows.slice(0, 24);
   // Which event's shot trace is expanded into the full-hole overlay.
   const [expandedTrace, setExpandedTrace] = useState<FeedRow | null>(null);
   if (items.length === 0) return null;
