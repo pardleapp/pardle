@@ -42,6 +42,56 @@ function word(n: number): string {
   return NUMBER_WORD[n] ?? String(n);
 }
 
+/** Parse a display distance ("140 yds", "50 ft 10 in.", "17 in") to feet. */
+function distanceToFeet(d: string): number | null {
+  if (!d) return null;
+  const yds = /(\d+)\s*yds/i.exec(d);
+  if (yds) return Number(yds[1]) * 3;
+  const ft = /(\d+)\s*ft/i.exec(d);
+  const inch = /(\d+)\s*in/i.exec(d);
+  if (ft || inch) {
+    return (ft ? Number(ft[1]) : 0) + (inch ? Number(inch[1]) : 0) / 12;
+  }
+  return null;
+}
+
+/** A putt this long, holed, is a reaction-worthy "drains it" moment. */
+const LONG_PUTT_FEET = 25;
+
+export interface HoleGlory {
+  /**
+   * Descriptive fragment for a great hole, e.g. "holes out from 140 yds"
+   * or "drains a 38 ft putt" — null when the eagle came the routine way
+   * (reached the green, two-putt) and the generic headline is fine.
+   */
+  verdict: string | null;
+  emoji: string;
+}
+
+/**
+ * Inspect how a hole was *finished* — the holing stroke tells the story:
+ * holed from off the green (a hole-out) or a long putt dropped.
+ */
+export function analyzeHighlightHole(strokes: PGAStroke[]): HoleGlory {
+  if (strokes.length === 0) return { verdict: null, emoji: "🦅" };
+  const holing = strokes[strokes.length - 1];
+
+  // Holed from anywhere but the green — a hole-out. The rarest thrill.
+  if (holing.fromLocationCode !== "OGR" && holing.distance) {
+    return { verdict: `holes out from ${holing.distance}`, emoji: "🎯" };
+  }
+
+  // Holed a putt — only call it out when it was a genuine bomb.
+  if (holing.fromLocationCode === "OGR" && holing.distance) {
+    const feet = distanceToFeet(holing.distance);
+    if (feet != null && feet >= LONG_PUTT_FEET) {
+      return { verdict: `drains a ${holing.distance} putt`, emoji: "🎯" };
+    }
+  }
+
+  return { verdict: null, emoji: "🦅" };
+}
+
 export function analyzeHole(strokes: PGAStroke[]): HoleDisaster {
   const putts = strokes.filter(isPutt);
   const penalties = strokes.filter(isPenalty);

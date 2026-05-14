@@ -21,7 +21,7 @@ import {
   getScorecards,
   getShotDetailsBatch,
 } from "@/lib/golf-api/pgatour";
-import { analyzeHole } from "./shot-analysis";
+import { analyzeHighlightHole, analyzeHole } from "./shot-analysis";
 import {
   cacheLeaderboard,
   getSnapshot,
@@ -232,15 +232,18 @@ export async function pollAndDiff(
   }
   fresh.proximityEmitted = Array.from(freshProx).slice(-2000);
 
-  // ── Enrich blow-ups with shot-level detail ──────────────────────
-  // For each double-or-worse this poll, pull the player's shot-by-shot
-  // data and rewrite the headline with what actually went wrong — a
-  // 3-putt, a 4-putt, a penalty — instead of a flat "doubles the 8th".
-  const lowlightEvents = events.filter((e) => e.lowlight);
-  if (lowlightEvents.length > 0) {
+  // ── Enrich blow-ups AND eagles/aces with shot-level detail ──────
+  // One batched shotDetailsV3 fetch feeds both reels: the worst reel
+  // gets "3-putts from 40 ft", the best reel gets "holes out from
+  // 140 yds for eagle". Stuffed-approach "shot" events already carry
+  // their detail from playByPlay, so they're skipped here.
+  const enrichEvents = events.filter(
+    (e) => e.lowlight || (e.type === "score" && e.highlight),
+  );
+  if (enrichEvents.length > 0) {
     const reqs = Array.from(
       new Map(
-        lowlightEvents.map((e) => [
+        enrichEvents.map((e) => [
           `${e.playerId}:${e.round}`,
           { playerId: e.playerId, round: e.round },
         ]),
@@ -248,15 +251,34 @@ export async function pollAndDiff(
     );
     try {
       const shotDetails = await getShotDetailsBatch(tournamentId, reqs);
-      for (const e of lowlightEvents) {
+      for (const e of enrichEvents) {
         if (e.hole == null) continue;
-        const holes = shotDetails[`${e.playerId}:${e.round}`];
-        const hole = holes?.find((h) => h.holeNumber === e.hole);
+        const hole = shotDetails[`${e.playerId}:${e.round}`]?.find(
+          (h) => h.holeNumber === e.hole,
+        );
         if (!hole) continue;
-        const d = analyzeHole(hole.strokes);
-        if (d.verdict) {
-          e.headline = `${e.playerName} ${d.verdict} on the ${ordinalHole(e.hole)}`;
-          e.emoji = d.emoji;
+
+        if (e.lowlight) {
+          const d = analyzeHole(hole.strokes);
+          if (d.verdict) {
+            e.headline = `${e.playerName} ${d.verdict} on the ${ordinalHole(e.hole)}`;
+            e.emoji = d.emoji;
+          }
+        } else if (e.ace) {
+          // Aces: append the tee-shot distance when we have it.
+          const teeDist = hole.strokes[0]?.distance;
+          if (teeDist) {
+            e.headline = `${e.playerName} ACES the ${ordinalHole(e.hole)} from ${teeDist} 🎯`;
+          }
+        } else {
+          // Eagle / albatross — describe how it was finished.
+          const g = analyzeHighlightHole(hole.strokes);
+          if (g.verdict) {
+            const label =
+              e.result === "albatross" ? "ALBATROSS" : "eagle";
+            e.headline = `${e.playerName} ${g.verdict} for ${label} on the ${ordinalHole(e.hole)}`;
+            e.emoji = g.emoji;
+          }
         }
       }
     } catch (err) {
