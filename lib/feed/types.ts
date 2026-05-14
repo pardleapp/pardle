@@ -57,6 +57,25 @@ export interface FeedEvent {
   lowlight?: boolean;
 }
 
+/**
+ * Whether an event belongs in the "Shots of the day" reel. Derived from
+ * the event's own fields rather than the `highlight` flag, so events
+ * created before that flag existed still qualify.
+ */
+export function isHighlightEvent(e: FeedEvent): boolean {
+  if (e.highlight) return true;
+  if (e.ace) return true;
+  if (e.result === "albatross" || e.result === "eagle") return true;
+  if (e.type === "shot") return true;
+  return false;
+}
+
+/** Whether an event belongs in the "Worst of the day" reel. Same rationale. */
+export function isLowlightEvent(e: FeedEvent): boolean {
+  if (e.lowlight) return true;
+  return e.result === "double" || e.result === "triple-plus";
+}
+
 /** Reaction tallies — stored separately so they update without rewriting the event. */
 export interface ReactionCounts {
   up: number;

@@ -3,7 +3,15 @@
 import Link from "next/link";
 import { useState } from "react";
 import { pgaTourHeadshotUrlById } from "@/lib/data/pga-tour-ids";
-import type { FeedEvent, FeedRow } from "@/lib/feed/types";
+import {
+  type FeedEvent,
+  type FeedRow,
+  isHighlightEvent as isHighlight,
+  isLowlightEvent as isLowlight,
+} from "@/lib/feed/types";
+
+// Re-exported so FeedClient can pass them as the reel's `include` filter.
+export { isHighlight, isLowlight };
 
 interface Props {
   title: string;
@@ -105,17 +113,3 @@ export default function Reel({
   );
 }
 
-/** A moment qualifies for the "Shots of the day" reel. */
-export function isHighlight(e: FeedEvent): boolean {
-  if (e.highlight) return true;
-  if (e.ace) return true;
-  if (e.result === "albatross" || e.result === "eagle") return true;
-  if (e.type === "shot") return true;
-  return false;
-}
-
-/** A moment qualifies for the "Worst of the day" reel. */
-export function isLowlight(e: FeedEvent): boolean {
-  if (e.lowlight) return true;
-  return e.result === "double" || e.result === "triple-plus";
-}

@@ -37,6 +37,8 @@ import {
   aceHeadline,
   emojiFor,
   type FeedEvent,
+  isHighlightEvent,
+  isLowlightEvent,
   ordinalHole,
   resultFor,
   scoreHeadline,
@@ -286,11 +288,16 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
     getEnrichments(tournamentId),
   ]);
 
+  // Derive eligibility from the event's own fields — events created
+  // before the lowlight/highlight flags existed still qualify, and
+  // stuffed-approach "shot" events already carry their detail so we
+  // skip them.
   const candidates = events.filter(
     (e) =>
       e.hole != null &&
       !done[e.id] &&
-      (e.lowlight || (e.type === "score" && e.highlight)),
+      e.type !== "shot" &&
+      (isLowlightEvent(e) || isHighlightEvent(e)),
   );
   if (candidates.length === 0) return;
 
@@ -315,7 +322,7 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
 
     let headline = e.headline;
     let emoji = e.emoji;
-    if (e.lowlight) {
+    if (isLowlightEvent(e)) {
       const d = analyzeHole(hole.strokes);
       if (d.verdict) {
         headline = `${e.playerName} ${d.verdict} on the ${ordinalHole(e.hole!)}`;
