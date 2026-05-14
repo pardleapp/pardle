@@ -44,17 +44,24 @@ export default function FantasyHubPage() {
             invite up to 10 friends with a shareable link.
           </li>
           <li>
-            <strong>Each player picks 6 pros</strong> from the live field
-            before round 1 tees off.
+            <strong>Pick 6 pros across 4 tiers</strong> — 1 favourite (top 10),
+            2 contenders (11–30), 2 outsiders (31–60), 1 dark horse (61+).
+            Everyone picks before R1 tees off.
+          </li>
+          <li>
+            <strong>Name a captain &amp; vice-captain.</strong> Your captain&apos;s
+            points are doubled. If they miss the cut, your vice steps in.
+          </li>
+          <li>
+            <strong>Nominate your double-round.</strong> Save R4 for a Sunday
+            hero swing, or play it safe with R1. That round&apos;s birdies,
+            eagles and bogeys count 2x — stacks with captain.
           </li>
           <li>
             <strong>Score updates round-by-round.</strong> Birdies +3,
             eagles +8, bogeys −1, doubles −3, plus finish-position bonuses
-            on Sunday.
-          </li>
-          <li>
-            <strong>Sweat the leaderboard</strong> all weekend. Trash-talk
-            your friends in the league chat.
+            on Sunday. Sweat the leaderboard and trash-talk in the league
+            chat.
           </li>
         </ol>
       </section>

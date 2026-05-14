@@ -17,6 +17,45 @@ export const DEFAULT_PICK_COUNT = 6;
 export const LEAGUE_ID_LENGTH = 8;
 export const INVITE_CODE_LENGTH = 6;
 
+/**
+ * Default tier breakdown — count of picks required from each skill tier.
+ * Tiers are computed from DataGolf's pre-tournament skill ranking
+ * (essentially the field's odds-implied order).
+ *
+ *   A — 1 pick   (rank 1–10)
+ *   B — 2 picks  (rank 11–30)
+ *   C — 2 picks  (rank 31–60)
+ *   D — 1 pick   (rank 61+)
+ */
+export const DEFAULT_TIER_BREAKDOWN = { A: 1, B: 2, C: 2, D: 1 } as const;
+export type Tier = "A" | "B" | "C" | "D";
+export interface TierBreakdown {
+  A: number;
+  B: number;
+  C: number;
+  D: number;
+}
+
+export const TIER_RANK_BOUNDS: Record<Tier, [number, number]> = {
+  A: [1, 10],
+  B: [11, 30],
+  C: [31, 60],
+  D: [61, 9999],
+};
+
+/** Multipliers stacked when a pick's points are computed. */
+export interface Multipliers {
+  /** Captain multiplier (applied if pick is captain, or vice if captain MC). */
+  captain: number;
+  /** Multiplier applied to whichever round the user nominated. */
+  doubleRound: number;
+}
+
+export const DEFAULT_MULTIPLIERS: Multipliers = {
+  captain: 2,
+  doubleRound: 2,
+};
+
 /** Golfer participating in the live tournament. Pulled from DataGolf. */
 export interface FieldGolfer {
   /** DataGolf player id (numeric, stringified). */
@@ -104,15 +143,18 @@ export interface Membership {
   userId: string;
   displayName: string; // can override User.name per-league
   joinedAt: number;
-  /** Drafted/picked golfer dgIds. Empty until picks lock. */
+  /** Drafted/picked golfer dgIds. Empty until picks lock. Length = sum of tier breakdown. */
   picks: string[];
+  /** dgId of the captain — must be one of `picks`. 2x points. */
+  captainDgId: string | null;
+  /** dgId of the vice-captain — must be one of `picks`, not equal to captain.
+   *  Promoted to captain (2x) if captain misses the cut. */
+  viceCaptainDgId: string | null;
+  /** Nominated round (1..4) whose stats count 2x for this user's picks. */
+  doubleRound: 1 | 2 | 3 | 4 | null;
   /** Set once the user has locked their picks (before R1 tee-off). */
   picksLockedAt: number | null;
-  /** Snake-draft order assigned at league lock; null if async picks. */
-  draftPosition: number | null;
 }
-
-export type DraftMode = "async" | "snake";
 
 export interface ScoringRules {
   /** Per-event point values. */
@@ -158,9 +200,10 @@ export interface League {
   createdAt: number;
   tournamentId: string;
   inviteCode: string; // human-shareable, e.g. "ASTRAL"
-  draftMode: DraftMode;
-  pickCount: number;
+  /** How many picks from each tier. Sum determines total picks. */
+  tierBreakdown: TierBreakdown;
   scoring: ScoringRules;
+  multipliers: Multipliers;
   status: LeagueStatus;
   memberIds: string[]; // cap MAX_LEAGUE_MEMBERS
 }
