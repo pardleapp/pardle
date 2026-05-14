@@ -5557,12 +5557,6 @@ footer {
   text-decoration: underline;
 }
 
-.reel-avatar-wrap {
-  position: relative;
-  width: 52px;
-  height: 52px;
-}
-
 .reel-avatar {
   width: 52px;
   height: 52px;
@@ -5579,21 +5573,6 @@ footer {
   align-items: center;
   justify-content: center;
   font-size: 24px;
-}
-
-.reel-avatar-badge {
-  position: absolute;
-  right: -4px;
-  bottom: -4px;
-  font-size: 18px;
-  background: var(--bg, white);
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .reel-react-row {

@@ -24,35 +24,25 @@ function isHighlight(e: FeedEvent): boolean {
   return false;
 }
 
-/** Player headshot with a graceful fallback to the result emoji. */
-function ReelAvatar({
-  playerId,
-  emoji,
-}: {
-  playerId: string;
-  emoji: string;
-}) {
+/** Player headshot with a graceful fallback when no image is available. */
+function ReelAvatar({ playerId }: { playerId: string }) {
   const [failed, setFailed] = useState(false);
-  return (
-    <span className="reel-avatar-wrap">
-      {failed ? (
-        <span className="reel-avatar reel-avatar-fallback" aria-hidden="true">
-          🏌️
-        </span>
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          className="reel-avatar"
-          src={pgaTourHeadshotUrlById(playerId, 160)}
-          alt=""
-          loading="lazy"
-          onError={() => setFailed(true)}
-        />
-      )}
-      <span className="reel-avatar-badge" aria-hidden="true">
-        {emoji}
+  if (failed) {
+    return (
+      <span className="reel-avatar reel-avatar-fallback" aria-hidden="true">
+        🏌️
       </span>
-    </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      className="reel-avatar"
+      src={pgaTourHeadshotUrlById(playerId, 160)}
+      alt=""
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
   );
 }
 
@@ -93,7 +83,7 @@ export default function HighlightsReel({
                 href={`/live/player/${event.playerId}`}
                 className="reel-card-body"
               >
-                <ReelAvatar playerId={event.playerId} emoji={event.emoji} />
+                <ReelAvatar playerId={event.playerId} />
                 <span className="reel-headline">{event.headline}</span>
                 <span className="reel-meta">R{event.round} · view card →</span>
               </Link>
