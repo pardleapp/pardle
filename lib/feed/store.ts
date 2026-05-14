@@ -21,6 +21,7 @@ import {
   type FeedEvent,
   type ReactionCounts,
 } from "./types";
+import type { ShotTraceSegment } from "./shot-trace";
 
 const redis = Redis.fromEnv();
 
@@ -278,12 +279,14 @@ export interface Enrichment {
   emoji: string;
   /** True when shot detail confirmed a reel-worthy disaster. */
   reelWorthy: boolean;
+  /** Normalised shot trace for the hole — drawn as an SVG on reel cards. */
+  trace?: ShotTraceSegment[];
 }
 
 // Versioned — bump when the enrichment analysis changes so the backlog
 // re-processes against the new logic instead of keeping stale verdicts.
 function enrichKey(t: string) {
-  return `feed:enrich:v4:${t}`;
+  return `feed:enrich:v5:${t}`;
 }
 
 export async function getEnrichments(

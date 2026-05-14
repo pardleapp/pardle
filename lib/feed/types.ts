@@ -7,6 +7,8 @@
  * list, and streamed to clients.
  */
 
+import type { ShotTraceSegment } from "./shot-trace";
+
 export type ScoreResult =
   | "albatross"
   | "eagle"
@@ -61,6 +63,8 @@ export interface FeedEvent {
    * the Worst-of reel — a plain sloppy double does not.
    */
   reelWorthy?: boolean;
+  /** Normalised shot trace for the hole — rendered as an SVG mini-tracer. */
+  trace?: ShotTraceSegment[];
 }
 
 /**

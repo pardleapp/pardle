@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { pgaTourHeadshotUrlById } from "@/lib/data/pga-tour-ids";
 import FollowButton from "./FollowButton";
+import ShotTracer from "./ShotTracer";
 import {
   type FeedEvent,
   type FeedRow,
@@ -81,6 +82,9 @@ export default function Reel({
               key={event.id}
               className={`reel-card reel-card-${cardKind(event)}`}
             >
+              {event.trace && event.trace.length > 0 && (
+                <ShotTracer trace={event.trace} />
+              )}
               <Link
                 href={`/live/player/${event.playerId}`}
                 className="reel-card-body"

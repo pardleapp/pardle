@@ -288,6 +288,15 @@ export interface PGAStroke {
   /** Display distance of the stroke, e.g. "299 yds" or "50 ft 10 in.". */
   distance: string;
   playByPlay: string;
+  /**
+   * Enhanced (normalised 0-1) shot coordinates on the hole's
+   * left-to-right overhead view. -1 when the orchestrator hasn't
+   * captured tracking for this stroke.
+   */
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
 }
 
 export interface PGAShotHole {
@@ -297,6 +306,10 @@ export interface PGAShotHole {
   strokes: PGAStroke[];
 }
 
+interface CoordNode {
+  enhancedX?: number;
+  enhancedY?: number;
+}
 interface ShotDetailNode {
   holes?: {
     holeNumber: number;
@@ -309,6 +322,12 @@ interface ShotDetailNode {
       toLocationCode: string;
       distance: string;
       playByPlay: string;
+      overview?: {
+        leftToRightCoords?: {
+          fromCoords?: CoordNode;
+          toCoords?: CoordNode;
+        };
+      };
     }[];
   }[];
 }
@@ -341,6 +360,12 @@ export async function getShotDetailsBatch(
                strokes {
                  strokeNumber strokeType fromLocationCode toLocationCode
                  distance playByPlay
+                 overview {
+                   leftToRightCoords {
+                     fromCoords { enhancedX enhancedY }
+                     toCoords { enhancedX enhancedY }
+                   }
+                 }
                }
              }
            }`,
@@ -356,14 +381,21 @@ export async function getShotDetailsBatch(
         holeNumber: h.holeNumber,
         par: h.par,
         score: h.score,
-        strokes: (h.strokes ?? []).map((s) => ({
-          strokeNumber: s.strokeNumber,
-          strokeType: s.strokeType,
-          fromLocationCode: s.fromLocationCode,
-          toLocationCode: s.toLocationCode,
-          distance: s.distance,
-          playByPlay: s.playByPlay,
-        })),
+        strokes: (h.strokes ?? []).map((s) => {
+          const ltr = s.overview?.leftToRightCoords;
+          return {
+            strokeNumber: s.strokeNumber,
+            strokeType: s.strokeType,
+            fromLocationCode: s.fromLocationCode,
+            toLocationCode: s.toLocationCode,
+            distance: s.distance,
+            playByPlay: s.playByPlay,
+            fromX: ltr?.fromCoords?.enhancedX ?? -1,
+            fromY: ltr?.fromCoords?.enhancedY ?? -1,
+            toX: ltr?.toCoords?.enhancedX ?? -1,
+            toY: ltr?.toCoords?.enhancedY ?? -1,
+          };
+        }),
       }));
     }
     return out;

@@ -22,6 +22,7 @@ import {
   getShotDetailsBatch,
 } from "@/lib/golf-api/pgatour";
 import { analyzeHighlightHole, analyzeHole } from "./shot-analysis";
+import { extractTrace } from "./shot-trace";
 import {
   cacheLeaderboard,
   type Enrichment,
@@ -288,16 +289,17 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
     getEnrichments(tournamentId),
   ]);
 
-  // Derive eligibility from the event's own fields — events created
-  // before the lowlight/highlight flags existed still qualify, and
-  // stuffed-approach "shot" events already carry their detail so we
-  // skip them.
+  // Eligibility is derived from the event's own fields so events
+  // created before the lowlight/highlight flags existed still qualify.
+  // "shot" (stuffed-approach) events are included too — not for a
+  // headline rewrite, but so they pick up a shot trace.
   const candidates = events.filter(
     (e) =>
       e.hole != null &&
       !done[e.id] &&
-      e.type !== "shot" &&
-      (isLowlightEvent(e) || isHighlightEvent(e)),
+      (e.type === "shot" ||
+        isLowlightEvent(e) ||
+        isHighlightEvent(e)),
   );
   if (candidates.length === 0) return;
 
@@ -325,7 +327,9 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
     // reelWorthy: only confirmed disasters (multi-putt / penalty) make
     // the Worst-of reel. Highlights aren't worst-reel events at all.
     let reelWorthy = false;
-    if (isLowlightEvent(e)) {
+    if (e.type === "shot") {
+      // Stuffed approach — keep its playByPlay headline, just add a trace.
+    } else if (isLowlightEvent(e)) {
       const d = analyzeHole(hole.strokes);
       if (d.verdict) {
         headline = `${e.playerName} ${d.verdict} on the ${ordinalHole(e.hole!)}`;
@@ -345,9 +349,15 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
         emoji = g.emoji;
       }
     }
-    // Store even when unchanged — marks the event processed so we
+    const trace = extractTrace(hole.strokes);
+    // Store even when nothing changed — marks the event processed so we
     // don't re-fetch its shot detail every poll.
-    enrichments[e.id] = { headline, emoji, reelWorthy };
+    enrichments[e.id] = {
+      headline,
+      emoji,
+      reelWorthy,
+      ...(trace.length > 0 ? { trace } : {}),
+    };
   }
   await putEnrichments(tournamentId, enrichments);
 }

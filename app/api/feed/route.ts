@@ -133,6 +133,7 @@ export async function GET(req: Request) {
           headline: enriched.headline || event.headline,
           emoji: enriched.emoji || event.emoji,
           reelWorthy: enriched.reelWorthy,
+          trace: enriched.trace,
         }
       : event;
     return {
