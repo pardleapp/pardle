@@ -1,10 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import type { FeedRow } from "@/lib/feed/types";
+import type { FeedEvent, FeedRow } from "@/lib/feed/types";
 
 interface Props {
   rows: FeedRow[];
+}
+
+/**
+ * A moment belongs in the reel if the engine flagged it OR — for events
+ * created before the highlight flag existed — its own fields qualify it
+ * (an ace, albatross, eagle, or a stuffed-approach shot event).
+ */
+function isHighlight(e: FeedEvent): boolean {
+  if (e.highlight) return true;
+  if (e.ace) return true;
+  if (e.result === "albatross" || e.result === "eagle") return true;
+  if (e.type === "shot") return true;
+  return false;
 }
 
 /**
@@ -13,7 +26,9 @@ interface Props {
  * the feed rows the page already has; each card links to the player.
  */
 export default function HighlightsReel({ rows }: Props) {
-  const highlights = rows.filter((r) => r.event.highlight).slice(0, 24);
+  const highlights = rows
+    .filter((r) => isHighlight(r.event))
+    .slice(0, 24);
   if (highlights.length === 0) return null;
 
   return (
