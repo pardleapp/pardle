@@ -81,6 +81,42 @@ export async function putSnapshot(
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Live presence — "X watching now"
+// ──────────────────────────────────────────────────────────────────
+
+const PRESENCE_WINDOW_MS = 45_000; // a visitor counts as "watching" for 45s after their last ping
+
+function presenceKey(t: string) {
+  return `feed:presence:${t}`;
+}
+
+/**
+ * Record that `visitorId` is currently watching, and return the count
+ * of distinct visitors active within the sliding window. Stale entries
+ * are pruned on every call so the set never grows unbounded.
+ */
+export async function touchPresence(
+  tournamentId: string,
+  visitorId: string,
+): Promise<number> {
+  const key = presenceKey(tournamentId);
+  const now = Date.now();
+  await redis.zadd(key, { score: now, member: visitorId });
+  await redis.zremrangebyscore(key, 0, now - PRESENCE_WINDOW_MS);
+  await redis.expire(key, 120);
+  return await redis.zcard(key);
+}
+
+/** Read-only count of current watchers (prunes stale entries first). */
+export async function getWatchingCount(
+  tournamentId: string,
+): Promise<number> {
+  const key = presenceKey(tournamentId);
+  await redis.zremrangebyscore(key, 0, Date.now() - PRESENCE_WINDOW_MS);
+  return await redis.zcard(key);
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Poll lock — coalesces concurrent viewer-triggered polls
 // ──────────────────────────────────────────────────────────────────
 
@@ -199,6 +235,55 @@ export async function react(
   }
   await redis.set(marker, want, { ex: REACTED_TTL });
   return getReactions(eventId);
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Burst reactions — ephemeral floating emoji everyone watching sees
+// ──────────────────────────────────────────────────────────────────
+
+export interface Burst {
+  id: string;
+  emoji: string;
+  ts: number;
+}
+
+const BURST_CAP = 60;
+const BURST_TTL = 120;
+
+function burstsKey(t: string) {
+  return `feed:bursts:${t}`;
+}
+
+export async function pushBurst(
+  tournamentId: string,
+  emoji: string,
+): Promise<Burst> {
+  const burst: Burst = {
+    id: `b${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
+    emoji,
+    ts: Date.now(),
+  };
+  const key = burstsKey(tournamentId);
+  await redis.lpush(key, JSON.stringify(burst));
+  await redis.ltrim(key, 0, BURST_CAP - 1);
+  await redis.expire(key, BURST_TTL);
+  return burst;
+}
+
+/** Recent bursts, newest first. Clients diff against ids they've already shown. */
+export async function getRecentBursts(
+  tournamentId: string,
+): Promise<Burst[]> {
+  const raw = await redis.lrange<string>(burstsKey(tournamentId), 0, BURST_CAP - 1);
+  return raw
+    .map((r) => {
+      try {
+        return typeof r === "string" ? (JSON.parse(r) as Burst) : (r as Burst);
+      } catch {
+        return null;
+      }
+    })
+    .filter((b): b is Burst => b !== null);
 }
 
 // ──────────────────────────────────────────────────────────────────

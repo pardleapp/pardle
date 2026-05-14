@@ -5413,6 +5413,20 @@ footer {
   margin: 0;
 }
 
+.feed-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.feed-watching {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .feed-live-dot {
   display: inline-flex;
   align-items: center;
@@ -5538,6 +5552,80 @@ footer {
   color: var(--muted);
   margin: 18px 0 8px;
   line-height: 1.4;
+}
+
+/* ── Burst reactions: floating emoji + bottom bar ──────────────── */
+
+.feed-floater-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 40;
+}
+
+.feed-floater {
+  position: absolute;
+  bottom: 84px;
+  font-size: 34px;
+  will-change: transform, opacity;
+  animation: feed-float 2.6s ease-out forwards;
+}
+
+@keyframes feed-float {
+  0% {
+    transform: translateY(0) scale(0.4) rotate(0deg);
+    opacity: 0;
+  }
+  12% {
+    transform: translateY(-30px) scale(1.15) rotate(-6deg);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-58vh) scale(0.9) rotate(8deg);
+    opacity: 0;
+  }
+}
+
+.feed-burst-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 8px calc(10px + env(safe-area-inset-bottom));
+  margin: 8px -12px 0;
+  background: var(--bg, #fff);
+  border-top: 1px solid var(--border);
+  z-index: 41;
+}
+
+.feed-burst-btn {
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  width: 48px;
+  height: 48px;
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.08s ease;
+}
+
+.feed-burst-btn:active {
+  transform: scale(0.82);
+  background: rgba(123, 174, 63, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feed-floater {
+    animation-duration: 0.4s;
+  }
 }
 
 @media (max-width: 420px) {
@@ -5706,5 +5794,11 @@ footer {
   .feed-comment-name,
   .feed-comment-input {
     background: #1f1f20;
+  }
+  .feed-burst-bar {
+    background: #161616;
+  }
+  .feed-burst-btn {
+    background: rgba(255, 255, 255, 0.05);
   }
 }

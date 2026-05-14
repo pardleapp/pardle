@@ -6,34 +6,44 @@ import {
   getCommentCountsBulk,
   getEvents,
   getReactionsBulk,
+  getRecentBursts,
+  touchPresence,
 } from "@/lib/feed/store";
 import type { FeedRow } from "@/lib/feed/types";
 
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/feed
+ * GET /api/feed?v=<visitorId>
  *
  * The /live page's single data endpoint. On each call:
  *   1. Resolve the active tournament (or the next upcoming one).
- *   2. If the poll lock is free, run the diff engine — this is how the
- *      feed advances. Concurrent viewers share one poll (45s lock).
- *   3. Return the latest feed rows (events + reactions + comment counts).
- *
- * Response:
- *   { tournament: {id,name,isLive}, rows: FeedRow[], polled: boolean }
+ *   2. Register the caller's presence + read the live watcher count.
+ *   3. If the poll lock is free, run the diff engine — concurrent
+ *      viewers share one poll (25s lock).
+ *   4. Return feed rows + recent bursts + watcher count.
  */
-export async function GET() {
+export async function GET(req: Request) {
+  const visitorId = new URL(req.url).searchParams.get("v") ?? "";
+
   const active = await getActiveTournament();
   if (!active) {
     return NextResponse.json({
       tournament: null,
       rows: [],
+      bursts: [],
+      watching: 0,
       polled: false,
     });
   }
 
   const { tournament, isLive } = active;
+
+  // Presence — count this visitor, get the live watcher tally.
+  let watching = 0;
+  if (visitorId) {
+    watching = await touchPresence(tournament.id, visitorId);
+  }
 
   // Advance the feed if it's our turn to poll and the event is live.
   let polled = false;
@@ -49,7 +59,10 @@ export async function GET() {
     }
   }
 
-  const events = await getEvents(tournament.id, 80);
+  const [events, bursts] = await Promise.all([
+    getEvents(tournament.id, 80),
+    getRecentBursts(tournament.id),
+  ]);
   const ids = events.map((e) => e.id);
   const [reactions, commentCounts] = await Promise.all([
     getReactionsBulk(ids),
@@ -70,6 +83,8 @@ export async function GET() {
       startDate: tournament.startDate,
     },
     rows,
+    bursts,
+    watching,
     polled,
   });
 }

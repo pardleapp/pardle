@@ -1,11 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Burst } from "@/lib/feed/store";
 import type { FeedRow } from "@/lib/feed/types";
 import CommentThread from "./CommentThread";
 
 const REFRESH_MS = 15_000;
 const AUTHOR_KEY_STORAGE = "pardle_feed_author";
+const BURST_EMOJIS = ["🔥", "😱", "⛳", "👏", "💀", "🐐"];
+const FLOATER_LIFETIME_MS = 2600;
 
 interface FeedResponse {
   tournament: {
@@ -15,10 +18,18 @@ interface FeedResponse {
     startDate: number;
   } | null;
   rows: FeedRow[];
+  bursts: Burst[];
+  watching: number;
   polled: boolean;
 }
 
-/** Stable per-browser id for reactions — generated once, persisted locally. */
+interface Floater {
+  key: string;
+  emoji: string;
+  xPct: number;
+}
+
+/** Stable per-browser id for reactions/presence — generated once, persisted. */
 function getAuthorKey(): string {
   if (typeof window === "undefined") return "";
   let k = window.localStorage.getItem(AUTHOR_KEY_STORAGE);
@@ -34,8 +45,7 @@ function timeAgo(ts: number): string {
   if (s < 60) return `${s}s ago`;
   const m = Math.floor(s / 60);
   if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  return `${h}h ago`;
+  return `${Math.floor(m / 60)}h ago`;
 }
 
 export default function FeedClient() {
@@ -45,27 +55,53 @@ export default function FeedClient() {
     Record<string, "up" | "down">
   >({});
   const [expanded, setExpanded] = useState<string | null>(null);
-  /** Local override of comment counts after the user posts in a thread. */
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>(
     {},
   );
+  const [floaters, setFloaters] = useState<Floater[]>([]);
+
   const authorKey = useRef<string>("");
+  const seenBursts = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     authorKey.current = getAuthorKey();
   }, []);
 
+  // ── Floating emoji bursts ──────────────────────────────────────
+  const spawnFloater = useCallback((emoji: string) => {
+    const key = `f${Math.random().toString(36).slice(2)}${Date.now()}`;
+    const xPct = 8 + Math.random() * 84; // keep away from the very edges
+    setFloaters((f) => [...f, { key, emoji, xPct }]);
+    setTimeout(() => {
+      setFloaters((f) => f.filter((x) => x.key !== key));
+    }, FLOATER_LIFETIME_MS);
+  }, []);
+
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/feed", { cache: "no-store" });
+      const res = await fetch(`/api/feed?v=${authorKey.current}`, {
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error(String(res.status));
       const json = (await res.json()) as FeedResponse;
       setData(json);
       setError(false);
+
+      // Animate any bursts we haven't shown yet (others' taps).
+      for (const b of json.bursts ?? []) {
+        if (!seenBursts.current.has(b.id)) {
+          seenBursts.current.add(b.id);
+          // Only animate genuinely recent ones — avoids a flood when
+          // first opening the page mid-tournament.
+          if (Date.now() - b.ts < 12_000) {
+            spawnFloater(b.emoji);
+          }
+        }
+      }
     } catch {
       setError(true);
     }
-  }, []);
+  }, [spawnFloater]);
 
   useEffect(() => {
     load();
@@ -73,8 +109,20 @@ export default function FeedClient() {
     return () => clearInterval(t);
   }, [load]);
 
+  async function sendBurst(emoji: string) {
+    spawnFloater(emoji); // optimistic — instant feedback for the tapper
+    try {
+      await fetch("/api/feed/burst", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji, visitorId: authorKey.current }),
+      });
+    } catch {
+      /* the floater still showed; no-op on failure */
+    }
+  }
+
   async function sendReaction(eventId: string, dir: "up" | "down") {
-    // Optimistic — flip local state immediately.
     setMyReactions((m) => ({ ...m, [eventId]: dir }));
     setData((d) => {
       if (!d) return d;
@@ -96,11 +144,7 @@ export default function FeedClient() {
       await fetch("/api/feed/react", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          eventId,
-          dir,
-          authorKey: authorKey.current,
-        }),
+        body: JSON.stringify({ eventId, dir, authorKey: authorKey.current }),
       });
     } catch {
       /* optimistic update stays; next refresh corrects it */
@@ -146,9 +190,16 @@ export default function FeedClient() {
     <section className="feed-wrap">
       <div className="feed-header-row">
         <h2 className="feed-tournament-name">{data.tournament.name}</h2>
-        <span className="feed-live-dot">
-          <span className="feed-live-pulse" /> LIVE
-        </span>
+        <div className="feed-header-meta">
+          {data.watching > 0 && (
+            <span className="feed-watching">
+              👀 {data.watching} watching
+            </span>
+          )}
+          <span className="feed-live-dot">
+            <span className="feed-live-pulse" /> LIVE
+          </span>
+        </div>
       </div>
 
       {data.rows.length === 0 ? (
@@ -199,9 +250,7 @@ export default function FeedClient() {
                     <button
                       type="button"
                       className={`feed-react ${isOpen ? "feed-react-on" : ""}`}
-                      onClick={() =>
-                        setExpanded(isOpen ? null : event.id)
-                      }
+                      onClick={() => setExpanded(isOpen ? null : event.id)}
                       aria-label="Comments"
                     >
                       💬 {count > 0 ? count : ""}
@@ -227,6 +276,34 @@ export default function FeedClient() {
         Live PGA Tour scoring · auto-refreshes every 15s · usually within
         ~30s of the course
       </p>
+
+      {/* Floating-emoji overlay — fixed so bursts rise over the whole feed */}
+      <div className="feed-floater-layer" aria-hidden="true">
+        {floaters.map((f) => (
+          <span
+            key={f.key}
+            className="feed-floater"
+            style={{ left: `${f.xPct}%` }}
+          >
+            {f.emoji}
+          </span>
+        ))}
+      </div>
+
+      {/* Burst reaction bar — sticky at the bottom */}
+      <div className="feed-burst-bar">
+        {BURST_EMOJIS.map((e) => (
+          <button
+            key={e}
+            type="button"
+            className="feed-burst-btn"
+            onClick={() => sendBurst(e)}
+            aria-label={`React ${e}`}
+          >
+            {e}
+          </button>
+        ))}
+      </div>
     </section>
   );
 }
