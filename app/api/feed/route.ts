@@ -60,6 +60,8 @@ export async function GET(req: Request) {
   }
 
   let polled = false;
+  // TEMP diagnostic — surfaces why the winner-poll re-seed did/didn't run.
+  let seedDebug = "no-lock";
   if (isLive) {
     const gotLock = await acquirePollLock(tournament.id);
     if (gotLock) {
@@ -79,7 +81,9 @@ export async function GET(req: Request) {
         const current = winnerPolls.find(
           (p) => p.seededFrom === WINNER_POLL_SEED,
         );
-        if (!current) {
+        if (current) {
+          seedDebug = "already-seeded";
+        } else {
           const contenders = await getLiveContenders();
           const top = contenders.slice(0, 8);
           if (top.length >= 2) {
@@ -94,9 +98,13 @@ export async function GET(req: Request) {
               resolvedOptionId: null,
               seededFrom: WINNER_POLL_SEED,
             });
+            seedDebug = `reseeded:${top.length}`;
+          } else {
+            seedDebug = `too-few-contenders:${contenders.length}`;
           }
         }
       } catch (err) {
+        seedDebug = `error:${err instanceof Error ? err.message : String(err)}`;
         console.error("[feed] winner-poll seed failed", err);
       }
     }
@@ -147,5 +155,6 @@ export async function GET(req: Request) {
     myVotes,
     watching,
     polled,
+    seedDebug,
   });
 }
