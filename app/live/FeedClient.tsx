@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FeedRow } from "@/lib/feed/types";
+import CommentThread from "./CommentThread";
 
 const REFRESH_MS = 20_000;
 const AUTHOR_KEY_STORAGE = "pardle_feed_author";
@@ -43,6 +44,11 @@ export default function FeedClient() {
   const [myReactions, setMyReactions] = useState<
     Record<string, "up" | "down">
   >({});
+  const [expanded, setExpanded] = useState<string | null>(null);
+  /** Local override of comment counts after the user posts in a thread. */
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>(
+    {},
+  );
   const authorKey = useRef<string>("");
 
   useEffect(() => {
@@ -154,41 +160,63 @@ export default function FeedClient() {
         <ul className="feed-list">
           {data.rows.map(({ event, reactions, commentCount }) => {
             const mine = myReactions[event.id];
+            const isOpen = expanded === event.id;
+            const count = commentCounts[event.id] ?? commentCount;
             return (
               <li
                 key={event.id}
-                className={`feed-row feed-row-${event.result ?? "other"}`}
+                className={`feed-row-wrap ${isOpen ? "feed-row-wrap-open" : ""}`}
               >
-                <span className="feed-emoji" aria-hidden="true">
-                  {event.emoji}
-                </span>
-                <div className="feed-body">
-                  <p className="feed-headline">{event.headline}</p>
-                  <p className="feed-meta">
-                    R{event.round} · {timeAgo(event.ts)}
-                  </p>
-                </div>
-                <div className="feed-actions">
-                  <button
-                    type="button"
-                    className={`feed-react ${mine === "up" ? "feed-react-on" : ""}`}
-                    onClick={() => sendReaction(event.id, "up")}
-                    aria-label="Like"
-                  >
-                    👍 {reactions.up > 0 ? reactions.up : ""}
-                  </button>
-                  <button
-                    type="button"
-                    className={`feed-react ${mine === "down" ? "feed-react-on" : ""}`}
-                    onClick={() => sendReaction(event.id, "down")}
-                    aria-label="Dislike"
-                  >
-                    👎 {reactions.down > 0 ? reactions.down : ""}
-                  </button>
-                  <span className="feed-comment-count" aria-hidden="true">
-                    💬 {commentCount}
+                <div
+                  className={`feed-row feed-row-${event.result ?? "other"}`}
+                >
+                  <span className="feed-emoji" aria-hidden="true">
+                    {event.emoji}
                   </span>
+                  <div className="feed-body">
+                    <p className="feed-headline">{event.headline}</p>
+                    <p className="feed-meta">
+                      R{event.round} · {timeAgo(event.ts)}
+                    </p>
+                  </div>
+                  <div className="feed-actions">
+                    <button
+                      type="button"
+                      className={`feed-react ${mine === "up" ? "feed-react-on" : ""}`}
+                      onClick={() => sendReaction(event.id, "up")}
+                      aria-label="Like"
+                    >
+                      👍 {reactions.up > 0 ? reactions.up : ""}
+                    </button>
+                    <button
+                      type="button"
+                      className={`feed-react ${mine === "down" ? "feed-react-on" : ""}`}
+                      onClick={() => sendReaction(event.id, "down")}
+                      aria-label="Dislike"
+                    >
+                      👎 {reactions.down > 0 ? reactions.down : ""}
+                    </button>
+                    <button
+                      type="button"
+                      className={`feed-react ${isOpen ? "feed-react-on" : ""}`}
+                      onClick={() =>
+                        setExpanded(isOpen ? null : event.id)
+                      }
+                      aria-label="Comments"
+                    >
+                      💬 {count > 0 ? count : ""}
+                    </button>
+                  </div>
                 </div>
+                {isOpen && (
+                  <CommentThread
+                    eventId={event.id}
+                    authorKey={authorKey.current}
+                    onCountChange={(c) =>
+                      setCommentCounts((m) => ({ ...m, [event.id]: c }))
+                    }
+                  />
+                )}
               </li>
             );
           })}

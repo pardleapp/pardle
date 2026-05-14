@@ -5560,6 +5560,134 @@ footer {
   }
 }
 
+.feed-row-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.feed-row-wrap-open .feed-row {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.feed-thread {
+  border: 1px solid var(--border);
+  border-top: none;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  background: rgba(0, 0, 0, 0.02);
+  padding: 12px;
+}
+
+.feed-thread-loading {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  margin: 4px 0 12px;
+}
+
+.feed-thread-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.feed-comment {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.feed-comment-author {
+  font-weight: 800;
+  color: var(--green);
+}
+
+.feed-comment-text {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.feed-comment-time {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+.feed-comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.feed-comment-name {
+  padding: 8px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  background: var(--bg, white);
+  color: var(--text);
+  max-width: 160px;
+}
+
+.feed-comment-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.feed-comment-input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  font-size: 15px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  background: var(--bg, white);
+  color: var(--text);
+  min-height: 40px;
+}
+
+.feed-comment-name:focus,
+.feed-comment-input:focus {
+  outline: none;
+  border-color: var(--green);
+}
+
+.feed-comment-send {
+  background: var(--green);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0 16px;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  min-height: 40px;
+  flex-shrink: 0;
+}
+
+.feed-comment-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.feed-comment-err {
+  font-size: 12.5px;
+  color: #c0392b;
+  margin: 2px 0 0;
+}
+
 @media (prefers-color-scheme: dark) {
   .feed-row {
     background: #1f1f20;
@@ -5571,5 +5699,12 @@ footer {
   .feed-row-double,
   .feed-row-triple-plus {
     background: rgba(224, 91, 91, 0.1);
+  }
+  .feed-thread {
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .feed-comment-name,
+  .feed-comment-input {
+    background: #1f1f20;
   }
 }
