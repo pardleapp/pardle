@@ -308,6 +308,12 @@ export interface PGAShotHole {
   par: number;
   score: string;
   strokes: PGAStroke[];
+  /**
+   * PGA Tour "TourCast Pickle" overhead hole-diagram image URL — the
+   * enhanced left-to-right view that the enhanced shot coords map onto.
+   * Empty string when unavailable.
+   */
+  holeImage: string;
 }
 
 interface CoordNode {
@@ -319,6 +325,7 @@ interface ShotDetailNode {
     holeNumber: number;
     par: number;
     score: string;
+    enhancedPickle?: { leftToRight?: string | null };
     strokes?: {
       strokeNumber: number;
       strokeType: string;
@@ -361,6 +368,7 @@ export async function getShotDetailsBatch(
           `s${playerId}_${round}: shotDetailsV3(tournamentId: "${tournamentId}", playerId: "${playerId}", round: ${round}) {
              holes {
                holeNumber par score
+               enhancedPickle { leftToRight }
                strokes {
                  strokeNumber strokeType fromLocationCode toLocationCode
                  distance playByPlay
@@ -385,6 +393,7 @@ export async function getShotDetailsBatch(
         holeNumber: h.holeNumber,
         par: h.par,
         score: h.score,
+        holeImage: h.enhancedPickle?.leftToRight ?? "",
         strokes: (h.strokes ?? []).map((s) => {
           const ltr = s.overview?.leftToRightCoords;
           return {

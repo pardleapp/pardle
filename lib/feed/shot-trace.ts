@@ -22,6 +22,8 @@ export interface ShotTrace {
   segments: ShotTraceSegment[];
   /** Index of the segment that is the story — the tracer focuses here. -1 if none. */
   keyIndex: number;
+  /** PGA Tour overhead hole-diagram image URL, drawn behind the trace. */
+  holeImage?: string;
 }
 
 /** Which shot the event is "about" — drives which segment is the key one. */
@@ -34,6 +36,7 @@ function valid(n: number): boolean {
 export function extractTrace(
   strokes: PGAStroke[],
   focus: TraceFocus = "auto",
+  holeImage?: string,
 ): ShotTrace {
   const segments: ShotTraceSegment[] = [];
   for (const s of strokes) {
@@ -53,7 +56,10 @@ export function extractTrace(
     });
   }
 
-  if (segments.length === 0) return { segments, keyIndex: -1 };
+  const img = holeImage || undefined;
+  if (segments.length === 0) {
+    return { segments, keyIndex: -1, holeImage: img };
+  }
 
   let keyIndex: number;
   if (focus === "putt") {
@@ -72,5 +78,5 @@ export function extractTrace(
     keyIndex = segments.length - 1;
   }
 
-  return { segments, keyIndex };
+  return { segments, keyIndex, holeImage: img };
 }

@@ -11,9 +11,9 @@ import type { ShotTrace } from "@/lib/feed/shot-trace";
  *   shot that matters, not the whole hole flat.
  * - `full` mode shows the whole hole with the key segment highlighted.
  *
- * We don't have the real hole-diagram image (the PGA Tour CDN path
- * doesn't resolve publicly), so the backdrop is a clean gradient —
- * the trace is the story.
+ * The backdrop is the PGA Tour "TourCast Pickle" overhead hole-diagram
+ * image (the enhanced shot coords map onto it), falling back to a
+ * clean gradient when an image isn't available.
  */
 
 const W = 200;
@@ -74,7 +74,28 @@ export default function ShotTracer({
         </linearGradient>
       </defs>
 
+      {/* Real PGA Tour hole diagram, with a gradient fallback behind it. */}
       <rect x={0} y={0} width={W} height={H} fill="url(#tracer-turf)" />
+      {trace.holeImage && (
+        <image
+          href={trace.holeImage}
+          x={0}
+          y={0}
+          width={W}
+          height={H}
+          preserveAspectRatio="none"
+        />
+      )}
+      {/* Dim the diagram slightly so the white trace pops. */}
+      {trace.holeImage && (
+        <rect
+          x={0}
+          y={0}
+          width={W}
+          height={H}
+          fill="rgba(15,31,15,0.28)"
+        />
+      )}
 
       {/* the green — a soft disc around the final resting point */}
       <circle
