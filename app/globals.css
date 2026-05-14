@@ -5533,17 +5533,40 @@ footer {
 }
 
 .reel-card {
-  flex: 0 0 200px;
+  flex: 0 0 210px;
   scroll-snap-align: start;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   padding: 12px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--bg, white);
-  text-decoration: none;
   color: var(--text);
+}
+
+.reel-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.reel-card-body:hover .reel-headline {
+  text-decoration: underline;
+}
+
+.reel-react-row {
+  display: flex;
+  gap: 6px;
+}
+
+.reel-react-row .feed-react {
+  flex: 1;
+  justify-content: center;
+  display: flex;
+  align-items: center;
 }
 
 .reel-card-ace {

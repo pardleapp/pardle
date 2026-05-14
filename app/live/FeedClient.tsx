@@ -231,7 +231,11 @@ export default function FeedClient() {
         </div>
       </div>
 
-      <HighlightsReel rows={data.rows} />
+      <HighlightsReel
+        rows={data.rows}
+        myReactions={myReactions}
+        onReact={sendReaction}
+      />
 
       <LeaderboardPanel rows={data.leaderboard ?? []} />
 
