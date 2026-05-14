@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const FOLLOWS_STORAGE = "pardle_feed_follows";
+const FOLLOWS_EVENT = "pardle-follows-changed";
 
 /** Read the followed-player id list from localStorage. */
 export function getFollows(): string[] {
@@ -17,21 +18,34 @@ export function getFollows(): string[] {
 
 function setFollows(ids: string[]): void {
   window.localStorage.setItem(FOLLOWS_STORAGE, JSON.stringify(ids));
-  // Let other components on the page react (the feed filter toggle).
-  window.dispatchEvent(new CustomEvent("pardle-follows-changed"));
+  // Notify every other FollowButton + the feed filter on the page.
+  window.dispatchEvent(new CustomEvent(FOLLOWS_EVENT));
 }
 
 interface Props {
   playerId: string;
   playerName: string;
+  /** "full" = labelled pill (player card); "icon" = compact star (feed rows). */
+  variant?: "full" | "icon";
 }
 
-export default function FollowButton({ playerId, playerName }: Props) {
+export default function FollowButton({
+  playerId,
+  playerName,
+  variant = "full",
+}: Props) {
   const [following, setFollowing] = useState(false);
 
-  useEffect(() => {
+  const sync = useCallback(() => {
     setFollowing(getFollows().includes(playerId));
   }, [playerId]);
+
+  // Initial read + stay in sync when any other FollowButton toggles.
+  useEffect(() => {
+    sync();
+    window.addEventListener(FOLLOWS_EVENT, sync);
+    return () => window.removeEventListener(FOLLOWS_EVENT, sync);
+  }, [sync]);
 
   function toggle() {
     const current = getFollows();
@@ -40,6 +54,23 @@ export default function FollowButton({ playerId, playerName }: Props) {
       : [...current, playerId];
     setFollows(next);
     setFollowing(next.includes(playerId));
+  }
+
+  if (variant === "icon") {
+    return (
+      <button
+        type="button"
+        onClick={toggle}
+        className={`follow-icon ${following ? "follow-icon-on" : ""}`}
+        aria-pressed={following}
+        aria-label={
+          following ? `Unfollow ${playerName}` : `Follow ${playerName}`
+        }
+        title={following ? "Following" : "Follow"}
+      >
+        {following ? "★" : "☆"}
+      </button>
+    );
   }
 
   return (

@@ -6,7 +6,7 @@ import type { Burst, CachedLeaderboardRow } from "@/lib/feed/store";
 import type { PollWithVotes } from "@/lib/feed/polls";
 import type { FeedRow } from "@/lib/feed/types";
 import CommentThread from "./CommentThread";
-import { getFollows } from "./FollowButton";
+import FollowButton, { getFollows } from "./FollowButton";
 import LeaderboardPanel from "./LeaderboardPanel";
 import PollPanel from "./PollPanel";
 import Reel, { isHighlight, isLowlight } from "./Reel";
@@ -334,6 +334,11 @@ export default function FeedClient() {
                     >
                       💬 {count > 0 ? count : ""}
                     </button>
+                    <FollowButton
+                      playerId={event.playerId}
+                      playerName={event.playerName}
+                      variant="icon"
+                    />
                   </div>
                 </div>
                 {isOpen && (

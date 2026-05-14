@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { pgaTourHeadshotUrlById } from "@/lib/data/pga-tour-ids";
+import FollowButton from "./FollowButton";
 import {
   type FeedEvent,
   type FeedRow,
@@ -105,6 +106,11 @@ export default function Reel({
                 >
                   👎 {reactions.down > 0 ? reactions.down : ""}
                 </button>
+                <FollowButton
+                  playerId={event.playerId}
+                  playerName={event.playerName}
+                  variant="icon"
+                />
               </div>
             </div>
           );

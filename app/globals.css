@@ -5881,6 +5881,34 @@ footer {
   color: var(--text);
 }
 
+/* Compact star toggle used inline in feed rows + reel cards. */
+.follow-icon {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  min-width: 36px;
+  min-height: 36px;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.follow-icon:hover {
+  border-color: #e8c547;
+}
+
+.follow-icon-on {
+  background: rgba(232, 197, 71, 0.2);
+  border-color: #e8c547;
+  color: #b8901a;
+}
+
 /* ── Player card page ──────────────────────────────────────────── */
 
 .pcard-head {
