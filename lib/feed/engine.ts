@@ -21,6 +21,7 @@ import {
   getScorecards,
 } from "@/lib/golf-api/pgatour";
 import {
+  cacheLeaderboard,
   getSnapshot,
   type PollSnapshot,
   pushEvents,
@@ -74,6 +75,20 @@ export async function pollAndDiff(
   const activeIds = leaderboard
     .filter((r) => !INACTIVE_STATES.has(r.playerState))
     .map((r) => r.playerId);
+
+  // Cache the leaderboard for /live's leaderboard panel — served from
+  // Redis so viewers don't each hit the PGA Tour API.
+  await cacheLeaderboard(
+    tournamentId,
+    leaderboard.slice(0, 30).map((r) => ({
+      playerId: r.playerId,
+      displayName: r.displayName,
+      position: r.position,
+      total: r.total,
+      thru: r.thru,
+      playerState: r.playerState,
+    })),
+  );
 
   const scorecards = await getScorecards(tournamentId, activeIds);
 

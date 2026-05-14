@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Burst } from "@/lib/feed/store";
+import type { Burst, CachedLeaderboardRow } from "@/lib/feed/store";
+import type { PollWithVotes } from "@/lib/feed/polls";
 import type { FeedRow } from "@/lib/feed/types";
 import CommentThread from "./CommentThread";
 import { getFollows } from "./FollowButton";
+import LeaderboardPanel from "./LeaderboardPanel";
+import PollPanel from "./PollPanel";
 
 const REFRESH_MS = 15_000;
 const AUTHOR_KEY_STORAGE = "pardle_feed_author";
@@ -21,6 +24,9 @@ interface FeedResponse {
   } | null;
   rows: FeedRow[];
   bursts: Burst[];
+  leaderboard: CachedLeaderboardRow[];
+  polls: PollWithVotes[];
+  myVotes: Record<string, string>;
   watching: number;
   polled: boolean;
 }
@@ -223,6 +229,14 @@ export default function FeedClient() {
           </span>
         </div>
       </div>
+
+      <LeaderboardPanel rows={data.leaderboard ?? []} />
+
+      <PollPanel
+        polls={data.polls ?? []}
+        myVotes={data.myVotes ?? {}}
+        authorKey={authorKey.current}
+      />
 
       <div className="feed-filter-row">
         <button

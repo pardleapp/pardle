@@ -238,6 +238,43 @@ export async function react(
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Leaderboard cache
+// ──────────────────────────────────────────────────────────────────
+
+/**
+ * Cached leaderboard rows for /live display. Written by whoever holds
+ * the poll lock (every ~25s) so the feed page can render a fresh-ish
+ * leaderboard without every viewer hitting the PGA Tour API.
+ */
+export interface CachedLeaderboardRow {
+  playerId: string;
+  displayName: string;
+  position: string;
+  total: string;
+  thru: string;
+  playerState: string;
+}
+
+export async function cacheLeaderboard(
+  tournamentId: string,
+  rows: CachedLeaderboardRow[],
+): Promise<void> {
+  await redis.set(`feed:leaderboard:${tournamentId}`, rows, {
+    ex: 5 * 60,
+  });
+}
+
+export async function getCachedLeaderboard(
+  tournamentId: string,
+): Promise<CachedLeaderboardRow[]> {
+  return (
+    (await redis.get<CachedLeaderboardRow[]>(
+      `feed:leaderboard:${tournamentId}`,
+    )) ?? []
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Burst reactions — ephemeral floating emoji everyone watching sees
 // ──────────────────────────────────────────────────────────────────
 
