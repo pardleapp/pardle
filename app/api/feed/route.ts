@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
+import { getLiveContenders } from "@/lib/golf-api/datagolf";
 import { pollAndDiff } from "@/lib/feed/engine";
 import {
   acquirePollLock,
@@ -12,8 +13,8 @@ import {
 } from "@/lib/feed/store";
 import {
   createPoll,
+  deletePoll,
   getVoterChoice,
-  hasPollOfKind,
   listPolls,
   pollWithVotes,
 } from "@/lib/feed/polls";
@@ -21,14 +22,8 @@ import type { FeedRow } from "@/lib/feed/types";
 
 export const dynamic = "force-dynamic";
 
-const INACTIVE_STATES = new Set([
-  "CUT",
-  "WD",
-  "DQ",
-  "MDF",
-  "MC",
-  "WITHDRAWN",
-]);
+/** Marks the current winner-poll seeding strategy; bump to force a re-seed. */
+const WINNER_POLL_SEED = "win-prob-v1";
 
 /**
  * GET /api/feed?v=<visitorId>
@@ -74,25 +69,30 @@ export async function GET(req: Request) {
       } catch (err) {
         console.error("[feed] pollAndDiff failed", err);
       }
-      // Seed the "Who wins?" poll once we have a leaderboard to draw
-      // options from. Runs at most once per tournament.
+      // Seed (or re-seed) the "Who wins?" poll from live win
+      // probability — the genuine "most likely to win", not whoever
+      // teed off early and went low. Replaces any poll seeded by an
+      // older strategy.
       try {
-        const hasWinner = await hasPollOfKind(tournament.id, "winner");
-        if (!hasWinner) {
-          const lb = await getCachedLeaderboard(tournament.id);
-          const contenders = lb
-            .filter((r) => !INACTIVE_STATES.has(r.playerState))
-            .slice(0, 8);
-          if (contenders.length >= 2) {
+        const polls = await listPolls(tournament.id);
+        const winnerPolls = polls.filter((p) => p.kind === "winner");
+        const current = winnerPolls.find(
+          (p) => p.seededFrom === WINNER_POLL_SEED,
+        );
+        if (!current) {
+          const contenders = await getLiveContenders();
+          const top = contenders.slice(0, 8);
+          if (top.length >= 2) {
+            for (const stale of winnerPolls) {
+              await deletePoll(tournament.id, stale.id);
+            }
             await createPoll({
               tournamentId: tournament.id,
               kind: "winner",
               question: `Who wins the ${tournament.name}?`,
-              options: contenders.map((r) => ({
-                id: r.playerId,
-                label: r.displayName,
-              })),
+              options: top.map((c) => ({ id: c.dgId, label: c.name })),
               resolvedOptionId: null,
+              seededFrom: WINNER_POLL_SEED,
             });
           }
         }

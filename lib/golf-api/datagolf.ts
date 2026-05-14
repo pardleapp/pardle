@@ -186,6 +186,53 @@ export async function getFieldRanking(
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Live win probabilities — "who's actually contending right now"
+// ──────────────────────────────────────────────────────────────────
+
+interface DGInPlayRow {
+  dg_id: number;
+  player_name: string; // "Last, First"
+  country?: string;
+  win?: number;
+  top_5?: number;
+  top_10?: number;
+  current_pos?: string;
+  current_score?: number;
+}
+
+interface DGInPlayResponse {
+  data?: DGInPlayRow[];
+}
+
+export interface LiveContender {
+  dgId: string;
+  name: string;
+  /** Win probability 0..1 — updates live as the tournament plays out. */
+  winProb: number;
+  currentPos: string;
+}
+
+/**
+ * Players ranked by live win probability for the in-progress event.
+ * This is the genuine "most likely to win" — it folds in current
+ * score, holes remaining and player skill, so it surfaces real
+ * contenders rather than whoever happened to tee off early and go low.
+ */
+export async function getLiveContenders(): Promise<LiveContender[]> {
+  const data = await fetchJson<DGInPlayResponse>(`/preds/in-play`);
+  const rows = data.data ?? [];
+  return rows
+    .map((r) => ({
+      dgId: String(r.dg_id),
+      name: flipName(r.player_name),
+      winProb: r.win ?? 0,
+      currentPos: String(r.current_pos ?? "--"),
+    }))
+    .filter((c) => c.winProb > 0)
+    .sort((a, b) => b.winProb - a.winProb);
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Live tournament stats
 // ──────────────────────────────────────────────────────────────────
 

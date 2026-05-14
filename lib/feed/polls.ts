@@ -39,6 +39,11 @@ export interface Poll {
   createdAt: number;
   /** Set once the real-world outcome is known. */
   resolvedOptionId?: string | null;
+  /**
+   * How the options were chosen — lets us detect and replace a poll
+   * seeded by an older, worse heuristic (e.g. early-R1 leaderboard).
+   */
+  seededFrom?: string;
 }
 
 export interface PollWithVotes {
@@ -84,6 +89,16 @@ export async function createPoll(
 
 export async function getPoll(id: string): Promise<Poll | null> {
   return (await redis.get<Poll>(pollKey(id))) ?? null;
+}
+
+/** Remove a poll, its vote tallies, and drop it from the tournament list. */
+export async function deletePoll(
+  tournamentId: string,
+  pollId: string,
+): Promise<void> {
+  await redis.del(pollKey(pollId));
+  await redis.del(votesKey(pollId));
+  await redis.lrem(pollListKey(tournamentId), 0, pollId);
 }
 
 export async function listPolls(
