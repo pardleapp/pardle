@@ -61,12 +61,6 @@ export interface PollSnapshot {
   holes: Record<string, Record<number, Record<number, string>>>;
   /** playerId → last-seen position string */
   positions: Record<string, string>;
-  /**
-   * Keys `${playerId}:${round}:${hole}` for which we've already emitted
-   * a stuffed-approach "shot" event — stops the same shot re-firing on
-   * every poll while the player lines up the putt.
-   */
-  proximityEmitted?: string[];
 }
 
 export async function getSnapshot(
@@ -279,6 +273,8 @@ export interface Enrichment {
   emoji: string;
   /** True when shot detail confirmed a reel-worthy disaster. */
   reelWorthy: boolean;
+  /** True when shot detail confirmed a genuine wow shot for the best reel. */
+  reelGreat: boolean;
   /** Normalised shot trace for the hole — drawn as an SVG on reel cards. */
   trace?: ShotTrace;
 }
@@ -286,7 +282,7 @@ export interface Enrichment {
 // Versioned — bump when the enrichment analysis changes so the backlog
 // re-processes against the new logic instead of keeping stale verdicts.
 function enrichKey(t: string) {
-  return `feed:enrich:v7:${t}`;
+  return `feed:enrich:v8:${t}`;
 }
 
 export async function getEnrichments(

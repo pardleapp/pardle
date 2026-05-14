@@ -60,36 +60,53 @@ const LONG_PUTT_FEET = 25;
 
 export interface HoleGlory {
   /**
-   * Descriptive fragment for a great hole, e.g. "holes out from 140 yds"
-   * or "drains a 38 ft putt" — null when the eagle came the routine way
-   * (reached the green, two-putt) and the generic headline is fine.
+   * Descriptive fragment for a great finish, e.g. "holes out from
+   * 140 yds" or "drains a 38 ft putt" — null when the hole was finished
+   * the routine way and the generic headline is fine.
    */
   verdict: string | null;
   emoji: string;
+  /**
+   * True when the *way it finished* is genuinely reaction-worthy — a
+   * hole-out from off the green or a long putt dropped. This is what
+   * promotes an ordinary birdie into the Shots-of-the-day reel.
+   */
+  great: boolean;
 }
 
 /**
  * Inspect how a hole was *finished* — the holing stroke tells the story:
- * holed from off the green (a hole-out) or a long putt dropped.
+ * holed from off the green (a hole-out) or a long putt dropped. Works
+ * for any score: a chip-in for birdie is as much a "shot of the day"
+ * as a holed approach for eagle.
  */
 export function analyzeHighlightHole(strokes: PGAStroke[]): HoleGlory {
-  if (strokes.length === 0) return { verdict: null, emoji: "🦅" };
+  if (strokes.length === 0)
+    return { verdict: null, emoji: "🦅", great: false };
   const holing = strokes[strokes.length - 1];
 
   // Holed from anywhere but the green — a hole-out. The rarest thrill.
   if (holing.fromLocationCode !== "OGR" && holing.distance) {
-    return { verdict: `holes out from ${holing.distance}`, emoji: "🎯" };
+    return {
+      verdict: `holes out from ${holing.distance}`,
+      emoji: "🎯",
+      great: true,
+    };
   }
 
   // Holed a putt — only call it out when it was a genuine bomb.
   if (holing.fromLocationCode === "OGR" && holing.distance) {
     const feet = distanceToFeet(holing.distance);
     if (feet != null && feet >= LONG_PUTT_FEET) {
-      return { verdict: `drains a ${holing.distance} putt`, emoji: "🎯" };
+      return {
+        verdict: `drains a ${holing.distance} putt`,
+        emoji: "🎯",
+        great: true,
+      };
     }
   }
 
-  return { verdict: null, emoji: "🦅" };
+  return { verdict: null, emoji: "🦅", great: false };
 }
 
 /**

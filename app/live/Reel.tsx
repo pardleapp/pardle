@@ -8,12 +8,12 @@ import ShotTracer from "./ShotTracer";
 import {
   type FeedEvent,
   type FeedRow,
-  isHighlightEvent as isHighlight,
+  isBestReelEvent as isHighlight,
   isWorstReelEvent as isLowlight,
 } from "@/lib/feed/types";
 
 // Re-exported so FeedClient can pass them as the reel's `include` filter.
-// `isLowlight` is the Worst-of reel filter — confirmed disasters only.
+// Both are post-enrichment filters — confirmed wow shots / disasters only.
 export { isHighlight, isLowlight };
 
 interface Props {

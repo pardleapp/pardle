@@ -63,21 +63,39 @@ export interface FeedEvent {
    * the Worst-of reel — a plain sloppy double does not.
    */
   reelWorthy?: boolean;
+  /**
+   * Set by the enrichment overlay once shot detail confirms a genuine
+   * wow shot — an ace, albatross, eagle, hole-out, or long putt. Only
+   * these make the Shots-of-the-day reel; an ordinary birdie does not.
+   */
+  reelGreat?: boolean;
   /** Normalised shot trace for the hole — rendered as an SVG mini-tracer. */
   trace?: ShotTrace;
 }
 
 /**
- * Whether an event belongs in the "Shots of the day" reel. Derived from
- * the event's own fields rather than the `highlight` flag, so events
- * created before that flag existed still qualify.
+ * Whether an event is a candidate for Shots-of-the-day enrichment —
+ * any score worth examining for a wow finish. Birdies are included
+ * because a birdie can be a hole-out or a long putt; shot detail
+ * decides. This is what the engine *examines*; what actually makes the
+ * reel is decided later by `isBestReelEvent`.
  */
 export function isHighlightEvent(e: FeedEvent): boolean {
-  if (e.highlight) return true;
   if (e.ace) return true;
-  if (e.result === "albatross" || e.result === "eagle") return true;
-  if (e.type === "shot") return true;
-  return false;
+  return (
+    e.result === "albatross" ||
+    e.result === "eagle" ||
+    e.result === "birdie"
+  );
+}
+
+/**
+ * Whether an event actually belongs in the "Shots of the day" reel.
+ * Only confirmed wow shots — set by the enrichment overlay once shot
+ * detail is in.
+ */
+export function isBestReelEvent(e: FeedEvent): boolean {
+  return e.reelGreat === true;
 }
 
 /**
@@ -212,18 +230,4 @@ export function scoreHeadline(
 /** Headline + emoji for a hole-in-one — always the loudest row in the feed. */
 export function aceHeadline(playerName: string, hole: number): string {
   return `${playerName} ACES the ${ordinalHole(hole)} 🎯 HOLE IN ONE`;
-}
-
-/** Headline + emoji for a stuffed-approach shot event. */
-export function shotHeadline(
-  playerName: string,
-  hole: number,
-  par: number,
-  proximityText: string,
-  stiff: boolean,
-): string {
-  const where = `the par-${par} ${ordinalHole(hole)}`;
-  return stiff
-    ? `${playerName} sticks it to ${proximityText} on ${where}`
-    : `${playerName}'s approach to ${proximityText} on ${where}`;
 }

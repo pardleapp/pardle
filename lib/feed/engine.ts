@@ -43,14 +43,7 @@ import {
   ordinalHole,
   resultFor,
   scoreHeadline,
-  shotHeadline,
 } from "./types";
-import {
-  formatProximity,
-  parsePlayByPlay,
-  STIFF_THRESHOLD_INCHES,
-  STUFFED_THRESHOLD_INCHES,
-} from "./playbyplay";
 
 /** Player states we don't poll scorecards for. */
 const INACTIVE_STATES = new Set([
@@ -111,7 +104,7 @@ export async function pollAndDiff(
   const scorecards = await getScorecards(tournamentId, activeIds);
 
   // Build the fresh snapshot.
-  const fresh: PollSnapshot = { holes: {}, positions: {}, proximityEmitted: [] };
+  const fresh: PollSnapshot = { holes: {}, positions: {} };
   for (const r of leaderboard) {
     fresh.positions[r.playerId] = r.position;
   }
@@ -160,9 +153,6 @@ export async function pollAndDiff(
         if (result === "par") continue;
 
         const ace = strokes === 1;
-        // Highlights reel = aces, albatrosses, eagles.
-        const highlight =
-          ace || result === "albatross" || result === "eagle";
         // Worst-of reel = doubles and worse (the blow-ups).
         const lowlight = result === "double" || result === "triple-plus";
 
@@ -179,7 +169,6 @@ export async function pollAndDiff(
           strokes,
           result,
           ace,
-          highlight,
           lowlight,
           headline: ace
             ? aceHeadline(playerName, h.holeNumber)
@@ -190,65 +179,12 @@ export async function pollAndDiff(
     }
   }
 
-  // ── Stuffed-approach "shot" events ──────────────────────────────
-  // Parse each active player's playByPlay; a full-swing approach that
-  // finished on the green inside the threshold is a highlight. Dedup
-  // per (player, round, hole) so it fires once, not every poll.
-  const prevProx = new Set(prev.proximityEmitted ?? []);
-  const freshProx = new Set(prevProx);
-  for (const [pid, sc] of Object.entries(scorecards)) {
-    const parsed = parsePlayByPlay(sc.playByPlay);
-    if (
-      !parsed ||
-      !parsed.fullSwing ||
-      !parsed.onGreen ||
-      parsed.proximityInches == null ||
-      parsed.proximityInches > STUFFED_THRESHOLD_INCHES ||
-      sc.currentHole == null
-    ) {
-      continue;
-    }
-    const round =
-      leaderboard.find((r) => r.playerId === pid)?.currentRound ?? 1;
-    const dedupKey = `${pid}:${round}:${sc.currentHole}`;
-    if (prevProx.has(dedupKey)) continue;
-    freshProx.add(dedupKey);
-
-    const playerName = nameById.get(pid) ?? "Unknown";
-    const holes = sc.rounds[round] ?? [];
-    const par = holes.find((h) => h.holeNumber === sc.currentHole)?.par ?? 4;
-    const stiff = parsed.proximityInches <= STIFF_THRESHOLD_INCHES;
-    const proxText = formatProximity(parsed.proximityInches);
-
-    events.push({
-      id: newEventId(now),
-      tournamentId,
-      ts: now,
-      type: "shot",
-      playerId: pid,
-      playerName,
-      round,
-      hole: sc.currentHole,
-      par,
-      proximityInches: parsed.proximityInches,
-      shotYards: parsed.shotYards ?? undefined,
-      highlight: true,
-      headline: shotHeadline(playerName, sc.currentHole, par, proxText, stiff),
-      emoji: stiff ? "🎯" : "🏌️",
-    });
-  }
-  fresh.proximityEmitted = Array.from(freshProx).slice(-2000);
-
   // Order events so the "most interesting" land last (= top of feed
-  // after LPUSH). Aces loudest, then albatross/eagle, stuffed shots,
-  // blow-ups, birdies, the rest.
+  // after LPUSH). Aces loudest, then albatross/eagle, blow-ups, birdies.
   const interestOf = (e: FeedEvent): number => {
     if (e.ace) return 10;
     if (e.result === "albatross") return 9;
     if (e.result === "eagle") return 8;
-    if (e.type === "shot") {
-      return (e.proximityInches ?? 99) <= 24 ? 7 : 6;
-    }
     if (e.result === "triple-plus") return 4;
     if (e.result === "double") return 3;
     if (e.result === "birdie") return 2;
@@ -289,19 +225,26 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
     getEnrichments(tournamentId),
   ]);
 
-  // Eligibility is derived from the event's own fields so events
-  // created before the lowlight/highlight flags existed still qualify.
-  // "shot" (stuffed-approach) events are included too — not for a
-  // headline rewrite, but so they pick up a shot trace.
+  // Eligibility is derived from the event's own fields. Birdies are
+  // included because a birdie can be a genuine wow shot (a hole-out or
+  // a long putt) — shot detail tells us which.
   const candidates = events.filter(
     (e) =>
       e.hole != null &&
       !done[e.id] &&
-      (e.type === "shot" ||
-        isLowlightEvent(e) ||
-        isHighlightEvent(e)),
+      (isLowlightEvent(e) || isHighlightEvent(e)),
   );
   if (candidates.length === 0) return;
+
+  // Prioritise the high-value events so they're examined first when
+  // there's a backlog — aces/blow-ups/eagles before plain birdies.
+  const priority = (e: FeedEvent): number => {
+    if (e.ace || e.result === "albatross") return 0;
+    if (e.result === "eagle" || e.result === "triple-plus") return 1;
+    if (e.result === "double") return 2;
+    return 3; // birdies
+  };
+  candidates.sort((a, b) => priority(a) - priority(b));
 
   const batch = candidates.slice(0, 40);
   const reqs = Array.from(
@@ -324,15 +267,14 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
 
     let headline = e.headline;
     let emoji = e.emoji;
-    // reelWorthy: only confirmed disasters (multi-putt / penalty) make
-    // the Worst-of reel. Highlights aren't worst-reel events at all.
+    // reelWorthy: confirmed disasters (multi-putt / penalty) make the
+    // Worst-of reel. reelGreat: genuine wow shots (ace / albatross /
+    // eagle / hole-out / long putt) make the Shots-of-the-day reel.
     let reelWorthy = false;
+    let reelGreat = false;
     // `focus` tells the tracer which shot to frame and highlight.
     let focus: TraceFocus = "auto";
-    if (e.type === "shot") {
-      // Stuffed approach — keep its playByPlay headline, just add a trace.
-      focus = "approach";
-    } else if (isLowlightEvent(e)) {
+    if (isLowlightEvent(e)) {
       const d = analyzeHole(hole.strokes);
       if (d.verdict) {
         headline = `${e.playerName} ${d.verdict} on the ${ordinalHole(e.hole!)}`;
@@ -342,15 +284,27 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
       if (d.puttCount >= 3) focus = "putt";
     } else if (e.ace) {
       focus = "holeout";
+      reelGreat = true;
       const teeDist = hole.strokes[0]?.distance;
       if (teeDist) {
         headline = `${e.playerName} ACES the ${ordinalHole(e.hole!)} from ${teeDist} 🎯`;
       }
     } else {
+      // albatross / eagle / birdie — eagles & albatrosses are auto-great;
+      // a birdie only counts as a "shot of the day" when shot detail
+      // shows it was a hole-out or a long putt.
       focus = "holeout";
+      const autoGreat =
+        e.result === "albatross" || e.result === "eagle";
       const g = analyzeHighlightHole(hole.strokes);
+      reelGreat = autoGreat || g.great;
       if (g.verdict) {
-        const label = e.result === "albatross" ? "ALBATROSS" : "eagle";
+        const label =
+          e.result === "albatross"
+            ? "ALBATROSS"
+            : e.result === "eagle"
+            ? "eagle"
+            : "birdie";
         headline = `${e.playerName} ${g.verdict} for ${label} on the ${ordinalHole(e.hole!)}`;
         emoji = g.emoji;
       }
@@ -362,6 +316,7 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
       headline,
       emoji,
       reelWorthy,
+      reelGreat,
       ...(trace.segments.length > 0 ? { trace } : {}),
     };
   }

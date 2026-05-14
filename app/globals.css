@@ -5690,7 +5690,8 @@ footer {
   );
 }
 .reel-card-albatross,
-.reel-card-eagle {
+.reel-card-eagle,
+.reel-card-birdie {
   border-color: rgba(123, 174, 63, 0.6);
   background: rgba(123, 174, 63, 0.1);
 }
