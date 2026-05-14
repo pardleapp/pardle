@@ -122,6 +122,10 @@ export async function pollAndDiff(
         if (!Number.isFinite(strokes) || strokes <= 0) continue;
 
         const result = resultFor(strokes, h.par);
+        // Pars are noise in a reaction feed — nobody shouts "what a par".
+        // The feed is highlights only: birdies, eagles, bogeys, blow-ups.
+        if (result === "par") continue;
+
         events.push({
           id: newEventId(now),
           tournamentId,
