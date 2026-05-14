@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { pgaTourHeadshotUrlById } from "@/lib/data/pga-tour-ids";
 import type { FeedEvent, FeedRow } from "@/lib/feed/types";
 
 interface Props {
@@ -20,6 +22,38 @@ function isHighlight(e: FeedEvent): boolean {
   if (e.result === "albatross" || e.result === "eagle") return true;
   if (e.type === "shot") return true;
   return false;
+}
+
+/** Player headshot with a graceful fallback to the result emoji. */
+function ReelAvatar({
+  playerId,
+  emoji,
+}: {
+  playerId: string;
+  emoji: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className="reel-avatar-wrap">
+      {failed ? (
+        <span className="reel-avatar reel-avatar-fallback" aria-hidden="true">
+          🏌️
+        </span>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          className="reel-avatar"
+          src={pgaTourHeadshotUrlById(playerId, 160)}
+          alt=""
+          loading="lazy"
+          onError={() => setFailed(true)}
+        />
+      )}
+      <span className="reel-avatar-badge" aria-hidden="true">
+        {emoji}
+      </span>
+    </span>
+  );
 }
 
 /**
@@ -59,9 +93,7 @@ export default function HighlightsReel({
                 href={`/live/player/${event.playerId}`}
                 className="reel-card-body"
               >
-                <span className="reel-emoji" aria-hidden="true">
-                  {event.emoji}
-                </span>
+                <ReelAvatar playerId={event.playerId} emoji={event.emoji} />
                 <span className="reel-headline">{event.headline}</span>
                 <span className="reel-meta">R{event.round} · view card →</span>
               </Link>
