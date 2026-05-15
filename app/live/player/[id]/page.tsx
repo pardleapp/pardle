@@ -53,7 +53,12 @@ export default async function PlayerPage({ params }: PageProps) {
   const stats = scorecard
     ? derivePlayerStats(scorecard)
     : null;
-  const recentHoles = await getRecentHoles(tournament.id, id, scorecard);
+  const recentHoles = await getRecentHoles(
+    tournament.id,
+    id,
+    scorecard,
+    row?.thru,
+  );
 
   return (
     <main className="container">
