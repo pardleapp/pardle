@@ -26,10 +26,12 @@ import type { ShotTrace } from "./shot-trace";
 const redis = Redis.fromEnv();
 
 const REACTED_TTL = 24 * 60 * 60;
-// Coalesce window for viewer-triggered polls. Short enough that the
-// feed feels live, long enough that 100 concurrent viewers still only
-// trigger one real PGA Tour fetch per window.
-const POLL_LOCK_SECONDS = 25;
+// Coalesce window for viewer-triggered polls. Speed is the most
+// valuable property of the live feed (highlights minutes-late kills
+// the social loop), so we keep this short. 100 concurrent viewers
+// still collapse to one PGA orchestrator fetch per window; the
+// orchestrator itself comfortably handles this rate.
+const POLL_LOCK_SECONDS = 6;
 
 function eventsKey(t: string) {
   return `feed:events:${t}`;

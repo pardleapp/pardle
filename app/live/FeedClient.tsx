@@ -11,7 +11,7 @@ import LeaderboardPanel from "./LeaderboardPanel";
 import PollPanel from "./PollPanel";
 import Reel from "./Reel";
 
-const REFRESH_MS = 15_000;
+const REFRESH_MS = 6_000;
 const AUTHOR_KEY_STORAGE = "pardle_feed_author";
 const BURST_EMOJIS = ["🔥", "😱", "⛳", "👏", "💀", "🐐"];
 const FLOATER_LIFETIME_MS = 2600;
