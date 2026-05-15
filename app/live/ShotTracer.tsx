@@ -368,16 +368,24 @@ function TracerSvg({ trace, vb }: { trace: ShotTrace; vb: ViewBox }) {
   // Scale stroke widths so they look consistent when zoomed.
   const sc = (vb.w / W + vb.h / H) / 2;
 
+  // In green-zoom views (long putt, 3-putt, short chip-in from feet)
+  // EVERY segment lives on-or-around the green and reads visually like
+  // a putt. Treat them as putts in the renderer so chip-ins from feet
+  // get the same smooth blue-style line as putts — no broadcast yellow
+  // arrow when the action is right at the cup.
+  const treatAsPutt = (s: ShotTraceSegment) =>
+    s.kind === "putt" || trace.fullFrame === true;
+
   const puttIdxBy = new Map<number, number>();
   let puttCount = 0;
   segments.forEach((s, i) => {
-    if (s.kind === "putt") {
+    if (treatAsPutt(s)) {
       puttIdxBy.set(i, puttCount);
       puttCount++;
     }
   });
   const holingIdx = segments.length - 1;
-  const holingIsPutt = segments[holingIdx].kind === "putt";
+  const holingIsPutt = treatAsPutt(segments[holingIdx]);
 
   const uid = `tr${Math.abs(
     (first.fromX * 1e6 + last.toX * 1e6 + segments.length) | 0,
@@ -432,7 +440,7 @@ function TracerSvg({ trace, vb }: { trace: ShotTrace; vb: ViewBox }) {
 
 
       {segments.map((s, i) => {
-        if (s.kind === "putt" || i === keyI) return null;
+        if (treatAsPutt(s) || i === keyI) return null;
         return (
           <path
             key={`ctx${i}`}
@@ -447,7 +455,7 @@ function TracerSvg({ trace, vb }: { trace: ShotTrace; vb: ViewBox }) {
       })}
 
       {segments.map((s, i) => {
-        if (s.kind !== "putt") return null;
+        if (!treatAsPutt(s)) return null;
         const n = puttIdxBy.get(i) ?? 0;
         return (
           <g key={`putt${i}`}>
@@ -469,7 +477,7 @@ function TracerSvg({ trace, vb }: { trace: ShotTrace; vb: ViewBox }) {
         );
       })}
 
-      {key.kind !== "putt" && (
+      {!treatAsPutt(key) && (
         <>
           <path
             d={curvePath(key, px, py)}
@@ -493,7 +501,7 @@ function TracerSvg({ trace, vb }: { trace: ShotTrace; vb: ViewBox }) {
 
       {puttCount > 1 &&
         segments.map((s, i) => {
-          if (s.kind !== "putt") return null;
+          if (!treatAsPutt(s)) return null;
           if (i === holingIdx) return null;
           const idx = puttIdxBy.get(i) ?? 0;
           const n = idx + 1;
@@ -522,7 +530,7 @@ function TracerSvg({ trace, vb }: { trace: ShotTrace; vb: ViewBox }) {
         })}
 
       {segments.map((s, i) => {
-        if (s.kind === "putt" || i === keyI || i === holingIdx) return null;
+        if (treatAsPutt(s) || i === keyI || i === holingIdx) return null;
         return (
           <circle
             key={`d${i}`}
