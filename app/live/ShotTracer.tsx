@@ -27,9 +27,12 @@ import type { ShotTrace, ShotTraceSegment } from "@/lib/feed/shot-trace";
 const W = 200;
 const H = 112;
 
-const PUTT_COLORS = ["#fff200", "#ff9a1f", "#ff2f2f", "#a31010"];
+// Single bright accent colour for putts — matches the PGA Tour
+// imaging look. Numbered chips at each at-rest position carry the
+// "which putt was this" information; no need for colour progression.
+const PUTT_COLOR = "#2ea7f0";
 
-function arcPath(
+function curvePath(
   s: ShotTraceSegment,
   px: (x: number) => number,
   py: (y: number) => number,
@@ -38,8 +41,6 @@ function arcPath(
   const fy = py(s.fromY);
   const tx = px(s.toX);
   const ty = py(s.toY);
-  if (s.kind === "putt") return `M${fx},${fy} L${tx},${ty}`;
-
   const dx = tx - fx;
   const dy = ty - fy;
   const len = Math.hypot(dx, dy);
@@ -48,13 +49,15 @@ function arcPath(
   // Perpendicular unit vector (rotated 90° left).
   let nx = -dy / len;
   let ny = dx / len;
-  // Always bulge toward the top of the frame so the arc reads as
-  // "flight" no matter which way the shot is travelling.
+  // Always bulge toward the top of the frame so the arc reads
+  // consistently no matter the shot direction.
   if (ny > 0) {
     nx = -nx;
     ny = -ny;
   }
-  const arcHeight = len * 0.18;
+  // Shots arc through the air; putts roll on the green and curve
+  // gently with break. Smaller bulge for putts.
+  const arcHeight = len * (s.kind === "putt" ? 0.08 : 0.18);
   const cx = (fx + tx) / 2 + nx * arcHeight;
   const cy = (fy + ty) / 2 + ny * arcHeight;
   return `M${fx},${fy} Q${cx},${cy} ${tx},${ty}`;
@@ -126,8 +129,7 @@ export default function ShotTracer({
   // Scale stroke widths / radii so they look consistent when zoomed.
   const sc = (vb.w / W + vb.h / H) / 2;
 
-  // Assign each putt segment an index in the putt sequence so we can
-  // colour-progress yellow→red across the multi-putt holes.
+  // Assign each putt segment its sequential putt index (0-based).
   const puttIdxBy = new Map<number, number>();
   let puttCount = 0;
   segments.forEach((s, i) => {
@@ -137,24 +139,15 @@ export default function ShotTracer({
     }
   });
 
-  // Arrow goes on the holing stroke (the last segment, which ends in
-  // the cup). When the last stroke is a putt it'll be the final
-  // (highest-numbered) putt; when it's a hole-out it'll be the
-  // approach itself.
-  const arrowIdx = segments.length - 1;
+  // The holing stroke is the last segment — it ends in the cup.
+  const holingIdx = segments.length - 1;
+  const holingIsPutt = segments[holingIdx].kind === "putt";
 
   // Unique-per-render IDs so multiple tracers on a page don't share
   // <defs> (the modal stacks on top of the thumb).
   const uid = `tr${Math.abs(
     (first.fromX * 1e6 + last.toX * 1e6 + segments.length) | 0,
   )}`;
-
-  // The arrow needs to match whichever colour the holing stroke uses.
-  const holingPuttN = puttIdxBy.get(arrowIdx);
-  const arrowFill =
-    holingPuttN != null
-      ? PUTT_COLORS[Math.min(holingPuttN, PUTT_COLORS.length - 1)]
-      : "#fff200";
 
   return (
     <svg
@@ -178,7 +171,7 @@ export default function ShotTracer({
           orient="auto"
           markerUnits="strokeWidth"
         >
-          <path d="M0,1 L10,5 L0,9 z" fill={arrowFill} />
+          <path d="M0,1 L10,5 L0,9 z" fill="#fff200" />
         </marker>
       </defs>
 
@@ -210,7 +203,7 @@ export default function ShotTracer({
         return (
           <path
             key={`ctx${i}`}
-            d={arcPath(s, px, py)}
+            d={curvePath(s, px, py)}
             stroke="rgba(255,255,255,0.65)"
             strokeWidth={1.6 * sc}
             strokeLinecap="round"
@@ -220,29 +213,25 @@ export default function ShotTracer({
         );
       })}
 
-      {/* Pass 2: putts — each putt its own bright colour-coded dash. */}
+      {/* Pass 2: putts — smooth solid bright-blue curves, with a thin
+          white halo behind for legibility on the green texture. */}
       {segments.map((s, i) => {
         if (s.kind !== "putt") return null;
-        const n = puttIdxBy.get(i) ?? 0;
-        const color = PUTT_COLORS[Math.min(n, PUTT_COLORS.length - 1)];
         return (
           <g key={`putt${i}`}>
             <path
-              d={arcPath(s, px, py)}
-              stroke="rgba(20,15,5,0.75)"
-              strokeWidth={3.6 * sc}
+              d={curvePath(s, px, py)}
+              stroke="rgba(255,255,255,0.55)"
+              strokeWidth={4.8 * sc}
               strokeLinecap="round"
-              strokeDasharray={`${3.2 * sc} ${1.8 * sc}`}
               fill="none"
             />
             <path
-              d={arcPath(s, px, py)}
-              stroke={color}
-              strokeWidth={2.2 * sc}
+              d={curvePath(s, px, py)}
+              stroke={PUTT_COLOR}
+              strokeWidth={2.4 * sc}
               strokeLinecap="round"
-              strokeDasharray={`${3.2 * sc} ${1.8 * sc}`}
               fill="none"
-              markerEnd={i === arrowIdx ? `url(#${uid}-arrow)` : undefined}
             />
           </g>
         );
@@ -252,47 +241,50 @@ export default function ShotTracer({
       {key.kind !== "putt" && (
         <>
           <path
-            d={arcPath(key, px, py)}
+            d={curvePath(key, px, py)}
             stroke="rgba(20,15,5,0.85)"
             strokeWidth={5 * sc}
             strokeLinecap="round"
             fill="none"
           />
           <path
-            d={arcPath(key, px, py)}
+            d={curvePath(key, px, py)}
             stroke="#fff200"
             strokeWidth={2.6 * sc}
             strokeLinecap="round"
             fill="none"
-            markerEnd={keyI === arrowIdx ? `url(#${uid}-arrow)` : undefined}
+            markerEnd={
+              keyI === holingIdx ? `url(#${uid}-arrow)` : undefined
+            }
           />
         </>
       )}
 
-      {/* Putt landing-dot numbers — only when there are multiple putts,
-          so a normal one-putt birdie stays clean. */}
+      {/* Numbered chips at each putt's at-rest position (PGA-style).
+          Skip the holing putt — its destination is the cup, marked by
+          the flag below. Skip entirely when there's only one putt. */}
       {puttCount > 1 &&
         segments.map((s, i) => {
           if (s.kind !== "putt") return null;
+          if (i === holingIdx) return null;
           const n = (puttIdxBy.get(i) ?? 0) + 1;
-          const color = PUTT_COLORS[Math.min(n - 1, PUTT_COLORS.length - 1)];
           return (
             <g key={`pn${i}`}>
               <circle
                 cx={px(s.toX)}
                 cy={py(s.toY)}
-                r={3.4 * sc}
-                fill={color}
-                stroke="rgba(20,15,5,0.9)"
-                strokeWidth={0.8 * sc}
+                r={4.2 * sc}
+                fill={PUTT_COLOR}
+                stroke="#ffffff"
+                strokeWidth={1.2 * sc}
               />
               <text
                 x={px(s.toX)}
-                y={py(s.toY) + 1.6 * sc}
+                y={py(s.toY) + 1.7 * sc}
                 textAnchor="middle"
-                fontSize={4.2 * sc}
+                fontSize={4.6 * sc}
                 fontWeight="900"
-                fill="#1a1500"
+                fill="#ffffff"
               >
                 {n}
               </text>
@@ -300,9 +292,9 @@ export default function ShotTracer({
           );
         })}
 
-      {/* Landing dots on supporting shots — quieter than the putt dots. */}
+      {/* Landing dots on supporting shots — quieter than the putt chips. */}
       {segments.map((s, i) => {
-        if (s.kind === "putt" || i === keyI || i === arrowIdx) return null;
+        if (s.kind === "putt" || i === keyI || i === holingIdx) return null;
         return (
           <circle
             key={`d${i}`}
@@ -314,14 +306,15 @@ export default function ShotTracer({
         );
       })}
 
-      {/* Start dot on the first segment's ball position. */}
+      {/* Start dot on the first segment's ball position — matches the
+          tracker style when there's a clear "ball started here". */}
       <circle
         cx={px(first.fromX)}
         cy={py(first.fromY)}
-        r={2.8 * sc}
-        fill="#fff"
-        stroke="rgba(20,15,5,0.9)"
-        strokeWidth={1 * sc}
+        r={3 * sc}
+        fill={holingIsPutt ? PUTT_COLOR : "#ffffff"}
+        stroke="#ffffff"
+        strokeWidth={1.2 * sc}
       />
 
       {/* Flag at the cup. */}
