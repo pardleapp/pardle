@@ -29,7 +29,7 @@ export default function RecentHoles({ holes }: Props) {
           <li key={`${h.round}-${h.holeNumber}`} className={`rhole ${resultClass(h.result)}`}>
             <span className="rhole-hole">
               <span className="rhole-num">{h.holeNumber}</span>
-              <span className="rhole-par">par {h.par}</span>
+              <span className="rhole-par-label">par {h.par}</span>
             </span>
             <span className="rhole-body">
               <span className="rhole-emoji" aria-hidden="true">{h.emoji}</span>

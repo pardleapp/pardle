@@ -6197,7 +6197,7 @@ footer {
   line-height: 1;
 }
 
-.rhole-par {
+.rhole-par-label {
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -6245,7 +6245,7 @@ footer {
   color: var(--muted);
 }
 
-.rhole-par-result {
+.rhole-par {
   border-left-color: rgba(0, 0, 0, 0.18);
 }
 .rhole-birdie {
