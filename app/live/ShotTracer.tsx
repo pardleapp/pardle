@@ -117,42 +117,17 @@ export default function ShotTracer({
           <stop offset="0%" stopColor="#3f7d3a" />
           <stop offset="100%" stopColor="#2c5a28" />
         </linearGradient>
-        <linearGradient
-          id={`${uid}-trace`}
-          gradientUnits="userSpaceOnUse"
-          x1={px(key.fromX)}
-          y1={py(key.fromY)}
-          x2={px(key.toX)}
-          y2={py(key.toY)}
-        >
-          <stop offset="0%" stopColor="#fff48a" />
-          <stop offset="55%" stopColor="#ffb02b" />
-          <stop offset="100%" stopColor="#ff4d2c" />
-        </linearGradient>
-        <filter
-          id={`${uid}-glow`}
-          x="-40%"
-          y="-40%"
-          width="180%"
-          height="180%"
-        >
-          <feGaussianBlur stdDeviation={2.4 * sc} result="b" />
-          <feMerge>
-            <feMergeNode in="b" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
         <marker
           id={`${uid}-arrow`}
           viewBox="0 0 10 10"
           refX="8"
           refY="5"
-          markerWidth={4.5}
-          markerHeight={4.5}
+          markerWidth={4}
+          markerHeight={4}
           orient="auto"
           markerUnits="strokeWidth"
         >
-          <path d="M0,1 L10,5 L0,9 z" fill="#ff4d2c" />
+          <path d="M0,1 L10,5 L0,9 z" fill="#fff200" />
         </marker>
       </defs>
 
@@ -179,48 +154,38 @@ export default function ShotTracer({
         />
       )}
 
-      {/* Soft halo at the cup. */}
-      <circle
-        cx={px(last.toX)}
-        cy={py(last.toY)}
-        r={11 * sc}
-        fill="rgba(255,180,60,0.18)"
-      />
-
-      {/* Non-key segments: faded white, straight, narrow — context. */}
+      {/* Non-key segments: faded white, dashed — the lead-in context. */}
       {segments.map((s, i) =>
         i === keyI ? null : (
           <path
             key={`bg${i}`}
             d={arcPath(s, px, py)}
-            stroke="rgba(255,255,255,0.55)"
+            stroke="rgba(255,255,255,0.65)"
             strokeWidth={1.6 * sc}
             strokeLinecap="round"
             strokeDasharray={`${3 * sc} ${2.4 * sc}`}
             fill="none"
-            opacity={0.55}
           />
         ),
       )}
 
-      {/* Key segment: glowing wide outer + bright inner with arrow. */}
-      <g filter={`url(#${uid}-glow)`}>
-        <path
-          d={arcPath(key, px, py)}
-          stroke="rgba(255,180,40,0.55)"
-          strokeWidth={9 * sc}
-          strokeLinecap="round"
-          fill="none"
-        />
-        <path
-          d={arcPath(key, px, py)}
-          stroke={`url(#${uid}-trace)`}
-          strokeWidth={3.6 * sc}
-          strokeLinecap="round"
-          fill="none"
-          markerEnd={`url(#${uid}-arrow)`}
-        />
-      </g>
+      {/* Key segment: solid bright yellow with a dark outline so it
+          stays legible on green turf, light fairway, or shadow. */}
+      <path
+        d={arcPath(key, px, py)}
+        stroke="rgba(20,15,5,0.85)"
+        strokeWidth={5 * sc}
+        strokeLinecap="round"
+        fill="none"
+      />
+      <path
+        d={arcPath(key, px, py)}
+        stroke="#fff200"
+        strokeWidth={2.6 * sc}
+        strokeLinecap="round"
+        fill="none"
+        markerEnd={`url(#${uid}-arrow)`}
+      />
 
       {/* Landing dots on non-key segments only — the key has an arrow. */}
       {segments.map((s, i) =>
@@ -235,14 +200,14 @@ export default function ShotTracer({
         ),
       )}
 
-      {/* Start dot for the key segment — bright yellow to anchor the eye. */}
+      {/* Start dot for the key segment — outlined bright yellow. */}
       <circle
         cx={px(key.fromX)}
         cy={py(key.fromY)}
-        r={3.2 * sc}
-        fill="#fff48a"
-        stroke="rgba(255,120,40,0.9)"
-        strokeWidth={1 * sc}
+        r={3 * sc}
+        fill="#fff200"
+        stroke="rgba(20,15,5,0.9)"
+        strokeWidth={1.2 * sc}
       />
 
       {/* Tee marker if the tee shot exists and isn't the key segment. */}
