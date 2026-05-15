@@ -38,6 +38,24 @@ function valid(n: number): boolean {
   return Number.isFinite(n) && n >= 0 && n <= 1;
 }
 
+/**
+ * The stroke index that defines the story for this focus. For a
+ * hole-out or long putt or auto, it's the holing stroke; for an
+ * approach event, it's the last non-putt stroke.
+ */
+function storyStrokeIndex(
+  strokes: PGAStroke[],
+  focus: TraceFocus,
+): number {
+  if (strokes.length === 0) return -1;
+  if (focus === "approach") {
+    let k = strokes.length - 1;
+    while (k > 0 && strokes[k].fromLocationCode === "OGR") k--;
+    return k;
+  }
+  return strokes.length - 1;
+}
+
 export function extractTrace(
   strokes: PGAStroke[],
   focus: TraceFocus = "auto",
@@ -49,6 +67,7 @@ export function extractTrace(
   const useGreen = focus === "putt";
 
   const segments: ShotTraceSegment[] = [];
+  const segmentStrokeNumbers: number[] = [];
   for (const s of strokes) {
     const fx = useGreen ? s.greenFromX : s.fromX;
     const fy = useGreen ? s.greenFromY : s.fromY;
@@ -62,11 +81,24 @@ export function extractTrace(
         ? "putt"
         : "shot";
     segments.push({ fromX: fx, fromY: fy, toX: tx, toY: ty, kind });
+    segmentStrokeNumbers.push(s.strokeNumber);
   }
 
   const img = (useGreen ? greenImage : holeImage) || undefined;
   if (segments.length === 0) {
     return { segments, keyIndex: -1, holeImage: img };
+  }
+
+  // If the orchestrator didn't track the stroke that the story is
+  // about, the trace would mislead — e.g. an event headlined "holes out
+  // from 289 yds" rendered as a tee-shot diagram because only the tee
+  // had valid coords. Drop the trace entirely in that case.
+  const storyIdx = storyStrokeIndex(strokes, focus);
+  if (storyIdx >= 0) {
+    const storyStrokeNum = strokes[storyIdx].strokeNumber;
+    if (!segmentStrokeNumbers.includes(storyStrokeNum)) {
+      return { segments: [], keyIndex: -1, holeImage: img };
+    }
   }
 
   let keyIndex: number;
