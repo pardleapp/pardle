@@ -15,15 +15,19 @@ import type { ShotTrace, ShotTraceSegment } from "@/lib/feed/shot-trace";
  * image (the enhanced shot coords map onto it), falling back to a
  * clean gradient when an image isn't available.
  *
- * Each non-putt segment is drawn as a quadratic Bezier with a small
- * perpendicular bulge — mimicking the curved arc broadcast tracers
- * paint on flight footage. Putts stay straight (they hug the ground).
- * The key segment carries a soft glow + a bright yellow→red gradient
- * and an arrowhead so it reads as "this is the shot".
+ * Visual language (matches what golf broadcasts tend to use):
+ * - Non-putt shots: arced solid line. The "story" shot is bright
+ *   yellow with a dark outline + arrow at the cup; supporting shots
+ *   (the tee, lay-ups) are faded dashed white.
+ * - Putts: dashed colour-progressing lines (yellow → orange → red →
+ *   deep red), each putt clearly distinct so a 3-putt reads as three
+ *   strokes, not one arrow.
  */
 
 const W = 200;
 const H = 112;
+
+const PUTT_COLORS = ["#fff200", "#ff9a1f", "#ff2f2f", "#a31010"];
 
 function arcPath(
   s: ShotTraceSegment,
@@ -99,11 +103,35 @@ export default function ShotTracer({
   // Scale stroke widths / radii so they look consistent when zoomed.
   const sc = (vb.w / W + vb.h / H) / 2;
 
+  // Assign each putt segment an index in the putt sequence so we can
+  // colour-progress yellow→red across the multi-putt holes.
+  const puttIdxBy = new Map<number, number>();
+  let puttCount = 0;
+  segments.forEach((s, i) => {
+    if (s.kind === "putt") {
+      puttIdxBy.set(i, puttCount);
+      puttCount++;
+    }
+  });
+
+  // Arrow goes on the holing stroke (the last segment, which ends in
+  // the cup). When the last stroke is a putt it'll be the final
+  // (highest-numbered) putt; when it's a hole-out it'll be the
+  // approach itself.
+  const arrowIdx = segments.length - 1;
+
   // Unique-per-render IDs so multiple tracers on a page don't share
-  // <defs> (the modal can stack on top of a thumb).
+  // <defs> (the modal stacks on top of the thumb).
   const uid = `tr${Math.abs(
     (first.fromX * 1e6 + last.toX * 1e6 + segments.length) | 0,
   )}`;
+
+  // The arrow needs to match whichever colour the holing stroke uses.
+  const holingPuttN = puttIdxBy.get(arrowIdx);
+  const arrowFill =
+    holingPuttN != null
+      ? PUTT_COLORS[Math.min(holingPuttN, PUTT_COLORS.length - 1)]
+      : "#fff200";
 
   return (
     <svg
@@ -127,7 +155,7 @@ export default function ShotTracer({
           orient="auto"
           markerUnits="strokeWidth"
         >
-          <path d="M0,1 L10,5 L0,9 z" fill="#fff200" />
+          <path d="M0,1 L10,5 L0,9 z" fill={arrowFill} />
         </marker>
       </defs>
 
@@ -143,7 +171,6 @@ export default function ShotTracer({
           preserveAspectRatio="none"
         />
       )}
-      {/* Dim the diagram slightly so the trace pops. */}
       {trace.holeImage && (
         <rect
           x={0}
@@ -154,11 +181,12 @@ export default function ShotTracer({
         />
       )}
 
-      {/* Non-key segments: faded white, dashed — the lead-in context. */}
-      {segments.map((s, i) =>
-        i === keyI ? null : (
+      {/* Pass 1: lead-in context (non-key, non-putt) — faded dashed white. */}
+      {segments.map((s, i) => {
+        if (s.kind === "putt" || i === keyI) return null;
+        return (
           <path
-            key={`bg${i}`}
+            key={`ctx${i}`}
             d={arcPath(s, px, py)}
             stroke="rgba(255,255,255,0.65)"
             strokeWidth={1.6 * sc}
@@ -166,63 +194,114 @@ export default function ShotTracer({
             strokeDasharray={`${3 * sc} ${2.4 * sc}`}
             fill="none"
           />
-        ),
+        );
+      })}
+
+      {/* Pass 2: putts — each putt its own bright colour-coded dash. */}
+      {segments.map((s, i) => {
+        if (s.kind !== "putt") return null;
+        const n = puttIdxBy.get(i) ?? 0;
+        const color = PUTT_COLORS[Math.min(n, PUTT_COLORS.length - 1)];
+        return (
+          <g key={`putt${i}`}>
+            <path
+              d={arcPath(s, px, py)}
+              stroke="rgba(20,15,5,0.75)"
+              strokeWidth={3.6 * sc}
+              strokeLinecap="round"
+              strokeDasharray={`${3.2 * sc} ${1.8 * sc}`}
+              fill="none"
+            />
+            <path
+              d={arcPath(s, px, py)}
+              stroke={color}
+              strokeWidth={2.2 * sc}
+              strokeLinecap="round"
+              strokeDasharray={`${3.2 * sc} ${1.8 * sc}`}
+              fill="none"
+              markerEnd={i === arrowIdx ? `url(#${uid}-arrow)` : undefined}
+            />
+          </g>
+        );
+      })}
+
+      {/* Pass 3: the key non-putt segment — solid bright yellow + outline. */}
+      {key.kind !== "putt" && (
+        <>
+          <path
+            d={arcPath(key, px, py)}
+            stroke="rgba(20,15,5,0.85)"
+            strokeWidth={5 * sc}
+            strokeLinecap="round"
+            fill="none"
+          />
+          <path
+            d={arcPath(key, px, py)}
+            stroke="#fff200"
+            strokeWidth={2.6 * sc}
+            strokeLinecap="round"
+            fill="none"
+            markerEnd={keyI === arrowIdx ? `url(#${uid}-arrow)` : undefined}
+          />
+        </>
       )}
 
-      {/* Key segment: solid bright yellow with a dark outline so it
-          stays legible on green turf, light fairway, or shadow. */}
-      <path
-        d={arcPath(key, px, py)}
-        stroke="rgba(20,15,5,0.85)"
-        strokeWidth={5 * sc}
-        strokeLinecap="round"
-        fill="none"
-      />
-      <path
-        d={arcPath(key, px, py)}
-        stroke="#fff200"
-        strokeWidth={2.6 * sc}
-        strokeLinecap="round"
-        fill="none"
-        markerEnd={`url(#${uid}-arrow)`}
-      />
+      {/* Putt landing-dot numbers — only when there are multiple putts,
+          so a normal one-putt birdie stays clean. */}
+      {puttCount > 1 &&
+        segments.map((s, i) => {
+          if (s.kind !== "putt") return null;
+          const n = (puttIdxBy.get(i) ?? 0) + 1;
+          const color = PUTT_COLORS[Math.min(n - 1, PUTT_COLORS.length - 1)];
+          return (
+            <g key={`pn${i}`}>
+              <circle
+                cx={px(s.toX)}
+                cy={py(s.toY)}
+                r={3.4 * sc}
+                fill={color}
+                stroke="rgba(20,15,5,0.9)"
+                strokeWidth={0.8 * sc}
+              />
+              <text
+                x={px(s.toX)}
+                y={py(s.toY) + 1.6 * sc}
+                textAnchor="middle"
+                fontSize={4.2 * sc}
+                fontWeight="900"
+                fill="#1a1500"
+              >
+                {n}
+              </text>
+            </g>
+          );
+        })}
 
-      {/* Landing dots on non-key segments only — the key has an arrow. */}
-      {segments.map((s, i) =>
-        i === keyI ? null : (
+      {/* Landing dots on supporting shots — quieter than the putt dots. */}
+      {segments.map((s, i) => {
+        if (s.kind === "putt" || i === keyI || i === arrowIdx) return null;
+        return (
           <circle
             key={`d${i}`}
             cx={px(s.toX)}
             cy={py(s.toY)}
-            r={2 * sc}
+            r={1.8 * sc}
             fill="rgba(255,255,255,0.85)"
           />
-        ),
-      )}
+        );
+      })}
 
-      {/* Start dot for the key segment — outlined bright yellow. */}
+      {/* Start dot on the first segment's ball position. */}
       <circle
-        cx={px(key.fromX)}
-        cy={py(key.fromY)}
-        r={3 * sc}
-        fill="#fff200"
+        cx={px(first.fromX)}
+        cy={py(first.fromY)}
+        r={2.8 * sc}
+        fill="#fff"
         stroke="rgba(20,15,5,0.9)"
-        strokeWidth={1.2 * sc}
+        strokeWidth={1 * sc}
       />
 
-      {/* Tee marker if the tee shot exists and isn't the key segment. */}
-      {keyI !== 0 && (
-        <circle
-          cx={px(first.fromX)}
-          cy={py(first.fromY)}
-          r={2.6 * sc}
-          fill="#7BAE3F"
-          stroke="#ffffff"
-          strokeWidth={1 * sc}
-        />
-      )}
-
-      {/* Flag at the hole. */}
+      {/* Flag at the cup. */}
       <g
         transform={`translate(${px(last.toX)} ${py(last.toY)}) scale(${sc})`}
         stroke="#ffffff"
