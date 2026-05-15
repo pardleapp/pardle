@@ -6,9 +6,11 @@ import {
   getLeaderboard,
   getScorecards,
 } from "@/lib/golf-api/pgatour";
+import { getPlayerReelRows } from "@/lib/feed/player-rows";
 import { derivePlayerStats } from "@/lib/feed/scorecard-stats";
 import { resultFor } from "@/lib/feed/types";
 import FollowButton from "../../FollowButton";
+import PlayerHighlights from "../../PlayerHighlights";
 
 export const dynamic = "force-dynamic";
 
@@ -35,9 +37,10 @@ export default async function PlayerPage({ params }: PageProps) {
   if (!active) notFound();
 
   const { tournament } = active;
-  const [leaderboard, scorecards] = await Promise.all([
+  const [leaderboard, scorecards, reelRows] = await Promise.all([
     getLeaderboard(tournament.id),
     getScorecards(tournament.id, [id]),
+    getPlayerReelRows(tournament.id, id),
   ]);
 
   const row = leaderboard.find((r) => r.playerId === id);
@@ -83,6 +86,8 @@ export default async function PlayerPage({ params }: PageProps) {
           </div>
         )}
       </section>
+
+      <PlayerHighlights best={reelRows.best} worst={reelRows.worst} />
 
       {stats && stats.rounds.length > 0 ? (
         <>
