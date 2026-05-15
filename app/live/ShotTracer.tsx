@@ -77,17 +77,40 @@ export default function ShotTracer({
   const keyI = keyIndex >= 0 ? keyIndex : segments.length - 1;
   const key = segments[keyI];
 
-  // Frame: thumb zooms around the key segment, full shows the hole.
-  // `fullFrame` traces (green-zoom diagrams) are already framed —
-  // show them whole even in thumb mode.
+  // Frame around the action so the strokes that matter are big enough
+  // to read. For putt traces (long putt, 3-putt) frame around all the
+  // putts — otherwise a 3-putt's misses get lost on a giant green
+  // diagram. For other traces frame around the key segment.
+  //
+  // - thumb mode: always zoom (the reel card is small).
+  // - full (modal) mode: zoom when the trace is already a green-zoom
+  //   diagram (otherwise the putts are dwarfed by the green); show the
+  //   whole hole when the backdrop IS the whole hole.
+  const framingPutts = segments.filter((s) => s.kind === "putt");
+  const framingSegs =
+    framingPutts.length > 0 ? framingPutts : [key];
+  const shouldZoom = mode === "thumb" || trace.fullFrame;
+
   let vb = { x: 0, y: 0, w: W, h: H };
-  if (mode === "thumb" && !trace.fullFrame) {
-    let minX = Math.min(key.fromX, key.toX);
-    let maxX = Math.max(key.fromX, key.toX);
-    let minY = Math.min(key.fromY, key.toY);
-    let maxY = Math.max(key.fromY, key.toY);
-    const padX = Math.max(0.2, (maxX - minX) * 0.6);
-    const padY = Math.max(0.2, (maxY - minY) * 0.6);
+  if (shouldZoom) {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const s of framingSegs) {
+      minX = Math.min(minX, s.fromX, s.toX);
+      maxX = Math.max(maxX, s.fromX, s.toX);
+      minY = Math.min(minY, s.fromY, s.toY);
+      maxY = Math.max(maxY, s.fromY, s.toY);
+    }
+    const spanX = maxX - minX;
+    const spanY = maxY - minY;
+    // Wider padding in the modal so it feels less cramped; tighter in
+    // the thumb where every pixel counts.
+    const padFactor = mode === "full" ? 0.9 : 0.6;
+    const minPad = mode === "full" ? 0.14 : 0.1;
+    const padX = Math.max(minPad, spanX * padFactor);
+    const padY = Math.max(minPad, spanY * padFactor);
     minX = Math.max(0, minX - padX);
     maxX = Math.min(1, maxX + padX);
     minY = Math.max(0, minY - padY);
