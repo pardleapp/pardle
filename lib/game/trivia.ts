@@ -6,6 +6,13 @@
  * correct answer isn't always in the same position. Same day = same
  * 10 questions for every player worldwide; same day = same option
  * order, so share grids are comparable.
+ *
+ * Picking strategy: the pool is partitioned across a cycle of
+ * `floor(pool / 10)` days using a per-cycle shuffle. Two adjacent days
+ * inside the same cycle share zero questions; cycle boundaries (every
+ * ~4 days) re-shuffle the whole pool. Before this, naive random
+ * sampling with a 40-question pool produced 2–5 repeat questions every
+ * day, which players noticed.
  */
 
 import {
@@ -71,10 +78,25 @@ export function generateDailyTrivia(
     );
   }
 
-  const seed = dayNumber * 1009 + DIFFICULTY_SALT[difficulty];
-  const rand = seededRandom(seed);
+  // Cycle = how many days we can run before exhausting the pool. With
+  // a 40-question pool that's 4 days; the same question won't recur
+  // until the cycle rolls over.
+  const cycleDays = Math.max(1, Math.floor(pool.length / QUESTIONS_PER_PUZZLE));
+  const cycleNum = Math.floor(dayNumber / cycleDays);
+  const slotInCycle = ((dayNumber % cycleDays) + cycleDays) % cycleDays;
 
-  const picked = shuffle(pool, rand).slice(0, QUESTIONS_PER_PUZZLE);
+  // Each cycle re-shuffles the pool with its own seed so the cycle
+  // boundary isn't a predictable list reset.
+  const cycleSeed = cycleNum * 1009 + DIFFICULTY_SALT[difficulty];
+  const shuffledPool = shuffle(pool, seededRandom(cycleSeed));
+  const picked = shuffledPool.slice(
+    slotInCycle * QUESTIONS_PER_PUZZLE,
+    (slotInCycle + 1) * QUESTIONS_PER_PUZZLE,
+  );
+
+  // Option-shuffle salt: stable per question per day, regardless of
+  // which cycle we landed in.
+  const seed = dayNumber * 1009 + DIFFICULTY_SALT[difficulty];
 
   const questions: DailyTriviaQuestion[] = picked.map((q) => {
     // Shuffle the 4 options so the correct answer isn't always at the
