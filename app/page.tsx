@@ -5,6 +5,8 @@ import { BRAND } from "@/lib/brand";
 import { getGolfHeadlines } from "@/lib/golf-news";
 import { NewsTicker } from "@/app/_components/NewsTicker";
 import { todayDayNumber } from "@/lib/day-index";
+import { getActiveTournament } from "@/lib/golf-api/pgatour";
+import { getEvents } from "@/lib/feed/store";
 import {
   readPerGameStats,
   STATS_GAMES,
@@ -120,14 +122,26 @@ function CardBody({
   );
 }
 
+async function getLiveFeedLabel(): Promise<string> {
+  const active = await getActiveTournament().catch(() => null);
+  if (!active || !active.isLive) return "Live tournament feed";
+  const events = await getEvents(active.tournament.id, 5).catch(() => []);
+  const rounds = events.map((e) => e.round).filter((r) => Number.isFinite(r));
+  const round = rounds.length > 0 ? Math.max(...rounds) : null;
+  return round
+    ? `${active.tournament.name} R${round} live feed`
+    : `${active.tournament.name} live feed`;
+}
+
 export default async function HubHome() {
-  const [headlines, statsList] = await Promise.all([
+  const [headlines, statsList, liveLabel] = await Promise.all([
     getGolfHeadlines(),
     readPerGameStats(
       Object.fromEntries(
         STATS_GAMES.map((g) => [g, todayDayNumber(g)]),
       ) as Record<StatsGameId, number>,
     ).catch(() => [] as GameDayStats[]),
+    getLiveFeedLabel(),
   ]);
   const statsByGame = new Map(statsList.map((s) => [s.game, s]));
   const totalToday = statsList.reduce((sum, s) => sum + s.total, 0);
@@ -145,9 +159,7 @@ export default async function HubHome() {
         <span className="hub-live-badge">
           <span className="hub-live-badge-dot" /> LIVE
         </span>
-        <span className="hub-live-text">
-          Shot feed — react to every birdie &amp; blow-up
-        </span>
+        <span className="hub-live-text">{liveLabel}</span>
         <span className="hub-live-arrow" aria-hidden="true">
           →
         </span>
