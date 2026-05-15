@@ -6470,6 +6470,37 @@ footer {
   background: rgba(224, 91, 91, 0.06);
 }
 
+/* Live-shot events (long drives, stuffed approaches, penalties) — the
+   in-progress moments that come ahead of the hole-completion score
+   event. Subtle blue accent + LIVE pulse so they read as "happening
+   right now" rather than "result tallied". */
+.feed-row-shot {
+  border-color: rgba(46, 167, 240, 0.45);
+  background: rgba(46, 167, 240, 0.06);
+  position: relative;
+}
+.feed-row-shot::before {
+  content: "LIVE";
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  color: #2ea7f0;
+  background: rgba(46, 167, 240, 0.14);
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+.feed-row-shot-good {
+  border-color: rgba(123, 174, 63, 0.5);
+  background: rgba(123, 174, 63, 0.07);
+}
+.feed-row-shot-bad {
+  border-color: rgba(224, 91, 91, 0.5);
+  background: rgba(224, 91, 91, 0.07);
+}
+
 .feed-emoji {
   font-size: 26px;
   line-height: 1;

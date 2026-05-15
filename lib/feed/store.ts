@@ -63,6 +63,15 @@ export interface PollSnapshot {
   holes: Record<string, Record<number, Record<number, string>>>;
   /** playerId → last-seen position string */
   positions: Record<string, string>;
+  /**
+   * playerId → last-seen shot signature, of the form
+   * `${currentHole}:${currentShotDisplay}:${playByPlay}`. When this
+   * changes, a new stroke has been recorded. Used to emit shot-level
+   * events (long drives, stuffed approaches, penalties) ahead of the
+   * hole-completion score events. Optional for back-compat with old
+   * snapshots written before the shots field existed.
+   */
+  shots?: Record<string, string>;
 }
 
 export async function getSnapshot(

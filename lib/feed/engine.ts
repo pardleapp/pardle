@@ -44,6 +44,7 @@ import {
   resultFor,
   scoreHeadline,
 } from "./types";
+import { classifyShot, parsePlayByPlay } from "./shot-pbp";
 
 /** Player states we don't poll scorecards for. */
 const INACTIVE_STATES = new Set([
@@ -104,7 +105,7 @@ export async function pollAndDiff(
   const scorecards = await getScorecards(tournamentId, activeIds);
 
   // Build the fresh snapshot.
-  const fresh: PollSnapshot = { holes: {}, positions: {} };
+  const fresh: PollSnapshot = { holes: {}, positions: {}, shots: {} };
   for (const r of leaderboard) {
     fresh.positions[r.playerId] = r.position;
   }
@@ -116,6 +117,13 @@ export async function pollAndDiff(
       for (const h of holes) {
         fresh.holes[pid][round][h.holeNumber] = h.score;
       }
+    }
+    // Build the per-player shot signature. The playByPlay updates as
+    // each stroke lands, so this changes minutes before the per-hole
+    // score does — the source of the speed advantage.
+    if (sc.currentHole != null && sc.playByPlay) {
+      fresh.shots![pid] =
+        `${sc.currentHole}:${sc.currentShotDisplay ?? ""}:${sc.playByPlay}`;
     }
   }
 
@@ -179,12 +187,90 @@ export async function pollAndDiff(
     }
   }
 
+  // Shot-level diff: the playByPlay field updates as each stroke
+  // lands, ahead of the per-hole score. Detect signature changes and
+  // surface reaction-worthy shots (long drives, stuffs, penalties).
+  // De-dup against this poll's score events for the same hole — a
+  // hole-out's last stroke shouldn't double-emit as a shot event
+  // alongside the score event.
+  // Skip the very first poll after the shots-tracking shipped (when
+  // prev.shots is undefined) — every active player's signature would
+  // look "new" and we'd flood the feed with retroactive shot events.
+  const haveShotBaseline = prev.shots !== undefined;
+  const scoredHoleByPlayer = new Set<string>(
+    events.map((e) => `${e.playerId}:${e.round}:${e.hole}`),
+  );
+  for (const [pid, sc] of Object.entries(scorecards)) {
+    if (!haveShotBaseline) break;
+    const sig = fresh.shots?.[pid];
+    if (!sig) continue;
+    const prevSig = prev.shots?.[pid];
+    if (sig === prevSig) continue;
+    if (!sc.playByPlay || sc.currentHole == null) continue;
+
+    const round = leaderboard.find((r) => r.playerId === pid)?.currentRound;
+    if (round == null) continue;
+
+    // Don't double-emit on a hole we already scored this poll.
+    if (
+      scoredHoleByPlayer.has(`${pid}:${round}:${sc.currentHole}`)
+    ) {
+      continue;
+    }
+
+    const parsed = parsePlayByPlay(sc.playByPlay);
+    if (!parsed) continue;
+
+    // Look up the par of the current hole (best-effort — falls back
+    // to null if missing, which restricts long-drive emit).
+    const par =
+      sc.rounds[round]?.find((h) => h.holeNumber === sc.currentHole)?.par ??
+      null;
+
+    const shotNumber = Number(sc.currentShotDisplay) || 0;
+    const verdict = classifyShot(parsed, shotNumber, par);
+    if (!verdict) continue;
+
+    const playerName = nameById.get(pid) ?? "Unknown";
+    events.push({
+      id: newEventId(now),
+      tournamentId,
+      ts: now,
+      type: "shot",
+      playerId: pid,
+      playerName,
+      round,
+      hole: sc.currentHole,
+      par: par ?? undefined,
+      shotYards: parsed.shotYards ?? undefined,
+      proximityInches:
+        parsed.toHoleFeet != null
+          ? Math.round(parsed.toHoleFeet * 12)
+          : undefined,
+      highlight: verdict.highlight,
+      lowlight: verdict.lowlight,
+      // Shot events live in the main feed only — they're often
+      // followed minutes later by a score event for the same hole, so
+      // putting them in reels would duplicate the moment. The reels
+      // stay reserved for confirmed final outcomes (birdies, eagles,
+      // disasters) decided once the hole completes.
+      headline: `${playerName} ${verdict.verdict} on the ${ordinalHole(sc.currentHole)}`,
+      emoji: verdict.emoji,
+    });
+  }
+
   // Order events so the "most interesting" land last (= top of feed
-  // after LPUSH). Aces loudest, then albatross/eagle, blow-ups, birdies.
+  // after LPUSH). Aces loudest, then albatross/eagle, blow-ups,
+  // stuffed approaches, penalties, birdies, drives.
   const interestOf = (e: FeedEvent): number => {
     if (e.ace) return 10;
     if (e.result === "albatross") return 9;
     if (e.result === "eagle") return 8;
+    if (e.type === "shot") {
+      if (e.highlight) return 6; // stuffed approach
+      if (e.lowlight) return 5; // penalty
+      return 2; // long drive
+    }
     if (e.result === "triple-plus") return 4;
     if (e.result === "double") return 3;
     if (e.result === "birdie") return 2;

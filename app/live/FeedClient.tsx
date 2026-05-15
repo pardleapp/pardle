@@ -308,7 +308,11 @@ export default function FeedClient() {
                 className={`feed-row-wrap ${isOpen ? "feed-row-wrap-open" : ""}`}
               >
                 <div
-                  className={`feed-row feed-row-${event.result ?? "other"}`}
+                  className={`feed-row ${
+                    event.type === "shot"
+                      ? `feed-row-shot${event.highlight ? " feed-row-shot-good" : ""}${event.lowlight ? " feed-row-shot-bad" : ""}`
+                      : `feed-row-${event.result ?? "other"}`
+                  }`}
                 >
                   <span className="feed-emoji" aria-hidden="true">
                     {event.emoji}
