@@ -75,6 +75,16 @@ git push            # triggers Vercel deploy
 - Whether to use Expo Router or Next.js for web. (Leaning Expo for codebase reuse with future iOS — confirm before scaffolding.)
 - Whether the streak system needs server-side enforcement to prevent cheating. (Probably not for v0; trust localStorage.)
 
+## /live feed — product targets (model: the Real app)
+
+The `/live` golf feed is being built to deliver the same engagement loop the Real app captures for general sports (Real is a real-time sports social app). When designing or pruning live-feed features, weigh them against these three drivers — they are what Real's team called out as the reasons users keep showing up:
+
+1. **Betting talk is the magnet.** Bettors come in to discuss their picks and strategies — "I need three birdies", "if Scheffler bogeys 17 my parlay's dead". Treat betting-adjacent talk (props, live odds, "what I need") as a first-class use case for comments/threads, not an afterthought. Polls and prediction markets feed this directly.
+2. **Communal wins/losses are the glue.** Users celebrate hits and commiserate misses together. Reactions, threads, follow-a-player, and shareable "moment" cards should all make those emotional spikes social. A bogey on the wrong hole should be as fun to talk about as a birdie.
+3. **Speed beats TV and social.** Real's pitch: "usually faster than TV, faster than social media." Our live feed must consistently surface what's happening on the course before users see it on Twitter or a broadcast cut. That means: tight orchestrator polling cadence, no needless caching on event surfacing, and aggressively prioritising "fresh" over "complete" when there's a trade-off.
+
+Use these as the lens for prioritisation calls on `/live`. Features that don't pull on at least one of these three levers should be deprioritised; features that pull on multiple are the highest signal.
+
 ## Related files
 
 - Auto-memory project context: `C:\Users\tombu\.claude\projects\C--Users-tombu\memory\project_pardle.md`
