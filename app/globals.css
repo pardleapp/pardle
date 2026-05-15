@@ -5464,6 +5464,116 @@ footer {
   margin-bottom: 14px;
 }
 
+.psearch {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.psearch-input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: inherit;
+  background: var(--bg, #fff);
+  color: var(--text);
+  min-height: 44px;
+  outline: none;
+}
+
+.psearch-input:focus {
+  border-color: var(--green, #7bae3f);
+  box-shadow: 0 0 0 3px rgba(123, 174, 63, 0.18);
+}
+
+.psearch-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 360px;
+  overflow-y: auto;
+  background: var(--bg, #fff);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.15);
+}
+
+.psearch-row {
+  display: grid;
+  grid-template-columns: 40px 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.psearch-row:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.psearch-pos {
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.psearch-name {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.psearch-total {
+  font-weight: 900;
+  color: var(--text);
+}
+
+.psearch-thru {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  min-width: 32px;
+  text-align: right;
+}
+
+.psearch-empty {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--bg, #fff);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.15);
+}
+
+@media (prefers-color-scheme: dark) {
+  .psearch-input,
+  .psearch-list,
+  .psearch-empty {
+    background: #1f1f20;
+  }
+  .psearch-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
 .feed-tournament-name {
   font-size: 20px;
   font-weight: 900;

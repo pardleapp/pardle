@@ -8,6 +8,7 @@ import type { FeedRow } from "@/lib/feed/types";
 import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
 import LeaderboardPanel from "./LeaderboardPanel";
+import PlayerSearch from "./PlayerSearch";
 import PollPanel from "./PollPanel";
 import Reel from "./Reel";
 
@@ -28,6 +29,7 @@ interface FeedResponse {
   worstReel: FeedRow[];
   bursts: Burst[];
   leaderboard: CachedLeaderboardRow[];
+  playerIndex: CachedLeaderboardRow[];
   polls: PollWithVotes[];
   myVotes: Record<string, string>;
   watching: number;
@@ -233,6 +235,8 @@ export default function FeedClient() {
           </span>
         </div>
       </div>
+
+      <PlayerSearch players={data.playerIndex ?? []} />
 
       <Reel
         title="⛳ Shots of the day"

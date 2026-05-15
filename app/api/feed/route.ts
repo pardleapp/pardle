@@ -184,6 +184,17 @@ export async function GET(req: Request) {
     );
   }
 
+  // Slim shape for the player-search dropdown — just enough to match
+  // by name and render a result row with position + total.
+  const playerIndex = leaderboard.map((r) => ({
+    playerId: r.playerId,
+    displayName: r.displayName,
+    position: r.position,
+    total: r.total,
+    thru: r.thru,
+    playerState: r.playerState,
+  }));
+
   return NextResponse.json({
     tournament: {
       id: tournament.id,
@@ -196,6 +207,7 @@ export async function GET(req: Request) {
     worstReel,
     bursts,
     leaderboard: leaderboard.slice(0, 15),
+    playerIndex,
     polls: pollsWithVotes,
     myVotes,
     watching,

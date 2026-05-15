@@ -87,11 +87,11 @@ export async function pollAndDiff(
     .filter((r) => !INACTIVE_STATES.has(r.playerState))
     .map((r) => r.playerId);
 
-  // Cache the leaderboard for /live's leaderboard panel — served from
-  // Redis so viewers don't each hit the PGA Tour API.
+  // Cache the FULL leaderboard for /live — the top slice drives the
+  // leaderboard panel, the whole list drives the player search box.
   await cacheLeaderboard(
     tournamentId,
-    leaderboard.slice(0, 30).map((r) => ({
+    leaderboard.map((r) => ({
       playerId: r.playerId,
       displayName: r.displayName,
       position: r.position,
