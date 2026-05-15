@@ -407,6 +407,65 @@ function TracerSvg({ trace, vb }: { trace: ShotTrace; vb: ViewBox }) {
         >
           <path d="M0,1 L10,5 L0,9 z" fill="#fff200" />
         </marker>
+        {/* Decorative grass-grain texture for green-zoom views — short
+            white dashes at varied angles tiled across the visible area.
+            Reads as broadcast-style green texture; doesn't claim slope.
+            Uses userSpaceOnUse so the tile size is in SVG units; when
+            the user pinches in (smaller viewBox), more ticks fit per
+            visible area, giving a natural denser-when-zoomed feel. */}
+        <pattern
+          id={`${uid}-grain`}
+          width="3.2"
+          height="3.2"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(11)"
+        >
+          <line
+            x1="0.4"
+            y1="0.4"
+            x2="0.5"
+            y2="1.0"
+            stroke="#ffffff"
+            strokeWidth="0.16"
+            strokeLinecap="round"
+          />
+          <line
+            x1="1.7"
+            y1="0.8"
+            x2="1.85"
+            y2="1.45"
+            stroke="#ffffff"
+            strokeWidth="0.16"
+            strokeLinecap="round"
+          />
+          <line
+            x1="2.7"
+            y1="0.2"
+            x2="2.6"
+            y2="0.85"
+            stroke="#ffffff"
+            strokeWidth="0.14"
+            strokeLinecap="round"
+          />
+          <line
+            x1="0.9"
+            y1="2.0"
+            x2="1.05"
+            y2="2.7"
+            stroke="#ffffff"
+            strokeWidth="0.16"
+            strokeLinecap="round"
+          />
+          <line
+            x1="2.3"
+            y1="2.3"
+            x2="2.45"
+            y2="2.95"
+            stroke="#ffffff"
+            strokeWidth="0.16"
+            strokeLinecap="round"
+          />
+        </pattern>
       </defs>
 
       <rect x={0} y={0} width={W} height={H} fill={`url(#${uid}-turf)`} />
@@ -427,6 +486,22 @@ function TracerSvg({ trace, vb }: { trace: ShotTrace; vb: ViewBox }) {
           width={W}
           height={H}
           fill="rgba(15,31,15,0.32)"
+        />
+      )}
+
+      {/* Grass-grain texture overlay — only on green-zoom traces. The
+          screen blend keeps the white ticks visible on the darkened
+          turf but lets them fade across bunkers and fringe so the
+          texture reads as "this is the green surface". */}
+      {trace.fullFrame && (
+        <rect
+          x={0}
+          y={0}
+          width={W}
+          height={H}
+          fill={`url(#${uid}-grain)`}
+          opacity="0.55"
+          style={{ mixBlendMode: "screen" }}
         />
       )}
 
