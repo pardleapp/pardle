@@ -54,10 +54,18 @@ function getAuthorKey(): string {
   return k;
 }
 
+/**
+ * Coarse "time ago" label. The orchestrator's score data lags real
+ * play by a couple of minutes, so the `ts` we capture at detection is
+ * already 1–5 minutes after the shot actually happened — second-level
+ * precision would claim accuracy we don't have. Bucket to "just now" /
+ * "few min ago" / "Nm ago" / "Nh ago".
+ */
 function timeAgo(ts: number): string {
   const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  if (s < 60) return `${s}s ago`;
+  if (s < 120) return "just now";
   const m = Math.floor(s / 60);
+  if (m < 6) return "few min ago";
   if (m < 60) return `${m}m ago`;
   return `${Math.floor(m / 60)}h ago`;
 }
