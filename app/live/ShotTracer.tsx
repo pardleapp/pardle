@@ -27,10 +27,15 @@ import type { ShotTrace, ShotTraceSegment } from "@/lib/feed/shot-trace";
 const W = 200;
 const H = 112;
 
-// Single bright accent colour for putts — matches the PGA Tour
-// imaging look. Numbered chips at each at-rest position carry the
-// "which putt was this" information; no need for colour progression.
-const PUTT_COLOR = "#2ea7f0";
+// Putt 1 → 4 colour progression, so a 3-putt reads as three distinct
+// strokes at a glance even before you parse the chip numbers. Matches
+// the PGA Tour tracker's smooth-curve style; the multi-colour layer is
+// our own decision to make the worst-reel disasters legible.
+const PUTT_COLORS = ["#ffd200", "#ff8a1f", "#ff3a2f", "#b3140e"];
+
+function puttColor(n: number): string {
+  return PUTT_COLORS[Math.min(n, PUTT_COLORS.length - 1)];
+}
 
 function curvePath(
   s: ShotTraceSegment,
@@ -213,10 +218,13 @@ export default function ShotTracer({
         );
       })}
 
-      {/* Pass 2: putts — smooth solid bright-blue curves, with a thin
-          white halo behind for legibility on the green texture. */}
+      {/* Pass 2: putts — smooth solid curves, colour-progressing
+          yellow → red across the putt sequence so a 3-putt's three
+          strokes are visually distinct. Thin white halo behind keeps
+          each line legible on textured green. */}
       {segments.map((s, i) => {
         if (s.kind !== "putt") return null;
+        const n = puttIdxBy.get(i) ?? 0;
         return (
           <g key={`putt${i}`}>
             <path
@@ -228,7 +236,7 @@ export default function ShotTracer({
             />
             <path
               d={curvePath(s, px, py)}
-              stroke={PUTT_COLOR}
+              stroke={puttColor(n)}
               strokeWidth={2.4 * sc}
               strokeLinecap="round"
               fill="none"
@@ -260,21 +268,23 @@ export default function ShotTracer({
         </>
       )}
 
-      {/* Numbered chips at each putt's at-rest position (PGA-style).
-          Skip the holing putt — its destination is the cup, marked by
-          the flag below. Skip entirely when there's only one putt. */}
+      {/* Numbered chips at each putt's at-rest position (PGA-style),
+          coloured to match the line that ENDS at that chip. Skip the
+          holing putt (destination is the cup → marked by the flag).
+          Skip entirely for a single-putt birdie — feels cleaner. */}
       {puttCount > 1 &&
         segments.map((s, i) => {
           if (s.kind !== "putt") return null;
           if (i === holingIdx) return null;
-          const n = (puttIdxBy.get(i) ?? 0) + 1;
+          const idx = puttIdxBy.get(i) ?? 0;
+          const n = idx + 1;
           return (
             <g key={`pn${i}`}>
               <circle
                 cx={px(s.toX)}
                 cy={py(s.toY)}
                 r={4.2 * sc}
-                fill={PUTT_COLOR}
+                fill={puttColor(idx)}
                 stroke="#ffffff"
                 strokeWidth={1.2 * sc}
               />
@@ -307,12 +317,12 @@ export default function ShotTracer({
       })}
 
       {/* Start dot on the first segment's ball position — matches the
-          tracker style when there's a clear "ball started here". */}
+          colour of the first stroke so the sequence reads start-to-end. */}
       <circle
         cx={px(first.fromX)}
         cy={py(first.fromY)}
         r={3 * sc}
-        fill={holingIsPutt ? PUTT_COLOR : "#ffffff"}
+        fill={holingIsPutt ? puttColor(0) : "#ffffff"}
         stroke="#ffffff"
         strokeWidth={1.2 * sc}
       />
