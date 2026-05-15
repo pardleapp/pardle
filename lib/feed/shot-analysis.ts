@@ -233,12 +233,16 @@ export function summarizeHole(
     }
   }
 
-  const reach = strokes.find(
-    (s) => s.toLocationCode === "OGR" && s.strokeType !== "PENALTY",
-  );
-  const reachOn = reach?.strokeNumber ?? null;
-  const gir = reachOn !== null && reachOn <= Math.max(1, par - 2);
-  const reachFrom = reach?.fromLocationCode ?? "";
+  // The stroke that reached the green is the one right before the first
+  // putt — derive it by index, not by toLocationCode (which the
+  // orchestrator sometimes labels as fringe/other even when the next
+  // stroke is a putt).
+  const approachIdx = strokes.length - puttCount - 1;
+  const approach = approachIdx >= 0 ? strokes[approachIdx] : null;
+  const approachStrokeNum = approach?.strokeNumber ?? strokes.length;
+  const gir =
+    approach !== null && approachStrokeNum <= Math.max(1, par - 2);
+  const reachFrom = approach?.fromLocationCode ?? "";
 
   if (!gir) {
     if (puttCount === 1) {
