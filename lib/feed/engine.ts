@@ -297,8 +297,10 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
         e.result === "albatross" || e.result === "eagle";
       const g = analyzeHighlightHole(hole.strokes);
       reelGreat = autoGreat || g.great;
-      // A long putt zooms to the green; a hole-out shows the whole hole.
-      focus = g.kind === "longputt" ? "putt" : "holeout";
+      // Long putts and short chip-ins zoom to the green; longer
+      // hole-outs (yards) show the whole hole so the distance reads.
+      focus =
+        g.kind === "longputt" || g.kind === "chipin" ? "putt" : "holeout";
       if (g.verdict) {
         const label =
           e.result === "albatross"
@@ -310,12 +312,23 @@ async function enrichRecentEvents(tournamentId: string): Promise<void> {
         emoji = g.emoji;
       }
     }
-    const trace = extractTrace(
+    let trace = extractTrace(
       hole.strokes,
       focus,
       hole.holeImage,
       hole.greenImage,
     );
+    // Chip-ins occasionally start outside the green-diagram bounds —
+    // when the green-zoom can't draw the key stroke, fall back to the
+    // whole-hole view so we still show something accurate.
+    if (trace.segments.length === 0 && focus === "putt") {
+      trace = extractTrace(
+        hole.strokes,
+        "holeout",
+        hole.holeImage,
+        hole.greenImage,
+      );
+    }
     // Store even when nothing changed — marks the event processed so we
     // don't re-fetch its shot detail every poll.
     enrichments[e.id] = {

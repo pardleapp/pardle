@@ -75,10 +75,11 @@ export interface HoleGlory {
   great: boolean;
   /**
    * Which kind of great finish — drives the tracer's framing. A long
-   * putt zooms to the green; a hole-out shows the whole hole so the
-   * distance reads.
+   * putt or short chip-in (distance in feet, off the green) zooms to
+   * the green; a longer hole-out (distance in yards) shows the whole
+   * hole so the distance reads.
    */
-  kind: "holeout" | "longputt" | null;
+  kind: "holeout" | "chipin" | "longputt" | null;
 }
 
 /**
@@ -94,11 +95,15 @@ export function analyzeHighlightHole(strokes: PGAStroke[]): HoleGlory {
 
   // Holed from anywhere but the green — a hole-out. The rarest thrill.
   if (holing.fromLocationCode !== "OGR" && holing.distance) {
+    // Distance in feet/inches = a short chip or pitch from just off
+    // the green; distance in yards = a longer holed approach. The
+    // tracer wants different framings for each.
+    const isChip = /\bft\b|\bin\.?\b/i.test(holing.distance);
     return {
       verdict: `holes out from ${holing.distance}`,
       emoji: "🎯",
       great: true,
-      kind: "holeout",
+      kind: isChip ? "chipin" : "holeout",
     };
   }
 
