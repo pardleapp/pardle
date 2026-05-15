@@ -407,66 +407,6 @@ function TracerSvg({ trace, vb }: { trace: ShotTrace; vb: ViewBox }) {
         >
           <path d="M0,1 L10,5 L0,9 z" fill="#fff200" />
         </marker>
-        {/* Decorative grass-grain texture for green-zoom views — short
-            bright dashes at varied angles, tiled across the visible
-            area. Reads as broadcast-style green texture; doesn't claim
-            slope. Uses userSpaceOnUse so the tile size is in SVG
-            units; when the user pinches in (smaller viewBox), more
-            ticks fit per visible area, giving a natural
-            denser-when-zoomed feel. */}
-        <pattern
-          id={`${uid}-grain`}
-          width="2.6"
-          height="2.6"
-          patternUnits="userSpaceOnUse"
-          patternTransform="rotate(11)"
-        >
-          <line
-            x1="0.3"
-            y1="0.2"
-            x2="0.45"
-            y2="0.95"
-            stroke="#f5f2dc"
-            strokeWidth="0.22"
-            strokeLinecap="round"
-          />
-          <line
-            x1="1.5"
-            y1="0.7"
-            x2="1.7"
-            y2="1.45"
-            stroke="#f5f2dc"
-            strokeWidth="0.22"
-            strokeLinecap="round"
-          />
-          <line
-            x1="2.3"
-            y1="0.15"
-            x2="2.2"
-            y2="0.85"
-            stroke="#f5f2dc"
-            strokeWidth="0.2"
-            strokeLinecap="round"
-          />
-          <line
-            x1="0.75"
-            y1="1.65"
-            x2="0.9"
-            y2="2.35"
-            stroke="#f5f2dc"
-            strokeWidth="0.22"
-            strokeLinecap="round"
-          />
-          <line
-            x1="1.95"
-            y1="1.9"
-            x2="2.1"
-            y2="2.55"
-            stroke="#f5f2dc"
-            strokeWidth="0.2"
-            strokeLinecap="round"
-          />
-        </pattern>
       </defs>
 
       <rect x={0} y={0} width={W} height={H} fill={`url(#${uid}-turf)`} />
@@ -490,20 +430,6 @@ function TracerSvg({ trace, vb }: { trace: ShotTrace; vb: ViewBox }) {
         />
       )}
 
-      {/* Grass-grain texture overlay — only on green-zoom traces.
-          Solid opacity (no blend mode — blend modes on SVG are flaky
-          across browsers and made the ticks invisible on lighter
-          grass). The off-white tint reads as sun-lit grass blades. */}
-      {trace.fullFrame && (
-        <rect
-          x={0}
-          y={0}
-          width={W}
-          height={H}
-          fill={`url(#${uid}-grain)`}
-          opacity="0.9"
-        />
-      )}
 
       {segments.map((s, i) => {
         if (s.kind === "putt" || i === keyI) return null;
