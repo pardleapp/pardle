@@ -497,14 +497,14 @@ export const GOLFERS: Golfer[] = [
   {
     "id": "justin-rose",
     "name": "Justin Rose",
-    "country": "South Africa",
-    "countryCode": "ZA",
-    "continent": "AF",
+    "country": "England",
+    "countryCode": "GB-ENG",
+    "continent": "EU",
     "age": 45,
     "heightCm": 190,
     "majors": 1,
     "pgaTourWins": 13,
-    "ryderCup": null,
+    "ryderCup": 7,
     "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Justin_Rose_Ryder_Cup_2025-168_%28cropped%29.jpg/500px-Justin_Rose_Ryder_Cup_2025-168_%28cropped%29.jpg",
     "tier": "A"
   },

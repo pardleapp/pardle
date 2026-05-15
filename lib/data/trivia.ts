@@ -567,8 +567,8 @@ export const TRIVIA_QUESTIONS: TriviaQuestion[] = [
     difficulty: "medium",
   },
   {
-    id: "m-schauffele-olympic",
-    q: "Who won the men's gold medal at the 2020 and 2024 Olympics?",
+    id: "m-schauffele-olympic-2020",
+    q: "Who won the men's gold medal at the 2020 Tokyo Olympics?",
     options: [
       "Rory McIlroy",
       "Xander Schauffele",
@@ -577,7 +577,20 @@ export const TRIVIA_QUESTIONS: TriviaQuestion[] = [
     ],
     correct: 1,
     difficulty: "medium",
-    fact: "Schauffele won gold in Tokyo 2020 and defended it in Paris 2024.",
+    fact: "Schauffele edged Rory Sabbatini by one stroke for gold at Kasumigaseki.",
+  },
+  {
+    id: "m-scheffler-olympic-2024",
+    q: "Who won the men's gold medal at the 2024 Paris Olympics?",
+    options: [
+      "Tommy Fleetwood",
+      "Xander Schauffele",
+      "Scottie Scheffler",
+      "Hideki Matsuyama",
+    ],
+    correct: 2,
+    difficulty: "medium",
+    fact: "Scheffler closed with a 9-under 62 at Le Golf National to win gold by one.",
   },
   {
     id: "m-koepka-majors",
