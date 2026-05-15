@@ -283,6 +283,18 @@ export async function getScorecards(
 // Shot details — per-stroke data for disaster detection
 // ──────────────────────────────────────────────────────────────────
 
+/**
+ * Replace the orchestrator's default `w_1500` Cloudinary transform
+ * with a wider one so the hole-diagram backdrop stays crisp when a
+ * user pinches in on the modal tracer. Pure URL rewrite — no extra
+ * API calls. Cloudinary serves f_auto/q_auto so the byte cost is
+ * modest (~300KB at w_4000 vs ~70KB at w_1500).
+ */
+function upscalePickle(url: string): string {
+  if (!url || !url.includes("pga-tour-res.cloudinary.com")) return url;
+  return url.replace(/(^|[,/])w_\d+([,/])/, "$1w_4000$2");
+}
+
 export interface PGAStroke {
   strokeNumber: number;
   /** "STROKE" | "PENALTY" | "DROP" — drives disaster detection. */
@@ -416,8 +428,8 @@ export async function getShotDetailsBatch(
         holeNumber: h.holeNumber,
         par: h.par,
         score: h.score,
-        holeImage: h.enhancedPickle?.leftToRight ?? "",
-        greenImage: h.enhancedPickle?.greenLeftToRight ?? "",
+        holeImage: upscalePickle(h.enhancedPickle?.leftToRight ?? ""),
+        greenImage: upscalePickle(h.enhancedPickle?.greenLeftToRight ?? ""),
         strokes: (h.strokes ?? []).map((s) => {
           const ltr = s.overview?.leftToRightCoords;
           const grn = s.green?.leftToRightCoords;
