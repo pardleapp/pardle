@@ -10,6 +10,7 @@
  */
 
 import type { PGAStroke } from "@/lib/golf-api/pgatour";
+import { resultFor, type ScoreResult } from "./types";
 
 export interface HoleDisaster {
   /** Number of putts taken (includes the holed putt). */
@@ -160,5 +161,106 @@ export function analyzeHole(strokes: PGAStroke[]): HoleDisaster {
     penaltyCount,
     verdict,
     emoji,
+  };
+}
+
+export interface HoleSummary {
+  /** Short line describing how the hole played out, e.g. "up and down for par". */
+  synopsis: string;
+  emoji: string;
+}
+
+const RESULT_LABEL: Record<ScoreResult, string> = {
+  albatross: "albatross",
+  eagle: "eagle",
+  birdie: "birdie",
+  par: "par",
+  bogey: "bogey",
+  double: "double",
+  "triple-plus": "triple+",
+};
+
+const SAND_FROM = new Set(["OST", "OBK", "OSA", "OFB", "OGB"]);
+const ROUGH_FROM = new Set(["ORO", "OPR", "OFR", "ONA"]);
+
+/**
+ * One-line synopsis of how a hole played out — used in the player card's
+ * "Recent holes" feed. Looks at the stroke pattern, not just the score,
+ * so a scrambled par reads "up and down for par" while a tap-in birdie
+ * reads "stuffed it close, birdie".
+ */
+export function summarizeHole(
+  strokes: PGAStroke[],
+  par: number,
+  score: number,
+): HoleSummary {
+  const result = resultFor(score, par);
+  const label = RESULT_LABEL[result];
+
+  if (strokes.length === 0) return { synopsis: label, emoji: "—" };
+
+  if (strokes.length === 1 && score === 1) {
+    return { synopsis: "HOLE IN ONE", emoji: "🏌️" };
+  }
+
+  const putts = strokes.filter(isPutt);
+  const penaltyCount = strokes.filter(isPenalty).length;
+  const puttCount = putts.length;
+  const holing = strokes[strokes.length - 1];
+
+  if (holing.fromLocationCode !== "OGR" && strokes.length > 1) {
+    const where = holing.distance ? `from ${holing.distance} ` : "";
+    return { synopsis: `holes out ${where}for ${label}`, emoji: "🎯" };
+  }
+
+  if (penaltyCount >= 2) {
+    return { synopsis: `two penalties, ${label}`, emoji: "🌊" };
+  }
+  if (penaltyCount === 1) {
+    return { synopsis: `penalty drop, ${label}`, emoji: "🌊" };
+  }
+
+  if (puttCount >= 4) return { synopsis: `4-putts for ${label}`, emoji: "😱" };
+  if (puttCount === 3) return { synopsis: `3-putts for ${label}`, emoji: "😬" };
+
+  if (puttCount === 1 && holing.fromLocationCode === "OGR") {
+    const feet = distanceToFeet(holing.distance);
+    if (feet != null && feet >= LONG_PUTT_FEET) {
+      return {
+        synopsis: `drains a ${holing.distance} putt for ${label}`,
+        emoji: "🎯",
+      };
+    }
+  }
+
+  const reach = strokes.find(
+    (s) => s.toLocationCode === "OGR" && s.strokeType !== "PENALTY",
+  );
+  const reachOn = reach?.strokeNumber ?? null;
+  const gir = reachOn !== null && reachOn <= Math.max(1, par - 2);
+  const reachFrom = reach?.fromLocationCode ?? "";
+
+  if (!gir) {
+    if (puttCount === 1) {
+      if (SAND_FROM.has(reachFrom))
+        return { synopsis: `sand save for ${label}`, emoji: "🙌" };
+      return { synopsis: `up and down for ${label}`, emoji: "🙌" };
+    }
+    if (SAND_FROM.has(reachFrom))
+      return { synopsis: `from the sand, ${label}`, emoji: "😬" };
+    if (ROUGH_FROM.has(reachFrom))
+      return { synopsis: `missed the green, ${label}`, emoji: "😬" };
+    return { synopsis: `missed the green, ${label}`, emoji: "😬" };
+  }
+
+  if (puttCount <= 1 && (result === "birdie" || result === "eagle" || result === "albatross")) {
+    return { synopsis: `stuffs it close, ${label}`, emoji: "🦅" };
+  }
+  if (puttCount === 1) {
+    return { synopsis: `1-putt ${label}`, emoji: "✅" };
+  }
+  return {
+    synopsis: `2-putt ${label}`,
+    emoji: result === "bogey" || result === "double" || result === "triple-plus" ? "😬" : "🟢",
   };
 }

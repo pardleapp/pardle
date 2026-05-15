@@ -6161,6 +6161,112 @@ footer {
   }
 }
 
+.rhole-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rhole {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 10px;
+  background: var(--bg, white);
+}
+
+.rhole-hole {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 36px;
+  flex-shrink: 0;
+}
+
+.rhole-num {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--text);
+  line-height: 1;
+}
+
+.rhole-par {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+}
+
+.rhole-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rhole-emoji {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.rhole-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rhole-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.rhole-score strong {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--text);
+  line-height: 1;
+}
+
+.rhole-topar {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.rhole-par-result {
+  border-left-color: rgba(0, 0, 0, 0.18);
+}
+.rhole-birdie {
+  border-left-color: var(--green, #7bae3f);
+}
+.rhole-eagle {
+  border-left-color: #d4a017;
+}
+.rhole-bogey {
+  border-left-color: #e8c547;
+}
+.rhole-double {
+  border-left-color: #e05b5b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .rhole {
+    background: #1f1f20;
+  }
+}
+
 .feed-row {
   display: grid;
   grid-template-columns: auto 1fr auto;

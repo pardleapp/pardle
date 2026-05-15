@@ -7,10 +7,12 @@ import {
   getScorecards,
 } from "@/lib/golf-api/pgatour";
 import { getPlayerReelRows } from "@/lib/feed/player-rows";
+import { getRecentHoles } from "@/lib/feed/recent-holes";
 import { derivePlayerStats } from "@/lib/feed/scorecard-stats";
 import { resultFor } from "@/lib/feed/types";
 import FollowButton from "../../FollowButton";
 import PlayerHighlights from "../../PlayerHighlights";
+import RecentHoles from "../../RecentHoles";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +53,7 @@ export default async function PlayerPage({ params }: PageProps) {
   const stats = scorecard
     ? derivePlayerStats(scorecard)
     : null;
+  const recentHoles = await getRecentHoles(tournament.id, id, scorecard);
 
   return (
     <main className="container">
@@ -88,6 +91,8 @@ export default async function PlayerPage({ params }: PageProps) {
       </section>
 
       <PlayerHighlights best={reelRows.best} worst={reelRows.worst} />
+
+      <RecentHoles holes={recentHoles} />
 
       {stats && stats.rounds.length > 0 ? (
         <>

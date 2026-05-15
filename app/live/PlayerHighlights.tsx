@@ -78,7 +78,7 @@ export default function PlayerHighlights({ best, worst }: Props) {
     <>
       {bestRows.length > 0 && (
         <Reel
-          title="⛳ Highlights this round"
+          title="⛳ Top plays"
           rows={bestRows}
           myReactions={myReactions}
           onReact={sendReaction}
