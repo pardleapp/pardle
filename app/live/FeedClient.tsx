@@ -63,6 +63,8 @@ interface FeedResponse {
           roundPar: number;
           toPar: number;
           status: "not-started" | "in-progress" | "complete";
+          expectedRemaining?: number;
+          variance?: number;
         }
       >;
     }

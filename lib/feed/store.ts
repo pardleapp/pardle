@@ -402,6 +402,89 @@ export async function getCachedTournamentPars(
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Player skill cache — DataGolf SG_total (strokes gained per round
+// vs current field). Refreshed ~daily; powers the round-score bet
+// model's skill adjustment.
+// ──────────────────────────────────────────────────────────────────
+
+export type PlayerSkillMap = Record<string, number>;
+
+export async function cachePlayerSkill(
+  tournamentId: string,
+  skill: PlayerSkillMap,
+): Promise<void> {
+  await redis.set(`feed:skill:${tournamentId}`, skill, {
+    ex: 24 * 60 * 60,
+  });
+}
+
+export async function getCachedPlayerSkill(
+  tournamentId: string,
+): Promise<PlayerSkillMap | null> {
+  return await redis.get<PlayerSkillMap>(`feed:skill:${tournamentId}`);
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Field hole stats — for the round-score bet model. Each entry is
+// the field-wide mean and variance of (strokes − par) on a given
+// (round, hole), aggregated across every player who's completed it
+// so far this tournament.
+// ──────────────────────────────────────────────────────────────────
+
+export interface FieldHoleStat {
+  mean: number;
+  variance: number;
+  count: number;
+}
+
+export type FieldHoleStats = Record<number, Record<number, FieldHoleStat>>;
+
+export function computeFieldStats(
+  snapshot: PollSnapshot | null,
+  pars: TournamentPars,
+): FieldHoleStats {
+  if (!snapshot) return {};
+  const sums: Record<
+    number,
+    Record<number, { sum: number; sumsq: number; count: number }>
+  > = {};
+  for (const byRound of Object.values(snapshot.holes)) {
+    for (const [rStr, holes] of Object.entries(byRound)) {
+      const round = Number(rStr);
+      const pr = pars[round] ?? {};
+      if (!sums[round]) sums[round] = {};
+      for (const [holeStr, scoreStr] of Object.entries(holes)) {
+        const hole = Number(holeStr);
+        const par = pr[hole];
+        const strokes = Number(scoreStr);
+        if (par == null || !Number.isFinite(strokes) || strokes <= 0) continue;
+        const dev = strokes - par;
+        const slot = sums[round][hole] ?? { sum: 0, sumsq: 0, count: 0 };
+        slot.sum += dev;
+        slot.sumsq += dev * dev;
+        slot.count++;
+        sums[round][hole] = slot;
+      }
+    }
+  }
+  const out: FieldHoleStats = {};
+  for (const [rStr, holes] of Object.entries(sums)) {
+    const round = Number(rStr);
+    out[round] = {};
+    for (const [hStr, slot] of Object.entries(holes)) {
+      const hole = Number(hStr);
+      const mean = slot.sum / slot.count;
+      const variance = Math.max(
+        0.05,
+        slot.sumsq / slot.count - mean * mean,
+      );
+      out[round][hole] = { mean, variance, count: slot.count };
+    }
+  }
+  return out;
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Feed bundle — pipelines every read /api/feed needs into ONE HTTP
 // request. Each helper above issues a separate Upstash request which
 // adds up fast (their daily quota caps total requests, not commands).

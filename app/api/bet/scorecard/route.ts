@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { getActiveTournament, getScorecards } from "@/lib/golf-api/pgatour";
+import {
+  computeFieldStats,
+  getFeedBundle,
+} from "@/lib/feed/store";
+import { ensurePlayerSkill } from "@/lib/feed/skill-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +80,60 @@ export async function GET(req: Request) {
         ]
       : played.sort((a, b) => a.holeNumber - b.holeNumber);
 
-    return NextResponse.json({ holes: ordered, roundPar });
+    // Build the field stats + skill for the round-score chart's
+    // hole-by-hole reconstruction. Same prior-round fallback ladder
+    // as /api/feed: thin samples for this round use the same hole's
+    // average from any earlier round before falling back to par.
+    const bundle = await getFeedBundle(active.tournament.id);
+    const fieldStats = computeFieldStats(bundle.snapshot, bundle.pars);
+    const skillMap = await ensurePlayerSkill(
+      active.tournament.id,
+      bundle.leaderboard,
+    );
+    const skillPerHole = (skillMap[playerId] ?? 0) / 18;
+
+    type HoleStat = { mean: number; variance: number };
+    const MIN_SAMPLE = 10;
+    const FALLBACK_VAR = 0.65;
+    const holeStats: Record<number, HoleStat> = {};
+    for (const h of all) {
+      const s = fieldStats[round]?.[h.holeNumber];
+      if (s && s.count >= MIN_SAMPLE) {
+        holeStats[h.holeNumber] = { mean: s.mean, variance: s.variance };
+        continue;
+      }
+      let resolved = false;
+      for (let r = round - 1; r >= 1; r--) {
+        const prior = fieldStats[r]?.[h.holeNumber];
+        if (prior && prior.count >= MIN_SAMPLE) {
+          holeStats[h.holeNumber] = {
+            mean: prior.mean,
+            variance: prior.variance,
+          };
+          resolved = true;
+          break;
+        }
+      }
+      if (!resolved) {
+        holeStats[h.holeNumber] = { mean: 0, variance: FALLBACK_VAR };
+      }
+    }
+
+    // Remaining holes (unplayed) so the chart knows what's left to
+    // project against. Same ordering: if the player teed off on 10,
+    // we want completion order; otherwise 1→18.
+    const playedSet = new Set(ordered.map((h) => h.holeNumber));
+    const remaining = all
+      .filter((h) => !playedSet.has(h.holeNumber))
+      .map((h) => ({ holeNumber: h.holeNumber, par: Number(h.par) || 0 }));
+
+    return NextResponse.json({
+      holes: ordered,
+      remaining,
+      roundPar,
+      holeStats,
+      skillPerHole,
+    });
   } catch (err) {
     console.error("[bet/scorecard]", err);
     return NextResponse.json(

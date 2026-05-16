@@ -235,6 +235,50 @@ export async function getLiveContenders(): Promise<LiveContender[]> {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Skill ratings — per-player current SG (used by round-score model)
+// ──────────────────────────────────────────────────────────────────
+
+interface DGSkillRow {
+  dg_id: number;
+  player_name: string;
+  sg_total?: number;
+  sg_ott?: number;
+  sg_app?: number;
+  sg_arg?: number;
+  sg_putt?: number;
+}
+
+interface DGSkillResponse {
+  players?: DGSkillRow[];
+}
+
+export interface DGSkillRating {
+  dgId: string;
+  name: string;
+  /** Strokes gained per round vs current field. Negative = better. */
+  sgTotal: number;
+}
+
+/**
+ * DataGolf's current skill estimates — refreshed weekly. SG_total is
+ * "expected strokes gained per round vs an average tour field" using
+ * the bayesian rolling fit DataGolf publishes. Negative = worse than
+ * field; we flip it in the consumer so "per-hole adjustment to add
+ * to par" is the natural sign.
+ */
+export async function getSkillRatings(): Promise<DGSkillRating[]> {
+  const data = await fetchJson<DGSkillResponse>(
+    `/preds/skill-ratings?display=value`,
+  );
+  const rows = data.players ?? [];
+  return rows.map((r) => ({
+    dgId: String(r.dg_id),
+    name: flipName(r.player_name),
+    sgTotal: Number.isFinite(r.sg_total) ? Number(r.sg_total) : 0,
+  }));
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Live tournament stats
 // ──────────────────────────────────────────────────────────────────
 

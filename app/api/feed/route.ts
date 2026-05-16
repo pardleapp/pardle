@@ -3,12 +3,16 @@ import { getActiveTournament } from "@/lib/golf-api/pgatour";
 import { pollAndDiff } from "@/lib/feed/engine";
 import {
   acquirePollLock,
+  computeFieldStats,
   getCommentCountsBulk,
   getFeedBundle,
   getReactionsBulk,
   markSeenToday,
   touchPresence,
+  type FieldHoleStats,
+  type PlayerSkillMap,
 } from "@/lib/feed/store";
+import { ensurePlayerSkill } from "@/lib/feed/skill-cache";
 import { findOddsShift } from "@/lib/feed/odds-store";
 import type { FeedRow } from "@/lib/feed/types";
 
@@ -179,11 +183,27 @@ async function handle(req: Request) {
     playerState: r.playerState,
   }));
 
+  // Field hole-by-hole stats — aggregate of (strokes − par) across
+  // every player who's completed each hole this tournament. Powers
+  // the round-score bet model's "expected remaining" projection. Free
+  // because the snapshot is already loaded from the bundle.
+  const fieldStats = computeFieldStats(bundle.snapshot, bundle.pars);
+
+  // Per-player DataGolf SG_total (strokes-gained per round). 24h
+  // cache; fetches lazily on miss. Returns {} on DataGolf failure so
+  // the model degrades to "no skill adjustment" rather than blowing
+  // up the route.
+  const playerSkill = await ensurePlayerSkill(tournament.id, leaderboard);
+
   // Per-player round state from the (already-fetched) snapshot + par
-  // map — zero extra Redis traffic.
+  // map. Also bakes in the round-score model's expectedRemaining +
+  // variance for each player+round so the client just plugs into a
+  // CDF — no per-bet model evaluation server work.
   const playerRoundStates = computePlayerRoundStates(
     bundle.snapshot,
     bundle.pars,
+    fieldStats,
+    playerSkill,
   );
 
   return NextResponse.json({
@@ -205,6 +225,9 @@ async function handle(req: Request) {
     // server-driven, so charts cover the period a user was off-page.
     oddsHistories: oddsBuffers,
     playerRoundStates,
+    fieldStats,
+    playerSkill,
+    tournamentPars: bundle.pars,
     watching,
     seenToday,
     polled,
@@ -226,12 +249,35 @@ async function handle(req: Request) {
 function computePlayerRoundStates(
   snap: import("@/lib/feed/store").FeedBundle["snapshot"],
   pars: import("@/lib/feed/store").FeedBundle["pars"],
+  fieldStats: FieldHoleStats,
+  playerSkill: PlayerSkillMap,
 ): Record<string, PlayerRoundState> {
   if (!snap) return {};
   const result: Record<string, PlayerRoundState> = {};
+  const MIN_SAMPLE = 10;
+  const FALLBACK_VAR = 0.65;
+
+  /** Per-hole (mean, variance). Walks fall-back hierarchy if the
+   *  current-round sample for this hole is too thin: try every prior
+   *  round of the same hole; fail over to par + constant variance. */
+  function holeStat(
+    round: number,
+    hole: number,
+  ): { mean: number; variance: number } {
+    const s = fieldStats[round]?.[hole];
+    if (s && s.count >= MIN_SAMPLE) return { mean: s.mean, variance: s.variance };
+    for (let r = round - 1; r >= 1; r--) {
+      const prior = fieldStats[r]?.[hole];
+      if (prior && prior.count >= MIN_SAMPLE) {
+        return { mean: prior.mean, variance: prior.variance };
+      }
+    }
+    return { mean: 0, variance: FALLBACK_VAR };
+  }
 
   for (const [pid, byRound] of Object.entries(snap.holes)) {
-    // Tournament-to-date pace — computed once across all rounds played.
+    // Tournament-to-date pace — kept for legacy clients on this
+    // payload; the new round-score model uses skillPerHole instead.
     let ttdStrokes = 0;
     let ttdPar = 0;
     let ttdHoles = 0;
@@ -253,6 +299,8 @@ function computePlayerRoundStates(
     }
     const ttdPacePerHole = ttdHoles > 0 ? (ttdStrokes - ttdPar) / ttdHoles : 0;
 
+    const skillPerHole = (playerSkill[pid] ?? 0) / 18;
+
     // Per-round snapshot for ALL four rounds the orchestrator knows
     // about — round-score bets can target any round, not just the
     // currently-live one.
@@ -269,9 +317,15 @@ function computePlayerRoundStates(
       let parRemaining = 0;
       let holesRemaining = 0;
       let anyPlayed = false;
+      // Round-score model running totals: walk the remaining holes
+      // and sum (par + fieldMean - skillPerHole) for the projection
+      // mean, sum fieldVar for the projection variance.
+      let expectedRemaining = 0;
+      let variance = 0;
       for (const [holeStr, par] of Object.entries(pl)) {
+        const hole = Number(holeStr);
         roundPar += par;
-        const scoreStr = holes?.[Number(holeStr)];
+        const scoreStr = holes?.[hole];
         const played =
           scoreStr != null &&
           scoreStr !== "" &&
@@ -285,6 +339,9 @@ function computePlayerRoundStates(
         } else {
           parRemaining += par;
           holesRemaining++;
+          const stat = holeStat(r, hole);
+          expectedRemaining += par + stat.mean - skillPerHole;
+          variance += stat.variance;
         }
       }
       rounds[r] = {
@@ -301,6 +358,8 @@ function computePlayerRoundStates(
             : anyPlayed
             ? "in-progress"
             : "not-started",
+        expectedRemaining,
+        variance,
       };
       if (anyPlayed && r > currentRound) currentRound = r;
     }
@@ -344,6 +403,11 @@ interface RoundSnapshot {
   roundPar: number;
   toPar: number;
   status: "not-started" | "in-progress" | "complete";
+  /** Round-score model projection of remaining strokes (field-anchored,
+   *  skill-adjusted). 0 when the round is complete. */
+  expectedRemaining: number;
+  /** Variance of the projection (sum of per-hole variance for remaining). */
+  variance: number;
 }
 
 interface PlayerRoundState {

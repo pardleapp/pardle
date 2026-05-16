@@ -75,6 +75,11 @@ export interface RoundSnapshot {
   roundPar: number;
   toPar: number;
   status: "not-started" | "in-progress" | "complete";
+  /** Round-score model projection of remaining strokes (field-anchored,
+   *  skill-adjusted). Server-baked. Older payloads omit it. */
+  expectedRemaining?: number;
+  /** Variance of the projection (sum of per-hole variance for remaining). */
+  variance?: number;
 }
 
 export interface PlayerRoundState {
@@ -109,10 +114,24 @@ export interface FeedRowLike {
   };
 }
 
+export interface FieldHoleStat {
+  mean: number;
+  variance: number;
+}
+
 export interface BetScorecard {
   /** Played holes in completion order. */
   holes: { holeNumber: number; par: number; strokes: number }[];
+  /** Currently-unplayed holes in this round. */
+  remaining: { holeNumber: number; par: number }[];
   roundPar: number;
+  /** Field's (mean, variance) of (strokes − par) for each hole this
+   *  round — already walked through the prior-round fallback ladder
+   *  server-side, so the client just reads. */
+  holeStats: Record<number, FieldHoleStat>;
+  /** This player's DataGolf SG_total ÷ 18 — i.e. strokes better than
+   *  field, per hole. Positive = better. */
+  skillPerHole: number;
 }
 
 // ── localStorage ────────────────────────────────────────────────────
@@ -178,28 +197,41 @@ function clamp01(p: number): number {
   return Math.max(0, Math.min(1, p));
 }
 
-function roundScoreProb(
-  bet: Pick<RoundScoreBet, "side" | "line">,
-  strokes: number,
-  parPlayed: number,
-  holesPlayed: number,
-  parRemaining: number,
-  holesRemaining: number,
-  ttdPacePerHole: number,
+/** Prob given a finished projection (mean of final score, variance). */
+function probFromProjection(
+  side: "under" | "over",
+  line: number,
+  currentStrokes: number,
+  expectedRemaining: number,
+  variance: number,
 ): number {
-  if (holesRemaining <= 0) {
-    const won =
-      bet.side === "under" ? strokes < bet.line : strokes > bet.line;
+  const expectedFinal = currentStrokes + expectedRemaining;
+  if (variance <= 0) {
+    const won = side === "under" ? expectedFinal < line : expectedFinal > line;
     return won ? 1 : 0;
   }
-  const currentPace =
-    holesPlayed > 0 ? (strokes - parPlayed) / holesPlayed : 0;
-  const w = Math.min(1, holesPlayed / 9);
-  const blendedPace = w * currentPace + (1 - w) * ttdPacePerHole;
-  const expectedFinal = strokes + parRemaining + holesRemaining * blendedPace;
-  const sd = Math.sqrt(Math.max(1, holesRemaining) * PER_HOLE_VAR);
-  const cdf = normalCdf(bet.line, expectedFinal, sd);
-  return clamp01(bet.side === "under" ? cdf : 1 - cdf);
+  const sd = Math.sqrt(variance);
+  const cdf = normalCdf(line, expectedFinal, sd);
+  return clamp01(side === "under" ? cdf : 1 - cdf);
+}
+
+/** Project remaining strokes from a set of remaining (hole, par)
+ *  entries + per-hole field stats + the player's skill. Returns
+ *  (expectedRemaining, variance) which are the inputs to
+ *  probFromProjection. */
+function projectRemaining(
+  remaining: { holeNumber: number; par: number }[],
+  holeStats: Record<number, FieldHoleStat>,
+  skillPerHole: number,
+): { expectedRemaining: number; variance: number } {
+  let expectedRemaining = 0;
+  let variance = 0;
+  for (const h of remaining) {
+    const stat = holeStats[h.holeNumber] ?? { mean: 0, variance: PER_HOLE_VAR };
+    expectedRemaining += h.par + stat.mean - skillPerHole;
+    variance += stat.variance;
+  }
+  return { expectedRemaining, variance };
 }
 
 /** Anchored value formula: scales by model-prob movement since
@@ -222,12 +254,28 @@ export function anchoredValue(
   return v;
 }
 
+/** Read the server-baked projection out of a RoundSnapshot, falling
+ *  back to a par-anchored estimate if the snapshot pre-dates the
+ *  expectedRemaining/variance fields. */
+function projectionFromSnap(
+  r: RoundSnapshot,
+): { expectedRemaining: number; variance: number } {
+  if (
+    typeof r.expectedRemaining === "number" &&
+    typeof r.variance === "number"
+  ) {
+    return { expectedRemaining: r.expectedRemaining, variance: r.variance };
+  }
+  return {
+    expectedRemaining: r.parRemaining,
+    variance: r.holesRemaining * PER_HOLE_VAR,
+  };
+}
+
 /** Best-effort backfill of `placement` for round-score bets stored
- *  before the field existed. Assumes pre-round placement (strokes=0,
- *  holesPlayed=0) and uses the current player state's roundPar + ttd
- *  pace to compute the pre-round model prob. Bets placed mid-round
- *  will be slightly off after this migration — there's no recovering
- *  the exact placement moment without it. */
+ *  before the field existed. Assumes pre-round placement and uses
+ *  the current player state's projection (already baked with field
+ *  + skill server-side) to anchor `probAtPlacement`. */
 export function patchLegacyPlacement(
   b: RoundScoreBet,
   state: PlayerRoundState | undefined,
@@ -237,16 +285,31 @@ export function patchLegacyPlacement(
   if (round == null) return b;
   const r = state.rounds?.[round];
   if (!r) return b;
-  const ttd = state.ttdPacePerHole ?? 0;
-  const prob = roundScoreProb(b, 0, 0, 0, r.roundPar, 18, ttd);
+  // For a bet assumed placed pre-round, the "expected remaining" is
+  // the same projection the snap gives us when no holes are played
+  // yet — which is what we'd want to anchor against.
+  const { expectedRemaining, variance } = projectionFromSnap(r);
+  // If the round is mid-way, scale the projection back to pre-round
+  // by adding the holes that were played + their actual deviation.
+  // Cleaner: just use the snap's projection plus current strokes (=
+  // "where the model thinks it'd finish from here"), and use that
+  // as the placement anchor. Captures the bet's setup state well
+  // enough for the chart to be sensible.
+  const prob = probFromProjection(
+    b.side,
+    b.line,
+    r.strokes,
+    expectedRemaining,
+    variance,
+  );
   return {
     ...b,
     placement: {
-      holesPlayed: 0,
-      strokes: 0,
-      parPlayed: 0,
+      holesPlayed: r.holesPlayed,
+      strokes: r.strokes,
+      parPlayed: r.parPlayed,
       roundPar: r.roundPar,
-      ttdPacePerHole: ttd,
+      ttdPacePerHole: state.ttdPacePerHole ?? 0,
       probAtPlacement: prob > 0 ? prob : 1 / b.oddsTaken,
     },
   };
@@ -262,22 +325,24 @@ export function snapshotForPlacement(
   if (round == null) return undefined;
   const r = state.rounds?.[round];
   if (!r) return undefined;
-  const ttd = state.ttdPacePerHole ?? 0;
-  const holesRemaining = Math.max(0, 18 - r.holesPlayed);
-  const parRemaining = Math.max(0, r.roundPar - r.parPlayed);
   let prob: number;
   if (r.status === "complete") {
     prob =
-      bet.side === "under" ? (r.strokes < bet.line ? 1 : 0) : r.strokes > bet.line ? 1 : 0;
+      bet.side === "under"
+        ? r.strokes < bet.line
+          ? 1
+          : 0
+        : r.strokes > bet.line
+        ? 1
+        : 0;
   } else {
-    prob = roundScoreProb(
-      bet,
+    const { expectedRemaining, variance } = projectionFromSnap(r);
+    prob = probFromProjection(
+      bet.side,
+      bet.line,
       r.strokes,
-      r.parPlayed,
-      r.holesPlayed,
-      parRemaining,
-      holesRemaining,
-      ttd,
+      expectedRemaining,
+      variance,
     );
   }
   return {
@@ -285,7 +350,7 @@ export function snapshotForPlacement(
     strokes: r.strokes,
     parPlayed: r.parPlayed,
     roundPar: r.roundPar,
-    ttdPacePerHole: ttd,
+    ttdPacePerHole: state.ttdPacePerHole ?? 0,
     probAtPlacement: prob > 0 ? prob : 1 / bet.oddsTaken,
   };
 }
@@ -326,14 +391,13 @@ export function evaluateRoundScore(
       bet.side === "under" ? r.strokes < bet.line : r.strokes > bet.line;
     return { kind: "settled", round, won, finalStrokes: r.strokes };
   }
-  const prob = roundScoreProb(
-    bet,
+  const { expectedRemaining, variance } = projectionFromSnap(r);
+  const prob = probFromProjection(
+    bet.side,
+    bet.line,
     r.strokes,
-    r.parPlayed,
-    r.holesPlayed,
-    r.parRemaining,
-    r.holesRemaining,
-    state.ttdPacePerHole,
+    expectedRemaining,
+    variance,
   );
   return { kind: "in-progress", round, prob, roundState: r };
 }
@@ -429,39 +493,53 @@ export function reconstructHistory(
   // bet placed mid-round still computes prob against the player's
   // actual cumulative strokes — not "0 strokes after 1 hole".
   let strokes = bet.placement?.strokes ?? 0;
-  let parPlayed = bet.placement?.parPlayed ?? 0;
   let holesPlayed = bet.placement?.holesPlayed ?? 0;
   const baselineHoles = holesPlayed;
-  const roundPar =
-    scorecard?.roundPar || bet.placement?.roundPar || roundSnap.roundPar;
-  const ttdPace = state?.ttdPacePerHole ?? bet.placement?.ttdPacePerHole ?? 0;
 
   // Prefer the orchestrator scorecard when available — it's
   // authoritative and isn't subject to the events list's 1000-entry
-  // cap. Fall back to the feed events list otherwise.
+  // cap. Field stats + per-player skill come along for the new
+  // round-score model; falls back to a par-anchored projection if
+  // the scorecard predates the new fields.
   if (scorecard && scorecard.holes.length > 0) {
+    const holeStats = scorecard.holeStats ?? {};
+    const skillPerHole = scorecard.skillPerHole ?? 0;
+    // Walk the round's full hole sequence (played + remaining) so we
+    // can shrink "remaining" by one each step. Played holes that
+    // pre-date placement are removed too — they're locked in.
+    type RemEntry = { holeNumber: number; par: number };
+    const fullRemaining: RemEntry[] = [
+      ...scorecard.holes
+        .slice(baselineHoles)
+        .map((h) => ({ holeNumber: h.holeNumber, par: h.par })),
+      ...(scorecard.remaining ?? []).map((h) => ({
+        holeNumber: h.holeNumber,
+        par: h.par,
+      })),
+    ];
     const post = scorecard.holes.slice(baselineHoles);
     for (let i = 0; i < post.length; i++) {
       const h = post[i];
       strokes += h.strokes;
-      parPlayed += h.par;
       holesPlayed++;
-      const holesRemaining = 18 - holesPlayed;
-      const parRemaining = roundPar - parPlayed;
-      const prob = roundScoreProb(
-        bet,
+      fullRemaining.shift();
+      const { expectedRemaining, variance } = projectRemaining(
+        fullRemaining,
+        holeStats,
+        skillPerHole,
+      );
+      const prob = probFromProjection(
+        bet.side,
+        bet.line,
         strokes,
-        parPlayed,
-        holesPlayed,
-        parRemaining,
-        holesRemaining,
-        ttdPace,
+        expectedRemaining,
+        variance,
       );
       const v = anchoredValue(prob, probAtP, bet.stake, bet.oddsTaken);
       series.push({
-        // Holes don't carry completion timestamps in the scorecard;
-        // synthesize a monotonic ts so the time-axis fallback still
-        // sorts. The round-score chart axis is holesPlayed anyway.
+        // Holes don't carry completion timestamps; synthesize one so
+        // the time-axis fallback still sorts. Round-score chart axis
+        // is holesPlayed anyway.
         t: bet.placedAt + (i + 1) * 60_000,
         v,
         holesPlayed: holesPlayed - baselineHoles,
@@ -469,6 +547,9 @@ export function reconstructHistory(
       });
     }
   } else {
+    // No scorecard — degrade to the feed events list. We won't have
+    // per-hole field stats here, so the projection falls back to a
+    // par + constant-variance baseline (no skill adjustment).
     const events = feedEvents
       .filter(
         (r) =>
@@ -481,21 +562,20 @@ export function reconstructHistory(
           typeof r.event.hole === "number",
       )
       .sort((a, b) => a.event.ts - b.event.ts);
-
+    let parPlayed = bet.placement?.parPlayed ?? 0;
+    const roundPar = bet.placement?.roundPar ?? roundSnap.roundPar;
     for (const r of events) {
       strokes += r.event.strokes!;
       parPlayed += r.event.par!;
       holesPlayed++;
       const holesRemaining = 18 - holesPlayed;
       const parRemaining = roundPar - parPlayed;
-      const prob = roundScoreProb(
-        bet,
+      const prob = probFromProjection(
+        bet.side,
+        bet.line,
         strokes,
-        parPlayed,
-        holesPlayed,
         parRemaining,
-        holesRemaining,
-        ttdPace,
+        holesRemaining * PER_HOLE_VAR,
       );
       const v = anchoredValue(prob, probAtP, bet.stake, bet.oddsTaken);
       series.push({
