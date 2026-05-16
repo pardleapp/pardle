@@ -2,23 +2,25 @@ import { NextResponse } from "next/server";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
 import { getCachedLeaderboard } from "@/lib/feed/store";
 import { pushOddsSamples } from "@/lib/feed/odds-store";
-import { listMarketBook, midPrice } from "@/lib/betfair/client";
-import { withBetfairAuth } from "@/lib/betfair/session";
+import { getEvent, midOddsFromMarket } from "@/lib/polymarket/client";
 import {
-  discoverWinnerMarket,
-  getCachedWinnerMarket,
-} from "@/lib/betfair/winner-market";
+  discoverWinnerEvent,
+  getCachedWinnerEvent,
+} from "@/lib/polymarket/winner-market";
 
 /**
  * GET /api/feed/odds-poll
  *
- * Cron-triggered: read the Betfair winner market for the active PGA
- * tournament, convert each runner's best back/lay into a mid-price,
- * snapshot the readings into a rolling Redis buffer per player.
+ * Cron-triggered: read the Polymarket winner event for the active PGA
+ * tournament, convert each player's `lastTradePrice` / best-of-book
+ * into decimal odds, snapshot the readings into a rolling Redis buffer
+ * per player.
  *
- * Coalesces gracefully with `/api/feed/poll`: each route owns its own
- * data source and there's no lock contention between them — feed
- * polling and odds polling can run on separate cron schedules.
+ * Polymarket > Betfair for our use case because:
+ *   - Public gamma-api with no auth
+ *   - No geo-block on data-center IPs (Betfair 403s from Vercel)
+ *   - $4M+ volume on major-tournament winner markets — plenty for
+ *     directional shift detection
  *
  * Auth: when CRON_SECRET is set, the caller must send
  * `Authorization: Bearer <secret>` (same convention as /api/feed/poll).
@@ -40,62 +42,57 @@ export async function GET(req: Request) {
   }
   const tournamentId = active.tournament.id;
 
-  // Need the cached leaderboard to map Betfair runners → playerIds.
   const leaderboard = await getCachedLeaderboard(tournamentId);
   if (leaderboard.length === 0) {
     return NextResponse.json({ skipped: "no-leaderboard-yet" });
   }
 
-  // Look up (or re-discover) the Betfair winner market for this event.
-  let market = await getCachedWinnerMarket(tournamentId);
-  if (!market) {
+  // Look up (or re-discover) the Polymarket winner event for this
+  // tournament. Re-discovery hits the gamma-api list endpoint once
+  // per cache TTL (24h) — every other poll uses the cache.
+  let winner = await getCachedWinnerEvent(tournamentId);
+  if (!winner) {
     try {
-      market = await discoverWinnerMarket(
+      winner = await discoverWinnerEvent(
         tournamentId,
         active.tournament.name,
         leaderboard,
       );
     } catch (err) {
-      console.error("[odds-poll] discoverWinnerMarket failed", err);
+      console.error("[odds-poll] discoverWinnerEvent failed", err);
       return NextResponse.json(
         {
-          error: "betfair-discover-failed",
+          error: "polymarket-discover-failed",
           message: err instanceof Error ? err.message : String(err),
         },
         { status: 502 },
       );
     }
   }
-  if (!market) {
-    return NextResponse.json({ skipped: "betfair-market-not-found" });
+  if (!winner) {
+    return NextResponse.json({ skipped: "polymarket-event-not-found" });
   }
 
-  // Pull the live market book.
-  let books;
+  // Pull the latest event payload (child-market prices).
+  let event;
   try {
-    books = await withBetfairAuth((auth) =>
-      listMarketBook(auth, [market!.marketId]),
-    );
+    event = await getEvent(winner.eventId);
   } catch (err) {
-    console.error("[odds-poll] listMarketBook failed", err);
+    console.error("[odds-poll] getEvent failed", err);
     return NextResponse.json(
-      { error: "betfair-fetch-failed", message: String(err) },
+      { error: "polymarket-fetch-failed", message: String(err) },
       { status: 502 },
     );
   }
-  const book = books[0];
-  if (!book) {
-    return NextResponse.json({ skipped: "empty-market-book" });
-  }
 
-  // Convert runner mid-prices into a playerId-keyed map.
+  // Convert market lastTradePrice → decimal odds, keyed by playerId.
   const latest: Record<string, number> = {};
-  for (const runner of book.runners) {
-    const pid = market.runnerToPlayer[String(runner.selectionId)];
+  for (const m of event.markets) {
+    const pid = winner.marketToPlayer[m.id];
     if (!pid) continue;
-    const mid = midPrice(runner);
-    if (mid == null) continue;
-    latest[pid] = mid;
+    const odds = midOddsFromMarket(m);
+    if (odds == null) continue;
+    latest[pid] = odds;
   }
 
   const now = Date.now();
@@ -104,8 +101,9 @@ export async function GET(req: Request) {
   return NextResponse.json({
     polled: true,
     tournament: tournamentId,
-    betfairMarket: market.marketId,
-    seenRunners: book.runners.length,
+    polymarketEvent: winner.eventId,
+    polymarketTitle: winner.eventTitle,
+    seenMarkets: event.markets.length,
     mappedPlayers: Object.keys(latest).length,
     bufferUpdated: result.updated,
   });
