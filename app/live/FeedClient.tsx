@@ -4,6 +4,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Burst, CachedLeaderboardRow } from "@/lib/feed/store";
 import type { FeedRow } from "@/lib/feed/types";
+import {
+  DEFAULT_ODDS_FORMAT,
+  formatOdds,
+  nextOddsFormat,
+  oddsFormatLabel,
+  ODDS_FORMAT_STORAGE_KEY,
+  type OddsFormat,
+} from "@/lib/odds-format";
 import BetTracker from "./BetTracker";
 import CatchMeUp from "./CatchMeUp";
 import CommentThread from "./CommentThread";
@@ -88,13 +96,6 @@ function getAuthorKey(): string {
  * precision would claim accuracy we don't have. Bucket to "just now" /
  * "few min ago" / "Nm ago" / "Nh ago".
  */
-/** Format decimal odds as American ("5.0" → "+400", "1.5" → "-200"). */
-function americanOdds(decimal: number): string {
-  if (!Number.isFinite(decimal) || decimal <= 1) return "—";
-  if (Math.abs(decimal - 2) < 0.01) return "+100";
-  if (decimal >= 2) return `+${Math.round((decimal - 1) * 100)}`;
-  return `-${Math.round(100 / (decimal - 1))}`;
-}
 
 function timeAgo(ts: number): string {
   const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
@@ -119,6 +120,27 @@ export default function FeedClient() {
   const [filterMode, setFilterMode] = useState<"all" | "following">("all");
   const [follows, setFollowsState] = useState<string[]>([]);
   const [view, setView] = useState<"feed" | "leaderboard">("feed");
+  const [oddsFormat, setOddsFormat] =
+    useState<OddsFormat>(DEFAULT_ODDS_FORMAT);
+
+  // Hydrate odds-format preference from localStorage after mount.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.localStorage.getItem(ODDS_FORMAT_STORAGE_KEY);
+    if (raw === "american" || raw === "fractional" || raw === "decimal") {
+      setOddsFormat(raw);
+    }
+  }, []);
+
+  const cycleOddsFormat = useCallback(() => {
+    setOddsFormat((cur) => {
+      const next = nextOddsFormat(cur);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(ODDS_FORMAT_STORAGE_KEY, next);
+      }
+      return next;
+    });
+  }, []);
 
   const authorKey = useRef<string>("");
   const seenBursts = useRef<Set<string>>(new Set());
@@ -269,6 +291,14 @@ export default function FeedClient() {
       <div className="feed-header-row">
         <h2 className="feed-tournament-name">{data.tournament.name}</h2>
         <div className="feed-header-meta">
+          <button
+            type="button"
+            className="feed-odds-toggle"
+            onClick={cycleOddsFormat}
+            title="Cycle odds format"
+          >
+            {oddsFormatLabel(oddsFormat)} odds
+          </button>
           {data.seenToday > 0 && (
             <span className="feed-watching">
               👀 {data.seenToday.toLocaleString()} here today
@@ -327,6 +357,7 @@ export default function FeedClient() {
         players={data.playerIndex ?? []}
         currentOdds={data.currentOdds ?? {}}
         playerRoundStates={data.playerRoundStates ?? {}}
+        oddsFormat={oddsFormat}
       />
 
       <div className="feed-filter-row">
@@ -399,8 +430,8 @@ export default function FeedClient() {
                             }`}
                             title="Win-market odds shift"
                           >
-                            odds {americanOdds(event.oddsBefore)} →{" "}
-                            {americanOdds(event.oddsAfter)}
+                            odds {formatOdds(event.oddsBefore, oddsFormat)} →{" "}
+                            {formatOdds(event.oddsAfter, oddsFormat)}
                           </span>
                         )}
                       </p>
@@ -417,8 +448,8 @@ export default function FeedClient() {
                             }`}
                             title="Win-market odds shift"
                           >
-                            odds {americanOdds(event.oddsBefore)} →{" "}
-                            {americanOdds(event.oddsAfter)}
+                            odds {formatOdds(event.oddsBefore, oddsFormat)} →{" "}
+                            {formatOdds(event.oddsAfter, oddsFormat)}
                           </span>
                         </p>
                       )}

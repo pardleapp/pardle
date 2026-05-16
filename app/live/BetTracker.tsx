@@ -2,6 +2,11 @@
 
 import { useEffect, useMemo, useState, type JSX } from "react";
 import type { CachedLeaderboardRow } from "@/lib/feed/store";
+import {
+  formatOdds,
+  parseOdds as parseOddsShared,
+  type OddsFormat,
+} from "@/lib/odds-format";
 
 const STORAGE_KEY = "pardle_bets_v2";
 const LEGACY_KEY = "pardle_bets_v1";
@@ -66,6 +71,7 @@ interface Props {
   players: CachedLeaderboardRow[];
   currentOdds: Record<string, number>;
   playerRoundStates: Record<string, PlayerRoundState>;
+  oddsFormat: OddsFormat;
 }
 
 function readBets(): TrackedBet[] {
@@ -95,52 +101,18 @@ function writeBets(bets: TrackedBet[]): void {
 }
 
 /**
- * Parse an odds string in any of the common bookmaker formats:
- *   - American: "+250", "-310"
- *   - Fractional: "8/1", "9/2", "evens"
- *   - Decimal: "9.0", "1.91"
- * Returns null on garbage.
+ * Wrap the shared odds parser so a saved bet remembers its original
+ * label in the user's preferred format (we re-format on display via
+ * `formatOdds` anyway, but the stored label is a useful fallback if
+ * the format helper ever regresses).
  */
-function parseOdds(input: string): { decimal: number; label: string } | null {
-  const t = input.trim().toLowerCase();
-  if (!t) return null;
-  if (t === "evens" || t === "even" || t === "1/1") {
-    return { decimal: 2, label: "+100" };
-  }
-  // American odds: leading + or -, integer follows.
-  const am = /^([+-])\s*(\d+)$/.exec(t);
-  if (am) {
-    const sign = am[1];
-    const v = Number(am[2]);
-    if (v >= 100) {
-      const decimal = sign === "+" ? 1 + v / 100 : 1 + 100 / v;
-      return { decimal, label: `${sign}${v}` };
-    }
-  }
-  const frac = /^(\d+)\s*\/\s*(\d+)$/.exec(t);
-  if (frac) {
-    const num = Number(frac[1]);
-    const den = Number(frac[2]);
-    if (num > 0 && den > 0) {
-      const decimal = 1 + num / den;
-      return { decimal, label: americanDisplay(decimal) };
-    }
-  }
-  const decimal = Number(t);
-  if (Number.isFinite(decimal) && decimal > 1) {
-    return { decimal, label: americanDisplay(decimal) };
-  }
-  return null;
-}
-
-/** Decimal odds → American format ("+250" / "-310" / "+100"). */
-function americanDisplay(decimal: number): string {
-  if (!Number.isFinite(decimal) || decimal <= 1) return "—";
-  if (Math.abs(decimal - 2) < 0.01) return "+100";
-  if (decimal >= 2) {
-    return `+${Math.round((decimal - 1) * 100)}`;
-  }
-  return `-${Math.round(100 / (decimal - 1))}`;
+function parseOdds(
+  input: string,
+  preferredFormat: OddsFormat,
+): { decimal: number; label: string } | null {
+  const parsed = parseOddsShared(input);
+  if (!parsed) return null;
+  return { decimal: parsed.decimal, label: formatOdds(parsed.decimal, preferredFormat) };
 }
 
 const gbp = new Intl.NumberFormat("en-GB", {
@@ -236,6 +208,7 @@ export default function BetTracker({
   players,
   currentOdds,
   playerRoundStates,
+  oddsFormat,
 }: Props) {
   const [bets, setBets] = useState<TrackedBet[]>([]);
   const [open, setOpen] = useState(false);
@@ -323,6 +296,7 @@ export default function BetTracker({
                 key={b.id}
                 bet={b}
                 currentOdds={currentOdds}
+                oddsFormat={oddsFormat}
                 onRemove={() => removeBet(b.id)}
               />
             ) : (
@@ -330,6 +304,7 @@ export default function BetTracker({
                 key={b.id}
                 bet={b}
                 state={playerRoundStates[b.playerId]}
+                oddsFormat={oddsFormat}
                 onRemove={() => removeBet(b.id)}
               />
             );
@@ -359,6 +334,7 @@ export default function BetTracker({
       {open && (
         <AddBetForm
           players={players}
+          oddsFormat={oddsFormat}
           onAdd={(b) => {
             addBet(b);
             setOpen(false);
@@ -380,10 +356,12 @@ export default function BetTracker({
 function OutrightRow({
   bet,
   currentOdds,
+  oddsFormat,
   onRemove,
 }: {
   bet: OutrightBet;
   currentOdds: Record<string, number>;
+  oddsFormat: OddsFormat;
   onRemove: () => void;
 }) {
   const fair = currentOdds[bet.playerId];
@@ -403,8 +381,9 @@ function OutrightRow({
       <div className="bets-row-main">
         <p className="bets-row-name">{bet.playerName}</p>
         <p className="bets-row-meta">
-          Win @ {bet.oddsTakenLabel} · {gbp.format(bet.stake)}
-          {haveFair && <> · now {americanDisplay(fair)}</>}
+          Win @ {formatOdds(bet.oddsTaken, oddsFormat)} ·{" "}
+          {gbp.format(bet.stake)}
+          {haveFair && <> · now {formatOdds(fair, oddsFormat)}</>}
         </p>
       </div>
       <div className={`bets-row-value ${profitClass}`}>
@@ -436,10 +415,12 @@ function OutrightRow({
 function RoundScoreRow({
   bet,
   state,
+  oddsFormat,
   onRemove,
 }: {
   bet: RoundScoreBet;
   state: PlayerRoundState | undefined;
+  oddsFormat: OddsFormat;
   onRemove: () => void;
 }) {
   const ev = evaluateRoundScore(bet, state);
@@ -503,13 +484,14 @@ function RoundScoreRow({
           </span>
         </p>
         <p className="bets-row-meta">
-          @ {bet.oddsTakenLabel} · {gbp.format(bet.stake)} · {stateText}
+          @ {formatOdds(bet.oddsTaken, oddsFormat)} · {gbp.format(bet.stake)} ·{" "}
+          {stateText}
         </p>
         {ev?.kind === "in-progress" && (
           <p className="bets-row-meta">
             Model: {Math.round(ev.prob * 100)}% chance · fair{" "}
             {ev.prob > 0 && ev.prob < 1
-              ? americanDisplay(1 / ev.prob)
+              ? formatOdds(1 / ev.prob, oddsFormat)
               : "—"}
           </p>
         )}
@@ -532,10 +514,12 @@ function RoundScoreRow({
 
 function AddBetForm({
   players,
+  oddsFormat,
   onAdd,
   onCancel,
 }: {
   players: CachedLeaderboardRow[];
+  oddsFormat: OddsFormat;
   onAdd: (b: TrackedBet) => void;
   onCancel: () => void;
 }) {
@@ -564,7 +548,7 @@ function AddBetForm({
     e.preventDefault();
     setErr(null);
     if (!pickedPlayer) return setErr("Pick a player from the list.");
-    const odds = parseOdds(oddsText);
+    const odds = parseOdds(oddsText, oddsFormat);
     if (!odds) return setErr("Enter odds like +250, -150, 8/1, or 9.0.");
     const stake = Number(stakeText);
     if (!Number.isFinite(stake) || stake <= 0) {
