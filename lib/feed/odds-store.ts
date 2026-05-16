@@ -17,9 +17,10 @@ const redis = Redis.fromEnv();
 
 const HASH_PREFIX = "feed:odds:";
 // Each buffer keeps the last N samples per player. At ~1 sample/min
-// during a live round, 480 covers ~8 hours — a full tournament day
-// for round-score and outright bet history charts.
-const MAX_SAMPLES = 480;
+// during a live round, 720 covers ~12 hours — a full tournament day
+// for round-score and outright bet history charts, including early
+// tee times all the way through to last group's finish.
+const MAX_SAMPLES = 720;
 
 export interface OddsSample {
   /** epoch ms */

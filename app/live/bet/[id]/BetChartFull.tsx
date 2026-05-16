@@ -101,8 +101,9 @@ export default function BetChartFull({ bet, history }: Props) {
       <div className="bd-chart">
         <ChartToggle mode={mode} setMode={setMode} />
         <div className="bd-chart-empty">
-          Chart will fill in as {isRound ? "holes complete" : "odds shift"} after
-          the bet was placed.
+          {isRound
+            ? "Chart will fill in as holes complete."
+            : "Chart will fill in as Polymarket odds move."}
         </div>
       </div>
     );

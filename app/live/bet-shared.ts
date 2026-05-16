@@ -449,8 +449,8 @@ export function reconstructHistory(
   if (bet.kind === "outright") {
     // Show the full odds buffer the server has for this player —
     // not just post-placement — so the chart covers today's round
-    // regardless of when the user got in. The buffer is naturally
-    // bounded server-side (~last 8 hours of samples).
+    // regardless of when the user got in. The buffer is bounded
+    // server-side at a rolling ~12 hours of samples.
     const samples = oddsHistories[bet.playerId] ?? [];
     for (const s of samples) {
       if (!Number.isFinite(s.p) || s.p <= 1) continue;
@@ -460,11 +460,11 @@ export function reconstructHistory(
         continue;
       series.push({ t: s.ts, v });
     }
+    // Always append the current value as the rightmost sample so a
+    // thin buffer (e.g. a market we just started tracking) still
+    // gives the chart two points to draw a line between.
     if (nowValue != null) {
-      const last = series[series.length - 1];
-      if (!last || Math.abs(nowValue - last.v) > 0.01) {
-        series.push({ t: Date.now(), v: nowValue });
-      }
+      series.push({ t: Date.now(), v: nowValue });
     }
     return series;
   }
