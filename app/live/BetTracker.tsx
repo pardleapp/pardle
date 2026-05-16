@@ -572,6 +572,9 @@ function AddBetForm({
       return;
     }
 
+    // Outright + round-score from here on — both need a picked player.
+    if (!pickedPlayer) return setErr("Pick a player from the list.");
+
     if (kind === "outright") {
       onAdd({
         kind: "outright",
