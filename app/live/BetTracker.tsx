@@ -13,6 +13,15 @@ const LEGACY_KEY = "pardle_bets_v1";
 
 type BetKind = "outright" | "round-score";
 
+/** One PnL sample for the per-bet history chart. */
+interface PnlSample {
+  t: number; // epoch ms
+  v: number; // bet's "current value" in £
+}
+const HISTORY_MAX = 240; // ~4 hours at one sample per minute
+const HISTORY_COALESCE_MS = 25_000; // replace last sample if within 25s
+const HISTORY_VALUE_NOISE = 0.05; // and value moved less than £0.05
+
 interface OutrightBet {
   id: string;
   kind: "outright";
@@ -22,6 +31,7 @@ interface OutrightBet {
   oddsTakenLabel: string;
   stake: number;
   placedAt: number;
+  history?: PnlSample[];
 }
 
 interface RoundScoreBet {
@@ -38,6 +48,7 @@ interface RoundScoreBet {
   oddsTakenLabel: string;
   stake: number;
   placedAt: number;
+  history?: PnlSample[];
 }
 
 type TrackedBet = OutrightBet | RoundScoreBet;
@@ -145,6 +156,34 @@ function normalCdf(x: number, mean: number, sd: number): number {
 /** Per-remaining-hole stroke variance — empirical PGA Tour estimate. */
 const PER_HOLE_VAR = 0.65;
 
+/**
+ * Compute the "current value" of any bet (outright or round-score)
+ * in a single place so totals, row rendering, and history sampling
+ * all see the same number. Returns null when we have no data to
+ * value the bet against (e.g. the player isn't priced on Polymarket
+ * yet, or their snapshot data hasn't landed). Settled bets return
+ * their final payout (won) or 0 (lost).
+ */
+function currentValueForBet(
+  b: TrackedBet,
+  currentOdds: Record<string, number>,
+  playerRoundStates: Record<string, PlayerRoundState>,
+): number | null {
+  if (b.kind === "outright") {
+    const fair = currentOdds[b.playerId];
+    if (!Number.isFinite(fair) || fair <= 1) return null;
+    return b.stake * (b.oddsTaken / fair);
+  }
+  const ev = evaluateRoundScore(b, playerRoundStates[b.playerId]);
+  if (!ev) return null;
+  if (ev.kind === "not-started") return b.stake;
+  if (ev.kind === "settled") return ev.won ? b.stake * b.oddsTaken : 0;
+  // In-progress
+  if (ev.prob >= 1) return b.stake * b.oddsTaken;
+  if (ev.prob <= 0) return 0;
+  return b.stake * (b.oddsTaken / (1 / ev.prob));
+}
+
 /** Outcome of evaluating a round-score bet. */
 type RoundScoreEval =
   | { kind: "not-started"; round: number }
@@ -213,6 +252,7 @@ export default function BetTracker({
   const [bets, setBets] = useState<TrackedBet[]>([]);
   const [open, setOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     setBets(readBets());
@@ -231,45 +271,65 @@ export default function BetTracker({
     writeBets(next);
   }
 
+  // Per-bet current value, computed once per render and reused by
+  // totals + each row + the history sampler.
+  const valueByBet = useMemo(() => {
+    const out = new Map<string, number | null>();
+    for (const b of bets) out.set(b.id, currentValueForBet(b, currentOdds, playerRoundStates));
+    return out;
+  }, [bets, currentOdds, playerRoundStates]);
+
+  // Append a PnL sample to each bet's history if the value has moved
+  // meaningfully OR the last sample is older than HISTORY_COALESCE_MS.
+  // Persists silently — doesn't trigger an extra rerender.
+  useEffect(() => {
+    if (!hydrated) return;
+    const now = Date.now();
+    let changed = false;
+    const next = bets.map((b) => {
+      const v = valueByBet.get(b.id);
+      if (v == null) return b;
+      const hist = b.history ?? [];
+      const last = hist[hist.length - 1];
+      if (
+        last &&
+        now - last.t < HISTORY_COALESCE_MS &&
+        Math.abs(v - last.v) < HISTORY_VALUE_NOISE
+      ) {
+        return b; // skip — no meaningful change
+      }
+      let nextHist: PnlSample[];
+      if (last && now - last.t < HISTORY_COALESCE_MS) {
+        // Replace the head (recent sample with same/near value).
+        nextHist = [...hist.slice(0, -1), { t: now, v }];
+      } else {
+        nextHist = [...hist, { t: now, v }];
+      }
+      if (nextHist.length > HISTORY_MAX) {
+        nextHist = nextHist.slice(nextHist.length - HISTORY_MAX);
+      }
+      changed = true;
+      return { ...b, history: nextHist } as TrackedBet;
+    });
+    if (changed) {
+      setBets(next);
+      writeBets(next);
+    }
+  }, [hydrated, bets, valueByBet]);
+
   const totals = useMemo(() => {
     let stake = 0;
     let value = 0;
     let valued = 0;
     for (const b of bets) {
       stake += b.stake;
-      if (b.kind === "outright") {
-        const fair = currentOdds[b.playerId];
-        if (Number.isFinite(fair) && fair > 1) {
-          value += b.stake * (b.oddsTaken / fair);
-          valued += b.stake;
-        }
-        continue;
-      }
-      // Round-score
-      const ev = evaluateRoundScore(b, playerRoundStates[b.playerId]);
-      if (!ev) continue;
-      if (ev.kind === "not-started") {
-        // Flat: bet currently worth its stake, no PnL.
-        value += b.stake;
-        valued += b.stake;
-      } else if (ev.kind === "in-progress") {
-        if (ev.prob > 0 && ev.prob < 1) {
-          const fair = 1 / ev.prob;
-          value += b.stake * (b.oddsTaken / fair);
-          valued += b.stake;
-        } else if (ev.prob === 1) {
-          value += b.stake * b.oddsTaken;
-          valued += b.stake;
-        } else {
-          valued += b.stake; // adds 0 to value
-        }
-      } else if (ev.kind === "settled") {
-        value += ev.won ? b.stake * b.oddsTaken : 0;
-        valued += b.stake;
-      }
+      const v = valueByBet.get(b.id);
+      if (v == null) continue;
+      value += v;
+      valued += b.stake;
     }
     return { stake, value, valued, hasValue: valued > 0 };
-  }, [bets, currentOdds, playerRoundStates]);
+  }, [bets, valueByBet]);
 
   if (!hydrated) return null;
 
@@ -291,22 +351,39 @@ export default function BetTracker({
       {bets.length > 0 && (
         <ul className="bets-list">
           {bets.map((b) => {
-            return b.kind === "outright" ? (
-              <OutrightRow
+            const expanded = expandedId === b.id;
+            const toggle = () =>
+              setExpandedId((cur) => (cur === b.id ? null : b.id));
+            const row =
+              b.kind === "outright" ? (
+                <OutrightRow
+                  bet={b}
+                  currentOdds={currentOdds}
+                  oddsFormat={oddsFormat}
+                  expanded={expanded}
+                  onToggle={toggle}
+                  onRemove={() => removeBet(b.id)}
+                />
+              ) : (
+                <RoundScoreRow
+                  bet={b}
+                  state={playerRoundStates[b.playerId]}
+                  oddsFormat={oddsFormat}
+                  expanded={expanded}
+                  onToggle={toggle}
+                  onRemove={() => removeBet(b.id)}
+                />
+              );
+            return (
+              <li
                 key={b.id}
-                bet={b}
-                currentOdds={currentOdds}
-                oddsFormat={oddsFormat}
-                onRemove={() => removeBet(b.id)}
-              />
-            ) : (
-              <RoundScoreRow
-                key={b.id}
-                bet={b}
-                state={playerRoundStates[b.playerId]}
-                oddsFormat={oddsFormat}
-                onRemove={() => removeBet(b.id)}
-              />
+                className={`bets-row-wrap ${expanded ? "bets-row-wrap-open" : ""}`}
+              >
+                {row}
+                {expanded && (
+                  <BetChart bet={b} stake={b.stake} />
+                )}
+              </li>
             );
           })}
         </ul>
@@ -357,11 +434,15 @@ function OutrightRow({
   bet,
   currentOdds,
   oddsFormat,
+  expanded,
+  onToggle,
   onRemove,
 }: {
   bet: OutrightBet;
   currentOdds: Record<string, number>;
   oddsFormat: OddsFormat;
+  expanded: boolean;
+  onToggle: () => void;
   onRemove: () => void;
 }) {
   const fair = currentOdds[bet.playerId];
@@ -377,7 +458,18 @@ function OutrightRow({
       ? "bets-profit-down"
       : "";
   return (
-    <li className="bets-row">
+    <div
+      className={`bets-row ${expanded ? "bets-row-expanded" : ""}`}
+      role="button"
+      tabIndex={0}
+      onClick={onToggle}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onToggle();
+        }
+      }}
+    >
       <div className="bets-row-main">
         <p className="bets-row-name">{bet.playerName}</p>
         <p className="bets-row-meta">
@@ -402,13 +494,16 @@ function OutrightRow({
       <button
         type="button"
         className="bets-row-x"
-        onClick={onRemove}
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
         aria-label="Remove bet"
         title="Remove this bet"
       >
         ✕
       </button>
-    </li>
+    </div>
   );
 }
 
@@ -416,11 +511,15 @@ function RoundScoreRow({
   bet,
   state,
   oddsFormat,
+  expanded,
+  onToggle,
   onRemove,
 }: {
   bet: RoundScoreBet;
   state: PlayerRoundState | undefined;
   oddsFormat: OddsFormat;
+  expanded: boolean;
+  onToggle: () => void;
   onRemove: () => void;
 }) {
   const ev = evaluateRoundScore(bet, state);
@@ -475,7 +574,18 @@ function RoundScoreRow({
   }
 
   return (
-    <li className="bets-row">
+    <div
+      className={`bets-row ${expanded ? "bets-row-expanded" : ""}`}
+      role="button"
+      tabIndex={0}
+      onClick={onToggle}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onToggle();
+        }
+      }}
+    >
       <div className="bets-row-main">
         <p className="bets-row-name">
           {bet.playerName}{" "}
@@ -500,13 +610,16 @@ function RoundScoreRow({
       <button
         type="button"
         className="bets-row-x"
-        onClick={onRemove}
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
         aria-label="Remove bet"
         title="Remove this bet"
       >
         ✕
       </button>
-    </li>
+    </div>
   );
 }
 
@@ -746,5 +859,140 @@ function AddBetForm({
         </>
       )}
     </form>
+  );
+}
+
+// ── PnL-over-time chart ────────────────────────────────────────────
+
+const CHART_W = 320;
+const CHART_H = 100;
+const CHART_PAD = 8;
+
+/** Inline SVG line chart of a bet's value across the history samples
+ *  this device has captured. Shows the stake as a dashed baseline so
+ *  the user reads PnL at a glance — profit area tints green above,
+ *  loss area red below. */
+function BetChart({
+  bet,
+  stake,
+}: {
+  bet: TrackedBet;
+  stake: number;
+}) {
+  const history = bet.history ?? [];
+  if (history.length < 2) {
+    return (
+      <div className="bets-chart-empty">
+        Collecting price history… give it a few feed refreshes (or come back
+        as the round plays out).
+      </div>
+    );
+  }
+
+  const ts = history.map((h) => h.t);
+  const vs = history.map((h) => h.v);
+  const tMin = Math.min(...ts);
+  const tMax = Math.max(...ts);
+  const vMin = Math.min(...vs, stake);
+  const vMax = Math.max(...vs, stake);
+  const tRange = Math.max(1, tMax - tMin);
+  // Pad the value range so a flat line doesn't paint along the edge.
+  const vPad = Math.max((vMax - vMin) * 0.15, stake * 0.05, 0.5);
+  const yLo = vMin - vPad;
+  const yHi = vMax + vPad;
+  const yRange = Math.max(0.001, yHi - yLo);
+
+  const xOf = (t: number) =>
+    CHART_PAD + ((t - tMin) / tRange) * (CHART_W - CHART_PAD * 2);
+  const yOf = (v: number) =>
+    CHART_H - CHART_PAD - ((v - yLo) / yRange) * (CHART_H - CHART_PAD * 2);
+
+  const stakeY = yOf(stake);
+  const linePath = history
+    .map((h, i) => `${i === 0 ? "M" : "L"}${xOf(h.t)},${yOf(h.v)}`)
+    .join(" ");
+  // Build area paths above/below the stake baseline so we can tint
+  // profit-green and loss-red.
+  const areaPoints = history
+    .map((h) => `${xOf(h.t)},${yOf(h.v)}`)
+    .join(" ");
+  const profitArea = `M${xOf(history[0].t)},${stakeY} L ${areaPoints} L ${xOf(history[history.length - 1].t)},${stakeY} Z`;
+
+  const lastV = vs[vs.length - 1];
+  const profit = lastV - stake;
+  const profitClass =
+    profit > 0 ? "bets-profit-up" : profit < 0 ? "bets-profit-down" : "";
+
+  return (
+    <div className="bets-chart">
+      <div className="bets-chart-summary">
+        <span>Stake {gbp.format(stake)}</span>
+        <span className={profitClass}>
+          {profit >= 0 ? "+" : ""}
+          {gbp.format(profit)} now
+        </span>
+        <span className="bets-chart-meta">
+          {history.length} sample{history.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      <svg
+        className="bets-chart-svg"
+        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        <defs>
+          <clipPath id={`pnl-up-${bet.id}`}>
+            <rect x={0} y={0} width={CHART_W} height={stakeY} />
+          </clipPath>
+          <clipPath id={`pnl-down-${bet.id}`}>
+            <rect
+              x={0}
+              y={stakeY}
+              width={CHART_W}
+              height={CHART_H - stakeY}
+            />
+          </clipPath>
+        </defs>
+        {/* Profit area (green tint, clipped above the stake line) */}
+        <path
+          d={profitArea}
+          fill="rgba(123, 174, 63, 0.18)"
+          clipPath={`url(#pnl-up-${bet.id})`}
+        />
+        {/* Loss area (red tint, clipped below) */}
+        <path
+          d={profitArea}
+          fill="rgba(224, 91, 91, 0.16)"
+          clipPath={`url(#pnl-down-${bet.id})`}
+        />
+        {/* Stake baseline */}
+        <line
+          x1={CHART_PAD}
+          y1={stakeY}
+          x2={CHART_W - CHART_PAD}
+          y2={stakeY}
+          stroke="rgba(128,128,128,0.55)"
+          strokeWidth={1}
+          strokeDasharray="3 3"
+        />
+        {/* Value line */}
+        <path
+          d={linePath}
+          fill="none"
+          stroke="#2ea7f0"
+          strokeWidth={1.8}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {/* Latest point dot */}
+        <circle
+          cx={xOf(ts[ts.length - 1])}
+          cy={yOf(vs[vs.length - 1])}
+          r={3}
+          fill="#2ea7f0"
+        />
+      </svg>
+    </div>
   );
 }
