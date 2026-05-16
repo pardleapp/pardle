@@ -109,6 +109,12 @@ export interface FeedRowLike {
   };
 }
 
+export interface BetScorecard {
+  /** Played holes in completion order. */
+  holes: { holeNumber: number; par: number; strokes: number }[];
+  roundPar: number;
+}
+
 // ── localStorage ────────────────────────────────────────────────────
 
 const STORAGE_KEY = "pardle_bets_v2";
@@ -373,6 +379,7 @@ export function reconstructHistory(
   playerRoundStates: Record<string, PlayerRoundState>,
   feedEvents: FeedRowLike[],
   nowValue: number | null,
+  scorecard?: BetScorecard | null,
 ): PnlSample[] {
   const series: PnlSample[] = [];
 
@@ -418,19 +425,6 @@ export function reconstructHistory(
     return series;
   }
 
-  const events = feedEvents
-    .filter(
-      (r) =>
-        r.event.type === "score" &&
-        r.event.playerId === bet.playerId &&
-        r.event.round === round &&
-        r.event.ts >= bet.placedAt &&
-        typeof r.event.strokes === "number" &&
-        typeof r.event.par === "number" &&
-        typeof r.event.hole === "number",
-    )
-    .sort((a, b) => a.event.ts - b.event.ts);
-
   // Start the accumulator from the round state at placement so a
   // bet placed mid-round still computes prob against the player's
   // actual cumulative strokes — not "0 strokes after 1 hole".
@@ -438,31 +432,79 @@ export function reconstructHistory(
   let parPlayed = bet.placement?.parPlayed ?? 0;
   let holesPlayed = bet.placement?.holesPlayed ?? 0;
   const baselineHoles = holesPlayed;
-  const roundPar = bet.placement?.roundPar ?? roundSnap.roundPar;
+  const roundPar =
+    scorecard?.roundPar || bet.placement?.roundPar || roundSnap.roundPar;
   const ttdPace = state?.ttdPacePerHole ?? bet.placement?.ttdPacePerHole ?? 0;
 
-  for (const r of events) {
-    strokes += r.event.strokes!;
-    parPlayed += r.event.par!;
-    holesPlayed++;
-    const holesRemaining = 18 - holesPlayed;
-    const parRemaining = roundPar - parPlayed;
-    const prob = roundScoreProb(
-      bet,
-      strokes,
-      parPlayed,
-      holesPlayed,
-      parRemaining,
-      holesRemaining,
-      ttdPace,
-    );
-    const v = anchoredValue(prob, probAtP, bet.stake, bet.oddsTaken);
-    series.push({
-      t: r.event.ts,
-      v,
-      holesPlayed: holesPlayed - baselineHoles,
-      prob,
-    });
+  // Prefer the orchestrator scorecard when available — it's
+  // authoritative and isn't subject to the events list's 1000-entry
+  // cap. Fall back to the feed events list otherwise.
+  if (scorecard && scorecard.holes.length > 0) {
+    const post = scorecard.holes.slice(baselineHoles);
+    for (let i = 0; i < post.length; i++) {
+      const h = post[i];
+      strokes += h.strokes;
+      parPlayed += h.par;
+      holesPlayed++;
+      const holesRemaining = 18 - holesPlayed;
+      const parRemaining = roundPar - parPlayed;
+      const prob = roundScoreProb(
+        bet,
+        strokes,
+        parPlayed,
+        holesPlayed,
+        parRemaining,
+        holesRemaining,
+        ttdPace,
+      );
+      const v = anchoredValue(prob, probAtP, bet.stake, bet.oddsTaken);
+      series.push({
+        // Holes don't carry completion timestamps in the scorecard;
+        // synthesize a monotonic ts so the time-axis fallback still
+        // sorts. The round-score chart axis is holesPlayed anyway.
+        t: bet.placedAt + (i + 1) * 60_000,
+        v,
+        holesPlayed: holesPlayed - baselineHoles,
+        prob,
+      });
+    }
+  } else {
+    const events = feedEvents
+      .filter(
+        (r) =>
+          r.event.type === "score" &&
+          r.event.playerId === bet.playerId &&
+          r.event.round === round &&
+          r.event.ts >= bet.placedAt &&
+          typeof r.event.strokes === "number" &&
+          typeof r.event.par === "number" &&
+          typeof r.event.hole === "number",
+      )
+      .sort((a, b) => a.event.ts - b.event.ts);
+
+    for (const r of events) {
+      strokes += r.event.strokes!;
+      parPlayed += r.event.par!;
+      holesPlayed++;
+      const holesRemaining = 18 - holesPlayed;
+      const parRemaining = roundPar - parPlayed;
+      const prob = roundScoreProb(
+        bet,
+        strokes,
+        parPlayed,
+        holesPlayed,
+        parRemaining,
+        holesRemaining,
+        ttdPace,
+      );
+      const v = anchoredValue(prob, probAtP, bet.stake, bet.oddsTaken);
+      series.push({
+        t: r.event.ts,
+        v,
+        holesPlayed: holesPlayed - baselineHoles,
+        prob,
+      });
+    }
   }
 
   if (nowValue != null) {

@@ -16,6 +16,7 @@ import {
   reconstructHistory,
   writeBets,
   readBets,
+  type BetScorecard,
   type FeedRowLike,
   type OddsHistorySample,
   type PlayerRoundState,
@@ -45,6 +46,7 @@ export default function BetDetail({ betId }: { betId: string }) {
   const [bet, setBet] = useState<TrackedBet | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [data, setData] = useState<FeedResponse | null>(null);
+  const [scorecard, setScorecard] = useState<BetScorecard | null>(null);
   const [error, setError] = useState(false);
   const [oddsFormat, setOddsFormat] =
     useState<OddsFormat>(DEFAULT_ODDS_FORMAT);
@@ -76,6 +78,46 @@ export default function BetDetail({ betId }: { betId: string }) {
     const t = setInterval(load, REFRESH_MS);
     return () => clearInterval(t);
   }, [load]);
+
+  // Pull the orchestrator scorecard alongside each feed refresh —
+  // the events list on /api/feed is capped at 1000 entries, which a
+  // busy tournament day can blow through in a few hours, leaving
+  // early holes out of the chart.
+  const roundForBet =
+    bet?.kind === "round-score"
+      ? bet.round ??
+        (data
+          ? data.playerRoundStates[bet.playerId]?.currentRound ?? null
+          : null)
+      : null;
+  const scorecardKey =
+    bet?.kind === "round-score" && roundForBet != null && data != null
+      ? `${bet.playerId}:${roundForBet}`
+      : null;
+
+  useEffect(() => {
+    if (!scorecardKey) return;
+    const [playerId, roundStr] = scorecardKey.split(":");
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/bet/scorecard?playerId=${encodeURIComponent(
+            playerId,
+          )}&round=${roundStr}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) return;
+        const json = (await res.json()) as BetScorecard;
+        if (!cancelled) setScorecard(json);
+      } catch {
+        // Non-fatal — chart falls back to feed events.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [scorecardKey, data]);
 
   useEffect(() => {
     if (!bet || bet.kind !== "round-score" || bet.placement || !data) return;
@@ -131,6 +173,7 @@ export default function BetDetail({ betId }: { betId: string }) {
     data.playerRoundStates,
     data.rows,
     nowValue,
+    scorecard,
   );
   const profit = nowValue != null ? nowValue - bet.stake : null;
   const profitPct = profit != null ? (profit / bet.stake) * 100 : null;
