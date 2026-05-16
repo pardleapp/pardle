@@ -5919,27 +5919,69 @@ footer {
   background: var(--bg, white);
 }
 
-.lb-toggle {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 11px 14px;
-  background: transparent;
+/* When the leaderboard is its own tab content it doesn't need an
+   inline title or border — the tab strip above it gives context. */
+.lb-panel-tab {
   border: none;
-  cursor: pointer;
-  font-family: inherit;
+  border-radius: 0;
+  margin-bottom: 0;
+  background: transparent;
+}
+
+.lb-header {
+  margin: 0;
+  padding: 11px 14px;
   font-size: 14px;
   font-weight: 900;
   color: var(--text);
+  border-bottom: 1px solid var(--border);
 }
 
-.lb-toggle-hint {
-  font-size: 11px;
-  font-weight: 700;
+/* Pardle live-feed tab switcher. Two simple pill tabs above the
+   content (Feed vs Leaderboard). Sticky-ish only if we add scroll
+   handling later; for now they're inline. */
+.feed-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.feed-tab {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  min-height: 40px;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.feed-tab:hover {
+  color: var(--text);
+}
+
+.feed-tab-on {
+  background: var(--bg, #fff);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  .feed-tabs {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .feed-tab-on {
+    background: #2a2a2c;
+  }
 }
 
 .lb-list {

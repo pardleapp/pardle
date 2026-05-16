@@ -1,41 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import type { CachedLeaderboardRow } from "@/lib/feed/store";
 
 interface Props {
   rows: CachedLeaderboardRow[];
+  /**
+   * `tab` = lives on its own tab (no header, render every row).
+   * `inline` (default) = small panel inside the main feed view.
+   */
+  mode?: "inline" | "tab";
 }
 
-export default function LeaderboardPanel({ rows }: Props) {
-  const [open, setOpen] = useState(false);
+export default function LeaderboardPanel({ rows, mode = "inline" }: Props) {
   if (rows.length === 0) return null;
-
-  // Collapsed = top 5, expanded = top 15.
-  const shown = open ? rows : rows.slice(0, 5);
-
   return (
-    <section className="lb-panel">
-      <button
-        type="button"
-        className="lb-toggle"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-      >
-        <span>Leaderboard</span>
-        <span className="lb-toggle-hint">
-          {open ? "show less ▲" : "show top 15 ▼"}
-        </span>
-      </button>
+    <section className={`lb-panel ${mode === "tab" ? "lb-panel-tab" : ""}`}>
+      {mode === "inline" && (
+        <p className="lb-header">Leaderboard · top {rows.length}</p>
+      )}
       <ol className="lb-list">
-        {shown.map((r) => (
+        {rows.map((r) => (
           <li key={r.playerId} className="lb-row">
             <span className="lb-pos">{r.position}</span>
-            <Link
-              href={`/live/player/${r.playerId}`}
-              className="lb-name"
-            >
+            <Link href={`/live/player/${r.playerId}`} className="lb-name">
               {r.displayName}
             </Link>
             <span className="lb-total">{r.total}</span>

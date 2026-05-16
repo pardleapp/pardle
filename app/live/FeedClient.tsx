@@ -95,6 +95,7 @@ export default function FeedClient() {
   const [floaters, setFloaters] = useState<Floater[]>([]);
   const [filterMode, setFilterMode] = useState<"all" | "following">("all");
   const [follows, setFollowsState] = useState<string[]>([]);
+  const [view, setView] = useState<"feed" | "leaderboard">("feed");
 
   const authorKey = useRef<string>("");
   const seenBursts = useRef<Set<string>>(new Set());
@@ -260,6 +261,31 @@ export default function FeedClient() {
 
       <CatchMeUp rows={data.rows ?? []} />
 
+      <nav className="feed-tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === "feed"}
+          className={`feed-tab ${view === "feed" ? "feed-tab-on" : ""}`}
+          onClick={() => setView("feed")}
+        >
+          Live feed
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === "leaderboard"}
+          className={`feed-tab ${view === "leaderboard" ? "feed-tab-on" : ""}`}
+          onClick={() => setView("leaderboard")}
+        >
+          Leaderboard
+        </button>
+      </nav>
+
+      {view === "leaderboard" ? (
+        <LeaderboardPanel rows={data.leaderboard ?? []} mode="tab" />
+      ) : (
+        <>
       <Reel
         title="⛳ Shots of the day"
         rows={data.bestReel ?? []}
@@ -273,8 +299,6 @@ export default function FeedClient() {
         myReactions={myReactions}
         onReact={sendReaction}
       />
-
-      <LeaderboardPanel rows={data.leaderboard ?? []} />
 
       <BetTracker
         players={data.playerIndex ?? []}
@@ -429,6 +453,8 @@ export default function FeedClient() {
         Live PGA Tour scoring · auto-refreshes every 15s · usually within
         ~30s of the course
       </p>
+        </>
+      )}
 
       {/* Floating-emoji overlay — fixed so bursts rise over the whole feed */}
       <div className="feed-floater-layer" aria-hidden="true">

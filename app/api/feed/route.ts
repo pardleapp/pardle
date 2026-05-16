@@ -211,7 +211,7 @@ async function handle(req: Request) {
     bestReel,
     worstReel,
     bursts,
-    leaderboard: leaderboard.slice(0, 15),
+    leaderboard: leaderboard.slice(0, 30),
     playerIndex,
     currentOdds,
     watching,
