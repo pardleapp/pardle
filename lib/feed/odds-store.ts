@@ -84,13 +84,18 @@ export async function getOddsBuffer(
   return v ?? [];
 }
 
-/** Fetch buffers for a batch of players in one round-trip. */
+/**
+ * Fetch buffers for a batch of players in one round-trip. Players not
+ * yet in the hash come back with value `null` from Upstash's hmget,
+ * so the return type reflects that — callers MUST guard before
+ * reading from each entry.
+ */
 export async function getOddsBuffers(
   tournamentId: string,
   playerIds: string[],
-): Promise<Record<string, OddsSample[]>> {
+): Promise<Record<string, OddsSample[] | null>> {
   if (playerIds.length === 0) return {};
-  const v = await redis.hmget<Record<string, OddsSample[]>>(
+  const v = await redis.hmget<Record<string, OddsSample[] | null>>(
     key(tournamentId),
     ...playerIds,
   );

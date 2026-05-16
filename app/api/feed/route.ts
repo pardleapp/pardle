@@ -163,13 +163,15 @@ async function handle(req: Request) {
   const oddsBuffers = await getOddsBuffers(tournament.id, [...playerIds]);
   const currentOdds: Record<string, number> = {};
   for (const [pid, buf] of Object.entries(oddsBuffers)) {
+    // hmget returns null for missing fields — guard before reading length.
+    if (!Array.isArray(buf) || buf.length === 0) continue;
     const last = buf[buf.length - 1];
     if (last) currentOdds[pid] = last.p;
   }
   const ODDS_MIN_PCT = 0.15; // ≥15% relative move qualifies as a shift
   const attachOdds = (event: FeedRow["event"]): FeedRow["event"] => {
     const buf = oddsBuffers[event.playerId];
-    if (!buf || buf.length < 2) return event;
+    if (!Array.isArray(buf) || buf.length < 2) return event;
     const shift = findOddsShift(buf, event.ts);
     if (!shift) return event;
     const rel = Math.abs(shift.after - shift.before) / shift.before;
