@@ -447,19 +447,22 @@ export function reconstructHistory(
   const series: PnlSample[] = [];
 
   if (bet.kind === "outright") {
-    series.push({ t: bet.placedAt, v: bet.stake, holesPlayed: 0 });
+    // Show the full odds buffer the server has for this player —
+    // not just post-placement — so the chart covers today's round
+    // regardless of when the user got in. The buffer is naturally
+    // bounded server-side (~last 8 hours of samples).
     const samples = oddsHistories[bet.playerId] ?? [];
     for (const s of samples) {
-      if (s.ts < bet.placedAt) continue;
       if (!Number.isFinite(s.p) || s.p <= 1) continue;
       const v = bet.stake * (bet.oddsTaken / s.p);
       const last = series[series.length - 1];
-      if (Math.abs(v - last.v) < 0.05 && s.ts - last.t < 60_000) continue;
+      if (last && Math.abs(v - last.v) < 0.05 && s.ts - last.t < 60_000)
+        continue;
       series.push({ t: s.ts, v });
     }
     if (nowValue != null) {
       const last = series[series.length - 1];
-      if (Math.abs(nowValue - last.v) > 0.01) {
+      if (!last || Math.abs(nowValue - last.v) > 0.01) {
         series.push({ t: Date.now(), v: nowValue });
       }
     }
