@@ -583,6 +583,16 @@ export function reconstructHistory(
     return series;
   }
 
+  if (bet.kind === "winning-score") {
+    // No per-hole chart history for v1 — the field-level state would
+    // need persisting per-poll for every player. Return a stub series.
+    series.push({ t: bet.placedAt, v: bet.stake });
+    if (nowValue != null) {
+      series.push({ t: Date.now(), v: nowValue });
+    }
+    return series;
+  }
+
   const probAtP = probAtPlacementFor(bet);
   const state = playerRoundStates[bet.playerId];
   const round = bet.round != null ? bet.round : state?.currentRound ?? null;
