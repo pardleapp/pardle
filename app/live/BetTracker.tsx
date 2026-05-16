@@ -9,9 +9,12 @@ import {
   type OddsFormat,
 } from "@/lib/odds-format";
 import {
+  anchoredValue,
   currentValueForBet,
   evaluateRoundScore,
+  patchLegacyPlacement,
   readBets,
+  snapshotForPlacement,
   writeBets,
   type OutrightBet,
   type PlayerRoundState,
@@ -60,6 +63,24 @@ export default function BetTracker({
     setBets(readBets());
     setHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    let dirty = false;
+    const patched = bets.map((b) => {
+      if (b.kind !== "round-score" || b.placement) return b;
+      const next = patchLegacyPlacement(b, playerRoundStates[b.playerId]);
+      if (next.placement) {
+        dirty = true;
+        return next;
+      }
+      return b;
+    });
+    if (dirty) {
+      setBets(patched);
+      writeBets(patched);
+    }
+  }, [hydrated, playerRoundStates, bets]);
 
   function addBet(b: TrackedBet) {
     const next = [...bets, b];
@@ -157,6 +178,7 @@ export default function BetTracker({
       {open && (
         <AddBetForm
           players={players}
+          playerRoundStates={playerRoundStates}
           oddsFormat={oddsFormat}
           onAdd={(b) => {
             addBet(b);
@@ -278,13 +300,13 @@ function RoundScoreRow({
     );
   } else {
     const r = ev.roundState;
-    const fairDecimal = ev.prob > 0 ? 1 / ev.prob : null;
-    const currentValue =
-      fairDecimal != null && ev.prob < 1
-        ? bet.stake * (bet.oddsTaken / fairDecimal)
-        : ev.prob === 1
-        ? bet.stake * bet.oddsTaken
-        : 0;
+    const anchorProb = bet.placement?.probAtPlacement ?? 1 / bet.oddsTaken;
+    const currentValue = anchoredValue(
+      ev.prob,
+      anchorProb,
+      bet.stake,
+      bet.oddsTaken,
+    );
     const profit = currentValue - bet.stake;
     profitClass =
       profit > 0 ? "bets-profit-up" : profit < 0 ? "bets-profit-down" : "";
@@ -342,11 +364,13 @@ function RoundScoreRow({
 
 function AddBetForm({
   players,
+  playerRoundStates,
   oddsFormat,
   onAdd,
   onCancel,
 }: {
   players: CachedLeaderboardRow[];
+  playerRoundStates: Record<string, PlayerRoundState>;
   oddsFormat: OddsFormat;
   onAdd: (b: TrackedBet) => void;
   onCancel: () => void;
@@ -409,6 +433,10 @@ function AddBetForm({
     if (roundN !== null && (roundN < 1 || roundN > 4)) {
       return setErr("Pick a round between 1 and 4.");
     }
+    const placement = snapshotForPlacement(
+      { round: roundN, line, side, oddsTaken: odds.decimal },
+      playerRoundStates[pickedPlayer.id],
+    );
     onAdd({
       kind: "round-score",
       id,
@@ -421,6 +449,7 @@ function AddBetForm({
       oddsTaken: odds.decimal,
       oddsTakenLabel: odds.label,
       stake,
+      placement,
     });
   }
 

@@ -38,7 +38,10 @@ export default function BetChartFull({ bet, history }: Props) {
     const ys =
       mode === "pnl"
         ? history.map((s) => s.v - stake)
-        : history.map((s) => clamp01(s.v / winningValue) * 100);
+        : history.map(
+            (s) =>
+              clamp01(s.prob != null ? s.prob : s.v / winningValue) * 100,
+          );
 
     const baseline = mode === "pnl" ? 0 : ys[0];
 
@@ -284,10 +287,12 @@ export default function BetChartFull({ bet, history }: Props) {
               ? isRound
                 ? "Each step = a completed hole. Baseline = break-even."
                 : "Profit/loss since bet placement, valued from live market odds."
-              : `Implied win chance — started at ${(
+              : `Model win chance — started at ${(
+                  startingProbFor(bet) * 100
+                ).toFixed(1)}% (your @ ${bet.oddsTakenLabel} price = ${(
                   (1 / bet.oddsTaken) *
                   100
-                ).toFixed(1)}% from your @ ${bet.oddsTakenLabel} price.`}
+                ).toFixed(1)}% implied).`}
           </span>
         )}
       </div>
@@ -324,6 +329,13 @@ function ChartToggle({
       </button>
     </div>
   );
+}
+
+function startingProbFor(bet: TrackedBet): number {
+  if (bet.kind === "round-score" && bet.placement) {
+    return bet.placement.probAtPlacement;
+  }
+  return 1 / bet.oddsTaken;
 }
 
 function clamp01(x: number): number {

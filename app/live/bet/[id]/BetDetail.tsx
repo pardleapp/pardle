@@ -11,6 +11,7 @@ import {
 import {
   currentValueForBet,
   evaluateRoundScore,
+  patchLegacyPlacement,
   readBetById,
   reconstructHistory,
   writeBets,
@@ -75,6 +76,15 @@ export default function BetDetail({ betId }: { betId: string }) {
     const t = setInterval(load, REFRESH_MS);
     return () => clearInterval(t);
   }, [load]);
+
+  useEffect(() => {
+    if (!bet || bet.kind !== "round-score" || bet.placement || !data) return;
+    const next = patchLegacyPlacement(bet, data.playerRoundStates[bet.playerId]);
+    if (!next.placement) return;
+    const all = readBets().map((b) => (b.id === next.id ? next : b));
+    writeBets(all);
+    setBet(next);
+  }, [bet, data]);
 
   function removeThis() {
     if (!bet) return;
