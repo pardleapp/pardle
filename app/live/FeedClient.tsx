@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Burst, CachedLeaderboardRow } from "@/lib/feed/store";
 import type { FeedRow } from "@/lib/feed/types";
+import BetTracker from "./BetTracker";
 import CatchMeUp from "./CatchMeUp";
 import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
@@ -29,6 +30,7 @@ interface FeedResponse {
   bursts: Burst[];
   leaderboard: CachedLeaderboardRow[];
   playerIndex: CachedLeaderboardRow[];
+  currentOdds: Record<string, number>;
   watching: number;
   seenToday: number;
   polled: boolean;
@@ -273,6 +275,11 @@ export default function FeedClient() {
       />
 
       <LeaderboardPanel rows={data.leaderboard ?? []} />
+
+      <BetTracker
+        players={data.playerIndex ?? []}
+        currentOdds={data.currentOdds ?? {}}
+      />
 
       <div className="feed-filter-row">
         <button

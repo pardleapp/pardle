@@ -136,11 +136,21 @@ export async function GET(req: Request) {
   // time, not at event creation, because the post-shot odds movement
   // hasn't necessarily landed in our buffer the moment we detect a
   // shot. Computing here means newer renders show fuller deltas.
+  // Also: pull the current-odds-per-player map (latest sample from
+  // each buffer) so the client can live-value tracked bets.
   const playerIds = new Set<string>();
   for (const e of feedMerged) playerIds.add(e.playerId);
   for (const e of bestEvents) playerIds.add(e.playerId);
   for (const e of worstEvents) playerIds.add(e.playerId);
+  // Also include every player in the leaderboard so bet-tracker
+  // lookups work even for players whose events have aged out.
+  for (const r of leaderboard) playerIds.add(r.playerId);
   const oddsBuffers = await getOddsBuffers(tournament.id, [...playerIds]);
+  const currentOdds: Record<string, number> = {};
+  for (const [pid, buf] of Object.entries(oddsBuffers)) {
+    const last = buf[buf.length - 1];
+    if (last) currentOdds[pid] = last.p;
+  }
   const ODDS_MIN_PCT = 0.15; // ≥15% relative move qualifies as a shift
   const attachOdds = (event: FeedRow["event"]): FeedRow["event"] => {
     const buf = oddsBuffers[event.playerId];
@@ -186,6 +196,7 @@ export async function GET(req: Request) {
     bursts,
     leaderboard: leaderboard.slice(0, 15),
     playerIndex,
+    currentOdds,
     watching,
     seenToday,
     polled,

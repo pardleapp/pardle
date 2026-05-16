@@ -6501,6 +6501,332 @@ footer {
   background: rgba(224, 91, 91, 0.07);
 }
 
+/* Bet tracker — log a bet against a player, see it live-valued as
+   the win-market odds move during the round. localStorage-only;
+   nothing leaves the device. */
+.bets {
+  margin: 18px 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg, #fff);
+}
+
+.bets-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.bets-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.bets-toggle {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.bets-empty {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.bets-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bets-row {
+  display: grid;
+  grid-template-columns: 1fr auto 28px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.bets-row-main {
+  min-width: 0;
+}
+
+.bets-row-name {
+  margin: 0;
+  font-weight: 800;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bets-row-meta {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.bets-row-value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.bets-row-value strong {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.bets-row-value span {
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 1px;
+}
+
+.bets-row-pending {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.bets-profit-up {
+  color: #2c7a28;
+}
+
+.bets-profit-down {
+  color: #b13838;
+}
+
+.bets-row-x {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.bets-row-x:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #b13838;
+}
+
+.bets-totals {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.bets-form {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bets-form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  min-height: 44px;
+  outline: none;
+  background: var(--bg, #fff);
+  color: var(--text);
+}
+
+.bets-form-input:focus,
+.bets-form-label input:focus {
+  border-color: var(--green, #7bae3f);
+}
+
+.bets-form-suggest {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bets-form-suggest button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 6px;
+  text-align: left;
+  min-height: 38px;
+}
+
+.bets-form-suggest button:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.bets-form-suggest-meta {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.bets-form-picked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(123, 174, 63, 0.08);
+  font-size: 14px;
+}
+
+.bets-form-change {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.bets-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.bets-form-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+}
+
+.bets-form-label input {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  min-height: 44px;
+  outline: none;
+  background: var(--bg, #fff);
+  color: var(--text);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.bets-form-err {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #b13838;
+}
+
+.bets-form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.bets-form-cancel,
+.bets-form-submit {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.bets-form-cancel {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.bets-form-submit {
+  border: none;
+  background: var(--green, #7bae3f);
+  color: white;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bets {
+    background: #1f1f20;
+  }
+  .bets-row {
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .bets-form-input,
+  .bets-form-label input,
+  .bets-form-suggest {
+    background: #1f1f20;
+  }
+  .bets-row-x:hover,
+  .bets-form-suggest button:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .bets-profit-up {
+    color: #95d378;
+  }
+  .bets-profit-down {
+    color: #ee9090;
+  }
+}
+
 /* "Catch me up" banner + modal — single button that pops on the
    first visit after a gap, surfacing a compact summary of everything
    that happened while the user wasn't watching. */
