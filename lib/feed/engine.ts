@@ -20,6 +20,7 @@ import {
   getLeaderboard,
   getScorecards,
   getShotDetailsBatch,
+  type PGAScorecard,
 } from "@/lib/golf-api/pgatour";
 import { analyzeHighlightHole, analyzeHole } from "./shot-analysis";
 import { extractTrace, type TraceFocus } from "./shot-trace";
@@ -43,8 +44,13 @@ import {
   ordinalHole,
   resultFor,
   scoreHeadline,
+  type ScoreResult,
 } from "./types";
 import { classifyShot, parsePlayByPlay } from "./shot-pbp";
+import {
+  buildContextTags,
+  playedInOrderForRound,
+} from "./event-context";
 
 /** Player states we don't poll scorecards for. */
 const INACTIVE_STATES = new Set([
@@ -58,6 +64,34 @@ const INACTIVE_STATES = new Set([
 
 function isUnplayed(score: string | undefined | null): boolean {
   return score === undefined || score === null || score === "" || score === "-";
+}
+
+/**
+ * Pack a player's scorecard for one round into the shape the streak
+ * tagger expects. Returns null when the scorecard is missing or has
+ * no played holes for that round.
+ */
+function streakInputsFor(
+  scorecard: PGAScorecard | undefined,
+  round: number,
+  thru: string | undefined,
+  freshResult: ScoreResult | null,
+): {
+  playedInOrder: { result: ScoreResult; holeNumber: number }[];
+  freshResult: ScoreResult | null;
+} | null {
+  if (!scorecard) return null;
+  const holes = scorecard.rounds[round];
+  if (!holes || holes.length === 0) return null;
+  const holesScored: Record<number, string> = {};
+  const pars: Record<number, number> = {};
+  for (const h of holes) {
+    holesScored[h.holeNumber] = h.score;
+    pars[h.holeNumber] = h.par;
+  }
+  const playedInOrder = playedInOrderForRound(holesScored, pars, thru);
+  if (playedInOrder.length === 0) return null;
+  return { playedInOrder, freshResult };
 }
 
 let eventCounter = 0;
@@ -257,6 +291,35 @@ export async function pollAndDiff(
       headline: `${playerName} ${verdict.verdict} on the ${ordinalHole(sc.currentHole)}`,
       emoji: verdict.emoji,
     });
+  }
+
+  // ── Context tags ────────────────────────────────────────────────
+  // Annotate each event with the data-first chips that make routine
+  // moments read as moments — "Now solo leader", "5 of last 7 in red",
+  // "3 bogeys in a row". Stateless: derived from the same snapshot +
+  // leaderboard we already have in hand.
+  const positionByPid = new Map(
+    leaderboard.map((r) => [r.playerId, r.position]),
+  );
+  const thruByPid = new Map(leaderboard.map((r) => [r.playerId, r.thru]));
+  for (const ev of events) {
+    const freshPos = positionByPid.get(ev.playerId);
+    const prevPos = prev.positions[ev.playerId];
+    let streak: ReturnType<typeof streakInputsFor> = null;
+    if (ev.type === "score" && ev.round != null) {
+      streak = streakInputsFor(
+        scorecards[ev.playerId],
+        ev.round,
+        thruByPid.get(ev.playerId),
+        ev.result ?? null,
+      );
+    }
+    const tags = buildContextTags({
+      prevPosition: prevPos,
+      freshPosition: freshPos,
+      streak,
+    });
+    if (tags.length > 0) ev.tags = tags;
   }
 
   // Order events so the "most interesting" land last (= top of feed

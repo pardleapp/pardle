@@ -322,6 +322,15 @@ export default function FeedClient() {
                     className="feed-body feed-body-link"
                   >
                     <p className="feed-headline">{event.headline}</p>
+                    {event.tags && event.tags.length > 0 && (
+                      <p className="feed-tags">
+                        {event.tags.map((t) => (
+                          <span key={t} className="feed-tag">
+                            {t}
+                          </span>
+                        ))}
+                      </p>
+                    )}
                     <p className="feed-meta">
                       R{event.round} · {timeAgo(event.ts)} · view card →
                     </p>

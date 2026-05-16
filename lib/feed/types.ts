@@ -71,6 +71,13 @@ export interface FeedEvent {
   reelGreat?: boolean;
   /** Normalised shot trace for the hole — rendered as an SVG mini-tracer. */
   trace?: ShotTrace;
+  /**
+   * Context-tag chips rendered alongside the headline ("Takes the lead",
+   * "5 of last 7 in red", etc). Adds the editorial-data layer that
+   * makes a routine birdie read as a moment when it actually is one,
+   * and stays out of the way when it's not.
+   */
+  tags?: string[];
 }
 
 /**

@@ -6501,6 +6501,36 @@ footer {
   background: rgba(224, 91, 91, 0.07);
 }
 
+/* Context-tag chips on feed rows — the data-first layer that turns
+   routine moments into moments. Sit between the headline and the
+   meta line, small enough to stay out of the way. */
+.feed-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 3px 0 0;
+  padding: 0;
+}
+
+.feed-tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(46, 167, 240, 0.13);
+  color: #1a6fa3;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  line-height: 1.4;
+}
+
+@media (prefers-color-scheme: dark) {
+  .feed-tag {
+    background: rgba(46, 167, 240, 0.2);
+    color: #7cc4ed;
+  }
+}
+
 .feed-emoji {
   font-size: 26px;
   line-height: 1;
