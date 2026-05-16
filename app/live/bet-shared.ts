@@ -463,15 +463,9 @@ export function reconstructHistory(
     const usePolymarket =
       Array.isArray(pmSamples) && pmSamples.length >= POLYMARKET_LIQUIDITY_THRESHOLD;
 
-    // Build a unified (timestamp, prob) sample list for the chart
-    // window. The price the user paid at placedAt is also a real
-    // historical anchor — Polymarket / market was at oddsTaken at
-    // that moment, otherwise they wouldn't have got that price.
+    // Build a unified (timestamp, prob) sample list for the chart window.
     type Pt = { t: number; prob: number };
     const pts: Pt[] = [];
-    if (Date.now() - bet.placedAt < 24 * 60 * 60 * 1000) {
-      pts.push({ t: bet.placedAt, prob: 1 / bet.oddsTaken });
-    }
     if (usePolymarket) {
       for (const s of pmSamples) {
         if (!Number.isFinite(s.p) || s.p <= 1) continue;
@@ -482,6 +476,21 @@ export function reconstructHistory(
         if (!Number.isFinite(s.prob) || s.prob <= 0 || s.prob >= 1) continue;
         pts.push({ t: s.ts, prob: s.prob });
       }
+    }
+    // Only include the placedAt anchor (= the price the user paid)
+    // if the buffer has NO real samples near placement time —
+    // otherwise the user-paid price differs from the actual market
+    // price at that moment and injects a misleading V-dip into the
+    // chart line.
+    const NEAR_PLACEMENT_MS = 30 * 60 * 1000;
+    const haveSampleNearPlacement = pts.some(
+      (p) => Math.abs(p.t - bet.placedAt) < NEAR_PLACEMENT_MS,
+    );
+    if (
+      !haveSampleNearPlacement &&
+      Date.now() - bet.placedAt < 24 * 60 * 60 * 1000
+    ) {
+      pts.push({ t: bet.placedAt, prob: 1 / bet.oddsTaken });
     }
     pts.sort((a, b) => a.t - b.t);
     for (const pt of pts) {

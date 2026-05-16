@@ -55,6 +55,11 @@ export async function pushOddsSamples(
   const writes: Record<string, OddsSample[]> = {};
   let updated = 0;
 
+  // Force a fresh sample at least every 5 minutes even when the
+  // price hasn't moved meaningfully, so a market drifting slowly
+  // all afternoon still produces chart-friendly density instead of
+  // being collapsed to a single dot.
+  const FORCE_PUSH_MS = 5 * 60 * 1000;
   for (const pid of pids) {
     const buf: OddsSample[] = existing?.[pid] ?? [];
     const newPrice = latest[pid];
@@ -62,9 +67,12 @@ export async function pushOddsSamples(
     const head = buf[buf.length - 1];
     if (head) {
       const rel = Math.abs(newPrice - head.p) / head.p;
-      // Skip writing a duplicate; refresh timestamp on the existing
-      // head so the buffer's "last seen" is current.
-      if (rel < 0.005) {
+      const ageMs = ts - head.ts;
+      // Tight dedup only when the price truly hasn't moved AND
+      // we already have a recent enough sample. Past the 5-min
+      // floor, push a new entry regardless to keep the chart line
+      // honest about how long the level has held.
+      if (rel < 0.005 && ageMs < FORCE_PUSH_MS) {
         head.ts = ts;
         writes[pid] = buf.slice(-MAX_SAMPLES);
         continue;
