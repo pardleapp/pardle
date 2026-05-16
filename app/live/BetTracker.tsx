@@ -37,6 +37,17 @@ interface RoundScoreBet {
 
 type TrackedBet = OutrightBet | RoundScoreBet;
 
+interface RoundSnapshot {
+  holesPlayed: number;
+  holesRemaining: number;
+  strokes: number;
+  parPlayed: number;
+  parRemaining: number;
+  roundPar: number;
+  toPar: number;
+  status: "not-started" | "in-progress" | "complete";
+}
+
 interface PlayerRoundState {
   currentRound: number;
   holesPlayed: number;
@@ -48,6 +59,7 @@ interface PlayerRoundState {
   toPar: number;
   ttdPacePerHole: number;
   ttdHoles: number;
+  rounds: Record<number, RoundSnapshot>;
 }
 
 interface Props {
@@ -147,55 +159,63 @@ function normalCdf(x: number, mean: number, sd: number): number {
 /** Per-remaining-hole stroke variance — empirical PGA Tour estimate. */
 const PER_HOLE_VAR = 0.65;
 
+/** Outcome of evaluating a round-score bet. */
+type RoundScoreEval =
+  | { kind: "not-started"; round: number }
+  | { kind: "in-progress"; round: number; prob: number; round_state: RoundSnapshot }
+  | { kind: "settled"; round: number; won: boolean; finalStrokes: number };
+
 /**
- * Probability that a round-score bet wins, given the player's current
- * round state. Model:
- *   - blend the player's current-round pace with their
- *     tournament-to-date pace (60/40 once they have ≥6 holes today;
- *     more weight on TTD when current-round sample is small)
- *   - project remaining holes at the blended pace
- *   - Normal approximation around expected final, sd = sqrt(N * 0.65)
+ * Resolve which round the bet is targeting:
+ * - If bet.round is set → that round
+ * - Otherwise → state.currentRound (live or next-up)
  */
-function roundScoreFairProb(
+function resolveBetRound(
   bet: RoundScoreBet,
   state: PlayerRoundState | undefined,
 ): number | null {
+  if (bet.round != null) return bet.round;
+  return state?.currentRound ?? null;
+}
+
+/**
+ * Evaluate a round-score bet against the player's state.
+ * - not-started → flat PnL (bet value = stake, profit = 0)
+ * - in-progress → Normal projection (current pace blended with TTD pace)
+ * - settled → won/lost based on final strokes vs line
+ */
+function evaluateRoundScore(
+  bet: RoundScoreBet,
+  state: PlayerRoundState | undefined,
+): RoundScoreEval | null {
   if (!state) return null;
-  // Bet on a specific round and state is a different round → null.
-  if (bet.round != null && bet.round !== state.currentRound) return null;
+  const round = resolveBetRound(bet, state);
+  if (round == null) return null;
+  const r = state.rounds?.[round];
+  if (!r) return { kind: "not-started", round };
 
-  const { holesPlayed, holesRemaining, strokes, parRemaining, ttdPacePerHole } =
-    state;
-
-  if (holesRemaining === 0) {
-    // Round is over — bet is settled. Return 1 / 0 to show "won" / "lost".
-    const finalScore = strokes;
-    return bet.side === "under"
-      ? finalScore < bet.line
-        ? 1
-        : 0
-      : finalScore > bet.line
-      ? 1
-      : 0;
+  if (r.status === "not-started") {
+    return { kind: "not-started", round };
   }
-
+  if (r.status === "complete") {
+    const won =
+      bet.side === "under" ? r.strokes < bet.line : r.strokes > bet.line;
+    return { kind: "settled", round, won, finalStrokes: r.strokes };
+  }
+  // In progress — project final.
   const currentPace =
-    holesPlayed > 0 ? (strokes - (state.parPlayed)) / holesPlayed : 0;
-  // Weight current-round pace more once we have a real sample (≥6
-  // holes); before then, rely on TTD. Smooth weight via sigmoid.
-  const w = Math.min(1, holesPlayed / 9); // 0..1 from 0..9 holes
-  const blendedPace = w * currentPace + (1 - w) * ttdPacePerHole;
+    r.holesPlayed > 0 ? (r.strokes - r.parPlayed) / r.holesPlayed : 0;
+  const w = Math.min(1, r.holesPlayed / 9);
+  const blendedPace = w * currentPace + (1 - w) * state.ttdPacePerHole;
   const expectedRemainingStrokes =
-    parRemaining + holesRemaining * blendedPace;
-  const expectedFinal = strokes + expectedRemainingStrokes;
-  const sd = Math.sqrt(holesRemaining * PER_HOLE_VAR);
-
-  if (bet.side === "under") {
-    // P(final < line) — bet wins when score is strictly less than line.
-    // Lines are X.5 so this is equivalent to <= floor(line).
-    return normalCdf(bet.line, expectedFinal, sd);
-  }
-  return 1 - normalCdf(bet.line, expectedFinal, sd);
+    r.parRemaining + r.holesRemaining * blendedPace;
+  const expectedFinal = r.strokes + expectedRemainingStrokes;
+  const sd = Math.sqrt(r.holesRemaining * PER_HOLE_VAR);
+  const prob =
+    bet.side === "under"
+      ? normalCdf(bet.line, expectedFinal, sd)
+      : 1 - normalCdf(bet.line, expectedFinal, sd);
+  return { kind: "in-progress", round, prob, round_state: r };
 }
 
 export default function BetTracker({
@@ -236,13 +256,29 @@ export default function BetTracker({
           value += b.stake * (b.oddsTaken / fair);
           valued += b.stake;
         }
-      } else {
-        const p = roundScoreFairProb(b, playerRoundStates[b.playerId]);
-        if (p != null && p > 0) {
-          const fair = 1 / p;
+        continue;
+      }
+      // Round-score
+      const ev = evaluateRoundScore(b, playerRoundStates[b.playerId]);
+      if (!ev) continue;
+      if (ev.kind === "not-started") {
+        // Flat: bet currently worth its stake, no PnL.
+        value += b.stake;
+        valued += b.stake;
+      } else if (ev.kind === "in-progress") {
+        if (ev.prob > 0 && ev.prob < 1) {
+          const fair = 1 / ev.prob;
           value += b.stake * (b.oddsTaken / fair);
           valued += b.stake;
+        } else if (ev.prob === 1) {
+          value += b.stake * b.oddsTaken;
+          valued += b.stake;
+        } else {
+          valued += b.stake; // adds 0 to value
         }
+      } else if (ev.kind === "settled") {
+        value += ev.won ? b.stake * b.oddsTaken : 0;
+        valued += b.stake;
       }
     }
     return { stake, value, valued, hasValue: valued > 0 };
@@ -392,32 +428,55 @@ function RoundScoreRow({
   state: PlayerRoundState | undefined;
   onRemove: () => void;
 }) {
-  const prob = roundScoreFairProb(bet, state);
-  const haveValue = prob != null && prob > 0 && prob < 1;
-  const fairDecimal = haveValue ? 1 / prob! : null;
-  const currentValue =
-    fairDecimal != null ? bet.stake * (bet.oddsTaken / fairDecimal) : null;
-  const profit = currentValue !== null ? currentValue - bet.stake : null;
-  const profitClass =
-    profit === null
-      ? ""
-      : profit > 0
-      ? "bets-profit-up"
-      : profit < 0
-      ? "bets-profit-down"
-      : "";
+  const ev = evaluateRoundScore(bet, state);
+  const roundLabel = bet.round != null ? `R${bet.round}` : "current round";
 
-  // Settlement display: prob = 1 → won, prob = 0 → lost.
-  const settled = prob === 1 || prob === 0;
-  const settledWon = prob === 1;
+  let stateText: string;
+  let valueBlock: JSX.Element;
+  let profitClass = "";
 
-  let stateText = "Round not started yet";
-  if (state) {
-    if (state.holesRemaining === 0) {
-      stateText = `${state.strokes} (R${state.currentRound} final, ${state.toPar >= 0 ? "+" : ""}${state.toPar})`;
-    } else {
-      stateText = `${state.strokes} thru ${state.holesPlayed} (${state.toPar >= 0 ? "+" : ""}${state.toPar}) · ${state.holesRemaining} to play`;
-    }
+  if (!ev) {
+    stateText = "Waiting on data…";
+    valueBlock = <span className="bets-row-pending">—</span>;
+  } else if (ev.kind === "not-started") {
+    stateText = `R${ev.round} not started yet`;
+    valueBlock = (
+      <>
+        <strong>{gbp.format(bet.stake)}</strong>
+        <span>+£0.00</span>
+      </>
+    );
+  } else if (ev.kind === "settled") {
+    profitClass = ev.won ? "bets-profit-up" : "bets-profit-down";
+    stateText = `R${ev.round} final ${ev.finalStrokes} — ${ev.won ? "WON" : "LOST"}`;
+    valueBlock = (
+      <strong className={profitClass}>
+        {ev.won
+          ? `+${gbp.format(bet.stake * (bet.oddsTaken - 1))}`
+          : `-${gbp.format(bet.stake)}`}
+      </strong>
+    );
+  } else {
+    const r = ev.round_state;
+    const fairDecimal = ev.prob > 0 ? 1 / ev.prob : null;
+    const currentValue =
+      fairDecimal != null && ev.prob < 1
+        ? bet.stake * (bet.oddsTaken / fairDecimal)
+        : ev.prob === 1
+        ? bet.stake * bet.oddsTaken
+        : 0;
+    const profit = currentValue - bet.stake;
+    profitClass = profit > 0 ? "bets-profit-up" : profit < 0 ? "bets-profit-down" : "";
+    stateText = `R${ev.round}: ${r.strokes} thru ${r.holesPlayed} (${r.toPar >= 0 ? "+" : ""}${r.toPar}) · ${r.holesRemaining} to play`;
+    valueBlock = (
+      <>
+        <strong>{gbp.format(currentValue)}</strong>
+        <span>
+          {profit >= 0 ? "+" : ""}
+          {gbp.format(profit)}
+        </span>
+      </>
+    );
   }
 
   return (
@@ -426,39 +485,22 @@ function RoundScoreRow({
         <p className="bets-row-name">
           {bet.playerName}{" "}
           <span className="bets-row-kind">
-            {bet.side} {bet.line}
-            {bet.round ? ` R${bet.round}` : ""}
+            {bet.side} {bet.line} · {roundLabel}
           </span>
         </p>
         <p className="bets-row-meta">
           @ {bet.oddsTakenLabel} · {gbp.format(bet.stake)} · {stateText}
         </p>
-        {prob != null && !settled && (
+        {ev?.kind === "in-progress" && (
           <p className="bets-row-meta">
-            Model: {Math.round(prob * 100)}% chance · fair{" "}
-            {fairDecimal ? fractionalDisplay(fairDecimal) : "—"}
+            Model: {Math.round(ev.prob * 100)}% chance · fair{" "}
+            {ev.prob > 0 && ev.prob < 1
+              ? fractionalDisplay(1 / ev.prob)
+              : "—"}
           </p>
         )}
       </div>
-      <div className={`bets-row-value ${profitClass}`}>
-        {settled ? (
-          <strong className={settledWon ? "bets-profit-up" : "bets-profit-down"}>
-            {settledWon
-              ? `+${gbp.format(bet.stake * (bet.oddsTaken - 1))}`
-              : `-${gbp.format(bet.stake)}`}
-          </strong>
-        ) : currentValue !== null ? (
-          <>
-            <strong>{gbp.format(currentValue)}</strong>
-            <span>
-              {profit !== null && profit >= 0 ? "+" : ""}
-              {profit !== null ? gbp.format(profit) : ""}
-            </span>
-          </>
-        ) : (
-          <span className="bets-row-pending">—</span>
-        )}
-      </div>
+      <div className={`bets-row-value ${profitClass}`}>{valueBlock}</div>
       <button
         type="button"
         className="bets-row-x"
@@ -493,6 +535,7 @@ function AddBetForm({
   const [stakeText, setStakeText] = useState("");
   const [lineText, setLineText] = useState("");
   const [side, setSide] = useState<"under" | "over">("under");
+  const [roundText, setRoundText] = useState<string>(""); // "", "1", "2", "3", "4"
   const [err, setErr] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
@@ -536,13 +579,17 @@ function AddBetForm({
     if (!Number.isFinite(line) || line <= 50 || line >= 90) {
       return setErr("Enter a realistic round-score line, e.g. 69.5.");
     }
+    const roundN = roundText === "" ? null : Number(roundText);
+    if (roundN !== null && (roundN < 1 || roundN > 4)) {
+      return setErr("Pick a round between 1 and 4.");
+    }
     onAdd({
       kind: "round-score",
       id,
       placedAt,
       playerId: pickedPlayer.id,
       playerName: pickedPlayer.name,
-      round: null,
+      round: roundN,
       line,
       side,
       oddsTaken: odds.decimal,
@@ -618,19 +665,36 @@ function AddBetForm({
       {pickedPlayer && (
         <>
           {kind === "round-score" && (
-            <div className="bets-form-row">
+            <>
+              <div className="bets-form-row">
+                <label className="bets-form-label">
+                  <span>Round</span>
+                  <select
+                    value={roundText}
+                    onChange={(e) => setRoundText(e.target.value)}
+                  >
+                    <option value="">Auto (current/next)</option>
+                    <option value="1">R1</option>
+                    <option value="2">R2</option>
+                    <option value="3">R3</option>
+                    <option value="4">R4</option>
+                  </select>
+                </label>
+                <label className="bets-form-label">
+                  <span>Side</span>
+                  <select
+                    value={side}
+                    onChange={(e) =>
+                      setSide(e.target.value as "under" | "over")
+                    }
+                  >
+                    <option value="under">Under</option>
+                    <option value="over">Over</option>
+                  </select>
+                </label>
+              </div>
               <label className="bets-form-label">
-                <span>Side</span>
-                <select
-                  value={side}
-                  onChange={(e) => setSide(e.target.value as "under" | "over")}
-                >
-                  <option value="under">Under</option>
-                  <option value="over">Over</option>
-                </select>
-              </label>
-              <label className="bets-form-label">
-                <span>Line</span>
+                <span>Line (e.g. 69.5)</span>
                 <input
                   type="number"
                   step="0.5"
@@ -640,7 +704,7 @@ function AddBetForm({
                   inputMode="decimal"
                 />
               </label>
-            </div>
+            </>
           )}
           <div className="bets-form-row">
             <label className="bets-form-label">
