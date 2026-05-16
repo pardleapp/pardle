@@ -31,6 +31,21 @@ interface FeedResponse {
   leaderboard: CachedLeaderboardRow[];
   playerIndex: CachedLeaderboardRow[];
   currentOdds: Record<string, number>;
+  playerRoundStates: Record<
+    string,
+    {
+      currentRound: number;
+      holesPlayed: number;
+      holesRemaining: number;
+      strokes: number;
+      parPlayed: number;
+      parRemaining: number;
+      roundPar: number;
+      toPar: number;
+      ttdPacePerHole: number;
+      ttdHoles: number;
+    }
+  >;
   watching: number;
   seenToday: number;
   polled: boolean;
@@ -303,6 +318,7 @@ export default function FeedClient() {
       <BetTracker
         players={data.playerIndex ?? []}
         currentOdds={data.currentOdds ?? {}}
+        playerRoundStates={data.playerRoundStates ?? {}}
       />
 
       <div className="feed-filter-row">

@@ -365,6 +365,33 @@ export async function getCachedLeaderboard(
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Tournament par map — hole → par, per round. Doesn't really change
+// once a course is set up, but we refresh from the orchestrator each
+// poll cycle just in case (free-tier hosting tee changes etc).
+// Powers round-score bet valuation: client needs to know which holes
+// remain and what their par is to project the rest of a round.
+// ──────────────────────────────────────────────────────────────────
+
+export type TournamentPars = Record<number, Record<number, number>>;
+
+export async function cacheTournamentPars(
+  tournamentId: string,
+  parsByRoundHole: TournamentPars,
+): Promise<void> {
+  await redis.set(`feed:pars:${tournamentId}`, parsByRoundHole, {
+    ex: 24 * 60 * 60,
+  });
+}
+
+export async function getCachedTournamentPars(
+  tournamentId: string,
+): Promise<TournamentPars> {
+  return (
+    (await redis.get<TournamentPars>(`feed:pars:${tournamentId}`)) ?? {}
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Burst reactions — ephemeral floating emoji everyone watching sees
 // ──────────────────────────────────────────────────────────────────
 

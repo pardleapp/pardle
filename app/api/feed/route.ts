@@ -4,11 +4,13 @@ import { pollAndDiff } from "@/lib/feed/engine";
 import {
   acquirePollLock,
   getCachedLeaderboard,
+  getCachedTournamentPars,
   getCommentCountsBulk,
   getEnrichments,
   getEvents,
   getReactionsBulk,
   getRecentBursts,
+  getSnapshot,
   markSeenToday,
   touchPresence,
 } from "@/lib/feed/store";
@@ -200,6 +202,12 @@ async function handle(req: Request) {
     playerState: r.playerState,
   }));
 
+  // Per-player round state for the bet tracker's round-score bets:
+  // current strokes, holes played + remaining, par played + remaining,
+  // tournament-to-date pace (used by client to project final score).
+  // Built from the snapshot (already has scores) + cached pars map.
+  const playerRoundStates = await computePlayerRoundStates(tournament.id);
+
   return NextResponse.json({
     tournament: {
       id: tournament.id,
@@ -214,8 +222,140 @@ async function handle(req: Request) {
     leaderboard: leaderboard.slice(0, 30),
     playerIndex,
     currentOdds,
+    playerRoundStates,
     watching,
     seenToday,
     polled,
   });
+}
+
+/**
+ * Build per-player current-round state for the bet-tracker's
+ * round-score bets. Reads the existing snapshot (scores per round)
+ * and the tournament pars cache (par per round per hole).
+ *
+ * Each entry tells the client:
+ *   - which round to bet on (currentRound)
+ *   - what the player has scored so far + what par they've played
+ *   - how many holes + par remain
+ *   - their tournament-to-date pace (to-par per hole) — used as a
+ *     skill prior when projecting the rest of the round
+ */
+async function computePlayerRoundStates(
+  tournamentId: string,
+): Promise<Record<string, PlayerRoundState>> {
+  const [snap, pars] = await Promise.all([
+    getSnapshot(tournamentId),
+    getCachedTournamentPars(tournamentId),
+  ]);
+  if (!snap) return {};
+  const result: Record<string, PlayerRoundState> = {};
+
+  for (const [pid, byRound] of Object.entries(snap.holes)) {
+    let currentRound = 0;
+    let activeRoundHoles: Record<number, string> | null = null;
+    // Highest round that has any played hole = current round.
+    for (const [rStr, holes] of Object.entries(byRound)) {
+      const r = Number(rStr);
+      const anyPlayed = Object.values(holes).some(
+        (s) => s !== "" && s !== "-" && Number.isFinite(Number(s)),
+      );
+      if (anyPlayed && r > currentRound) {
+        currentRound = r;
+        activeRoundHoles = holes;
+      }
+    }
+    if (currentRound === 0 || !activeRoundHoles) continue;
+
+    // Per current-round accumulators.
+    let strokes = 0;
+    let parPlayed = 0;
+    let holesPlayed = 0;
+    let roundPar = 0;
+    let parRemaining = 0;
+    let holesRemaining = 0;
+    const pl = pars[currentRound] ?? {};
+    for (const [holeStr, scoreStr] of Object.entries(activeRoundHoles)) {
+      const p = pl[Number(holeStr)];
+      if (p == null) continue;
+      const played =
+        scoreStr !== "" && scoreStr !== "-" && Number.isFinite(Number(scoreStr));
+      roundPar += p;
+      if (played) {
+        const s = Number(scoreStr);
+        strokes += s;
+        parPlayed += p;
+        holesPlayed++;
+      } else {
+        parRemaining += p;
+        holesRemaining++;
+      }
+    }
+
+    // Tournament-to-date pace = (cumulative to-par strokes) / (cumulative holes played).
+    let ttdStrokes = 0;
+    let ttdPar = 0;
+    let ttdHoles = 0;
+    for (const holes of Object.values(byRound)) {
+      const pr = currentRound;
+      const parsForR = pars[pr] ?? {};
+      // Cumulative ALL rounds, not just current.
+      for (const [holeStr, scoreStr] of Object.entries(holes)) {
+        const played =
+          scoreStr !== "" &&
+          scoreStr !== "-" &&
+          Number.isFinite(Number(scoreStr));
+        if (!played) continue;
+        // For pace we need the par on the round this hole was played.
+        // We don't know round here without context; iterate again below.
+        void parsForR;
+      }
+    }
+    // Re-do with round context.
+    for (const [rStr, holes] of Object.entries(byRound)) {
+      const r = Number(rStr);
+      const pr = pars[r] ?? {};
+      for (const [holeStr, scoreStr] of Object.entries(holes)) {
+        const p = pr[Number(holeStr)];
+        if (p == null) continue;
+        const played =
+          scoreStr !== "" &&
+          scoreStr !== "-" &&
+          Number.isFinite(Number(scoreStr));
+        if (!played) continue;
+        ttdStrokes += Number(scoreStr);
+        ttdPar += p;
+        ttdHoles++;
+      }
+    }
+    const ttdPacePerHole = ttdHoles > 0 ? (ttdStrokes - ttdPar) / ttdHoles : 0;
+
+    result[pid] = {
+      currentRound,
+      holesPlayed,
+      holesRemaining,
+      strokes,
+      parPlayed,
+      parRemaining,
+      roundPar,
+      toPar: strokes - parPlayed,
+      ttdPacePerHole,
+      ttdHoles,
+    };
+  }
+  return result;
+}
+
+interface PlayerRoundState {
+  currentRound: number;
+  holesPlayed: number;
+  holesRemaining: number;
+  strokes: number;
+  parPlayed: number;
+  parRemaining: number;
+  roundPar: number;
+  toPar: number;
+  /** Tournament-to-date pace, in strokes-vs-par per hole. */
+  ttdPacePerHole: number;
+  ttdHoles: number;
 }

@@ -26,11 +26,13 @@ import { analyzeHighlightHole, analyzeHole } from "./shot-analysis";
 import { extractTrace, type TraceFocus } from "./shot-trace";
 import {
   cacheLeaderboard,
+  cacheTournamentPars,
   type Enrichment,
   getEnrichments,
   getEvents,
   getSnapshot,
   type PollSnapshot,
+  type TournamentPars,
   pushEvents,
   putEnrichments,
   putSnapshot,
@@ -143,13 +145,21 @@ export async function pollAndDiff(
   for (const r of leaderboard) {
     fresh.positions[r.playerId] = r.position;
   }
+  // Tournament-level hole pars (round → hole → par). Cached separately
+  // so the bet-tracker can know remaining par for round-score bets
+  // without needing a fresh orchestrator call from the client.
+  const pars: TournamentPars = {};
   for (const [pid, sc] of Object.entries(scorecards)) {
     fresh.holes[pid] = {};
     for (const [roundStr, holes] of Object.entries(sc.rounds)) {
       const round = Number(roundStr);
       fresh.holes[pid][round] = {};
+      if (!pars[round]) pars[round] = {};
       for (const h of holes) {
         fresh.holes[pid][round][h.holeNumber] = h.score;
+        if (pars[round][h.holeNumber] == null) {
+          pars[round][h.holeNumber] = h.par;
+        }
       }
     }
     // Build the per-player shot signature. The playByPlay updates as
@@ -159,6 +169,9 @@ export async function pollAndDiff(
       fresh.shots![pid] =
         `${sc.currentHole}:${sc.currentShotDisplay ?? ""}:${sc.playByPlay}`;
     }
+  }
+  if (Object.keys(pars).length > 0) {
+    await cacheTournamentPars(tournamentId, pars);
   }
 
   const prev = await getSnapshot(tournamentId);
