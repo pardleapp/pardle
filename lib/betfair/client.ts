@@ -104,11 +104,19 @@ export async function login(opts: {
     },
     body,
   });
-  const data = (await r.json()) as {
-    status: string;
-    token?: string;
-    error?: string;
-  };
+  const raw = await r.text();
+  let data: { status?: string; token?: string; error?: string };
+  try {
+    data = JSON.parse(raw) as typeof data;
+  } catch {
+    // HTML error pages indicate the endpoint refused the request at
+    // the protocol layer (typically a Betfair geo-block on non-UK IPs).
+    // Surface a short preview so the caller can diagnose.
+    const preview = raw.slice(0, 200).replace(/\s+/g, " ").trim();
+    throw new BetfairAuthError(
+      `Login endpoint returned non-JSON (HTTP ${r.status}): ${preview}…`,
+    );
+  }
   if (data.status !== "SUCCESS" || !data.token) {
     throw new BetfairAuthError(`Login failed: ${data.error ?? data.status}`);
   }
