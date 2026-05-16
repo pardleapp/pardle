@@ -986,8 +986,22 @@ function roundScoreValueAt(
 // ── PnL-over-time chart ────────────────────────────────────────────
 
 const CHART_W = 320;
-const CHART_H = 100;
-const CHART_PAD = 8;
+const CHART_H = 140;
+const CHART_PAD_TOP = 8;
+const CHART_PAD_BOTTOM = 22;
+const CHART_PAD_LEFT = 38;
+const CHART_PAD_RIGHT = 8;
+
+const timeFmt = new Intl.DateTimeFormat(undefined, {
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+function fmtPct(pct: number): string {
+  const rounded = Math.round(pct);
+  if (rounded === 0) return "0%";
+  return rounded > 0 ? `+${rounded}%` : `${rounded}%`;
+}
 
 /** Inline SVG line chart of a bet's value over time, reconstructed
  *  from server-tracked data (odds buffer for outrights, completed-hole
@@ -1013,37 +1027,64 @@ function BetChart({
     );
   }
 
-  const ts = history.map((h) => h.t);
-  const vs = history.map((h) => h.v);
+  // Convert each sample to a PnL percentage (0% = stake).
+  const pts = history.map((h) => ({
+    t: h.t,
+    pct: ((h.v - stake) / stake) * 100,
+  }));
+  const ts = pts.map((p) => p.t);
+  const ys = pts.map((p) => p.pct);
   const tMin = Math.min(...ts);
   const tMax = Math.max(...ts);
-  const vMin = Math.min(...vs, stake);
-  const vMax = Math.max(...vs, stake);
   const tRange = Math.max(1, tMax - tMin);
-  // Pad the value range so a flat line doesn't paint along the edge.
-  const vPad = Math.max((vMax - vMin) * 0.15, stake * 0.05, 0.5);
-  const yLo = vMin - vPad;
-  const yHi = vMax + vPad;
-  const yRange = Math.max(0.001, yHi - yLo);
+
+  // Y-axis bounds — always include 0% (the stake baseline). Pad and
+  // expand to a minimum spread of 20% so a tight series doesn't look
+  // chaotic.
+  let yMin = Math.min(0, ...ys);
+  let yMax = Math.max(0, ...ys);
+  const span = Math.max(yMax - yMin, 20);
+  const pad = span * 0.15;
+  yMin -= pad;
+  yMax += pad;
+  const yRange = yMax - yMin;
+
+  const chartLeft = CHART_PAD_LEFT;
+  const chartRight = CHART_W - CHART_PAD_RIGHT;
+  const chartTop = CHART_PAD_TOP;
+  const chartBottom = CHART_H - CHART_PAD_BOTTOM;
+  const chartWidth = chartRight - chartLeft;
+  const chartHeight = chartBottom - chartTop;
 
   const xOf = (t: number) =>
-    CHART_PAD + ((t - tMin) / tRange) * (CHART_W - CHART_PAD * 2);
-  const yOf = (v: number) =>
-    CHART_H - CHART_PAD - ((v - yLo) / yRange) * (CHART_H - CHART_PAD * 2);
+    chartLeft + ((t - tMin) / tRange) * chartWidth;
+  const yOf = (pct: number) =>
+    chartBottom - ((pct - yMin) / yRange) * chartHeight;
 
-  const stakeY = yOf(stake);
-  const linePath = history
-    .map((h, i) => `${i === 0 ? "M" : "L"}${xOf(h.t)},${yOf(h.v)}`)
+  const baselineY = yOf(0);
+  const linePath = pts
+    .map((p, i) => `${i === 0 ? "M" : "L"}${xOf(p.t)},${yOf(p.pct)}`)
     .join(" ");
-  // Build area paths above/below the stake baseline so we can tint
-  // profit-green and loss-red.
-  const areaPoints = history
-    .map((h) => `${xOf(h.t)},${yOf(h.v)}`)
-    .join(" ");
-  const profitArea = `M${xOf(history[0].t)},${stakeY} L ${areaPoints} L ${xOf(history[history.length - 1].t)},${stakeY} Z`;
+  const areaPath = `M${xOf(pts[0].t)},${baselineY} ${pts
+    .map((p) => `L${xOf(p.t)},${yOf(p.pct)}`)
+    .join(" ")} L${xOf(pts[pts.length - 1].t)},${baselineY} Z`;
 
-  const lastV = vs[vs.length - 1];
-  const profit = lastV - stake;
+  // Axis labels — three time stamps along the bottom and three PnL
+  // percentages on the left (top / 0 / bottom).
+  const xLabels = [
+    { t: tMin, label: timeFmt.format(new Date(tMin)) },
+    { t: (tMin + tMax) / 2, label: timeFmt.format(new Date((tMin + tMax) / 2)) },
+    { t: tMax, label: timeFmt.format(new Date(tMax)) },
+  ];
+  const yLabels = [
+    { pct: yMax - pad / 2, label: fmtPct(yMax - pad / 2) },
+    { pct: 0, label: "0%" },
+    { pct: yMin + pad / 2, label: fmtPct(yMin + pad / 2) },
+  ];
+
+  const lastPct = ys[ys.length - 1];
+  const lastValue = history[history.length - 1].v;
+  const profit = lastValue - stake;
   const profitClass =
     profit > 0 ? "bets-profit-up" : profit < 0 ? "bets-profit-down" : "";
 
@@ -1052,8 +1093,8 @@ function BetChart({
       <div className="bets-chart-summary">
         <span>Stake {gbp.format(stake)}</span>
         <span className={profitClass}>
-          {profit >= 0 ? "+" : ""}
-          {gbp.format(profit)} now
+          {fmtPct(lastPct)} ({profit >= 0 ? "+" : ""}
+          {gbp.format(profit)})
         </span>
         <span className="bets-chart-meta">
           {history.length} sample{history.length === 1 ? "" : "s"}
@@ -1067,40 +1108,64 @@ function BetChart({
       >
         <defs>
           <clipPath id={`pnl-up-${bet.id}`}>
-            <rect x={0} y={0} width={CHART_W} height={stakeY} />
+            <rect x={0} y={0} width={CHART_W} height={baselineY} />
           </clipPath>
           <clipPath id={`pnl-down-${bet.id}`}>
             <rect
               x={0}
-              y={stakeY}
+              y={baselineY}
               width={CHART_W}
-              height={CHART_H - stakeY}
+              height={CHART_H - baselineY}
             />
           </clipPath>
         </defs>
-        {/* Profit area (green tint, clipped above the stake line) */}
+
+        {/* Y-axis gridlines + labels */}
+        {yLabels.map((g) => {
+          const yPos = yOf(g.pct);
+          return (
+            <g key={`y${g.pct}`}>
+              <line
+                x1={chartLeft}
+                y1={yPos}
+                x2={chartRight}
+                y2={yPos}
+                stroke={
+                  g.pct === 0
+                    ? "rgba(128,128,128,0.55)"
+                    : "rgba(128,128,128,0.18)"
+                }
+                strokeWidth={1}
+                strokeDasharray={g.pct === 0 ? "3 3" : "1 3"}
+              />
+              <text
+                x={chartLeft - 4}
+                y={yPos + 3}
+                textAnchor="end"
+                fontSize={9}
+                fontWeight={700}
+                fill="rgba(128,128,128,0.9)"
+              >
+                {g.label}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Profit area (green) */}
         <path
-          d={profitArea}
-          fill="rgba(123, 174, 63, 0.18)"
+          d={areaPath}
+          fill="rgba(123, 174, 63, 0.22)"
           clipPath={`url(#pnl-up-${bet.id})`}
         />
-        {/* Loss area (red tint, clipped below) */}
+        {/* Loss area (red) */}
         <path
-          d={profitArea}
-          fill="rgba(224, 91, 91, 0.16)"
+          d={areaPath}
+          fill="rgba(224, 91, 91, 0.18)"
           clipPath={`url(#pnl-down-${bet.id})`}
         />
-        {/* Stake baseline */}
-        <line
-          x1={CHART_PAD}
-          y1={stakeY}
-          x2={CHART_W - CHART_PAD}
-          y2={stakeY}
-          stroke="rgba(128,128,128,0.55)"
-          strokeWidth={1}
-          strokeDasharray="3 3"
-        />
-        {/* Value line */}
+
+        {/* PnL line */}
         <path
           d={linePath}
           fill="none"
@@ -1112,10 +1177,25 @@ function BetChart({
         {/* Latest point dot */}
         <circle
           cx={xOf(ts[ts.length - 1])}
-          cy={yOf(vs[vs.length - 1])}
+          cy={yOf(ys[ys.length - 1])}
           r={3}
           fill="#2ea7f0"
         />
+
+        {/* X-axis time labels */}
+        {xLabels.map((x, i) => (
+          <text
+            key={`x${i}`}
+            x={xOf(x.t)}
+            y={CHART_H - 4}
+            textAnchor={i === 0 ? "start" : i === xLabels.length - 1 ? "end" : "middle"}
+            fontSize={9}
+            fontWeight={700}
+            fill="rgba(128,128,128,0.9)"
+          >
+            {x.label}
+          </text>
+        ))}
       </svg>
     </div>
   );
