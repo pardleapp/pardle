@@ -19,7 +19,9 @@ const redis = Redis.fromEnv();
 const TTL_S = 5 * 60;
 
 function key(tournamentId: string, round: number | "event_avg"): string {
-  return `feed:livestats:${tournamentId}:${round}`;
+  // v2: distance/accuracy field rename. Bumping invalidates the
+  // stale payloads that had nulls for those two fields.
+  return `feed:livestats:v2:${tournamentId}:${round}`;
 }
 
 /**

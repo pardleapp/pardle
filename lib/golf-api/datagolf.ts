@@ -330,8 +330,8 @@ interface DGLivePlayerRow {
   sg_arg?: number; // around-the-green
   sg_putt?: number;
   // Non-SG misc
-  driving_dist?: number;
-  driving_acc?: number;
+  distance?: number; // driving distance, yds
+  accuracy?: number; // driving accuracy, 0..1
   gir?: number; // greens in regulation, 0..1
   prox_rgh?: number; // proximity from rough, feet
   prox_fw?: number; // proximity from fairway, feet
@@ -384,8 +384,8 @@ const FULL_STATS_LIST = [
   "sg_app",
   "sg_arg",
   "sg_putt",
-  "driving_dist",
-  "driving_acc",
+  "distance",
+  "accuracy",
   "gir",
   "scrambling",
   "prox_rgh",
@@ -443,8 +443,8 @@ export async function getFullLiveStats(
     sgApp: numOrNull(r.sg_app),
     sgArg: numOrNull(r.sg_arg),
     sgPutt: numOrNull(r.sg_putt),
-    drivingDist: numOrNull(r.driving_dist),
-    drivingAcc: numOrNull(r.driving_acc),
+    drivingDist: numOrNull(r.distance),
+    drivingAcc: numOrNull(r.accuracy),
     gir: numOrNull(r.gir),
     scrambling: numOrNull(r.scrambling),
     proxRgh: numOrNull(r.prox_rgh),
