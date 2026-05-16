@@ -447,18 +447,34 @@ export function reconstructHistory(
   const series: PnlSample[] = [];
 
   if (bet.kind === "outright") {
-    // Show the full odds buffer the server has for this player —
-    // not just post-placement — so the chart covers today's round
-    // regardless of when the user got in. The buffer is bounded
-    // server-side at a rolling ~12 hours of samples.
+    // Build a unified sample list for the chart window:
+    //   - The price the user actually paid at placedAt — Polymarket
+    //     was at oddsTaken at that moment, that's why they got the
+    //     price. Acts as a hard historical anchor when the server's
+    //     odds buffer only started capturing later.
+    //   - Every server-side buffer sample we have.
+    //   - The current value as the rightmost point.
+    // Sort by timestamp so the line goes in time order.
     const samples = oddsHistories[bet.playerId] ?? [];
+    type Pt = { t: number; p: number };
+    const pts: Pt[] = [];
+    // Only include the placement anchor for recently-placed bets so
+    // a bet placed weeks ago doesn't stretch the time axis back to
+    // before the round started.
+    if (Date.now() - bet.placedAt < 24 * 60 * 60 * 1000) {
+      pts.push({ t: bet.placedAt, p: bet.oddsTaken });
+    }
     for (const s of samples) {
       if (!Number.isFinite(s.p) || s.p <= 1) continue;
-      const v = bet.stake * (bet.oddsTaken / s.p);
+      pts.push({ t: s.ts, p: s.p });
+    }
+    pts.sort((a, b) => a.t - b.t);
+    for (const pt of pts) {
+      const v = bet.stake * (bet.oddsTaken / pt.p);
       const last = series[series.length - 1];
-      if (last && Math.abs(v - last.v) < 0.05 && s.ts - last.t < 60_000)
+      if (last && Math.abs(v - last.v) < 0.05 && pt.t - last.t < 60_000)
         continue;
-      series.push({ t: s.ts, v });
+      series.push({ t: pt.t, v });
     }
     // Always append the current value as the rightmost sample so a
     // thin buffer (e.g. a market we just started tracking) still
