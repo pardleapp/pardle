@@ -3,14 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Burst, CachedLeaderboardRow } from "@/lib/feed/store";
-import type { PollWithVotes } from "@/lib/feed/polls";
 import type { FeedRow } from "@/lib/feed/types";
 import CatchMeUp from "./CatchMeUp";
 import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
 import LeaderboardPanel from "./LeaderboardPanel";
 import PlayerSearch from "./PlayerSearch";
-import PollPanel from "./PollPanel";
 import Reel from "./Reel";
 
 const REFRESH_MS = 6_000;
@@ -31,8 +29,6 @@ interface FeedResponse {
   bursts: Burst[];
   leaderboard: CachedLeaderboardRow[];
   playerIndex: CachedLeaderboardRow[];
-  polls: PollWithVotes[];
-  myVotes: Record<string, string>;
   watching: number;
   seenToday: number;
   polled: boolean;
@@ -277,12 +273,6 @@ export default function FeedClient() {
       />
 
       <LeaderboardPanel rows={data.leaderboard ?? []} />
-
-      <PollPanel
-        polls={data.polls ?? []}
-        myVotes={data.myVotes ?? {}}
-        authorKey={authorKey.current}
-      />
 
       <div className="feed-filter-row">
         <button

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
-import { getLiveContenders } from "@/lib/golf-api/datagolf";
 import { pollAndDiff } from "@/lib/feed/engine";
 import {
   acquirePollLock,
@@ -14,19 +13,10 @@ import {
   touchPresence,
 } from "@/lib/feed/store";
 import { findOddsShift, getOddsBuffers } from "@/lib/feed/odds-store";
-import {
-  createPoll,
-  deletePoll,
-  getVoterChoice,
-  listPolls,
-  pollWithVotes,
-} from "@/lib/feed/polls";
+import { deletePoll, listPolls } from "@/lib/feed/polls";
 import type { FeedRow } from "@/lib/feed/types";
 
 export const dynamic = "force-dynamic";
-
-/** Marks the current winner-poll seeding strategy; bump to force a re-seed. */
-const WINNER_POLL_SEED = "win-prob-v1";
 
 /**
  * GET /api/feed?v=<visitorId>
@@ -34,9 +24,9 @@ const WINNER_POLL_SEED = "win-prob-v1";
  * The /live page's single data endpoint. On each call:
  *   1. Resolve the active tournament.
  *   2. Register presence, read watcher count.
- *   3. If the poll lock is free: run the diff engine (which also caches
- *      the leaderboard) and seed the "Who wins?" poll if missing.
- *   4. Return feed rows + bursts + leaderboard + polls + watcher count.
+ *   3. If the poll lock is free: run the diff engine (which also
+ *      caches the leaderboard) and clean up any leftover winner polls.
+ *   4. Return feed rows + bursts + leaderboard + watcher count.
  */
 export async function GET(req: Request) {
   const visitorId = new URL(req.url).searchParams.get("v") ?? "";
@@ -50,8 +40,6 @@ export async function GET(req: Request) {
       worstReel: [],
       bursts: [],
       leaderboard: [],
-      polls: [],
-      myVotes: {},
       watching: 0,
       seenToday: 0,
       polled: false,
@@ -77,35 +65,16 @@ export async function GET(req: Request) {
       } catch (err) {
         console.error("[feed] pollAndDiff failed", err);
       }
-      // Seed (or re-seed) the "Who wins?" poll from live win
-      // probability — the genuine "most likely to win", not whoever
-      // teed off early and went low. Replaces any poll seeded by an
-      // older strategy.
+      // One-off cleanup: the winner-prediction poll has been removed
+      // from the UI. Delete any leftover poll rows from previous
+      // seeding so the API doesn't keep returning them.
       try {
-        const polls = await listPolls(tournament.id);
-        const winnerPolls = polls.filter((p) => p.kind === "winner");
-        const current = winnerPolls.find(
-          (p) => p.seededFrom === WINNER_POLL_SEED,
-        );
-        if (!current) {
-          const contenders = await getLiveContenders();
-          const top = contenders.slice(0, 8);
-          if (top.length >= 2) {
-            for (const stale of winnerPolls) {
-              await deletePoll(tournament.id, stale.id);
-            }
-            await createPoll({
-              tournamentId: tournament.id,
-              kind: "winner",
-              question: `Who wins the ${tournament.name}?`,
-              options: top.map((c) => ({ id: c.dgId, label: c.name })),
-              resolvedOptionId: null,
-              seededFrom: WINNER_POLL_SEED,
-            });
-          }
+        const existing = await listPolls(tournament.id);
+        for (const stale of existing.filter((p) => p.kind === "winner")) {
+          await deletePoll(tournament.id, stale.id);
         }
       } catch (err) {
-        console.error("[feed] winner-poll seed failed", err);
+        console.error("[feed] winner-poll cleanup failed", err);
       }
     }
   }
@@ -113,13 +82,12 @@ export async function GET(req: Request) {
   // The main feed shows the last 80 events; the reels are curated from
   // a much wider window so "shots/worst of the day" stay populated even
   // as the feed rolls.
-  const [feedEvents, reelSource, bursts, leaderboard, polls, enrichments] =
+  const [feedEvents, reelSource, bursts, leaderboard, enrichments] =
     await Promise.all([
       getEvents(tournament.id, 80),
       getEvents(tournament.id, 400),
       getRecentBursts(tournament.id),
       getCachedLeaderboard(tournament.id),
-      listPolls(tournament.id),
       getEnrichments(tournament.id),
     ]);
 
@@ -194,18 +162,6 @@ export async function GET(req: Request) {
   const bestReel: FeedRow[] = bestEvents.map(toRow);
   const worstReel: FeedRow[] = worstEvents.map(toRow);
 
-  // Polls + this visitor's existing choices.
-  const pollsWithVotes = await Promise.all(polls.map(pollWithVotes));
-  const myVotes: Record<string, string> = {};
-  if (visitorId) {
-    await Promise.all(
-      polls.map(async (p) => {
-        const choice = await getVoterChoice(p.id, visitorId);
-        if (choice) myVotes[p.id] = choice;
-      }),
-    );
-  }
-
   // Slim shape for the player-search dropdown — just enough to match
   // by name and render a result row with position + total.
   const playerIndex = leaderboard.map((r) => ({
@@ -230,8 +186,6 @@ export async function GET(req: Request) {
     bursts,
     leaderboard: leaderboard.slice(0, 15),
     playerIndex,
-    polls: pollsWithVotes,
-    myVotes,
     watching,
     seenToday,
     polled,

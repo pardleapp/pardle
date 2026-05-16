@@ -2,8 +2,6 @@ import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
-import { getGolfHeadlines } from "@/lib/golf-news";
-import { NewsTicker } from "@/app/_components/NewsTicker";
 import { todayDayNumber } from "@/lib/day-index";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
 import { getEvents } from "@/lib/feed/store";
@@ -134,8 +132,7 @@ async function getLiveFeedLabel(): Promise<string> {
 }
 
 export default async function HubHome() {
-  const [headlines, statsList, liveLabel] = await Promise.all([
-    getGolfHeadlines(),
+  const [statsList, liveLabel] = await Promise.all([
     readPerGameStats(
       Object.fromEntries(
         STATS_GAMES.map((g) => [g, todayDayNumber(g)]),
@@ -152,8 +149,6 @@ export default async function HubHome() {
         <h1 className="hub-wordmark">{BRAND.name}</h1>
         <p className="hub-subtitle">Daily golf puzzles</p>
       </header>
-
-      <NewsTicker headlines={headlines} />
 
       <Link href="/live" className="hub-live-link">
         <span className="hub-live-badge">
