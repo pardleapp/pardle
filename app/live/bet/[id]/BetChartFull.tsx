@@ -8,14 +8,24 @@ interface Props {
   history: PnlSample[];
 }
 
-const PAD = { top: 28, right: 18, bottom: 36, left: 52 };
+type Mode = "pnl" | "prob";
+
+const PAD = { top: 28, right: 18, bottom: 36, left: 60 };
 const W = 900;
 const H = 380;
 
+const gbp = new Intl.NumberFormat("en-GB", {
+  style: "currency",
+  currency: "GBP",
+  maximumFractionDigits: 2,
+});
+
 export default function BetChartFull({ bet, history }: Props) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const [mode, setMode] = useState<Mode>("pnl");
 
   const isRound = bet.kind === "round-score";
+  const winningValue = bet.stake * bet.oddsTaken;
 
   const data = useMemo(() => {
     if (history.length === 0) return null;
@@ -24,7 +34,13 @@ export default function BetChartFull({ bet, history }: Props) {
     const xs: number[] = isRound
       ? history.map((s, i) => s.holesPlayed ?? i)
       : history.map((s) => s.t);
-    const ys = history.map((s) => ((s.v - stake) / stake) * 100);
+
+    const ys =
+      mode === "pnl"
+        ? history.map((s) => s.v - stake)
+        : history.map((s) => clamp01(s.v / winningValue) * 100);
+
+    const baseline = mode === "pnl" ? 0 : ys[0];
 
     const xMin = xs[0];
     const xMaxRaw = xs[xs.length - 1];
@@ -32,12 +48,17 @@ export default function BetChartFull({ bet, history }: Props) {
       ? Math.max(18, Math.ceil(xMaxRaw))
       : Math.max(xMaxRaw, xMin + 1);
 
-    const yMaxStake = Math.max(0, ...ys);
-    const yMinStake = Math.min(0, ...ys);
-    const range = Math.max(yMaxStake - yMinStake, 4);
+    const yMaxRaw = Math.max(baseline, ...ys);
+    const yMinRaw = Math.min(baseline, ...ys);
+    const minRange = mode === "pnl" ? Math.max(stake * 0.2, 2) : 6;
+    const range = Math.max(yMaxRaw - yMinRaw, minRange);
     const headroom = range * 0.15;
-    const yMax = yMaxStake + headroom;
-    const yMin = yMinStake - headroom;
+    let yMax = yMaxRaw + headroom;
+    let yMin = yMinRaw - headroom;
+    if (mode === "prob") {
+      yMax = Math.min(100, yMax);
+      yMin = Math.max(0, yMin);
+    }
 
     const xScale = (x: number) =>
       PAD.left + ((x - xMin) / (xMax - xMin || 1)) * (W - PAD.left - PAD.right);
@@ -52,7 +73,7 @@ export default function BetChartFull({ bet, history }: Props) {
       yVal: ys[i],
     }));
 
-    const zeroY = yScale(0);
+    const baseY = yScale(baseline);
     const linePath = points
       .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`)
       .join(" ");
@@ -60,7 +81,8 @@ export default function BetChartFull({ bet, history }: Props) {
     return {
       points,
       linePath,
-      zeroY,
+      baseY,
+      baseline,
       xMin,
       xMax,
       yMin,
@@ -69,43 +91,48 @@ export default function BetChartFull({ bet, history }: Props) {
       yScale,
       latestY: ys[ys.length - 1],
     };
-  }, [history, isRound, bet.stake]);
+  }, [history, isRound, bet.stake, mode, winningValue]);
 
   if (!data || history.length < 2) {
     return (
-      <div className="bd-chart-empty">
-        Chart will fill in as {isRound ? "holes complete" : "odds shift"} after
-        the bet was placed.
+      <div className="bd-chart">
+        <ChartToggle mode={mode} setMode={setMode} />
+        <div className="bd-chart-empty">
+          Chart will fill in as {isRound ? "holes complete" : "odds shift"} after
+          the bet was placed.
+        </div>
       </div>
     );
   }
 
-  const { points, linePath, zeroY, xMin, xMax, yMin, yMax, xScale } = data;
+  const { points, linePath, baseY, baseline, xMin, xMax, yMin, yMax, xScale, latestY } =
+    data;
 
-  const yTicks = buildYTicks(yMin, yMax);
+  const yTicks = buildYTicks(yMin, yMax, baseline);
   const xTicks = isRound
     ? buildHoleTicks(xMin, xMax)
     : buildTimeTicks(xMin, xMax);
 
-  const profitNow = points[points.length - 1].yVal;
-  const lineColor = profitNow >= 0 ? "#2c7a28" : "#b13838";
-  const fillColor =
-    profitNow >= 0 ? "rgba(44,122,40,0.16)" : "rgba(177,56,56,0.16)";
+  const isUp = latestY >= baseline;
+  const lineColor = isUp ? "#2c7a28" : "#b13838";
+  const fillColor = isUp ? "rgba(44,122,40,0.16)" : "rgba(177,56,56,0.16)";
 
-  const areaPath = `M${points[0].x.toFixed(2)},${zeroY.toFixed(2)} ${points
+  const areaPath = `M${points[0].x.toFixed(2)},${baseY.toFixed(2)} ${points
     .map((p) => `L${p.x.toFixed(2)},${p.y.toFixed(2)}`)
-    .join(" ")} L${points[points.length - 1].x.toFixed(2)},${zeroY.toFixed(2)} Z`;
+    .join(" ")} L${points[points.length - 1].x.toFixed(2)},${baseY.toFixed(2)} Z`;
 
   const hover = hoverIdx != null ? points[hoverIdx] : null;
 
   return (
     <div className="bd-chart">
+      <ChartToggle mode={mode} setMode={setMode} />
+
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="bd-chart-svg"
         preserveAspectRatio="xMidYMid meet"
         role="img"
-        aria-label="PnL chart since bet placed"
+        aria-label={mode === "pnl" ? "Profit/loss chart" : "Win probability chart"}
         onMouseLeave={() => setHoverIdx(null)}
         onMouseMove={(e) => {
           const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
@@ -121,9 +148,27 @@ export default function BetChartFull({ bet, history }: Props) {
           }
           setHoverIdx(best);
         }}
+        onTouchMove={(e) => {
+          const t = e.touches[0];
+          if (!t) return;
+          const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+          const svgX = ((t.clientX - rect.left) / rect.width) * W;
+          let best = 0;
+          let bestD = Infinity;
+          for (let i = 0; i < points.length; i++) {
+            const d = Math.abs(points[i].x - svgX);
+            if (d < bestD) {
+              bestD = d;
+              best = i;
+            }
+          }
+          setHoverIdx(best);
+        }}
+        onTouchEnd={() => setHoverIdx(null)}
       >
         {yTicks.map((t) => {
           const y = data.yScale(t);
+          const isBaseline = Math.abs(t - baseline) < 1e-6;
           return (
             <g key={`y${t}`} className="bd-grid">
               <line
@@ -131,10 +176,10 @@ export default function BetChartFull({ bet, history }: Props) {
                 x2={W - PAD.right}
                 y1={y}
                 y2={y}
-                stroke={t === 0 ? "var(--border)" : "var(--border)"}
-                strokeWidth={t === 0 ? 1.5 : 0.5}
-                strokeDasharray={t === 0 ? "" : "3 4"}
-                opacity={t === 0 ? 0.9 : 0.55}
+                stroke="var(--border)"
+                strokeWidth={isBaseline ? 1.5 : 0.5}
+                strokeDasharray={isBaseline ? "" : "3 4"}
+                opacity={isBaseline ? 0.9 : 0.55}
               />
               <text
                 x={PAD.left - 8}
@@ -143,7 +188,7 @@ export default function BetChartFull({ bet, history }: Props) {
                 fontSize="11"
                 fill="var(--muted)"
               >
-                {t > 0 ? `+${t.toFixed(0)}%` : `${t.toFixed(0)}%`}
+                {formatY(t, mode)}
               </text>
             </g>
           );
@@ -193,17 +238,15 @@ export default function BetChartFull({ bet, history }: Props) {
         ))}
 
         {hover && (
-          <g>
-            <line
-              x1={hover.x}
-              x2={hover.x}
-              y1={PAD.top}
-              y2={H - PAD.bottom}
-              stroke="var(--muted)"
-              strokeDasharray="2 3"
-              strokeWidth={0.8}
-            />
-          </g>
+          <line
+            x1={hover.x}
+            x2={hover.x}
+            y1={PAD.top}
+            y2={H - PAD.bottom}
+            stroke="var(--muted)"
+            strokeDasharray="2 3"
+            strokeWidth={0.8}
+          />
         )}
 
         <text
@@ -214,7 +257,8 @@ export default function BetChartFull({ bet, history }: Props) {
           fill="var(--muted)"
           fontWeight={700}
         >
-          {isRound ? "Holes played" : "Time"} → PnL %
+          {isRound ? "Holes played" : "Time"} →{" "}
+          {mode === "pnl" ? "Profit / loss" : "Implied win chance"}
         </text>
       </svg>
 
@@ -230,24 +274,20 @@ export default function BetChartFull({ bet, history }: Props) {
                   })}
             </strong>{" "}
             ·{" "}
-            <span
-              className={
-                hover.yVal > 0
-                  ? "bets-profit-up"
-                  : hover.yVal < 0
-                  ? "bets-profit-down"
-                  : ""
-              }
-            >
-              {hover.yVal > 0 ? "+" : ""}
-              {hover.yVal.toFixed(1)}%
+            <span className={tintFor(hover.yVal, baseline)}>
+              {formatHoverValue(hover.yVal, mode)}
             </span>
           </span>
         ) : (
           <span className="bd-chart-foot-hint">
-            {isRound
-              ? "Each step = a completed hole since the bet was placed."
-              : "PnL since bet placement, valued from live market odds."}
+            {mode === "pnl"
+              ? isRound
+                ? "Each step = a completed hole. Baseline = break-even."
+                : "Profit/loss since bet placement, valued from live market odds."
+              : `Implied win chance — started at ${(
+                  (1 / bet.oddsTaken) *
+                  100
+                ).toFixed(1)}% from your @ ${bet.oddsTakenLabel} price.`}
           </span>
         )}
       </div>
@@ -255,9 +295,66 @@ export default function BetChartFull({ bet, history }: Props) {
   );
 }
 
-function buildYTicks(yMin: number, yMax: number): number[] {
+function ChartToggle({
+  mode,
+  setMode,
+}: {
+  mode: Mode;
+  setMode: (m: Mode) => void;
+}) {
+  return (
+    <div className="bd-chart-toggle" role="tablist" aria-label="Chart mode">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "pnl"}
+        className={mode === "pnl" ? "bd-chart-toggle-on" : ""}
+        onClick={() => setMode("pnl")}
+      >
+        PnL £
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "prob"}
+        className={mode === "prob" ? "bd-chart-toggle-on" : ""}
+        onClick={() => setMode("prob")}
+      >
+        Win %
+      </button>
+    </div>
+  );
+}
+
+function clamp01(x: number): number {
+  if (!Number.isFinite(x)) return 0;
+  if (x < 0) return 0;
+  if (x > 1) return 1;
+  return x;
+}
+
+function tintFor(v: number, baseline: number): string {
+  if (v > baseline + 1e-6) return "bets-profit-up";
+  if (v < baseline - 1e-6) return "bets-profit-down";
+  return "";
+}
+
+function formatY(v: number, mode: Mode): string {
+  if (mode === "prob") return `${v.toFixed(0)}%`;
+  if (Math.abs(v) < 0.005) return "£0";
+  const sign = v > 0 ? "+" : "-";
+  return `${sign}${gbp.format(Math.abs(v)).replace(".00", "")}`;
+}
+
+function formatHoverValue(v: number, mode: Mode): string {
+  if (mode === "prob") return `${v.toFixed(1)}% chance`;
+  if (v >= 0) return `+${gbp.format(v)}`;
+  return `-${gbp.format(Math.abs(v))}`;
+}
+
+function buildYTicks(yMin: number, yMax: number, baseline: number): number[] {
   const ticks = new Set<number>();
-  ticks.add(0);
+  ticks.add(Number(baseline.toFixed(2)));
   const span = yMax - yMin;
   const step = niceStep(span / 4);
   for (let v = Math.ceil(yMin / step) * step; v <= yMax; v += step) {

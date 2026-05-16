@@ -7174,6 +7174,49 @@ footer {
   height: auto;
   display: block;
   font-family: inherit;
+  touch-action: pan-y;
+}
+
+.bd-chart-toggle {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.bd-chart-toggle button {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  min-height: 32px;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.bd-chart-toggle button:hover {
+  color: var(--text);
+}
+
+.bd-chart-toggle .bd-chart-toggle-on {
+  background: var(--text);
+  color: var(--bg, white);
+}
+
+@media (prefers-color-scheme: dark) {
+  .bd-chart-toggle {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .bd-chart-toggle .bd-chart-toggle-on {
+    background: white;
+    color: #1f1f20;
+  }
 }
 
 .bd-chart-foot {
