@@ -18,9 +18,6 @@ interface PnlSample {
   t: number; // epoch ms
   v: number; // bet's "current value" in £
 }
-const HISTORY_MAX = 240; // ~4 hours at one sample per minute
-const HISTORY_COALESCE_MS = 25_000; // replace last sample if within 25s
-const HISTORY_VALUE_NOISE = 0.05; // and value moved less than £0.05
 
 interface OutrightBet {
   id: string;
@@ -31,7 +28,6 @@ interface OutrightBet {
   oddsTakenLabel: string;
   stake: number;
   placedAt: number;
-  history?: PnlSample[];
 }
 
 interface RoundScoreBet {
@@ -48,7 +44,6 @@ interface RoundScoreBet {
   oddsTakenLabel: string;
   stake: number;
   placedAt: number;
-  history?: PnlSample[];
 }
 
 type TrackedBet = OutrightBet | RoundScoreBet;
@@ -78,10 +73,32 @@ interface PlayerRoundState {
   rounds: Record<number, RoundSnapshot>;
 }
 
+interface OddsHistorySample {
+  ts: number;
+  p: number; // decimal odds
+}
+
+interface FeedRowLike {
+  event: {
+    id: string;
+    type: string;
+    playerId: string;
+    round: number;
+    hole?: number;
+    par?: number;
+    strokes?: number;
+    ts: number;
+  };
+}
+
 interface Props {
   players: CachedLeaderboardRow[];
   currentOdds: Record<string, number>;
+  /** Per-player decimal-odds samples (server-side rolling buffer). */
+  oddsHistories: Record<string, OddsHistorySample[] | null>;
   playerRoundStates: Record<string, PlayerRoundState>;
+  /** The visible feed rows — used to reconstruct round-score history. */
+  feedEvents: FeedRowLike[];
   oddsFormat: OddsFormat;
 }
 
@@ -246,7 +263,9 @@ function evaluateRoundScore(
 export default function BetTracker({
   players,
   currentOdds,
+  oddsHistories,
   playerRoundStates,
+  feedEvents,
   oddsFormat,
 }: Props) {
   const [bets, setBets] = useState<TrackedBet[]>([]);
@@ -272,50 +291,12 @@ export default function BetTracker({
   }
 
   // Per-bet current value, computed once per render and reused by
-  // totals + each row + the history sampler.
+  // totals + each row.
   const valueByBet = useMemo(() => {
     const out = new Map<string, number | null>();
     for (const b of bets) out.set(b.id, currentValueForBet(b, currentOdds, playerRoundStates));
     return out;
   }, [bets, currentOdds, playerRoundStates]);
-
-  // Append a PnL sample to each bet's history if the value has moved
-  // meaningfully OR the last sample is older than HISTORY_COALESCE_MS.
-  // Persists silently — doesn't trigger an extra rerender.
-  useEffect(() => {
-    if (!hydrated) return;
-    const now = Date.now();
-    let changed = false;
-    const next = bets.map((b) => {
-      const v = valueByBet.get(b.id);
-      if (v == null) return b;
-      const hist = b.history ?? [];
-      const last = hist[hist.length - 1];
-      if (
-        last &&
-        now - last.t < HISTORY_COALESCE_MS &&
-        Math.abs(v - last.v) < HISTORY_VALUE_NOISE
-      ) {
-        return b; // skip — no meaningful change
-      }
-      let nextHist: PnlSample[];
-      if (last && now - last.t < HISTORY_COALESCE_MS) {
-        // Replace the head (recent sample with same/near value).
-        nextHist = [...hist.slice(0, -1), { t: now, v }];
-      } else {
-        nextHist = [...hist, { t: now, v }];
-      }
-      if (nextHist.length > HISTORY_MAX) {
-        nextHist = nextHist.slice(nextHist.length - HISTORY_MAX);
-      }
-      changed = true;
-      return { ...b, history: nextHist } as TrackedBet;
-    });
-    if (changed) {
-      setBets(next);
-      writeBets(next);
-    }
-  }, [hydrated, bets, valueByBet]);
 
   const totals = useMemo(() => {
     let stake = 0;
@@ -381,7 +362,17 @@ export default function BetTracker({
               >
                 {row}
                 {expanded && (
-                  <BetChart bet={b} stake={b.stake} />
+                  <BetChart
+                    bet={b}
+                    stake={b.stake}
+                    history={reconstructHistory(
+                      b,
+                      oddsHistories,
+                      playerRoundStates,
+                      feedEvents,
+                      valueByBet.get(b.id) ?? null,
+                    )}
+                  />
                 )}
               </li>
             );
@@ -862,29 +853,162 @@ function AddBetForm({
   );
 }
 
+// ── History reconstruction ─────────────────────────────────────────
+
+/**
+ * Build the bet's value-over-time series from data the server already
+ * tracks (odds buffer + score events) — so the chart shows real
+ * history covering periods when the user wasn't on the page.
+ *
+ * Outright bets: walk the odds-history samples for the player from
+ * `placedAt` onwards. Each sample yields a value point.
+ *
+ * Round-score bets: walk the player's completed-hole events in the
+ * targeted round, oldest first. Each hole completed yields a new
+ * (strokes, holesPlayed, parPlayed) state which we run through the
+ * same projection model the row uses.
+ */
+function reconstructHistory(
+  bet: TrackedBet,
+  oddsHistories: Record<string, OddsHistorySample[] | null>,
+  playerRoundStates: Record<string, PlayerRoundState>,
+  feedEvents: FeedRowLike[],
+  nowValue: number | null,
+): PnlSample[] {
+  const series: PnlSample[] = [];
+  // Anchor with the stake at placed-time.
+  series.push({ t: bet.placedAt, v: bet.stake });
+
+  if (bet.kind === "outright") {
+    const samples = oddsHistories[bet.playerId] ?? [];
+    for (const s of samples) {
+      if (s.ts < bet.placedAt) continue;
+      if (!Number.isFinite(s.p) || s.p <= 1) continue;
+      const v = bet.stake * (bet.oddsTaken / s.p);
+      // Skip near-duplicates so the line isn't pixel-noise.
+      const last = series[series.length - 1];
+      if (Math.abs(v - last.v) < 0.05 && s.ts - last.t < 60_000) continue;
+      series.push({ t: s.ts, v });
+    }
+  } else {
+    // Round-score: rebuild round state hole-by-hole.
+    const state = playerRoundStates[bet.playerId];
+    const round =
+      bet.round != null ? bet.round : state?.currentRound ?? null;
+    if (round == null) {
+      if (nowValue != null) series.push({ t: Date.now(), v: nowValue });
+      return series;
+    }
+    const roundSnap = state?.rounds?.[round];
+    // Collect score events for this player+round from the visible feed.
+    const events = feedEvents
+      .filter(
+        (r) =>
+          r.event.type === "score" &&
+          r.event.playerId === bet.playerId &&
+          r.event.round === round &&
+          r.event.ts >= bet.placedAt &&
+          typeof r.event.strokes === "number" &&
+          typeof r.event.par === "number" &&
+          typeof r.event.hole === "number",
+      )
+      .sort((a, b) => a.event.ts - b.event.ts);
+
+    if (!roundSnap || (events.length === 0 && roundSnap.status === "not-started")) {
+      // Round hasn't moved since placedAt — flat line, value = stake.
+      if (nowValue != null && Math.abs(nowValue - bet.stake) > 0.01) {
+        series.push({ t: Date.now(), v: nowValue });
+      }
+      return series;
+    }
+
+    // Walk events accumulating round state.
+    let strokes = 0;
+    let parPlayed = 0;
+    let holesPlayed = 0;
+    const roundPar = roundSnap.roundPar;
+    for (const r of events) {
+      strokes += r.event.strokes!;
+      parPlayed += r.event.par!;
+      holesPlayed++;
+      const holesRemaining = 18 - holesPlayed;
+      const parRemaining = roundPar - parPlayed;
+      const v = roundScoreValueAt(
+        bet,
+        strokes,
+        parPlayed,
+        holesPlayed,
+        parRemaining,
+        holesRemaining,
+        state?.ttdPacePerHole ?? 0,
+      );
+      if (v != null) series.push({ t: r.event.ts, v });
+    }
+  }
+
+  // Make sure the latest server-known value lands on the chart.
+  if (nowValue != null) {
+    const last = series[series.length - 1];
+    if (Math.abs(nowValue - last.v) > 0.01) {
+      series.push({ t: Date.now(), v: nowValue });
+    }
+  }
+  return series;
+}
+
+function roundScoreValueAt(
+  bet: RoundScoreBet,
+  strokes: number,
+  parPlayed: number,
+  holesPlayed: number,
+  parRemaining: number,
+  holesRemaining: number,
+  ttdPacePerHole: number,
+): number | null {
+  if (holesRemaining === 0) {
+    const won =
+      bet.side === "under" ? strokes < bet.line : strokes > bet.line;
+    return won ? bet.stake * bet.oddsTaken : 0;
+  }
+  const currentPace = holesPlayed > 0 ? (strokes - parPlayed) / holesPlayed : 0;
+  const w = Math.min(1, holesPlayed / 9);
+  const blendedPace = w * currentPace + (1 - w) * ttdPacePerHole;
+  const expectedFinal = strokes + parRemaining + holesRemaining * blendedPace;
+  const sd = Math.sqrt(holesRemaining * PER_HOLE_VAR);
+  const z = (bet.line - expectedFinal) / (sd * Math.SQRT2);
+  const cdf = 0.5 * (1 + erf(z));
+  const prob = bet.side === "under" ? cdf : 1 - cdf;
+  if (prob <= 0) return 0;
+  if (prob >= 1) return bet.stake * bet.oddsTaken;
+  return bet.stake * (bet.oddsTaken / (1 / prob));
+}
+
 // ── PnL-over-time chart ────────────────────────────────────────────
 
 const CHART_W = 320;
 const CHART_H = 100;
 const CHART_PAD = 8;
 
-/** Inline SVG line chart of a bet's value across the history samples
- *  this device has captured. Shows the stake as a dashed baseline so
- *  the user reads PnL at a glance — profit area tints green above,
- *  loss area red below. */
+/** Inline SVG line chart of a bet's value over time, reconstructed
+ *  from server-tracked data (odds buffer for outrights, completed-hole
+ *  events for round-score bets). Covers the period from placedAt to
+ *  now even if the user wasn't viewing the page in between. Shows the
+ *  stake as a dashed baseline; profit area tints green above, loss
+ *  area red below. */
 function BetChart({
   bet,
   stake,
+  history,
 }: {
   bet: TrackedBet;
   stake: number;
+  history: PnlSample[];
 }) {
-  const history = bet.history ?? [];
   if (history.length < 2) {
     return (
       <div className="bets-chart-empty">
-        Collecting price history… give it a few feed refreshes (or come back
-        as the round plays out).
+        Not enough price moves yet to chart — the line will fill in as
+        odds move or as the round plays out.
       </div>
     );
   }

@@ -200,6 +200,10 @@ async function handle(req: Request) {
     leaderboard: leaderboard.slice(0, 30),
     playerIndex,
     currentOdds,
+    // Per-player rolling odds buffer (~last few hours of mid-price
+    // samples). Used by the bet tracker to reconstruct PnL history
+    // server-driven, so charts cover the period a user was off-page.
+    oddsHistories: oddsBuffers,
     playerRoundStates,
     watching,
     seenToday,

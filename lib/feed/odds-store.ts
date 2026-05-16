@@ -16,7 +16,10 @@ import { Redis } from "@upstash/redis";
 const redis = Redis.fromEnv();
 
 const HASH_PREFIX = "feed:odds:";
-const MAX_SAMPLES = 30;
+// Each buffer keeps the last N samples per player. At ~1 sample/min
+// during a live round, 480 covers ~8 hours — a full tournament day
+// for round-score and outright bet history charts.
+const MAX_SAMPLES = 480;
 
 export interface OddsSample {
   /** epoch ms */

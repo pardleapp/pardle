@@ -67,6 +67,7 @@ interface FeedResponse {
       >;
     }
   >;
+  oddsHistories: Record<string, Array<{ ts: number; p: number }> | null>;
   watching: number;
   seenToday: number;
   polled: boolean;
@@ -356,7 +357,9 @@ export default function FeedClient() {
       <BetTracker
         players={data.playerIndex ?? []}
         currentOdds={data.currentOdds ?? {}}
+        oddsHistories={data.oddsHistories ?? {}}
         playerRoundStates={data.playerRoundStates ?? {}}
+        feedEvents={data.rows ?? []}
         oddsFormat={oddsFormat}
       />
 
