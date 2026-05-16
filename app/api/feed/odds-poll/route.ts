@@ -49,11 +49,22 @@ export async function GET(req: Request) {
   // Look up (or re-discover) the Betfair winner market for this event.
   let market = await getCachedWinnerMarket(tournamentId);
   if (!market) {
-    market = await discoverWinnerMarket(
-      tournamentId,
-      active.tournament.name,
-      leaderboard,
-    );
+    try {
+      market = await discoverWinnerMarket(
+        tournamentId,
+        active.tournament.name,
+        leaderboard,
+      );
+    } catch (err) {
+      console.error("[odds-poll] discoverWinnerMarket failed", err);
+      return NextResponse.json(
+        {
+          error: "betfair-discover-failed",
+          message: err instanceof Error ? err.message : String(err),
+        },
+        { status: 502 },
+      );
+    }
   }
   if (!market) {
     return NextResponse.json({ skipped: "betfair-market-not-found" });
