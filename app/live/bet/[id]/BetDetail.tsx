@@ -413,83 +413,85 @@ function WinningScoreDetail({
   projections: Record<string, TournamentProjection>;
   oddsFormat: OddsFormat;
 }) {
-  const ev = evaluateWinningScore(bet, projections);
-  const active = Object.values(projections).filter((p) => p.active);
-  // Top 8 contenders most likely to break the line, ranked by their
-  // individual P(finish < line). Helpful "who could spoil it" view.
-  const candidates = active
-    .map((p) => {
-      const sd = Math.sqrt(p.variance || 1);
-      const probUnder =
-        p.variance > 0
-          ? (1 + erfInline((bet.line - p.mean) / (sd * Math.SQRT2))) / 2
-          : p.mean < bet.line
-          ? 1
-          : 0;
-      return { mean: p.mean, sd, probUnder };
-    })
-    .sort((a, b) => b.probUnder - a.probUnder)
-    .slice(0, 8);
+  // Build a table of nearby lines (yours ± 2) with the chance and
+  // fair price for each, on the same side the bettor chose. Gives
+  // context for whether the line they picked is generous or thin.
+  const lines: number[] = [];
+  for (let i = -2; i <= 2; i++) lines.push(bet.line + i);
+  const rows = lines.map((line) => {
+    const ev = evaluateWinningScore(
+      { ...bet, line, oddsTaken: 2 },
+      projections,
+    );
+    return { line, prob: ev?.prob ?? null };
+  });
+  const hasModel = rows.some((r) => r.prob != null);
 
   return (
     <div className="bd-table">
-      <p className="bd-table-title">
-        Field outlook · line {bet.line} {bet.side}
-      </p>
-      {ev ? (
+      <p className="bd-table-title">Nearby lines</p>
+      {!hasModel ? (
         <p className="bd-table-foot" style={{ marginTop: 0 }}>
-          Model: <strong>{Math.round(ev.prob * 100)}% chance</strong> · fair{" "}
-          {ev.prob > 0 && ev.prob < 1
-            ? formatOdds(1 / ev.prob, oddsFormat)
-            : "—"}{" "}
-          · {active.length} active players in the field
+          Live odds for nearby lines fill in once the field is on the
+          course.
         </p>
       ) : (
-        <p className="bd-table-foot">Model: waiting on field data…</p>
+        <ul>
+          {rows.map((r) => {
+            const yours = r.line === bet.line;
+            const cls =
+              r.prob == null
+                ? ""
+                : r.prob > 0.5
+                ? "bets-profit-up"
+                : r.prob < 0.2
+                ? "bets-profit-down"
+                : "";
+            return (
+              <li
+                key={r.line}
+                className="bd-table-row"
+                style={
+                  yours
+                    ? {
+                        background: "rgba(123, 174, 63, 0.10)",
+                        borderRadius: 6,
+                        paddingLeft: 8,
+                        paddingRight: 8,
+                      }
+                    : undefined
+                }
+              >
+                <span className="bd-table-hole">
+                  {bet.side === "under" ? "Under" : "Over"} {r.line.toFixed(1)}
+                  {yours && (
+                    <span
+                      style={{
+                        marginLeft: 6,
+                        fontSize: 10,
+                        fontWeight: 800,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        color: "var(--muted)",
+                      }}
+                    >
+                      Your bet
+                    </span>
+                  )}
+                </span>
+                <span className="bd-table-val">
+                  {r.prob == null ? "—" : `${Math.round(r.prob * 100)}%`}
+                </span>
+                <span className={`bd-table-pct ${cls}`}>
+                  {r.prob == null || r.prob <= 0 || r.prob >= 1
+                    ? "—"
+                    : formatOdds(1 / r.prob, oddsFormat)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       )}
-      <ul style={{ marginTop: 12 }}>
-        {candidates.map((c, i) => (
-          <li key={i} className="bd-table-row">
-            <span className="bd-table-hole">
-              Player projection #{i + 1}
-            </span>
-            <span className="bd-table-val">
-              {c.mean.toFixed(1)} ± {c.sd.toFixed(1)}
-            </span>
-            <span
-              className={`bd-table-pct ${
-                c.probUnder > 0.4
-                  ? "bets-profit-up"
-                  : c.probUnder < 0.05
-                  ? "bets-profit-down"
-                  : ""
-              }`}
-            >
-              {(c.probUnder * 100).toFixed(1)}% under
-            </span>
-          </li>
-        ))}
-      </ul>
-      <p className="bd-table-foot">
-        Model assumes independence between players — small course-wide
-        correlation isn't priced in.
-      </p>
     </div>
   );
-}
-
-// Inline erf for the winning-score detail's per-player CDF.
-function erfInline(x: number): number {
-  const sign = x < 0 ? -1 : 1;
-  const ax = Math.abs(x);
-  const t = 1 / (1 + 0.3275911 * ax);
-  const y =
-    1 -
-    (((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t -
-      0.284496736) *
-      t +
-      0.254829592) *
-      t) *
-      Math.exp(-ax * ax);
-  return sign * y;
 }
