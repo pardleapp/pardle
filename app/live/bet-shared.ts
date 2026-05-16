@@ -468,88 +468,93 @@ export function reconstructHistory(
   }
 
   const probAtP = probAtPlacementFor(bet);
-  series.push({
-    t: bet.placedAt,
-    v: bet.stake,
-    holesPlayed: 0,
-    prob: probAtP,
-  });
-
   const state = playerRoundStates[bet.playerId];
   const round = bet.round != null ? bet.round : state?.currentRound ?? null;
   if (round == null) {
+    // No round context — fall back to a single placement-anchored sample.
+    series.push({
+      t: bet.placedAt,
+      v: bet.stake,
+      holesPlayed: 0,
+      prob: probAtP,
+    });
     if (nowValue != null) series.push({ t: Date.now(), v: nowValue });
     return series;
   }
   const roundSnap = state?.rounds?.[round];
-  if (!roundSnap) {
-    if (nowValue != null && Math.abs(nowValue - bet.stake) > 0.01) {
-      series.push({ t: Date.now(), v: nowValue });
-    }
-    return series;
-  }
 
-  // Start the accumulator from the round state at placement so a
-  // bet placed mid-round still computes prob against the player's
-  // actual cumulative strokes — not "0 strokes after 1 hole".
-  let strokes = bet.placement?.strokes ?? 0;
-  let holesPlayed = bet.placement?.holesPlayed ?? 0;
-  const baselineHoles = holesPlayed;
-
-  // Prefer the orchestrator scorecard when available — it's
-  // authoritative and isn't subject to the events list's 1000-entry
-  // cap. Field stats + per-player skill come along for the new
-  // round-score model; falls back to a par-anchored projection if
-  // the scorecard predates the new fields.
+  // Walk the round from hole 0 (pre-round, before anyone teed off)
+  // through current. This shows the bet's full trajectory regardless
+  // of when the user actually placed it — so a bet placed at hole 5
+  // still gets the "would have looked like X at hole 1" context, and
+  // a chart-level placement marker shows where they got in.
   if (scorecard && scorecard.holes.length > 0) {
     const holeStats = scorecard.holeStats ?? {};
     const skillPerHole = scorecard.skillPerHole ?? 0;
-    // Walk the round's full hole sequence (played + remaining) so we
-    // can shrink "remaining" by one each step. Played holes that
-    // pre-date placement are removed too — they're locked in.
     type RemEntry = { holeNumber: number; par: number };
-    const fullRemaining: RemEntry[] = [
-      ...scorecard.holes
-        .slice(baselineHoles)
-        .map((h) => ({ holeNumber: h.holeNumber, par: h.par })),
+    const fullSequence: RemEntry[] = [
+      ...scorecard.holes.map((h) => ({
+        holeNumber: h.holeNumber,
+        par: h.par,
+      })),
       ...(scorecard.remaining ?? []).map((h) => ({
         holeNumber: h.holeNumber,
         par: h.par,
       })),
     ];
-    const post = scorecard.holes.slice(baselineHoles);
-    for (let i = 0; i < post.length; i++) {
-      const h = post[i];
-      strokes += h.strokes;
-      holesPlayed++;
-      fullRemaining.shift();
-      const { expectedRemaining, variance } = projectRemaining(
-        fullRemaining,
-        holeStats,
-        skillPerHole,
-      );
+    let strokes = 0;
+    const remaining = [...fullSequence];
+
+    // Hole 0 — pre-round, no holes played yet.
+    {
+      const proj = projectRemaining(remaining, holeStats, skillPerHole);
       const prob = probFromProjection(
         bet.side,
         bet.line,
         strokes,
-        expectedRemaining,
-        variance,
+        proj.expectedRemaining,
+        proj.variance,
       );
-      const v = anchoredValue(prob, probAtP, bet.stake, bet.oddsTaken);
       series.push({
-        // Holes don't carry completion timestamps; synthesize one so
-        // the time-axis fallback still sorts. Round-score chart axis
-        // is holesPlayed anyway.
-        t: bet.placedAt + (i + 1) * 60_000,
-        v,
-        holesPlayed: holesPlayed - baselineHoles,
+        t: bet.placedAt,
+        v: anchoredValue(prob, probAtP, bet.stake, bet.oddsTaken),
+        holesPlayed: 0,
         prob,
       });
     }
-  } else {
+
+    // Each subsequent hole completion.
+    for (let i = 0; i < scorecard.holes.length; i++) {
+      const h = scorecard.holes[i];
+      strokes += h.strokes;
+      remaining.shift();
+      const proj = projectRemaining(remaining, holeStats, skillPerHole);
+      const prob = probFromProjection(
+        bet.side,
+        bet.line,
+        strokes,
+        proj.expectedRemaining,
+        proj.variance,
+      );
+      series.push({
+        t: bet.placedAt + (i + 1) * 60_000,
+        v: anchoredValue(prob, probAtP, bet.stake, bet.oddsTaken),
+        holesPlayed: i + 1,
+        prob,
+      });
+    }
+  } else if (roundSnap) {
     // No scorecard — degrade to the feed events list. We won't have
-    // per-hole field stats here, so the projection falls back to a
-    // par + constant-variance baseline (no skill adjustment).
+    // per-hole field stats so the projection falls back to a par +
+    // constant-variance baseline (no skill adjustment). We can't
+    // recover pre-placement holes here either, so we start the chart
+    // at placement.
+    series.push({
+      t: bet.placedAt,
+      v: bet.stake,
+      holesPlayed: 0,
+      prob: probAtP,
+    });
     const events = feedEvents
       .filter(
         (r) =>
@@ -562,7 +567,10 @@ export function reconstructHistory(
           typeof r.event.hole === "number",
       )
       .sort((a, b) => a.event.ts - b.event.ts);
+    let strokes = bet.placement?.strokes ?? 0;
     let parPlayed = bet.placement?.parPlayed ?? 0;
+    let holesPlayed = bet.placement?.holesPlayed ?? 0;
+    const baselineHoles = holesPlayed;
     const roundPar = bet.placement?.roundPar ?? roundSnap.roundPar;
     for (const r of events) {
       strokes += r.event.strokes!;
@@ -577,14 +585,21 @@ export function reconstructHistory(
         parRemaining,
         holesRemaining * PER_HOLE_VAR,
       );
-      const v = anchoredValue(prob, probAtP, bet.stake, bet.oddsTaken);
       series.push({
         t: r.event.ts,
-        v,
+        v: anchoredValue(prob, probAtP, bet.stake, bet.oddsTaken),
         holesPlayed: holesPlayed - baselineHoles,
         prob,
       });
     }
+  } else {
+    // No scorecard, no round snap — anchor sample only.
+    series.push({
+      t: bet.placedAt,
+      v: bet.stake,
+      holesPlayed: 0,
+      prob: probAtP,
+    });
   }
 
   if (nowValue != null) {

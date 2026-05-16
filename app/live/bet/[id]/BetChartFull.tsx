@@ -240,6 +240,34 @@ export default function BetChartFull({ bet, history }: Props) {
           />
         ))}
 
+        {isRound &&
+          bet.kind === "round-score" &&
+          bet.placement &&
+          bet.placement.holesPlayed > 0 &&
+          bet.placement.holesPlayed <= 18 && (
+            <g>
+              <line
+                x1={xScale(bet.placement.holesPlayed)}
+                x2={xScale(bet.placement.holesPlayed)}
+                y1={PAD.top}
+                y2={H - PAD.bottom}
+                stroke="var(--text)"
+                strokeOpacity={0.45}
+                strokeDasharray="4 4"
+                strokeWidth={1.1}
+              />
+              <text
+                x={xScale(bet.placement.holesPlayed) + 4}
+                y={PAD.top + 12}
+                fontSize="10"
+                fontWeight={700}
+                fill="var(--muted)"
+              >
+                Bet placed
+              </text>
+            </g>
+          )}
+
         {hover && (
           <line
             x1={hover.x}
@@ -395,7 +423,7 @@ function buildHoleTicks(
   const stops = [0, 3, 6, 9, 12, 15, 18];
   for (const s of stops) {
     if (s >= xMin && s <= xMax) {
-      out.push({ x: s, label: s === 0 ? "Placed" : `${s}` });
+      out.push({ x: s, label: s === 0 ? "Tee off" : `${s}` });
     }
   }
   return out;
