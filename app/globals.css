@@ -7061,6 +7061,293 @@ footer {
   }
 }
 
+.bets-row-link {
+  text-decoration: none;
+  color: inherit;
+  grid-template-columns: 1fr auto;
+  padding-right: 38px;
+}
+
+.bets-row-x-detached {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+}
+
+.bets-row-wrap {
+  position: relative;
+}
+
+/* /live/bet/[id] dedicated bet detail page */
+.bd-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.bd-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.bd-overline {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.bd-name {
+  margin: 4px 0 2px;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.bd-name a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.bd-name a:hover {
+  text-decoration: underline;
+}
+
+.bd-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.bd-pnl {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  text-align: right;
+}
+
+.bd-pnl-pct {
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.bd-pnl-amt {
+  font-size: 15px;
+  font-weight: 800;
+  margin-top: 4px;
+}
+
+.bd-pnl-value {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 700;
+  margin-top: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bd-chart {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px 8px;
+  background: rgba(0, 0, 0, 0.015);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bd-chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  font-family: inherit;
+}
+
+.bd-chart-foot {
+  min-height: 18px;
+  padding: 2px 4px 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bd-chart-foot-hint {
+  color: var(--muted);
+  font-weight: 600;
+  font-style: italic;
+}
+
+.bd-chart-hover {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.bd-chart-empty {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.bd-table {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.015);
+}
+
+.bd-table-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.bd-table ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bd-table-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 10px;
+  padding: 7px 4px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px dashed transparent;
+  align-items: baseline;
+}
+
+.bd-table-row + .bd-table-row {
+  border-top: 1px dashed var(--border);
+}
+
+.bd-table-hole {
+  font-weight: 800;
+  color: var(--text);
+}
+
+.bd-table-val {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.bd-table-pct {
+  font-weight: 800;
+  text-align: right;
+  min-width: 64px;
+}
+
+.bd-table-swing {
+  font-weight: 700;
+  text-align: right;
+  min-width: 80px;
+  font-size: 12px;
+}
+
+.bd-table-foot {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.bd-empty {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 22px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.bd-missing {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 22px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.bd-missing a {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.bd-remove {
+  align-self: flex-end;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  background: transparent;
+  color: #b13838;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.bd-remove:hover {
+  background: rgba(177, 56, 56, 0.08);
+}
+
+@media (max-width: 640px) {
+  .bd-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .bd-pnl {
+    align-items: flex-start;
+    text-align: left;
+  }
+  .bd-pnl-pct {
+    font-size: 24px;
+  }
+  .bd-name {
+    font-size: 18px;
+  }
+  .bd-table-row {
+    grid-template-columns: 1fr auto auto;
+    column-gap: 8px;
+  }
+  .bd-table-swing {
+    display: none;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .bd-head,
+  .bd-chart,
+  .bd-table {
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
 /* "Catch me up" banner + modal — single button that pops on the
    first visit after a gap, surfacing a compact summary of everything
    that happened while the user wasn't watching. */

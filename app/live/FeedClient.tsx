@@ -357,9 +357,7 @@ export default function FeedClient() {
       <BetTracker
         players={data.playerIndex ?? []}
         currentOdds={data.currentOdds ?? {}}
-        oddsHistories={data.oddsHistories ?? {}}
         playerRoundStates={data.playerRoundStates ?? {}}
-        feedEvents={data.rows ?? []}
         oddsFormat={oddsFormat}
       />
 
