@@ -3,19 +3,13 @@ import { getActiveTournament } from "@/lib/golf-api/pgatour";
 import { pollAndDiff } from "@/lib/feed/engine";
 import {
   acquirePollLock,
-  getCachedLeaderboard,
-  getCachedTournamentPars,
   getCommentCountsBulk,
-  getEnrichments,
-  getEvents,
+  getFeedBundle,
   getReactionsBulk,
-  getRecentBursts,
-  getSnapshot,
   markSeenToday,
   touchPresence,
 } from "@/lib/feed/store";
-import { findOddsShift, getOddsBuffers } from "@/lib/feed/odds-store";
-import { deletePoll, listPolls } from "@/lib/feed/polls";
+import { findOddsShift } from "@/lib/feed/odds-store";
 import type { FeedRow } from "@/lib/feed/types";
 
 export const dynamic = "force-dynamic";
@@ -82,31 +76,20 @@ async function handle(req: Request) {
       } catch (err) {
         console.error("[feed] pollAndDiff failed", err);
       }
-      // One-off cleanup: the winner-prediction poll has been removed
-      // from the UI. Delete any leftover poll rows from previous
-      // seeding so the API doesn't keep returning them.
-      try {
-        const existing = await listPolls(tournament.id);
-        for (const stale of existing.filter((p) => p.kind === "winner")) {
-          await deletePoll(tournament.id, stale.id);
-        }
-      } catch (err) {
-        console.error("[feed] winner-poll cleanup failed", err);
-      }
     }
   }
 
-  // The main feed shows the last 80 events; the reels are curated from
-  // a much wider window so "shots/worst of the day" stay populated even
-  // as the feed rolls.
-  const [feedEvents, reelSource, bursts, leaderboard, enrichments] =
-    await Promise.all([
-      getEvents(tournament.id, 80),
-      getEvents(tournament.id, 400),
-      getRecentBursts(tournament.id),
-      getCachedLeaderboard(tournament.id),
-      getEnrichments(tournament.id),
-    ]);
+  // Pipelined single-HTTP-request fetch of every read this endpoint
+  // needs except per-event reaction/comment lookups (those depend on
+  // which event ids ended up visible). Drops the request count to
+  // Upstash from ~10/request down to 2/request.
+  const bundle = await getFeedBundle(tournament.id);
+  const allEvents = bundle.events;
+  const feedEvents = allEvents.slice(0, 80);
+  const reelSource = allEvents.slice(0, 400);
+  const bursts = bundle.bursts;
+  const leaderboard = bundle.leaderboard;
+  const enrichments = bundle.enrichments;
 
   // Merge the shot-detail enrichment overlay onto an event — gives
   // "3-putts from 40 ft" in place of "doubles the 8th", the shot
@@ -155,14 +138,8 @@ async function handle(req: Request) {
   // shot. Computing here means newer renders show fuller deltas.
   // Also: pull the current-odds-per-player map (latest sample from
   // each buffer) so the client can live-value tracked bets.
-  const playerIds = new Set<string>();
-  for (const e of feedMerged) playerIds.add(e.playerId);
-  for (const e of bestEvents) playerIds.add(e.playerId);
-  for (const e of worstEvents) playerIds.add(e.playerId);
-  // Also include every player in the leaderboard so bet-tracker
-  // lookups work even for players whose events have aged out.
-  for (const r of leaderboard) playerIds.add(r.playerId);
-  const oddsBuffers = await getOddsBuffers(tournament.id, [...playerIds]);
+  // Odds buffers come from the pipelined bundle — no extra HTTP call.
+  const oddsBuffers = bundle.oddsBuffers;
   const currentOdds: Record<string, number> = {};
   for (const [pid, buf] of Object.entries(oddsBuffers)) {
     // hmget returns null for missing fields — guard before reading length.
@@ -202,11 +179,12 @@ async function handle(req: Request) {
     playerState: r.playerState,
   }));
 
-  // Per-player round state for the bet tracker's round-score bets:
-  // current strokes, holes played + remaining, par played + remaining,
-  // tournament-to-date pace (used by client to project final score).
-  // Built from the snapshot (already has scores) + cached pars map.
-  const playerRoundStates = await computePlayerRoundStates(tournament.id);
+  // Per-player round state from the (already-fetched) snapshot + par
+  // map — zero extra Redis traffic.
+  const playerRoundStates = computePlayerRoundStates(
+    bundle.snapshot,
+    bundle.pars,
+  );
 
   return NextResponse.json({
     tournament: {
@@ -241,13 +219,10 @@ async function handle(req: Request) {
  *   - their tournament-to-date pace (to-par per hole) — used as a
  *     skill prior when projecting the rest of the round
  */
-async function computePlayerRoundStates(
-  tournamentId: string,
-): Promise<Record<string, PlayerRoundState>> {
-  const [snap, pars] = await Promise.all([
-    getSnapshot(tournamentId),
-    getCachedTournamentPars(tournamentId),
-  ]);
+function computePlayerRoundStates(
+  snap: import("@/lib/feed/store").FeedBundle["snapshot"],
+  pars: import("@/lib/feed/store").FeedBundle["pars"],
+): Record<string, PlayerRoundState> {
   if (!snap) return {};
   const result: Record<string, PlayerRoundState> = {};
 

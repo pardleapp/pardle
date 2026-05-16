@@ -111,12 +111,17 @@ export async function touchPresence(
   tournamentId: string,
   visitorId: string,
 ): Promise<number> {
+  // Single HTTP request via pipeline — was 4 separate round-trips,
+  // each counted against Upstash's daily request budget.
   const key = presenceKey(tournamentId);
   const now = Date.now();
-  await redis.zadd(key, { score: now, member: visitorId });
-  await redis.zremrangebyscore(key, 0, now - PRESENCE_WINDOW_MS);
-  await redis.expire(key, 120);
-  return await redis.zcard(key);
+  const pipe = redis.pipeline();
+  pipe.zadd(key, { score: now, member: visitorId });
+  pipe.zremrangebyscore(key, 0, now - PRESENCE_WINDOW_MS);
+  pipe.expire(key, 120);
+  pipe.zcard(key);
+  const res = (await pipe.exec()) as unknown[];
+  return Number(res[3] ?? 0);
 }
 
 /** Read-only count of current watchers (prunes stale entries first). */
@@ -137,11 +142,16 @@ export async function markSeenToday(
   tournamentId: string,
   visitorId: string,
 ): Promise<number> {
+  // Pipelined for the same reason as touchPresence — 1 HTTP request
+  // vs 3.
   const date = new Date().toISOString().slice(0, 10);
   const key = `feed:seen:${tournamentId}:${date}`;
-  await redis.sadd(key, visitorId);
-  await redis.expire(key, 3 * 24 * 60 * 60);
-  return await redis.scard(key);
+  const pipe = redis.pipeline();
+  pipe.sadd(key, visitorId);
+  pipe.expire(key, 3 * 24 * 60 * 60);
+  pipe.scard(key);
+  const res = (await pipe.exec()) as unknown[];
+  return Number(res[2] ?? 0);
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -389,6 +399,112 @@ export async function getCachedTournamentPars(
   return (
     (await redis.get<TournamentPars>(`feed:pars:${tournamentId}`)) ?? {}
   );
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Feed bundle — pipelines every read /api/feed needs into ONE HTTP
+// request. Each helper above issues a separate Upstash request which
+// adds up fast (their daily quota caps total requests, not commands).
+// Use this for /api/feed's main payload assembly; individual helpers
+// stay for narrow callers.
+// ──────────────────────────────────────────────────────────────────
+
+/** Re-shape of OddsSample from ./odds-store, kept local so the bundle
+ *  doesn't pull a circular import. */
+interface FeedBundleOddsSample {
+  ts: number;
+  p: number;
+}
+
+export interface FeedBundle {
+  events: FeedEvent[]; // up to FEED_MAX_EVENTS (1000) — caller slices
+  bursts: Burst[];
+  leaderboard: CachedLeaderboardRow[];
+  enrichments: Record<string, Enrichment>;
+  snapshot: PollSnapshot | null;
+  pars: TournamentPars;
+  /** playerId → ordered samples (or null when the player has none yet) */
+  oddsBuffers: Record<string, FeedBundleOddsSample[] | null>;
+}
+
+function parseEventStr(raw: unknown): FeedEvent | null {
+  try {
+    if (typeof raw === "string") return JSON.parse(raw) as FeedEvent;
+    if (raw && typeof raw === "object") return raw as FeedEvent;
+  } catch {}
+  return null;
+}
+function parseBurstStr(raw: unknown): Burst | null {
+  try {
+    if (typeof raw === "string") return JSON.parse(raw) as Burst;
+    if (raw && typeof raw === "object") return raw as Burst;
+  } catch {}
+  return null;
+}
+
+export async function getFeedBundle(
+  tournamentId: string,
+): Promise<FeedBundle> {
+  const pipe = redis.pipeline();
+  // Index 0 — events list (newest first, capped at FEED_MAX_EVENTS)
+  pipe.lrange(eventsKey(tournamentId), 0, FEED_MAX_EVENTS - 1);
+  // Index 1 — recent bursts
+  pipe.lrange(burstsKey(tournamentId), 0, 59);
+  // Index 2 — cached leaderboard (full field for player search)
+  pipe.get(`feed:leaderboard:${tournamentId}`);
+  // Index 3 — enrichment overlay (per-event headline / trace / reel flags)
+  pipe.hgetall(enrichKey(tournamentId));
+  // Index 4 — snapshot (per-player hole state for round-score bets)
+  pipe.get(snapshotKey(tournamentId));
+  // Index 5 — tournament hole pars (per round)
+  pipe.get(`feed:pars:${tournamentId}`);
+  // Index 6 — full odds buffer hash (per-player rolling samples). We
+  // fetch the whole hash instead of hmget'ing a known subset so we
+  // can stay inside one pipeline; the payload's bounded by player
+  // count × MAX_SAMPLES.
+  pipe.hgetall(`feed:odds:${tournamentId}`);
+  const res = (await pipe.exec()) as unknown[];
+
+  const eventsRaw = (res[0] ?? []) as unknown[];
+  const burstsRaw = (res[1] ?? []) as unknown[];
+  const leaderboardRaw = (res[2] ?? null) as
+    | CachedLeaderboardRow[]
+    | null;
+  const enrichRaw = (res[3] ?? {}) as Record<string, Enrichment | string>;
+  const snapshotRaw = (res[4] ?? null) as PollSnapshot | null;
+  const parsRaw = (res[5] ?? {}) as TournamentPars;
+  const oddsRaw = (res[6] ?? {}) as Record<
+    string,
+    FeedBundleOddsSample[] | null
+  >;
+
+  const events: FeedEvent[] = [];
+  for (const r of eventsRaw) {
+    const e = parseEventStr(r);
+    if (e) events.push(e);
+  }
+  const bursts: Burst[] = [];
+  for (const r of burstsRaw) {
+    const b = parseBurstStr(r);
+    if (b) bursts.push(b);
+  }
+  const enrichments: Record<string, Enrichment> = {};
+  for (const [id, val] of Object.entries(enrichRaw)) {
+    try {
+      enrichments[id] =
+        typeof val === "string" ? (JSON.parse(val) as Enrichment) : val;
+    } catch {}
+  }
+
+  return {
+    events,
+    bursts,
+    leaderboard: leaderboardRaw ?? [],
+    enrichments,
+    snapshot: snapshotRaw,
+    pars: parsRaw,
+    oddsBuffers: oddsRaw,
+  };
 }
 
 // ──────────────────────────────────────────────────────────────────
