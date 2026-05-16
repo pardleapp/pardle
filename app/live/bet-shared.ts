@@ -234,24 +234,23 @@ function projectRemaining(
   return { expectedRemaining, variance };
 }
 
-/** Anchored value formula: scales by model-prob movement since
- *  placement so v_at_placement === stake (PnL chart starts at 0)
- *  and a winning settlement still pays stake × oddsTaken. */
+/** Model-fair value of the bet given the latest model prob. The
+ *  reference price is the market price the user paid (oddsTaken),
+ *  *not* the model's view at placement — that way a bet placed at
+ *  +EV (e.g. evens on a 66 %-model favourite) shows the edge as PnL
+ *  from day one, instead of being normalised away by anchoring to
+ *  the model's own opinion at placement.
+ *
+ *  The second arg is retained for call-site back-compat and ignored. */
 export function anchoredValue(
   prob: number,
-  probAtPlacement: number,
+  _probAtPlacement: number,
   stake: number,
   oddsTaken: number,
 ): number {
-  const winningValue = stake * oddsTaken;
-  if (prob >= 1) return winningValue;
+  if (prob >= 1) return stake * oddsTaken;
   if (prob <= 0) return 0;
-  const anchor = probAtPlacement > 0 ? probAtPlacement : 1 / oddsTaken;
-  if (anchor <= 0) return stake;
-  const v = stake * (prob / anchor);
-  if (v < 0) return 0;
-  if (v > winningValue) return winningValue;
-  return v;
+  return stake * prob * oddsTaken;
 }
 
 /** Read the server-baked projection out of a RoundSnapshot, falling

@@ -285,10 +285,10 @@ export default function BetChartFull({ bet, history }: Props) {
           <span className="bd-chart-foot-hint">
             {mode === "pnl"
               ? isRound
-                ? "Each step = a completed hole. Baseline = break-even."
+                ? "Each step = a completed hole. Baseline = break-even (stake)."
                 : "Profit/loss since bet placement, valued from live market odds."
-              : `Model win chance — started at ${(
-                  startingProbFor(bet) * 100
+              : `Model win chance — pre-round ${(
+                  preRoundProbFor(history) * 100
                 ).toFixed(1)}% (your @ ${bet.oddsTakenLabel} price = ${(
                   (1 / bet.oddsTaken) *
                   100
@@ -331,11 +331,8 @@ function ChartToggle({
   );
 }
 
-function startingProbFor(bet: TrackedBet): number {
-  if (bet.kind === "round-score" && bet.placement) {
-    return bet.placement.probAtPlacement;
-  }
-  return 1 / bet.oddsTaken;
+function preRoundProbFor(history: PnlSample[]): number {
+  return history[0]?.prob ?? 0;
 }
 
 function clamp01(x: number): number {
