@@ -62,7 +62,29 @@ export interface RoundScoreBet {
   placement?: RoundScorePlacement;
 }
 
-export type TrackedBet = OutrightBet | RoundScoreBet;
+export interface WinningScoreBet {
+  id: string;
+  kind: "winning-score";
+  /** Total-strokes line for the eventual winner (e.g. 268.5). */
+  line: number;
+  side: "under" | "over";
+  oddsTaken: number;
+  oddsTakenLabel: string;
+  stake: number;
+  placedAt: number;
+}
+
+export type TrackedBet = OutrightBet | RoundScoreBet | WinningScoreBet;
+
+export interface TournamentProjection {
+  /** Model-expected final 4-round total strokes. */
+  mean: number;
+  /** Variance of the projection (sum of per-hole variance for
+   *  remaining holes across all 4 rounds). */
+  variance: number;
+  /** False if the player is cut, withdrawn, DQ'd, missed-cut, etc. */
+  active: boolean;
+}
 
 // ── Round state types (mirror /api/feed response shape) ────────────
 
@@ -414,11 +436,20 @@ export function currentValueForBet(
   b: TrackedBet,
   currentOdds: Record<string, number>,
   playerRoundStates: Record<string, PlayerRoundState>,
+  tournamentProjections?: Record<string, TournamentProjection>,
 ): number | null {
   if (b.kind === "outright") {
     const fair = currentOdds[b.playerId];
     if (!Number.isFinite(fair) || fair <= 1) return null;
     return b.stake * (b.oddsTaken / fair);
+  }
+  if (b.kind === "winning-score") {
+    if (!tournamentProjections) return null;
+    const ev = evaluateWinningScore(b, tournamentProjections);
+    if (!ev) return null;
+    if (ev.prob >= 1) return b.stake * b.oddsTaken;
+    if (ev.prob <= 0) return 0;
+    return b.stake * ev.prob * b.oddsTaken;
   }
   const ev = evaluateRoundScore(b, playerRoundStates[b.playerId]);
   if (!ev) return null;
@@ -437,6 +468,49 @@ export function currentProbForBet(
   if (ev.kind === "not-started") return probAtPlacementFor(b);
   if (ev.kind === "settled") return ev.won ? 1 : 0;
   return ev.prob;
+}
+
+/**
+ * Winning-score model. Each active player has a final-strokes
+ * distribution N(mean, variance). The eventual winner's score =
+ * min over active players. Under independence,
+ *   P(min < L) = 1 − Π_i P(player_i ≥ L)
+ *              = 1 − Π_i (1 − Φ((L − mean_i)/sd_i))
+ * "Under L" wins on at-least-one-finishes-below; "over L" wins on
+ * all-players-finish-at-or-above. The model treats players as
+ * independent — it ignores course-wide correlations (weather etc.),
+ * which makes the under side slightly underpriced in reality.
+ */
+export function evaluateWinningScore(
+  bet: WinningScoreBet,
+  projections: Record<string, TournamentProjection>,
+): { prob: number } | null {
+  let logProdMissed = 0;
+  let count = 0;
+  for (const p of Object.values(projections)) {
+    if (!p.active) continue;
+    if (p.variance <= 0) {
+      // Player has effectively finished — treat as deterministic.
+      if (p.mean < bet.line) {
+        return { prob: bet.side === "under" ? 1 : 0 };
+      }
+      continue;
+    }
+    const sd = Math.sqrt(p.variance);
+    const probUnder = clamp01(normalCdf(bet.line, p.mean, sd));
+    const probAtLeast = 1 - probUnder;
+    if (probAtLeast <= 1e-9) {
+      // Player almost certainly finishes under the line → under
+      // wins on this player alone.
+      return { prob: bet.side === "under" ? 1 : 0 };
+    }
+    logProdMissed += Math.log(probAtLeast);
+    count++;
+  }
+  if (count === 0) return null;
+  const probAllMiss = Math.exp(logProdMissed);
+  const probUnder = clamp01(1 - probAllMiss);
+  return { prob: bet.side === "under" ? probUnder : 1 - probUnder };
 }
 
 // ── History reconstruction ──────────────────────────────────────────

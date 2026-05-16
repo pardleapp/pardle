@@ -197,14 +197,16 @@ async function handle(req: Request) {
 
   // Per-player round state from the (already-fetched) snapshot + par
   // map. Also bakes in the round-score model's expectedRemaining +
-  // variance for each player+round so the client just plugs into a
-  // CDF — no per-bet model evaluation server work.
-  const playerRoundStates = computePlayerRoundStates(
-    bundle.snapshot,
-    bundle.pars,
-    fieldStats,
-    playerSkill,
-  );
+  // variance for each player+round, plus a tournament-total
+  // projection used by the winning-score bet model.
+  const { roundStates: playerRoundStates, tournamentProjections } =
+    computePlayerRoundStates(
+      bundle.snapshot,
+      bundle.pars,
+      fieldStats,
+      playerSkill,
+      leaderboard,
+    );
 
   return NextResponse.json({
     tournament: {
@@ -228,6 +230,9 @@ async function handle(req: Request) {
      *  fallback when Polymarket is thin (longshots, illiquid markets). */
     dgWinProbs: bundle.dgWinProbs,
     playerRoundStates,
+    /** Per-player N(mean, variance) projection of final 4-round
+     *  strokes. Powers the winning-score min-of-normals model. */
+    tournamentProjections,
     fieldStats,
     playerSkill,
     tournamentPars: bundle.pars,
@@ -254,9 +259,25 @@ function computePlayerRoundStates(
   pars: import("@/lib/feed/store").FeedBundle["pars"],
   fieldStats: FieldHoleStats,
   playerSkill: PlayerSkillMap,
-): Record<string, PlayerRoundState> {
-  if (!snap) return {};
+  leaderboard: import("@/lib/feed/store").CachedLeaderboardRow[],
+): {
+  roundStates: Record<string, PlayerRoundState>;
+  tournamentProjections: Record<string, TournamentProjection>;
+} {
+  if (!snap) return { roundStates: {}, tournamentProjections: {} };
   const result: Record<string, PlayerRoundState> = {};
+  const tournamentProjections: Record<string, TournamentProjection> = {};
+  const playerStateMap = new Map<string, string>();
+  for (const lb of leaderboard) {
+    playerStateMap.set(lb.playerId, lb.playerState);
+  }
+  const INACTIVE_STATES = new Set([
+    "CUT",
+    "MC",
+    "WD",
+    "DQ",
+    "DNS",
+  ]);
   const MIN_SAMPLE = 10;
   const FALLBACK_VAR = 0.65;
 
@@ -309,8 +330,19 @@ function computePlayerRoundStates(
     // currently-live one.
     const rounds: Record<number, RoundSnapshot> = {};
     let currentRound = 0;
+    // Tournament-total projection: mean of final 4-round strokes
+    // (played + projected) and the variance of the remaining holes.
+    // Powers the winning-score min-of-normals model.
+    let tournamentMean = 0;
+    let tournamentVariance = 0;
+    let tournamentRoundsCovered = 0;
+    // Fall back to round 1's pars for any later round the orchestrator
+    // hasn't cached pars for yet (same course, par doesn't change).
+    const fallbackPars = pars[1] ?? {};
     for (let r = 1; r <= 4; r++) {
-      const pl = pars[r];
+      const ownPars = pars[r];
+      const pl =
+        ownPars && Object.keys(ownPars).length > 0 ? ownPars : fallbackPars;
       const holes = byRound[r];
       if (!pl || Object.keys(pl).length === 0) continue;
       let strokes = 0;
@@ -364,7 +396,22 @@ function computePlayerRoundStates(
         expectedRemaining,
         variance,
       };
+      tournamentMean += strokes + expectedRemaining;
+      tournamentVariance += variance;
+      tournamentRoundsCovered++;
       if (anyPlayed && r > currentRound) currentRound = r;
+    }
+
+    // Only emit a tournament projection when we have data for all 4
+    // rounds (the winning-score model is a 72-hole bet — anything
+    // less is misleading).
+    if (tournamentRoundsCovered === 4) {
+      const status = playerStateMap.get(pid) ?? "ACTIVE";
+      tournamentProjections[pid] = {
+        mean: tournamentMean,
+        variance: tournamentVariance,
+        active: !INACTIVE_STATES.has(status),
+      };
     }
 
     // "currentRound" semantics for callers that want a single number:
@@ -394,7 +441,13 @@ function computePlayerRoundStates(
       rounds,
     };
   }
-  return result;
+  return { roundStates: result, tournamentProjections };
+}
+
+interface TournamentProjection {
+  mean: number;
+  variance: number;
+  active: boolean;
 }
 
 interface RoundSnapshot {

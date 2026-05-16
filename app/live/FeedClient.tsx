@@ -70,6 +70,10 @@ interface FeedResponse {
     }
   >;
   oddsHistories: Record<string, Array<{ ts: number; p: number }> | null>;
+  tournamentProjections?: Record<
+    string,
+    { mean: number; variance: number; active: boolean }
+  >;
   watching: number;
   seenToday: number;
   polled: boolean;
@@ -360,6 +364,7 @@ export default function FeedClient() {
         players={data.playerIndex ?? []}
         currentOdds={data.currentOdds ?? {}}
         playerRoundStates={data.playerRoundStates ?? {}}
+        tournamentProjections={data.tournamentProjections ?? {}}
         oddsFormat={oddsFormat}
       />
 

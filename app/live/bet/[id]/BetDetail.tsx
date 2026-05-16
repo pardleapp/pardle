@@ -11,6 +11,7 @@ import {
 import {
   currentValueForBet,
   evaluateRoundScore,
+  evaluateWinningScore,
   patchLegacyPlacement,
   readBetById,
   reconstructHistory,
@@ -23,7 +24,9 @@ import {
   type PlayerRoundState,
   type PnlSample,
   type RoundScoreBet,
+  type TournamentProjection,
   type TrackedBet,
+  type WinningScoreBet,
 } from "../../bet-shared";
 import BetChartFull from "./BetChartFull";
 
@@ -36,6 +39,7 @@ interface FeedResponse {
   oddsHistories: Record<string, OddsHistorySample[] | null>;
   dgWinProbs?: Record<string, DgProbHistorySample[] | null>;
   playerRoundStates: Record<string, PlayerRoundState>;
+  tournamentProjections?: Record<string, TournamentProjection>;
 }
 
 const gbp = new Intl.NumberFormat("en-GB", {
@@ -168,6 +172,7 @@ export default function BetDetail({ betId }: { betId: string }) {
     bet,
     data.currentOdds,
     data.playerRoundStates,
+    data.tournamentProjections,
   );
   const history = reconstructHistory(
     bet,
@@ -196,12 +201,20 @@ export default function BetDetail({ betId }: { betId: string }) {
           <p className="bd-overline">
             {bet.kind === "outright"
               ? "Outright winner"
+              : bet.kind === "winning-score"
+              ? `Winning score · ${bet.side} ${bet.line}`
               : `Round-score · ${bet.side} ${bet.line}${
                   bet.round != null ? ` · R${bet.round}` : ""
                 }`}
           </p>
           <h2 className="bd-name">
-            <Link href={`/live/player/${bet.playerId}`}>{bet.playerName}</Link>
+            {bet.kind === "winning-score" ? (
+              <span>Tournament total</span>
+            ) : (
+              <Link href={`/live/player/${bet.playerId}`}>
+                {bet.playerName}
+              </Link>
+            )}
           </h2>
           <p className="bd-sub">
             @ {formatOdds(bet.oddsTaken, oddsFormat)} · stake{" "}
@@ -226,21 +239,30 @@ export default function BetDetail({ betId }: { betId: string }) {
         </div>
       </header>
 
-      <BetChartFull bet={bet} history={history} />
-
-      {bet.kind === "round-score" ? (
-        <RoundDetailTable
+      {bet.kind === "winning-score" ? (
+        <WinningScoreDetail
           bet={bet}
-          state={data.playerRoundStates[bet.playerId]}
-          history={history}
+          projections={data.tournamentProjections ?? {}}
           oddsFormat={oddsFormat}
         />
       ) : (
-        <OutrightDetailTable
-          bet={bet}
-          history={history}
-          oddsFormat={oddsFormat}
-        />
+        <>
+          <BetChartFull bet={bet} history={history} />
+          {bet.kind === "round-score" ? (
+            <RoundDetailTable
+              bet={bet}
+              state={data.playerRoundStates[bet.playerId]}
+              history={history}
+              oddsFormat={oddsFormat}
+            />
+          ) : (
+            <OutrightDetailTable
+              bet={bet}
+              history={history}
+              oddsFormat={oddsFormat}
+            />
+          )}
+        </>
       )}
 
       <button
@@ -380,4 +402,94 @@ function OutrightDetailTable({
       <p className="bd-table-foot">Odds format: {oddsFormat}</p>
     </div>
   );
+}
+
+function WinningScoreDetail({
+  bet,
+  projections,
+  oddsFormat,
+}: {
+  bet: WinningScoreBet;
+  projections: Record<string, TournamentProjection>;
+  oddsFormat: OddsFormat;
+}) {
+  const ev = evaluateWinningScore(bet, projections);
+  const active = Object.values(projections).filter((p) => p.active);
+  // Top 8 contenders most likely to break the line, ranked by their
+  // individual P(finish < line). Helpful "who could spoil it" view.
+  const candidates = active
+    .map((p) => {
+      const sd = Math.sqrt(p.variance || 1);
+      const probUnder =
+        p.variance > 0
+          ? (1 + erfInline((bet.line - p.mean) / (sd * Math.SQRT2))) / 2
+          : p.mean < bet.line
+          ? 1
+          : 0;
+      return { mean: p.mean, sd, probUnder };
+    })
+    .sort((a, b) => b.probUnder - a.probUnder)
+    .slice(0, 8);
+
+  return (
+    <div className="bd-table">
+      <p className="bd-table-title">
+        Field outlook · line {bet.line} {bet.side}
+      </p>
+      {ev ? (
+        <p className="bd-table-foot" style={{ marginTop: 0 }}>
+          Model: <strong>{Math.round(ev.prob * 100)}% chance</strong> · fair{" "}
+          {ev.prob > 0 && ev.prob < 1
+            ? formatOdds(1 / ev.prob, oddsFormat)
+            : "—"}{" "}
+          · {active.length} active players in the field
+        </p>
+      ) : (
+        <p className="bd-table-foot">Model: waiting on field data…</p>
+      )}
+      <ul style={{ marginTop: 12 }}>
+        {candidates.map((c, i) => (
+          <li key={i} className="bd-table-row">
+            <span className="bd-table-hole">
+              Player projection #{i + 1}
+            </span>
+            <span className="bd-table-val">
+              {c.mean.toFixed(1)} ± {c.sd.toFixed(1)}
+            </span>
+            <span
+              className={`bd-table-pct ${
+                c.probUnder > 0.4
+                  ? "bets-profit-up"
+                  : c.probUnder < 0.05
+                  ? "bets-profit-down"
+                  : ""
+              }`}
+            >
+              {(c.probUnder * 100).toFixed(1)}% under
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="bd-table-foot">
+        Model assumes independence between players — small course-wide
+        correlation isn't priced in.
+      </p>
+    </div>
+  );
+}
+
+// Inline erf for the winning-score detail's per-player CDF.
+function erfInline(x: number): number {
+  const sign = x < 0 ? -1 : 1;
+  const ax = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * ax);
+  const y =
+    1 -
+    (((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t -
+      0.284496736) *
+      t +
+      0.254829592) *
+      t) *
+      Math.exp(-ax * ax);
+  return sign * y;
 }

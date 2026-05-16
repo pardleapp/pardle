@@ -12,6 +12,7 @@ import {
   anchoredValue,
   currentValueForBet,
   evaluateRoundScore,
+  evaluateWinningScore,
   patchLegacyPlacement,
   readBets,
   snapshotForPlacement,
@@ -19,15 +20,18 @@ import {
   type OutrightBet,
   type PlayerRoundState,
   type RoundScoreBet,
+  type TournamentProjection,
   type TrackedBet,
+  type WinningScoreBet,
 } from "./bet-shared";
 
-type BetKind = "outright" | "round-score";
+type BetKind = "outright" | "round-score" | "winning-score";
 
 interface Props {
   players: CachedLeaderboardRow[];
   currentOdds: Record<string, number>;
   playerRoundStates: Record<string, PlayerRoundState>;
+  tournamentProjections: Record<string, TournamentProjection>;
   oddsFormat: OddsFormat;
 }
 
@@ -53,6 +57,7 @@ export default function BetTracker({
   players,
   currentOdds,
   playerRoundStates,
+  tournamentProjections,
   oddsFormat,
 }: Props) {
   const [bets, setBets] = useState<TrackedBet[]>([]);
@@ -97,9 +102,17 @@ export default function BetTracker({
   const valueByBet = useMemo(() => {
     const out = new Map<string, number | null>();
     for (const b of bets)
-      out.set(b.id, currentValueForBet(b, currentOdds, playerRoundStates));
+      out.set(
+        b.id,
+        currentValueForBet(
+          b,
+          currentOdds,
+          playerRoundStates,
+          tournamentProjections,
+        ),
+      );
     return out;
-  }, [bets, currentOdds, playerRoundStates]);
+  }, [bets, currentOdds, playerRoundStates, tournamentProjections]);
 
   const totals = useMemo(() => {
     let stake = 0;
@@ -143,6 +156,14 @@ export default function BetTracker({
                 oddsFormat={oddsFormat}
                 onRemove={() => removeBet(b.id)}
               />
+            ) : b.kind === "winning-score" ? (
+              <WinningScoreRow
+                key={b.id}
+                bet={b}
+                projections={tournamentProjections}
+                oddsFormat={oddsFormat}
+                onRemove={() => removeBet(b.id)}
+              />
             ) : (
               <RoundScoreRow
                 key={b.id}
@@ -179,6 +200,7 @@ export default function BetTracker({
         <AddBetForm
           players={players}
           playerRoundStates={playerRoundStates}
+          tournamentProjections={tournamentProjections}
           oddsFormat={oddsFormat}
           onAdd={(b) => {
             addBet(b);
@@ -230,6 +252,123 @@ function OutrightRow({
             Win @ {formatOdds(bet.oddsTaken, oddsFormat)} ·{" "}
             {gbp.format(bet.stake)}
             {haveFair && <> · now {formatOdds(fair, oddsFormat)}</>}
+          </p>
+        </div>
+        <div className={`bets-row-value ${profitClass}`}>
+          {currentValue !== null ? (
+            <>
+              <strong>{gbp.format(currentValue)}</strong>
+              <span>
+                {profit !== null && profit >= 0 ? "+" : ""}
+                {profit !== null ? gbp.format(profit) : ""}
+              </span>
+            </>
+          ) : (
+            <span className="bets-row-pending">—</span>
+          )}
+        </div>
+      </Link>
+      <button
+        type="button"
+        className="bets-row-x bets-row-x-detached"
+        onClick={onRemove}
+        aria-label="Remove bet"
+        title="Remove this bet"
+      >
+        ✕
+      </button>
+    </li>
+  );
+}
+
+function WinningScoreFairOdds({
+  line,
+  side,
+  projections,
+  oddsFormat,
+}: {
+  line: number;
+  side: "under" | "over";
+  projections: Record<string, TournamentProjection>;
+  oddsFormat: OddsFormat;
+}) {
+  if (!Number.isFinite(line) || line < 230 || line > 320) return null;
+  const ev = evaluateWinningScore(
+    {
+      kind: "winning-score",
+      id: "preview",
+      placedAt: 0,
+      line,
+      side,
+      oddsTaken: 2,
+      oddsTakenLabel: "evens",
+      stake: 0,
+    },
+    projections,
+  );
+  if (!ev) return null;
+  return (
+    <p className="bets-form-fair">
+      Model: <strong>{Math.round(ev.prob * 100)}%</strong> chance · fair{" "}
+      <strong>
+        {ev.prob > 0 && ev.prob < 1
+          ? formatOdds(1 / ev.prob, oddsFormat)
+          : "—"}
+      </strong>
+    </p>
+  );
+}
+
+function WinningScoreRow({
+  bet,
+  projections,
+  oddsFormat,
+  onRemove,
+}: {
+  bet: WinningScoreBet;
+  projections: Record<string, TournamentProjection>;
+  oddsFormat: OddsFormat;
+  onRemove: () => void;
+}) {
+  const ev = evaluateWinningScore(bet, projections);
+  const havModel = ev != null;
+  const currentValue = havModel
+    ? ev.prob >= 1
+      ? bet.stake * bet.oddsTaken
+      : ev.prob <= 0
+      ? 0
+      : bet.stake * ev.prob * bet.oddsTaken
+    : null;
+  const profit = currentValue !== null ? currentValue - bet.stake : null;
+  const profitClass =
+    profit === null
+      ? ""
+      : profit > 0
+      ? "bets-profit-up"
+      : profit < 0
+      ? "bets-profit-down"
+      : "";
+  return (
+    <li className="bets-row-wrap">
+      <Link href={`/live/bet/${bet.id}`} className="bets-row bets-row-link">
+        <div className="bets-row-main">
+          <p className="bets-row-name">
+            Winning score{" "}
+            <span className="bets-row-kind">
+              {bet.side} {bet.line}
+            </span>
+          </p>
+          <p className="bets-row-meta">
+            @ {formatOdds(bet.oddsTaken, oddsFormat)} · {gbp.format(bet.stake)}
+            {havModel && (
+              <>
+                {" "}
+                · model {Math.round(ev.prob * 100)}% · fair{" "}
+                {ev.prob > 0 && ev.prob < 1
+                  ? formatOdds(1 / ev.prob, oddsFormat)
+                  : "—"}
+              </>
+            )}
           </p>
         </div>
         <div className={`bets-row-value ${profitClass}`}>
@@ -365,12 +504,14 @@ function RoundScoreRow({
 function AddBetForm({
   players,
   playerRoundStates,
+  tournamentProjections,
   oddsFormat,
   onAdd,
   onCancel,
 }: {
   players: CachedLeaderboardRow[];
   playerRoundStates: Record<string, PlayerRoundState>;
+  tournamentProjections: Record<string, TournamentProjection>;
   oddsFormat: OddsFormat;
   onAdd: (b: TrackedBet) => void;
   onCancel: () => void;
@@ -399,7 +540,9 @@ function AddBetForm({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    if (!pickedPlayer) return setErr("Pick a player from the list.");
+    if (kind !== "winning-score" && !pickedPlayer) {
+      return setErr("Pick a player from the list.");
+    }
     const odds = parseOdds(oddsText, oddsFormat);
     if (!odds) return setErr("Enter odds like +250, -150, 8/1, or 9.0.");
     const stake = Number(stakeText);
@@ -410,6 +553,24 @@ function AddBetForm({
     const id = `b${placedAt.toString(36)}${Math.random()
       .toString(36)
       .slice(2, 6)}`;
+
+    if (kind === "winning-score") {
+      const line = Number(lineText);
+      if (!Number.isFinite(line) || line < 230 || line > 320) {
+        return setErr("Enter a realistic winning-score line, e.g. 268.5.");
+      }
+      onAdd({
+        kind: "winning-score",
+        id,
+        placedAt,
+        line,
+        side,
+        oddsTaken: odds.decimal,
+        oddsTakenLabel: odds.label,
+        stake,
+      });
+      return;
+    }
 
     if (kind === "outright") {
       onAdd({
@@ -470,9 +631,87 @@ function AddBetForm({
         >
           Round score
         </button>
+        <button
+          type="button"
+          className={kind === "winning-score" ? "bets-kind-on" : ""}
+          onClick={() => setKind("winning-score")}
+        >
+          Winning score
+        </button>
       </div>
 
-      {pickedPlayer ? (
+      {kind === "winning-score" ? (
+        <>
+          <div className="bets-form-row">
+            <label className="bets-form-label">
+              <span>Side</span>
+              <select
+                value={side}
+                onChange={(e) => setSide(e.target.value as "under" | "over")}
+              >
+                <option value="under">Under</option>
+                <option value="over">Over</option>
+              </select>
+            </label>
+            <label className="bets-form-label">
+              <span>Line (e.g. 268.5)</span>
+              <input
+                type="number"
+                step="0.5"
+                placeholder="268.5"
+                value={lineText}
+                onChange={(e) => setLineText(e.target.value)}
+                inputMode="decimal"
+              />
+            </label>
+          </div>
+          <div className="bets-form-row">
+            <label className="bets-form-label">
+              <span>Odds</span>
+              <input
+                type="text"
+                placeholder="+250, -150, 8/1, 9.0"
+                value={oddsText}
+                onChange={(e) => setOddsText(e.target.value)}
+                inputMode="text"
+                autoComplete="off"
+                autoFocus
+              />
+            </label>
+            <label className="bets-form-label">
+              <span>Stake (£)</span>
+              <input
+                type="number"
+                placeholder="10"
+                value={stakeText}
+                onChange={(e) => setStakeText(e.target.value)}
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+              />
+            </label>
+          </div>
+          <WinningScoreFairOdds
+            line={Number(lineText)}
+            side={side}
+            projections={tournamentProjections}
+            oddsFormat={oddsFormat}
+          />
+          {err && <p className="bets-form-err">{err}</p>}
+          <div className="bets-form-actions">
+            <button
+              type="button"
+              className="bets-form-cancel"
+              onClick={onCancel}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="bets-form-submit">
+              Add bet
+            </button>
+          </div>
+        </>
+      ) : pickedPlayer ? (
         <div className="bets-form-picked">
           <span>
             <strong>{pickedPlayer.name}</strong>
