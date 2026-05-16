@@ -29,6 +29,21 @@ export const dynamic = "force-dynamic";
  *   4. Return feed rows + bursts + leaderboard + watcher count.
  */
 export async function GET(req: Request) {
+  try {
+    return await handle(req);
+  } catch (err) {
+    console.error("[feed] route handler failed", err);
+    return NextResponse.json(
+      {
+        error: "feed-failed",
+        message: err instanceof Error ? err.message : String(err),
+      },
+      { status: 500 },
+    );
+  }
+}
+
+async function handle(req: Request) {
   const visitorId = new URL(req.url).searchParams.get("v") ?? "";
 
   const active = await getActiveTournament();
