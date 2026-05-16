@@ -101,6 +101,11 @@ export interface OddsHistorySample {
   p: number; // decimal odds
 }
 
+export interface DgProbHistorySample {
+  ts: number;
+  prob: number; // 0..1
+}
+
 export interface FeedRowLike {
   event: {
     id: string;
@@ -443,34 +448,44 @@ export function reconstructHistory(
   feedEvents: FeedRowLike[],
   nowValue: number | null,
   scorecard?: BetScorecard | null,
+  dgWinProbs?: Record<string, DgProbHistorySample[] | null>,
 ): PnlSample[] {
   const series: PnlSample[] = [];
 
   if (bet.kind === "outright") {
-    // Build a unified sample list for the chart window:
-    //   - The price the user actually paid at placedAt — Polymarket
-    //     was at oddsTaken at that moment, that's why they got the
-    //     price. Acts as a hard historical anchor when the server's
-    //     odds buffer only started capturing later.
-    //   - Every server-side buffer sample we have.
-    //   - The current value as the rightmost point.
-    // Sort by timestamp so the line goes in time order.
-    const samples = oddsHistories[bet.playerId] ?? [];
-    type Pt = { t: number; p: number };
+    // Source preference: Polymarket primary, DataGolf in-play prob
+    // as fallback when Polymarket is thin (illiquid longshot market,
+    // late-starting tracking, dedup collapsed everything). "Thin"
+    // means < 3 distinct buffer samples for this player.
+    const pmSamples = oddsHistories[bet.playerId] ?? [];
+    const dgSamples = dgWinProbs?.[bet.playerId] ?? [];
+    const POLYMARKET_LIQUIDITY_THRESHOLD = 3;
+    const usePolymarket =
+      Array.isArray(pmSamples) && pmSamples.length >= POLYMARKET_LIQUIDITY_THRESHOLD;
+
+    // Build a unified (timestamp, prob) sample list for the chart
+    // window. The price the user paid at placedAt is also a real
+    // historical anchor — Polymarket / market was at oddsTaken at
+    // that moment, otherwise they wouldn't have got that price.
+    type Pt = { t: number; prob: number };
     const pts: Pt[] = [];
-    // Only include the placement anchor for recently-placed bets so
-    // a bet placed weeks ago doesn't stretch the time axis back to
-    // before the round started.
     if (Date.now() - bet.placedAt < 24 * 60 * 60 * 1000) {
-      pts.push({ t: bet.placedAt, p: bet.oddsTaken });
+      pts.push({ t: bet.placedAt, prob: 1 / bet.oddsTaken });
     }
-    for (const s of samples) {
-      if (!Number.isFinite(s.p) || s.p <= 1) continue;
-      pts.push({ t: s.ts, p: s.p });
+    if (usePolymarket) {
+      for (const s of pmSamples) {
+        if (!Number.isFinite(s.p) || s.p <= 1) continue;
+        pts.push({ t: s.ts, prob: 1 / s.p });
+      }
+    } else if (Array.isArray(dgSamples)) {
+      for (const s of dgSamples) {
+        if (!Number.isFinite(s.prob) || s.prob <= 0 || s.prob >= 1) continue;
+        pts.push({ t: s.ts, prob: s.prob });
+      }
     }
     pts.sort((a, b) => a.t - b.t);
     for (const pt of pts) {
-      const v = bet.stake * (bet.oddsTaken / pt.p);
+      const v = bet.stake * bet.oddsTaken * pt.prob;
       const last = series[series.length - 1];
       if (last && Math.abs(v - last.v) < 0.05 && pt.t - last.t < 60_000)
         continue;

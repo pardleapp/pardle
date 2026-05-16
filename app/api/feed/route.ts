@@ -224,6 +224,9 @@ async function handle(req: Request) {
     // samples). Used by the bet tracker to reconstruct PnL history
     // server-driven, so charts cover the period a user was off-page.
     oddsHistories: oddsBuffers,
+    /** DataGolf in-play win-prob buffer per player — outright chart's
+     *  fallback when Polymarket is thin (longshots, illiquid markets). */
+    dgWinProbs: bundle.dgWinProbs,
     playerRoundStates,
     fieldStats,
     playerSkill,

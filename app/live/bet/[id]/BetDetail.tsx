@@ -17,6 +17,7 @@ import {
   writeBets,
   readBets,
   type BetScorecard,
+  type DgProbHistorySample,
   type FeedRowLike,
   type OddsHistorySample,
   type PlayerRoundState,
@@ -33,6 +34,7 @@ interface FeedResponse {
   rows: FeedRowLike[];
   currentOdds: Record<string, number>;
   oddsHistories: Record<string, OddsHistorySample[] | null>;
+  dgWinProbs?: Record<string, DgProbHistorySample[] | null>;
   playerRoundStates: Record<string, PlayerRoundState>;
 }
 
@@ -174,6 +176,7 @@ export default function BetDetail({ betId }: { betId: string }) {
     data.rows,
     nowValue,
     scorecard,
+    data.dgWinProbs,
   );
   const profit = nowValue != null ? nowValue - bet.stake : null;
   const profitPct = profit != null ? (profit / bet.stake) * 100 : null;

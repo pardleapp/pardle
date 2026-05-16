@@ -234,6 +234,30 @@ export async function getLiveContenders(): Promise<LiveContender[]> {
     .sort((a, b) => b.winProb - a.winProb);
 }
 
+export interface InPlayProb {
+  dgId: string;
+  name: string;
+  winProb: number;
+}
+
+/**
+ * Every active player's live win probability — same source as
+ * getLiveContenders but unfiltered, used to populate the outright
+ * bet chart's fallback buffer for players Polymarket isn't tracking
+ * liquidly (e.g. longshot contenders).
+ */
+export async function getInPlayWinProbs(): Promise<InPlayProb[]> {
+  const data = await fetchJson<DGInPlayResponse>(`/preds/in-play`);
+  const rows = data.data ?? [];
+  return rows
+    .map((r) => ({
+      dgId: String(r.dg_id),
+      name: flipName(r.player_name),
+      winProb: typeof r.win === "number" ? r.win : 0,
+    }))
+    .filter((p) => Number.isFinite(p.winProb));
+}
+
 // ──────────────────────────────────────────────────────────────────
 // Skill ratings — per-player current SG (used by round-score model)
 // ──────────────────────────────────────────────────────────────────

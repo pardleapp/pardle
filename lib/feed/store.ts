@@ -508,6 +508,14 @@ export interface FeedBundle {
   pars: TournamentPars;
   /** playerId → ordered samples (or null when the player has none yet) */
   oddsBuffers: Record<string, FeedBundleOddsSample[] | null>;
+  /** playerId → ordered DataGolf in-play prob samples — outright chart
+   *  fallback when Polymarket is thin for a given player. */
+  dgWinProbs: Record<string, FeedBundleDgSample[] | null>;
+}
+
+interface FeedBundleDgSample {
+  ts: number;
+  prob: number;
 }
 
 function parseEventStr(raw: unknown): FeedEvent | null {
@@ -546,6 +554,9 @@ export async function getFeedBundle(
   // can stay inside one pipeline; the payload's bounded by player
   // count × MAX_SAMPLES.
   pipe.hgetall(`feed:odds:${tournamentId}`);
+  // Index 7 — DataGolf in-play win-prob buffer (per-player). Used as
+  // outright chart fallback when Polymarket is thin.
+  pipe.hgetall(`feed:dg:${tournamentId}`);
   const res = (await pipe.exec()) as unknown[];
 
   const eventsRaw = (res[0] ?? []) as unknown[];
@@ -559,6 +570,10 @@ export async function getFeedBundle(
   const oddsRaw = (res[6] ?? {}) as Record<
     string,
     FeedBundleOddsSample[] | null
+  >;
+  const dgRaw = (res[7] ?? {}) as Record<
+    string,
+    FeedBundleDgSample[] | null
   >;
 
   const events: FeedEvent[] = [];
@@ -587,6 +602,7 @@ export async function getFeedBundle(
     snapshot: snapshotRaw,
     pars: parsRaw,
     oddsBuffers: oddsRaw,
+    dgWinProbs: dgRaw,
   };
 }
 
