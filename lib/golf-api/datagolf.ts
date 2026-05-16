@@ -320,6 +320,22 @@ interface DGLivePlayerRow {
   doubles?: number; // doubles+
   bogeys?: number;
   pars?: number;
+  // Strokes-gained breakdown — populated when the `stats=` param
+  // requests them. Values are strokes gained vs the field per round
+  // (or per the requested round window).
+  sg_total?: number;
+  sg_t2g?: number; // tee-to-green
+  sg_ott?: number; // off-the-tee
+  sg_app?: number; // approach
+  sg_arg?: number; // around-the-green
+  sg_putt?: number;
+  // Non-SG misc
+  driving_dist?: number;
+  driving_acc?: number;
+  gir?: number; // greens in regulation, 0..1
+  prox_rgh?: number; // proximity from rough, feet
+  prox_fw?: number; // proximity from fairway, feet
+  scrambling?: number; // 0..1
 }
 
 interface DGLiveResponse {
@@ -354,5 +370,84 @@ export async function getLiveStatsForRound(
     doubles: r.doubles ?? 0,
     positionAfter:
       typeof r.current_pos === "number" ? r.current_pos : null,
+  }));
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Full live stats — SG breakdown + driving/GIR/etc for player pages
+// ──────────────────────────────────────────────────────────────────
+
+const FULL_STATS_LIST = [
+  "sg_total",
+  "sg_t2g",
+  "sg_ott",
+  "sg_app",
+  "sg_arg",
+  "sg_putt",
+  "driving_dist",
+  "driving_acc",
+  "gir",
+  "scrambling",
+  "prox_rgh",
+  "prox_fw",
+].join(",");
+
+export interface FullLiveStats {
+  dgId: string;
+  name: string;
+  position: string | null;
+  total: number | null;
+  thru: number | null;
+  sgTotal: number | null;
+  sgT2G: number | null;
+  sgOtt: number | null;
+  sgApp: number | null;
+  sgArg: number | null;
+  sgPutt: number | null;
+  drivingDist: number | null;
+  drivingAcc: number | null;
+  gir: number | null;
+  scrambling: number | null;
+  proxRgh: number | null;
+  proxFw: number | null;
+}
+
+function numOrNull(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Full per-player live stats for a round window. `round` accepts a
+ * 1-4 round number (that round only) or "event_avg" for the
+ * tournament-wide aggregate. DataGolf computes strokes-gained vs
+ * the field; positive = better than field by that many strokes per
+ * round (tournament-wide averages it across played rounds).
+ */
+export async function getFullLiveStats(
+  round: number | "event_avg" = "event_avg",
+  tour: string = "pga",
+): Promise<FullLiveStats[]> {
+  const data = await fetchJson<DGLiveResponse>(
+    `/preds/live-tournament-stats?tour=${encodeURIComponent(tour)}&round=${round}&stats=${FULL_STATS_LIST}&display=value`,
+  );
+  const rows = data.live_stats ?? [];
+  return rows.map((r) => ({
+    dgId: String(r.dg_id),
+    name: flipName(r.player_name),
+    position: r.current_pos != null ? String(r.current_pos) : null,
+    total: numOrNull(r.current_score),
+    thru: numOrNull(r.thru),
+    sgTotal: numOrNull(r.sg_total),
+    sgT2G: numOrNull(r.sg_t2g),
+    sgOtt: numOrNull(r.sg_ott),
+    sgApp: numOrNull(r.sg_app),
+    sgArg: numOrNull(r.sg_arg),
+    sgPutt: numOrNull(r.sg_putt),
+    drivingDist: numOrNull(r.driving_dist),
+    drivingAcc: numOrNull(r.driving_acc),
+    gir: numOrNull(r.gir),
+    scrambling: numOrNull(r.scrambling),
+    proxRgh: numOrNull(r.prox_rgh),
+    proxFw: numOrNull(r.prox_fw),
   }));
 }

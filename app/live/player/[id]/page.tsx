@@ -12,6 +12,7 @@ import { derivePlayerStats } from "@/lib/feed/scorecard-stats";
 import { resultFor } from "@/lib/feed/types";
 import FollowButton from "../../FollowButton";
 import PlayerHighlights from "../../PlayerHighlights";
+import PlayerStats from "../../PlayerStats";
 import RecentHoles from "../../RecentHoles";
 
 export const dynamic = "force-dynamic";
@@ -101,6 +102,12 @@ export default async function PlayerPage({ params }: PageProps) {
 
       {stats && stats.rounds.length > 0 ? (
         <>
+          <PlayerStats
+            tournamentId={tournament.id}
+            playerName={playerName}
+            playedRounds={stats.rounds.map((r) => r.round)}
+          />
+
           <section className="pcard-section">
             <h3 className="fantasy-section-title">Scorecard</h3>
             <div className="pcard-scroll">

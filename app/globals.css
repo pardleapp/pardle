@@ -6416,6 +6416,184 @@ footer {
   }
 }
 
+/* PlayerStats — DataGolf SG breakdown + advanced stats */
+.ps-sg-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--bg, white);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.ps-sg-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.ps-sg-headline-num {
+  font-size: 38px;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.ps-sg-headline-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ps-sg-headline-lbl {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.ps-sg-headline-rank {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.ps-sg-breakdown {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.ps-sg-bucket {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.ps-sg-bucket-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  text-align: center;
+}
+
+.ps-sg-bucket-num {
+  font-size: 17px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.ps-sg-bucket-rank {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.ps-round-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.ps-round-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--bg, white);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ps-round-head {
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.ps-round-total {
+  font-size: 22px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.ps-round-total-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-left: 4px;
+}
+
+.ps-round-breakdown {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ps-round-breakdown li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ps-round-breakdown li span {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ps-round-breakdown li strong {
+  font-weight: 900;
+}
+
+.ps-round-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ps-stat-rank {
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@media (prefers-color-scheme: dark) {
+  .ps-sg-card,
+  .ps-round-card {
+    background: #1f1f20;
+  }
+  .ps-sg-bucket {
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
 .rhole-list {
   list-style: none;
   margin: 0;
