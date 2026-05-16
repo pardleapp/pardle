@@ -44,6 +44,19 @@ interface FeedResponse {
       toPar: number;
       ttdPacePerHole: number;
       ttdHoles: number;
+      rounds: Record<
+        number,
+        {
+          holesPlayed: number;
+          holesRemaining: number;
+          strokes: number;
+          parPlayed: number;
+          parRemaining: number;
+          roundPar: number;
+          toPar: number;
+          status: "not-started" | "in-progress" | "complete";
+        }
+      >;
     }
   >;
   watching: number;
