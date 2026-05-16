@@ -78,6 +78,14 @@ export interface FeedEvent {
    * and stays out of the way when it's not.
    */
   tags?: string[];
+  /**
+   * Win-market mid-price (decimal odds) just before this event landed,
+   * and the latest reading after. Attached at API response time from
+   * the rolling Redis odds buffer; meaningful only when the move is
+   * big enough (≥15%). Renders as a pill: "odds 20/1 → 5/1".
+   */
+  oddsBefore?: number;
+  oddsAfter?: number;
 }
 
 /**

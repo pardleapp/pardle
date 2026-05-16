@@ -62,6 +62,19 @@ function getAuthorKey(): string {
  * precision would claim accuracy we don't have. Bucket to "just now" /
  * "few min ago" / "Nm ago" / "Nh ago".
  */
+/** Format decimal odds as fractional ("5.0" → "4/1"). */
+function fractionalOdds(decimal: number): string {
+  if (!Number.isFinite(decimal) || decimal <= 1) return "—";
+  const v = decimal - 1;
+  if (v >= 1) {
+    return `${Math.round(v)}/1`;
+  }
+  // Sub-evens — render to one decimal e.g. "8/11" or "4/9" require
+  // a denominator search; for compactness just say e.g. "1/2".
+  const inv = Math.round(1 / v);
+  return `1/${inv}`;
+}
+
 function timeAgo(ts: number): string {
   const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
   if (s < 120) return "just now";
@@ -332,8 +345,38 @@ export default function FeedClient() {
                             {t}
                           </span>
                         ))}
+                        {event.oddsBefore && event.oddsAfter && (
+                          <span
+                            className={`feed-tag feed-tag-odds ${
+                              event.oddsAfter < event.oddsBefore
+                                ? "feed-tag-odds-shorten"
+                                : "feed-tag-odds-drift"
+                            }`}
+                            title="Win-market odds shift"
+                          >
+                            odds {fractionalOdds(event.oddsBefore)} →{" "}
+                            {fractionalOdds(event.oddsAfter)}
+                          </span>
+                        )}
                       </p>
                     )}
+                    {!event.tags?.length &&
+                      event.oddsBefore &&
+                      event.oddsAfter && (
+                        <p className="feed-tags">
+                          <span
+                            className={`feed-tag feed-tag-odds ${
+                              event.oddsAfter < event.oddsBefore
+                                ? "feed-tag-odds-shorten"
+                                : "feed-tag-odds-drift"
+                            }`}
+                            title="Win-market odds shift"
+                          >
+                            odds {fractionalOdds(event.oddsBefore)} →{" "}
+                            {fractionalOdds(event.oddsAfter)}
+                          </span>
+                        </p>
+                      )}
                     <p className="feed-meta">
                       R{event.round} · {timeAgo(event.ts)} · view card →
                     </p>

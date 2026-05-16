@@ -6725,10 +6725,32 @@ footer {
   line-height: 1.4;
 }
 
+.feed-tag-odds {
+  font-variant-numeric: tabular-nums;
+}
+
+.feed-tag-odds-shorten {
+  background: rgba(123, 174, 63, 0.18);
+  color: #2c5a28;
+}
+
+.feed-tag-odds-drift {
+  background: rgba(224, 91, 91, 0.16);
+  color: #8a2a2a;
+}
+
 @media (prefers-color-scheme: dark) {
   .feed-tag {
     background: rgba(46, 167, 240, 0.2);
     color: #7cc4ed;
+  }
+  .feed-tag-odds-shorten {
+    background: rgba(123, 174, 63, 0.25);
+    color: #b8df7c;
+  }
+  .feed-tag-odds-drift {
+    background: rgba(224, 91, 91, 0.28);
+    color: #f4a7a7;
   }
 }
 

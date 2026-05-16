@@ -13,6 +13,7 @@ import {
   markSeenToday,
   touchPresence,
 } from "@/lib/feed/store";
+import { findOddsShift, getOddsBuffers } from "@/lib/feed/odds-store";
 import {
   createPoll,
   deletePoll,
@@ -162,8 +163,29 @@ export async function GET(req: Request) {
     getCommentCountsBulk(ids),
   ]);
 
+  // Pull odds buffers for the union of players in this response. We
+  // compute the per-event "before / after" shift here at response
+  // time, not at event creation, because the post-shot odds movement
+  // hasn't necessarily landed in our buffer the moment we detect a
+  // shot. Computing here means newer renders show fuller deltas.
+  const playerIds = new Set<string>();
+  for (const e of feedMerged) playerIds.add(e.playerId);
+  for (const e of bestEvents) playerIds.add(e.playerId);
+  for (const e of worstEvents) playerIds.add(e.playerId);
+  const oddsBuffers = await getOddsBuffers(tournament.id, [...playerIds]);
+  const ODDS_MIN_PCT = 0.15; // ≥15% relative move qualifies as a shift
+  const attachOdds = (event: FeedRow["event"]): FeedRow["event"] => {
+    const buf = oddsBuffers[event.playerId];
+    if (!buf || buf.length < 2) return event;
+    const shift = findOddsShift(buf, event.ts);
+    if (!shift) return event;
+    const rel = Math.abs(shift.after - shift.before) / shift.before;
+    if (rel < ODDS_MIN_PCT) return event;
+    return { ...event, oddsBefore: shift.before, oddsAfter: shift.after };
+  };
+
   const toRow = (event: FeedRow["event"]): FeedRow => ({
-    event,
+    event: attachOdds(event),
     reactions: reactions[event.id] ?? { up: 0, down: 0 },
     commentCount: commentCounts[event.id] ?? 0,
   });
