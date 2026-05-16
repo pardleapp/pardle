@@ -10,7 +10,7 @@ export const metadata = {
 
 export default function LivePage() {
   return (
-    <main className="container">
+    <main className="container container-wide">
       <header className="brand">
         <Link className="brand-back" href="/" aria-label="All games">
           ←

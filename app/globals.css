@@ -38,6 +38,17 @@ body {
   flex-direction: column;
 }
 
+/* Pages with denser content (the live feed + the player card) get a
+   wider container on desktop so they don't sit in a column of dead
+   space on a 1440px+ monitor. Puzzle pages stay at the
+   phone-optimised 600px so their tap targets / grids keep the
+   intended sizing. */
+@media (min-width: 1024px) {
+  .container-wide {
+    max-width: 900px;
+  }
+}
+
 /* ---------- /today stats page ---------- */
 
 .today-stats {
