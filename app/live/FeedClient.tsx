@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Burst, CachedLeaderboardRow } from "@/lib/feed/store";
 import type { PollWithVotes } from "@/lib/feed/polls";
 import type { FeedRow } from "@/lib/feed/types";
+import CatchMeUp from "./CatchMeUp";
 import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
 import LeaderboardPanel from "./LeaderboardPanel";
@@ -245,6 +246,8 @@ export default function FeedClient() {
       </div>
 
       <PlayerSearch players={data.playerIndex ?? []} />
+
+      <CatchMeUp rows={data.rows ?? []} />
 
       <Reel
         title="⛳ Shots of the day"
