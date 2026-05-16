@@ -94,39 +94,53 @@ function writeBets(bets: TrackedBet[]): void {
   window.localStorage.removeItem(LEGACY_KEY);
 }
 
+/**
+ * Parse an odds string in any of the common bookmaker formats:
+ *   - American: "+250", "-310"
+ *   - Fractional: "8/1", "9/2", "evens"
+ *   - Decimal: "9.0", "1.91"
+ * Returns null on garbage.
+ */
 function parseOdds(input: string): { decimal: number; label: string } | null {
   const t = input.trim().toLowerCase();
   if (!t) return null;
   if (t === "evens" || t === "even" || t === "1/1") {
-    return { decimal: 2, label: "evens" };
+    return { decimal: 2, label: "+100" };
+  }
+  // American odds: leading + or -, integer follows.
+  const am = /^([+-])\s*(\d+)$/.exec(t);
+  if (am) {
+    const sign = am[1];
+    const v = Number(am[2]);
+    if (v >= 100) {
+      const decimal = sign === "+" ? 1 + v / 100 : 1 + 100 / v;
+      return { decimal, label: `${sign}${v}` };
+    }
   }
   const frac = /^(\d+)\s*\/\s*(\d+)$/.exec(t);
   if (frac) {
     const num = Number(frac[1]);
     const den = Number(frac[2]);
     if (num > 0 && den > 0) {
-      return { decimal: 1 + num / den, label: `${num}/${den}` };
+      const decimal = 1 + num / den;
+      return { decimal, label: americanDisplay(decimal) };
     }
   }
   const decimal = Number(t);
   if (Number.isFinite(decimal) && decimal > 1) {
-    return { decimal, label: decimal.toFixed(2) };
+    return { decimal, label: americanDisplay(decimal) };
   }
   return null;
 }
 
-function fractionalDisplay(decimal: number): string {
+/** Decimal odds → American format ("+250" / "-310" / "+100"). */
+function americanDisplay(decimal: number): string {
   if (!Number.isFinite(decimal) || decimal <= 1) return "—";
-  const v = decimal - 1;
-  if (Math.abs(v - 1) < 0.05) return "evens";
-  for (const den of [1, 2, 3, 4, 5, 6, 7, 8, 10]) {
-    const num = v * den;
-    if (Math.abs(num - Math.round(num)) < 0.07 && Math.round(num) > 0) {
-      const n = Math.round(num);
-      return den === 1 ? `${n}/1` : `${n}/${den}`;
-    }
+  if (Math.abs(decimal - 2) < 0.01) return "+100";
+  if (decimal >= 2) {
+    return `+${Math.round((decimal - 1) * 100)}`;
   }
-  return `${v.toFixed(1)}/1`;
+  return `-${Math.round(100 / (decimal - 1))}`;
 }
 
 const gbp = new Intl.NumberFormat("en-GB", {
@@ -390,7 +404,7 @@ function OutrightRow({
         <p className="bets-row-name">{bet.playerName}</p>
         <p className="bets-row-meta">
           Win @ {bet.oddsTakenLabel} · {gbp.format(bet.stake)}
-          {haveFair && <> · now {fractionalDisplay(fair)}</>}
+          {haveFair && <> · now {americanDisplay(fair)}</>}
         </p>
       </div>
       <div className={`bets-row-value ${profitClass}`}>
@@ -495,7 +509,7 @@ function RoundScoreRow({
           <p className="bets-row-meta">
             Model: {Math.round(ev.prob * 100)}% chance · fair{" "}
             {ev.prob > 0 && ev.prob < 1
-              ? fractionalDisplay(1 / ev.prob)
+              ? americanDisplay(1 / ev.prob)
               : "—"}
           </p>
         )}
@@ -551,7 +565,7 @@ function AddBetForm({
     setErr(null);
     if (!pickedPlayer) return setErr("Pick a player from the list.");
     const odds = parseOdds(oddsText);
-    if (!odds) return setErr("Enter odds like 8/1, evens, or 9.0.");
+    if (!odds) return setErr("Enter odds like +250, -150, 8/1, or 9.0.");
     const stake = Number(stakeText);
     if (!Number.isFinite(stake) || stake <= 0) {
       return setErr("Enter a positive stake.");
@@ -711,7 +725,7 @@ function AddBetForm({
               <span>Odds</span>
               <input
                 type="text"
-                placeholder="8/1 or 9.0"
+                placeholder="+250, -150, 8/1, 9.0"
                 value={oddsText}
                 onChange={(e) => setOddsText(e.target.value)}
                 inputMode="text"

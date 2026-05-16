@@ -88,17 +88,12 @@ function getAuthorKey(): string {
  * precision would claim accuracy we don't have. Bucket to "just now" /
  * "few min ago" / "Nm ago" / "Nh ago".
  */
-/** Format decimal odds as fractional ("5.0" → "4/1"). */
-function fractionalOdds(decimal: number): string {
+/** Format decimal odds as American ("5.0" → "+400", "1.5" → "-200"). */
+function americanOdds(decimal: number): string {
   if (!Number.isFinite(decimal) || decimal <= 1) return "—";
-  const v = decimal - 1;
-  if (v >= 1) {
-    return `${Math.round(v)}/1`;
-  }
-  // Sub-evens — render to one decimal e.g. "8/11" or "4/9" require
-  // a denominator search; for compactness just say e.g. "1/2".
-  const inv = Math.round(1 / v);
-  return `1/${inv}`;
+  if (Math.abs(decimal - 2) < 0.01) return "+100";
+  if (decimal >= 2) return `+${Math.round((decimal - 1) * 100)}`;
+  return `-${Math.round(100 / (decimal - 1))}`;
 }
 
 function timeAgo(ts: number): string {
@@ -404,8 +399,8 @@ export default function FeedClient() {
                             }`}
                             title="Win-market odds shift"
                           >
-                            odds {fractionalOdds(event.oddsBefore)} →{" "}
-                            {fractionalOdds(event.oddsAfter)}
+                            odds {americanOdds(event.oddsBefore)} →{" "}
+                            {americanOdds(event.oddsAfter)}
                           </span>
                         )}
                       </p>
@@ -422,8 +417,8 @@ export default function FeedClient() {
                             }`}
                             title="Win-market odds shift"
                           >
-                            odds {fractionalOdds(event.oddsBefore)} →{" "}
-                            {fractionalOdds(event.oddsAfter)}
+                            odds {americanOdds(event.oddsBefore)} →{" "}
+                            {americanOdds(event.oddsAfter)}
                           </span>
                         </p>
                       )}
