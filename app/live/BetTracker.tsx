@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type JSX } from "react";
 import type { CachedLeaderboardRow } from "@/lib/feed/store";
 
 const STORAGE_KEY = "pardle_bets_v2";
