@@ -217,6 +217,12 @@ async function handle(req: Request) {
   // up the route.
   const playerSkill = await ensurePlayerSkill(tournament.id, leaderboard);
 
+  // Live-round drift: how much harder/easier the field has scored in
+  // the most recent ~30 events vs the rest of the round. Used as a
+  // per-remaining-hole bump in the projection so afternoon-wave
+  // remaining holes don't get priced at the easier morning conditions.
+  const fieldDrift = computeFieldDrift(allEvents);
+
   // Per-player round state from the (already-fetched) snapshot + par
   // map. Also bakes in the round-score model's expectedRemaining +
   // variance for each player+round, plus a tournament-total
@@ -228,6 +234,7 @@ async function handle(req: Request) {
       fieldStats,
       playerSkill,
       leaderboard,
+      fieldDrift,
     );
 
   // Maintain a rolling history of the winning-score CDF for the bet
@@ -283,12 +290,81 @@ async function handle(req: Request) {
     topFinishCurrent: topFinish,
     topFinishHistory,
     fieldStats,
+    /** Live-round field-mean drift bump (strokes/hole) applied to
+     *  remaining-hole projections — measures how the most recent
+     *  ~30 events scored vs the rest of the round. */
+    fieldDrift,
     playerSkill,
     tournamentPars: bundle.pars,
     watching,
     seenToday,
     polled,
   });
+}
+
+interface FieldDrift {
+  /** Live round the drift was measured against. */
+  round: number;
+  /** Strokes-per-hole bump to add to projections in `round` (can be
+   *  negative if the course is playing easier than earlier today). */
+  drift: number;
+}
+
+/**
+ * Compare how the field has scored in the most recent ~30 hole-events
+ * vs the rest of the events for the same round, and return the delta
+ * as a per-hole bump. Captures the "conditions got harder this
+ * afternoon" / "wind died down" drift that the static per-hole
+ * fieldStats mean misses.
+ *
+ * Caller applies the bump only to remaining holes whose round matches
+ * `result.round` — drift doesn't sensibly extrapolate to other rounds.
+ *
+ * Returns null when the sample is too thin to be useful (early in a
+ * round, or post-cut when score events have dried up).
+ */
+function computeFieldDrift(
+  events: FeedRow["event"][] | Array<{
+    type: string;
+    round?: number;
+    par?: number;
+    strokes?: number;
+    ts: number;
+  }>,
+): FieldDrift | null {
+  const scored = (events as Array<{
+    type: string;
+    round?: number;
+    par?: number;
+    strokes?: number;
+    ts: number;
+  }>).filter(
+    (e) =>
+      e.type === "score" &&
+      typeof e.par === "number" &&
+      typeof e.strokes === "number" &&
+      e.par >= 3 &&
+      e.par <= 5 &&
+      typeof e.round === "number",
+  );
+  if (scored.length < 60) return null;
+  // events come from Redis newest-first; defensively re-sort by ts.
+  scored.sort((a, b) => b.ts - a.ts);
+  const liveRound = scored[0].round as number;
+  const sameRound = scored.filter((e) => e.round === liveRound);
+  if (sameRound.length < 60) return null;
+  const RECENT_N = 30;
+  const recent = sameRound.slice(0, RECENT_N);
+  const rest = sameRound.slice(RECENT_N);
+  if (rest.length < 30) return null;
+  const meanDev = (arr: typeof sameRound) =>
+    arr.reduce((s, e) => s + ((e.strokes as number) - (e.par as number)), 0) /
+    arr.length;
+  const raw = meanDev(recent) - meanDev(rest);
+  // Sanity-cap so a few outliers can't blow up the projection.
+  const CAP = 0.25;
+  const drift = Math.max(-CAP, Math.min(CAP, raw));
+  return { round: liveRound, drift };
 }
 
 /**
@@ -309,6 +385,7 @@ function computePlayerRoundStates(
   fieldStats: FieldHoleStats,
   playerSkill: PlayerSkillMap,
   leaderboard: import("@/lib/feed/store").CachedLeaderboardRow[],
+  fieldDrift: FieldDrift | null,
 ): {
   roundStates: Record<string, PlayerRoundState>;
   tournamentProjections: Record<string, TournamentProjection>;
@@ -424,7 +501,12 @@ function computePlayerRoundStates(
           parRemaining += par;
           holesRemaining++;
           const stat = holeStat(r, hole);
-          expectedRemaining += par + stat.mean - skillPerHole;
+          // Apply the live-round drift bump only to remaining holes
+          // in the round it was measured from — extrapolating today's
+          // conditions to tomorrow's tee time isn't justified.
+          const driftBump =
+            fieldDrift && fieldDrift.round === r ? fieldDrift.drift : 0;
+          expectedRemaining += par + stat.mean + driftBump - skillPerHole;
           variance += stat.variance;
         }
       }

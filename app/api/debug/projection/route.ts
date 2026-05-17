@@ -70,6 +70,7 @@ export async function GET(req: Request) {
       { mean: number; variance: number; active: boolean }
     >;
     topFinishCurrent?: Record<string, TopFinishProbs>;
+    fieldDrift?: { round: number; drift: number } | null;
   };
 
   const bundle = await getFeedBundle(tournament.id);
@@ -202,6 +203,7 @@ export async function GET(req: Request) {
     skillCacheSize: Object.keys(skillMap).length,
     activeFieldSize: Object.values(projections).filter((p) => p.active)
       .length,
+    fieldDrift: feed.fieldDrift ?? null,
     matches: report,
   });
 }
