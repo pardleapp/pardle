@@ -115,25 +115,40 @@ export async function getOddsBuffers(
 }
 
 /**
- * Look up the snapshot price as close as possible to `targetTs` and
- * the most recent price after it. Returns nulls when the buffer is
- * too thin to find both sides.
+ * Look up the win-market price on either side of an event so we can
+ * render an odds-moved badge.
  *
- * `windowBeforeMs` is how far back from `targetTs` we'll accept a
- * "before" sample (typically 90s — the orchestrator's typical
- * publish lag). `windowAfterMs` is how far forward we'll accept an
- * "after" sample (the next 1-2 poll cycles).
+ * Tricky bit: `targetTs` is when our poller *detected* the event, not
+ * when the shot actually landed on course. The orchestrator typically
+ * publishes 60-90s after the real moment, and Betfair often reacts
+ * within ~30s of the on-course event. That means by the time
+ * `targetTs` arrives, Betfair has already moved — so the "before"
+ * price we want is from BEFORE the orchestrator's detection lag, not
+ * from just before `targetTs`.
+ *
+ * Mitigation:
+ * - Anchor the "before" cutoff at `targetTs - DETECTION_LAG_MS` and
+ *   look further back from there.
+ * - Keep the "after" window generous so we still find a settled
+ *   post-move sample at our typical 1/min sampling cadence.
  */
+const DETECTION_LAG_MS = 60_000;
+
 export function findOddsShift(
   buf: OddsSample[],
   targetTs: number,
-  windowBeforeMs = 120_000,
-  windowAfterMs = 90_000,
+  /** How far back from the (lag-adjusted) cutoff to accept a "before". */
+  windowBeforeMs = 180_000,
+  /** How far forward from targetTs to accept an "after". */
+  windowAfterMs = 180_000,
 ): { before: number; after: number } | null {
   if (buf.length < 2) return null;
+  const beforeCutoff = targetTs - DETECTION_LAG_MS;
   const before = [...buf]
     .reverse()
-    .find((s) => s.ts <= targetTs && targetTs - s.ts <= windowBeforeMs);
+    .find(
+      (s) => s.ts <= beforeCutoff && beforeCutoff - s.ts <= windowBeforeMs,
+    );
   const after = buf.find(
     (s) => s.ts >= targetTs && s.ts - targetTs <= windowAfterMs,
   );
