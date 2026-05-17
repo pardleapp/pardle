@@ -11,13 +11,24 @@ import webpush from "web-push";
 
 let configured = false;
 
+/** Trim + strip any non-base64-url characters from a VAPID key env
+ *  var value. Catches the common pasting hazards: trailing
+ *  whitespace, accidental newlines, zero-width chars, surrounding
+ *  quotes. Anything outside [A-Za-z0-9_-] is dropped. */
+function sanitizeVapidKey(raw: string | undefined): string {
+  if (!raw) return "";
+  return raw.trim().replace(/[^A-Za-z0-9_-]/g, "");
+}
+
 function ensureConfigured() {
   if (configured) return;
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-  const subject = process.env.VAPID_SUBJECT || "mailto:hello@pardle.app";
+  const publicKey = sanitizeVapidKey(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
+  const privateKey = sanitizeVapidKey(process.env.VAPID_PRIVATE_KEY);
+  const subject = (process.env.VAPID_SUBJECT || "mailto:hello@pardle.app").trim();
   if (!publicKey || !privateKey) {
-    throw new Error("VAPID keys missing — set NEXT_PUBLIC_VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY");
+    throw new Error(
+      "VAPID keys missing — set NEXT_PUBLIC_VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY",
+    );
   }
   webpush.setVapidDetails(subject, publicKey, privateKey);
   configured = true;
