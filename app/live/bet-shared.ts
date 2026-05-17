@@ -607,6 +607,10 @@ export function reconstructHistory(
   dgWinProbs?: Record<string, DgProbHistorySample[] | null>,
   winningScoreHistory?: WinningScoreSnapshot[],
   topFinishHistory?: TopFinishSnapshot[],
+  bookOdds?: {
+    draftkings: Record<string, OddsHistorySample[] | null>;
+    fanduel: Record<string, OddsHistorySample[] | null>;
+  },
 ): PnlSample[] {
   const series: PnlSample[] = [];
 
@@ -633,6 +637,23 @@ export function reconstructHistory(
       for (const s of dgSamples) {
         if (!Number.isFinite(s.prob) || s.prob <= 0 || s.prob >= 1) continue;
         pts.push({ t: s.ts, prob: s.prob });
+      }
+    }
+    // Merge DraftKings + FanDuel samples in regardless. Adds book
+    // consensus alongside Polymarket / DataGolf — more data points
+    // give the chart a smoother trajectory.
+    const dkSamples = bookOdds?.draftkings?.[bet.playerId];
+    if (Array.isArray(dkSamples)) {
+      for (const s of dkSamples) {
+        if (!Number.isFinite(s.p) || s.p <= 1) continue;
+        pts.push({ t: s.ts, prob: 1 / s.p });
+      }
+    }
+    const fdSamples = bookOdds?.fanduel?.[bet.playerId];
+    if (Array.isArray(fdSamples)) {
+      for (const s of fdSamples) {
+        if (!Number.isFinite(s.p) || s.p <= 1) continue;
+        pts.push({ t: s.ts, prob: 1 / s.p });
       }
     }
     // Only include the placedAt anchor (= the price the user paid)

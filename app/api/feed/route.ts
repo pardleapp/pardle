@@ -258,9 +258,9 @@ async function handle(req: Request) {
     /** DataGolf in-play win-prob buffer per player — outright chart's
      *  fallback when Polymarket is thin (longshots, illiquid markets). */
     dgWinProbs: bundle.dgWinProbs,
-    /** DraftKings top-X decimal odds buffers. cutoff → playerId →
-     *  rolling samples. Source of truth for top-finish bet pricing. */
-    dkTopOdds: bundle.dkTopOdds,
+    /** DK + FD outright winner odds via The Odds API. Merged into
+     *  the outright bet chart alongside the Polymarket samples. */
+    bookOdds: bundle.bookOdds,
     playerRoundStates,
     /** Per-player N(mean, variance) projection of final 4-round
      *  strokes. Powers the winning-score min-of-normals model. */

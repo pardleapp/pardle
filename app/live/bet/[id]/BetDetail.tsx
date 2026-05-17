@@ -46,6 +46,10 @@ interface FeedResponse {
   winningScoreHistory?: WinningScoreSnapshot[];
   topFinishCurrent?: Record<string, TopFinishProbs>;
   topFinishHistory?: TopFinishSnapshot[];
+  bookOdds?: {
+    draftkings: Record<string, OddsHistorySample[] | null>;
+    fanduel: Record<string, OddsHistorySample[] | null>;
+  };
 }
 
 const gbp = new Intl.NumberFormat("en-GB", {
@@ -191,6 +195,7 @@ export default function BetDetail({ betId }: { betId: string }) {
     data.dgWinProbs,
     data.winningScoreHistory,
     data.topFinishHistory,
+    data.bookOdds,
   );
   const profit = nowValue != null ? nowValue - bet.stake : null;
   const profitPct = profit != null ? (profit / bet.stake) * 100 : null;
