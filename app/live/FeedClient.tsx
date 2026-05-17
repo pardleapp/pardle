@@ -16,7 +16,7 @@ import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
 import LeaderboardPanel from "./LeaderboardPanel";
 import PlayerSearch from "./PlayerSearch";
-import Reel from "./Reel";
+import ReelGroup from "./ReelGroup";
 
 const REFRESH_MS = 6_000;
 const AUTHOR_KEY_STORAGE = "pardle_feed_author";
@@ -342,20 +342,22 @@ export default function FeedClient() {
         <LeaderboardPanel rows={data.leaderboard ?? []} mode="tab" />
       ) : (
         <>
-      <Reel
-        title="⛳ Shots of the day"
-        rows={data.bestReel ?? []}
+      <ReelGroup
+        panes={[
+          {
+            key: "best",
+            title: "⛳ Shots of the day",
+            rows: data.bestReel ?? [],
+          },
+          {
+            key: "worst",
+            title: "💀 Worst of the day",
+            rows: data.worstReel ?? [],
+          },
+        ]}
         myReactions={myReactions}
         onReact={sendReaction}
-        storageKey="best"
-      />
-
-      <Reel
-        title="💀 Worst of the day"
-        rows={data.worstReel ?? []}
-        myReactions={myReactions}
-        onReact={sendReaction}
-        storageKey="worst"
+        storageKey="homefeed"
       />
 
       <BetTracker
