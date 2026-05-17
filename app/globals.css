@@ -8336,6 +8336,88 @@ footer {
   }
 }
 
+/* ── Notification permission prompt ──────────────────────────── */
+
+.notif-prompt {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notif-prompt-body {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.notif-prompt-emoji {
+  font-size: 28px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.notif-prompt-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.notif-prompt-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--text);
+  letter-spacing: -0.005em;
+}
+
+.notif-prompt-blurb {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.notif-prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.notif-prompt-dismiss {
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.notif-prompt-enable {
+  border: none;
+  background: var(--text);
+  color: var(--bg);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.notif-prompt-enable[disabled] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 /* ── Bet detail share action ─────────────────────────────────── */
 
 .bd-actions {

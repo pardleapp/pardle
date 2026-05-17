@@ -30,6 +30,7 @@ import {
   type WinningScoreBet,
 } from "./bet-shared";
 import { useAuth } from "./auth/useAuth";
+import NotificationPrompt from "./notifications/NotificationPrompt";
 
 type BetKind = "outright" | "round-score" | "winning-score" | "top-finish";
 
@@ -277,6 +278,8 @@ export default function BetTracker({
           live as the round unfolds. Tap a bet to see the full PnL chart.
         </p>
       )}
+
+      <NotificationPrompt betCount={bets.length} />
     </section>
   );
 }
