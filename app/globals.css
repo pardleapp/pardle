@@ -9084,3 +9084,41 @@ html, body {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
 }
+
+/* ── Split header: title left, section tabs right ─────────────── */
+.container-wide > header.brand.brand-split,
+.hub-header.hub-header-split {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.container-wide > header.brand.brand-split .hub-nav-tabs,
+.hub-header.hub-header-split .hub-nav-tabs {
+  margin-top: 0;
+}
+
+/* Drop the now-redundant subtitle slot on the games hub when split */
+.hub-header.hub-header-split .hub-subtitle {
+  display: none;
+}
+
+/* ── Feed header: wrap on narrow screens so LIVE never overflows ─ */
+@media (max-width: 560px) {
+  .feed-header-row {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .feed-tournament-name {
+    flex: 1 1 100%;
+    font-size: 18px;
+  }
+  .feed-header-meta {
+    flex-wrap: wrap;
+    row-gap: 6px;
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

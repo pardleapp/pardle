@@ -145,9 +145,8 @@ export default async function HubHome() {
 
   return (
     <main className="hub">
-      <header className="hub-header">
+      <header className="hub-header hub-header-split">
         <h1 className="hub-wordmark">{BRAND.name}</h1>
-        <p className="hub-subtitle">Daily golf puzzles</p>
         <nav className="hub-nav-tabs" aria-label="Section">
           <Link href="/" className="hub-nav-tab">
             Live feed

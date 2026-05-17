@@ -13,9 +13,8 @@ export const dynamic = "force-dynamic";
 export default function HomeLive() {
   return (
     <main className="container container-wide">
-      <header className="brand">
+      <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
-        <p className="subtitle">Live · bets & feed</p>
         <nav className="hub-nav-tabs" aria-label="Section">
           <Link
             href="/"
