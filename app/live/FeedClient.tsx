@@ -78,6 +78,9 @@ interface FeedResponse {
     ts: number;
     points: Array<{ line: number; probUnder: number }>;
   }>;
+  dkTopOdds?: Partial<
+    Record<5 | 10 | 20, Record<string, Array<{ ts: number; p: number }> | null>>
+  >;
   watching: number;
   seenToday: number;
   polled: boolean;
@@ -98,6 +101,23 @@ function getAuthorKey(): string {
     window.localStorage.setItem(AUTHOR_KEY_STORAGE, k);
   }
   return k;
+}
+
+/** Reduce a DK-buffer-per-player map down to the most-recent decimal
+ *  odds for each player. The bet tracker only needs the latest. */
+function latestDkOdds(
+  buffers: Record<string, Array<{ ts: number; p: number }> | null> | undefined,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!buffers) return out;
+  for (const [pid, buf] of Object.entries(buffers)) {
+    if (!Array.isArray(buf) || buf.length === 0) continue;
+    const last = buf[buf.length - 1];
+    if (last && Number.isFinite(last.p) && last.p > 1) {
+      out[pid] = last.p;
+    }
+  }
+  return out;
 }
 
 /**
@@ -369,6 +389,15 @@ export default function FeedClient() {
         currentOdds={data.currentOdds ?? {}}
         playerRoundStates={data.playerRoundStates ?? {}}
         tournamentProjections={data.tournamentProjections ?? {}}
+        dkTopCurrentOdds={
+          data.dkTopOdds
+            ? {
+                5: latestDkOdds(data.dkTopOdds[5]),
+                10: latestDkOdds(data.dkTopOdds[10]),
+                20: latestDkOdds(data.dkTopOdds[20]),
+              }
+            : undefined
+        }
         oddsFormat={oddsFormat}
       />
 

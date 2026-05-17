@@ -42,6 +42,9 @@ interface FeedResponse {
   playerRoundStates: Record<string, PlayerRoundState>;
   tournamentProjections?: Record<string, TournamentProjection>;
   winningScoreHistory?: WinningScoreSnapshot[];
+  dkTopOdds?: Partial<
+    Record<5 | 10 | 20, Record<string, OddsHistorySample[] | null>>
+  >;
 }
 
 const gbp = new Intl.NumberFormat("en-GB", {
@@ -170,11 +173,19 @@ export default function BetDetail({ betId }: { betId: string }) {
     return <p className="feed-empty">Loading…</p>;
   }
 
+  const dkTopCurrentOdds = data.dkTopOdds
+    ? {
+        5: latestDkOddsFromBuffer(data.dkTopOdds[5]),
+        10: latestDkOddsFromBuffer(data.dkTopOdds[10]),
+        20: latestDkOddsFromBuffer(data.dkTopOdds[20]),
+      }
+    : undefined;
   const nowValue = currentValueForBet(
     bet,
     data.currentOdds,
     data.playerRoundStates,
     data.tournamentProjections,
+    dkTopCurrentOdds,
   );
   const history = reconstructHistory(
     bet,
@@ -185,6 +196,7 @@ export default function BetDetail({ betId }: { betId: string }) {
     scorecard,
     data.dgWinProbs,
     data.winningScoreHistory,
+    data.dkTopOdds,
   );
   const profit = nowValue != null ? nowValue - bet.stake : null;
   const profitPct = profit != null ? (profit / bet.stake) * 100 : null;
@@ -206,6 +218,8 @@ export default function BetDetail({ betId }: { betId: string }) {
               ? "Outright winner"
               : bet.kind === "winning-score"
               ? `Winning score · ${bet.side} ${bet.line}`
+              : bet.kind === "top-finish"
+              ? `Top ${bet.cutoff} finish`
               : `Round-score · ${bet.side} ${bet.line}${
                   bet.round != null ? ` · R${bet.round}` : ""
                 }`}
@@ -500,4 +514,19 @@ function WinningScoreDetail({
       )}
     </div>
   );
+}
+
+function latestDkOddsFromBuffer(
+  buffers: Record<string, OddsHistorySample[] | null> | undefined,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!buffers) return out;
+  for (const [pid, buf] of Object.entries(buffers)) {
+    if (!Array.isArray(buf) || buf.length === 0) continue;
+    const last = buf[buf.length - 1];
+    if (last && Number.isFinite(last.p) && last.p > 1) {
+      out[pid] = last.p;
+    }
+  }
+  return out;
 }

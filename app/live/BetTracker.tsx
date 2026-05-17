@@ -20,18 +20,21 @@ import {
   type OutrightBet,
   type PlayerRoundState,
   type RoundScoreBet,
+  type TopFinishBet,
   type TournamentProjection,
   type TrackedBet,
   type WinningScoreBet,
 } from "./bet-shared";
 
-type BetKind = "outright" | "round-score" | "winning-score";
+type BetKind = "outright" | "round-score" | "winning-score" | "top-finish";
 
 interface Props {
   players: CachedLeaderboardRow[];
   currentOdds: Record<string, number>;
   playerRoundStates: Record<string, PlayerRoundState>;
   tournamentProjections: Record<string, TournamentProjection>;
+  /** DK top-X latest decimal odds: cutoff → playerId → odds. */
+  dkTopCurrentOdds?: Partial<Record<5 | 10 | 20, Record<string, number>>>;
   oddsFormat: OddsFormat;
 }
 
@@ -58,6 +61,7 @@ export default function BetTracker({
   currentOdds,
   playerRoundStates,
   tournamentProjections,
+  dkTopCurrentOdds,
   oddsFormat,
 }: Props) {
   const [bets, setBets] = useState<TrackedBet[]>([]);
@@ -109,10 +113,17 @@ export default function BetTracker({
           currentOdds,
           playerRoundStates,
           tournamentProjections,
+          dkTopCurrentOdds,
         ),
       );
     return out;
-  }, [bets, currentOdds, playerRoundStates, tournamentProjections]);
+  }, [
+    bets,
+    currentOdds,
+    playerRoundStates,
+    tournamentProjections,
+    dkTopCurrentOdds,
+  ]);
 
   const totals = useMemo(() => {
     let stake = 0;
@@ -161,6 +172,16 @@ export default function BetTracker({
                 key={b.id}
                 bet={b}
                 projections={tournamentProjections}
+                oddsFormat={oddsFormat}
+                onRemove={() => removeBet(b.id)}
+              />
+            ) : b.kind === "top-finish" ? (
+              <TopFinishRow
+                key={b.id}
+                bet={b}
+                currentOdds={
+                  dkTopCurrentOdds?.[b.cutoff]?.[b.playerId] ?? null
+                }
                 oddsFormat={oddsFormat}
                 onRemove={() => removeBet(b.id)}
               />
@@ -252,6 +273,73 @@ function OutrightRow({
             Win @ {formatOdds(bet.oddsTaken, oddsFormat)} ·{" "}
             {gbp.format(bet.stake)}
             {haveFair && <> · now {formatOdds(fair, oddsFormat)}</>}
+          </p>
+        </div>
+        <div className={`bets-row-value ${profitClass}`}>
+          {currentValue !== null ? (
+            <>
+              <strong>{gbp.format(currentValue)}</strong>
+              <span>
+                {profit !== null && profit >= 0 ? "+" : ""}
+                {profit !== null ? gbp.format(profit) : ""}
+              </span>
+            </>
+          ) : (
+            <span className="bets-row-pending">—</span>
+          )}
+        </div>
+      </Link>
+      <button
+        type="button"
+        className="bets-row-x bets-row-x-detached"
+        onClick={onRemove}
+        aria-label="Remove bet"
+        title="Remove this bet"
+      >
+        ✕
+      </button>
+    </li>
+  );
+}
+
+function TopFinishRow({
+  bet,
+  currentOdds,
+  oddsFormat,
+  onRemove,
+}: {
+  bet: TopFinishBet;
+  currentOdds: number | null;
+  oddsFormat: OddsFormat;
+  onRemove: () => void;
+}) {
+  const haveFair =
+    currentOdds != null && Number.isFinite(currentOdds) && currentOdds > 1;
+  const currentValue = haveFair
+    ? bet.stake * (bet.oddsTaken / (currentOdds as number))
+    : null;
+  const profit = currentValue !== null ? currentValue - bet.stake : null;
+  const profitClass =
+    profit === null
+      ? ""
+      : profit > 0
+      ? "bets-profit-up"
+      : profit < 0
+      ? "bets-profit-down"
+      : "";
+  return (
+    <li className="bets-row-wrap">
+      <Link href={`/live/bet/${bet.id}`} className="bets-row bets-row-link">
+        <div className="bets-row-main">
+          <p className="bets-row-name">
+            {bet.playerName}{" "}
+            <span className="bets-row-kind">Top {bet.cutoff}</span>
+          </p>
+          <p className="bets-row-meta">
+            @ {formatOdds(bet.oddsTaken, oddsFormat)} · {gbp.format(bet.stake)}
+            {haveFair && (
+              <> · DK now {formatOdds(currentOdds as number, oddsFormat)}</>
+            )}
           </p>
         </div>
         <div className={`bets-row-value ${profitClass}`}>
@@ -527,6 +615,7 @@ function AddBetForm({
   const [lineText, setLineText] = useState("");
   const [side, setSide] = useState<"under" | "over">("under");
   const [roundText, setRoundText] = useState<string>("");
+  const [cutoff, setCutoff] = useState<5 | 10 | 20>(5);
   const [err, setErr] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
@@ -572,8 +661,23 @@ function AddBetForm({
       return;
     }
 
-    // Outright + round-score from here on — both need a picked player.
+    // Outright + round-score + top-finish from here on — all need a player.
     if (!pickedPlayer) return setErr("Pick a player from the list.");
+
+    if (kind === "top-finish") {
+      onAdd({
+        kind: "top-finish",
+        id,
+        placedAt,
+        playerId: pickedPlayer.id,
+        playerName: pickedPlayer.name,
+        cutoff,
+        oddsTaken: odds.decimal,
+        oddsTakenLabel: odds.label,
+        stake,
+      });
+      return;
+    }
 
     if (kind === "outright") {
       onAdd({
@@ -640,6 +744,13 @@ function AddBetForm({
           onClick={() => setKind("winning-score")}
         >
           Winning score
+        </button>
+        <button
+          type="button"
+          className={kind === "top-finish" ? "bets-kind-on" : ""}
+          onClick={() => setKind("top-finish")}
+        >
+          Top finish
         </button>
       </div>
 
@@ -761,6 +872,23 @@ function AddBetForm({
 
       {pickedPlayer && (
         <>
+          {kind === "top-finish" && (
+            <div className="bets-form-row">
+              <label className="bets-form-label">
+                <span>Top finish</span>
+                <select
+                  value={cutoff}
+                  onChange={(e) =>
+                    setCutoff(Number(e.target.value) as 5 | 10 | 20)
+                  }
+                >
+                  <option value="5">Top 5</option>
+                  <option value="10">Top 10</option>
+                  <option value="20">Top 20</option>
+                </select>
+              </label>
+            </div>
+          )}
           {kind === "round-score" && (
             <>
               <div className="bets-form-row">

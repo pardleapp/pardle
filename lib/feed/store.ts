@@ -567,6 +567,8 @@ export interface FeedBundle {
   dgWinProbs: Record<string, FeedBundleDgSample[] | null>;
   /** Rolling history of winning-score CDF snapshots (newest first). */
   winningScoreHistory: WinningScoreSnapshot[];
+  /** DraftKings top-X decimal-odds buffers. cutoff → playerId → samples. */
+  dkTopOdds: Record<5 | 10 | 20, Record<string, FeedBundleOddsSample[] | null>>;
 }
 
 interface FeedBundleDgSample {
@@ -615,6 +617,10 @@ export async function getFeedBundle(
   pipe.hgetall(`feed:dg:${tournamentId}`);
   // Index 8 — Winning-score CDF rolling history (newest first).
   pipe.lrange(wsKey(tournamentId), 0, WS_MAX_SNAPSHOTS - 1);
+  // Index 9-11 — DraftKings top-X (5/10/20) odds buffers.
+  pipe.hgetall(`feed:dk-top:${tournamentId}:5`);
+  pipe.hgetall(`feed:dk-top:${tournamentId}:10`);
+  pipe.hgetall(`feed:dk-top:${tournamentId}:20`);
   const res = (await pipe.exec()) as unknown[];
 
   const eventsRaw = (res[0] ?? []) as unknown[];
@@ -632,6 +638,18 @@ export async function getFeedBundle(
   const dgRaw = (res[7] ?? {}) as Record<
     string,
     FeedBundleDgSample[] | null
+  >;
+  const dkTop5Raw = (res[9] ?? {}) as Record<
+    string,
+    FeedBundleOddsSample[] | null
+  >;
+  const dkTop10Raw = (res[10] ?? {}) as Record<
+    string,
+    FeedBundleOddsSample[] | null
+  >;
+  const dkTop20Raw = (res[11] ?? {}) as Record<
+    string,
+    FeedBundleOddsSample[] | null
   >;
   const wsRaw = (res[8] ?? []) as unknown[];
   const winningScoreHistory: WinningScoreSnapshot[] = [];
@@ -679,6 +697,11 @@ export async function getFeedBundle(
     oddsBuffers: oddsRaw,
     dgWinProbs: dgRaw,
     winningScoreHistory,
+    dkTopOdds: {
+      5: dkTop5Raw,
+      10: dkTop10Raw,
+      20: dkTop20Raw,
+    },
   };
 }
 

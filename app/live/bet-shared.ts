@@ -74,7 +74,24 @@ export interface WinningScoreBet {
   placedAt: number;
 }
 
-export type TrackedBet = OutrightBet | RoundScoreBet | WinningScoreBet;
+export interface TopFinishBet {
+  id: string;
+  kind: "top-finish";
+  playerId: string;
+  playerName: string;
+  /** Which top-N market: 5, 10 or 20. */
+  cutoff: 5 | 10 | 20;
+  oddsTaken: number;
+  oddsTakenLabel: string;
+  stake: number;
+  placedAt: number;
+}
+
+export type TrackedBet =
+  | OutrightBet
+  | RoundScoreBet
+  | WinningScoreBet
+  | TopFinishBet;
 
 export interface TournamentProjection {
   /** Model-expected final 4-round total strokes. */
@@ -473,10 +490,16 @@ export function currentValueForBet(
   currentOdds: Record<string, number>,
   playerRoundStates: Record<string, PlayerRoundState>,
   tournamentProjections?: Record<string, TournamentProjection>,
+  dkTopCurrentOdds?: Partial<Record<5 | 10 | 20, Record<string, number>>>,
 ): number | null {
   if (b.kind === "outright") {
     const fair = currentOdds[b.playerId];
     if (!Number.isFinite(fair) || fair <= 1) return null;
+    return b.stake * (b.oddsTaken / fair);
+  }
+  if (b.kind === "top-finish") {
+    const fair = dkTopCurrentOdds?.[b.cutoff]?.[b.playerId];
+    if (!Number.isFinite(fair) || fair == null || fair <= 1) return null;
     return b.stake * (b.oddsTaken / fair);
   }
   if (b.kind === "winning-score") {
@@ -560,6 +583,9 @@ export function reconstructHistory(
   scorecard?: BetScorecard | null,
   dgWinProbs?: Record<string, DgProbHistorySample[] | null>,
   winningScoreHistory?: WinningScoreSnapshot[],
+  dkTopHistories?: Partial<
+    Record<5 | 10 | 20, Record<string, OddsHistorySample[] | null>>
+  >,
 ): PnlSample[] {
   const series: PnlSample[] = [];
 
@@ -614,6 +640,33 @@ export function reconstructHistory(
     // Always append the current value as the rightmost sample so a
     // thin buffer (e.g. a market we just started tracking) still
     // gives the chart two points to draw a line between.
+    if (nowValue != null) {
+      series.push({ t: Date.now(), v: nowValue });
+    }
+    return series;
+  }
+
+  if (bet.kind === "top-finish") {
+    const buf = dkTopHistories?.[bet.cutoff]?.[bet.playerId] ?? [];
+    type Pt = { t: number; p: number };
+    const pts: Pt[] = [];
+    if (Date.now() - bet.placedAt < 24 * 60 * 60 * 1000) {
+      pts.push({ t: bet.placedAt, p: bet.oddsTaken });
+    }
+    if (Array.isArray(buf)) {
+      for (const s of buf) {
+        if (!Number.isFinite(s.p) || s.p <= 1) continue;
+        pts.push({ t: s.ts, p: s.p });
+      }
+    }
+    pts.sort((a, b) => a.t - b.t);
+    for (const pt of pts) {
+      const v = bet.stake * (bet.oddsTaken / pt.p);
+      const last = series[series.length - 1];
+      if (last && Math.abs(v - last.v) < 0.05 && pt.t - last.t < 60_000)
+        continue;
+      series.push({ t: pt.t, v });
+    }
     if (nowValue != null) {
       series.push({ t: Date.now(), v: nowValue });
     }
