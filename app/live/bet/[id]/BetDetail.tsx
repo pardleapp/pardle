@@ -144,6 +144,41 @@ export default function BetDetail({ betId }: { betId: string }) {
     setBet(next);
   }, [bet, data]);
 
+  const [shareStatus, setShareStatus] = useState<"idle" | "copied" | "err">(
+    "idle",
+  );
+
+  async function shareThis() {
+    if (!bet) return;
+    setShareStatus("idle");
+    try {
+      const res = await fetch(
+        `/api/bets/${encodeURIComponent(bet.id)}/share`,
+        { method: "POST" },
+      );
+      if (!res.ok) {
+        if (res.status === 401) {
+          setShareStatus("err");
+          alert("Sign in first so we can attach the shared bet to you.");
+          return;
+        }
+        setShareStatus("err");
+        return;
+      }
+      const url = `${window.location.origin}/share/bet/${encodeURIComponent(bet.id)}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        setShareStatus("copied");
+      } catch {
+        // Older browsers: fall back to prompt so the user can copy manually.
+        window.prompt("Copy this share link:", url);
+        setShareStatus("copied");
+      }
+    } catch {
+      setShareStatus("err");
+    }
+  }
+
   function removeThis() {
     if (!bet) return;
     if (!confirm("Remove this bet from your tracker?")) return;
@@ -284,13 +319,23 @@ export default function BetDetail({ betId }: { betId: string }) {
         </>
       )}
 
-      <button
-        type="button"
-        className="bd-remove"
-        onClick={removeThis}
-      >
-        Remove this bet
-      </button>
+      <div className="bd-actions">
+        <button
+          type="button"
+          className="bd-share"
+          onClick={shareThis}
+          title="Make this bet viewable to anyone with the link"
+        >
+          {shareStatus === "copied"
+            ? "Link copied ✓"
+            : shareStatus === "err"
+            ? "Try again"
+            : "Share this bet"}
+        </button>
+        <button type="button" className="bd-remove" onClick={removeThis}>
+          Remove this bet
+        </button>
+      </div>
     </section>
   );
 }
