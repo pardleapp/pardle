@@ -94,7 +94,16 @@ function buildChartSvg() {
 }
 
 export default async function OpengraphImage() {
-  const chartSrc = buildChartSvg();
+  try {
+    const chartSrc = buildChartSvg();
+    return await renderCard(chartSrc);
+  } catch (err) {
+    const msg = err instanceof Error ? `${err.name}: ${err.message}\n${err.stack ?? ""}` : String(err);
+    return new Response(msg, { status: 500, headers: { "content-type": "text/plain; charset=utf-8" } });
+  }
+}
+
+async function renderCard(chartSrc: string) {
   return new ImageResponse(
     (
       <div
