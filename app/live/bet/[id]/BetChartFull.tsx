@@ -116,7 +116,7 @@ export default function BetChartFull({ bet, history }: Props) {
   const { points, linePath, baseY, baseline, xMin, xMax, yMin, yMax, xScale, latestY } =
     data;
 
-  const yTicks = buildYTicks(yMin, yMax, baseline);
+  const yTicks = buildYTicks(yMin, yMax, baseline, (v) => formatY(v, mode));
   const xTicks = isRound
     ? buildHoleTicks(xMin, xMax)
     : buildTimeTicks(xMin, xMax);
@@ -354,7 +354,13 @@ function tintFor(v: number, baseline: number): string {
 }
 
 function formatY(v: number, mode: Mode): string {
-  if (mode === "prob") return `${v.toFixed(0)}%`;
+  if (mode === "prob") {
+    // Sub-percent values lose visual fidelity at toFixed(0). Show 1
+    // decimal under 5% so a 0.2% baseline doesn't read the same as
+    // a hard-clamped 0%.
+    if (v > 0 && v < 5) return `${v.toFixed(1)}%`;
+    return `${v.toFixed(0)}%`;
+  }
   if (Math.abs(v) < 0.005) return "£0";
   const sign = v > 0 ? "+" : "-";
   return `${sign}${gbp.format(Math.abs(v)).replace(".00", "")}`;
@@ -366,15 +372,31 @@ function formatHoverValue(v: number, mode: Mode): string {
   return `-${gbp.format(Math.abs(v))}`;
 }
 
-function buildYTicks(yMin: number, yMax: number, baseline: number): number[] {
-  const ticks = new Set<number>();
-  ticks.add(Number(baseline.toFixed(2)));
+function buildYTicks(
+  yMin: number,
+  yMax: number,
+  baseline: number,
+  labelFor: (v: number) => string,
+): number[] {
+  const candidates: number[] = [];
+  candidates.push(Number(baseline.toFixed(2)));
   const span = yMax - yMin;
   const step = niceStep(span / 4);
   for (let v = Math.ceil(yMin / step) * step; v <= yMax; v += step) {
-    ticks.add(Number(v.toFixed(2)));
+    candidates.push(Number(v.toFixed(2)));
   }
-  return Array.from(ticks).sort((a, b) => a - b);
+  // Dedupe by rendered label so values that round to the same string
+  // (e.g. baseline 0.2% and yMin 0% both rendering as "0%") don't
+  // stack into a visually-confusing pair on the axis.
+  const seenLabels = new Set<string>();
+  const out: number[] = [];
+  for (const v of candidates.sort((a, b) => a - b)) {
+    const label = labelFor(v);
+    if (seenLabels.has(label)) continue;
+    seenLabels.add(label);
+    out.push(v);
+  }
+  return out;
 }
 
 function niceStep(raw: number): number {
