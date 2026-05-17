@@ -55,7 +55,11 @@ const X_MAX = 16;
 const Y_MIN = 0;
 const Y_MAX = 55;
 
-function buildPaths() {
+// Build the chart as a standalone SVG string, then embed it as a
+// data: URL <img>. Satori (next/og) is finicky about inline SVG
+// inside JSX — an <img src="data:image/svg+xml,..."> renders
+// reliably and is what Vercel themselves recommend.
+function buildChartSvg() {
   const innerW = CHART_W - PAD.left - PAD.right;
   const innerH = CHART_H - PAD.top - PAD.bottom;
   const xToPx = (x: number) =>
@@ -73,12 +77,24 @@ function buildPaths() {
   const areaPath = `M${firstX.toFixed(1)},${baseY.toFixed(1)} ${POINTS.map(
     ([x, y]) => `L${xToPx(x).toFixed(1)},${yToPx(y).toFixed(1)}`,
   ).join(" ")} L${lastX.toFixed(1)},${baseY.toFixed(1)} Z`;
-  return { linePath, areaPath, lastX, lastY };
+  const midY = PAD.top + innerH / 2;
+  const bottomY = CHART_H - PAD.bottom;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CHART_W}" height="${CHART_H}" viewBox="0 0 ${CHART_W} ${CHART_H}">
+    <line x1="${PAD.left}" x2="${CHART_W - PAD.right}" y1="${PAD.top}" y2="${PAD.top}" stroke="${SURFACE_2}" stroke-width="1"/>
+    <line x1="${PAD.left}" x2="${CHART_W - PAD.right}" y1="${midY}" y2="${midY}" stroke="${SURFACE_2}" stroke-width="1"/>
+    <line x1="${PAD.left}" x2="${CHART_W - PAD.right}" y1="${bottomY}" y2="${bottomY}" stroke="${SURFACE_2}" stroke-width="1"/>
+    <text x="${PAD.left - 12}" y="${PAD.top + 5}" font-size="14" font-weight="800" fill="${MUTED}" text-anchor="end" font-family="sans-serif">50%</text>
+    <text x="${PAD.left - 12}" y="${midY + 5}" font-size="14" font-weight="800" fill="${MUTED}" text-anchor="end" font-family="sans-serif">25%</text>
+    <text x="${PAD.left - 12}" y="${bottomY + 5}" font-size="14" font-weight="800" fill="${MUTED}" text-anchor="end" font-family="sans-serif">0%</text>
+    <path d="${areaPath}" fill="${GREEN_SOFT}"/>
+    <path d="${linePath}" stroke="${GREEN}" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="6" fill="${GREEN_BRIGHT}"/>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
 export default async function OpengraphImage() {
-  const { linePath, areaPath, lastX, lastY } = buildPaths();
-  const midY = PAD.top + (CHART_H - PAD.top - PAD.bottom) / 2;
+  const chartSrc = buildChartSvg();
   return new ImageResponse(
     (
       <div
@@ -256,81 +272,15 @@ export default async function OpengraphImage() {
             </div>
           </div>
 
-          {/* Chart */}
-          <svg
+          {/* Chart — pre-rendered SVG as data URL for Satori compat */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={chartSrc}
+            alt=""
             width={CHART_W}
             height={CHART_H}
-            viewBox={`0 0 ${CHART_W} ${CHART_H}`}
             style={{ marginTop: 20 }}
-          >
-            <line
-              x1={PAD.left}
-              x2={CHART_W - PAD.right}
-              y1={PAD.top}
-              y2={PAD.top}
-              stroke={SURFACE_2}
-              strokeWidth={1}
-            />
-            <line
-              x1={PAD.left}
-              x2={CHART_W - PAD.right}
-              y1={midY}
-              y2={midY}
-              stroke={SURFACE_2}
-              strokeWidth={1}
-            />
-            <line
-              x1={PAD.left}
-              x2={CHART_W - PAD.right}
-              y1={CHART_H - PAD.bottom}
-              y2={CHART_H - PAD.bottom}
-              stroke={SURFACE_2}
-              strokeWidth={1}
-            />
-
-            <text
-              x={PAD.left - 12}
-              y={PAD.top + 5}
-              fontSize={14}
-              fontWeight={800}
-              fill={MUTED}
-              textAnchor="end"
-            >
-              50%
-            </text>
-            <text
-              x={PAD.left - 12}
-              y={midY + 5}
-              fontSize={14}
-              fontWeight={800}
-              fill={MUTED}
-              textAnchor="end"
-            >
-              25%
-            </text>
-            <text
-              x={PAD.left - 12}
-              y={CHART_H - PAD.bottom + 5}
-              fontSize={14}
-              fontWeight={800}
-              fill={MUTED}
-              textAnchor="end"
-            >
-              0%
-            </text>
-
-            <path d={areaPath} fill={GREEN_SOFT} />
-            <path
-              d={linePath}
-              stroke={GREEN}
-              strokeWidth={3}
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-
-            <circle cx={lastX} cy={lastY} r={6} fill={GREEN_BRIGHT} />
-          </svg>
+          />
         </div>
 
         <div
