@@ -28,12 +28,14 @@ export default function DisplayNamePrompt({ userId, onComplete }: Props) {
       .select("display_name")
       .eq("user_id", userId)
       .maybeSingle()
-      .then(({ data }) => {
-        if (data?.display_name) {
-          onComplete();
-        }
-        setChecking(false);
-      });
+      .then(
+        (res: { data: { display_name?: string | null } | null }) => {
+          if (res.data?.display_name) {
+            onComplete();
+          }
+          setChecking(false);
+        },
+      );
   }, [userId, onComplete]);
 
   async function submit(e: React.FormEvent) {

@@ -31,14 +31,18 @@ export default function AuthChip() {
       .select("display_name")
       .eq("user_id", user.id)
       .maybeSingle()
-      .then(({ data }) => {
-        if (data?.display_name) {
-          setDisplayName(data.display_name);
-          setNeedsName(false);
-        } else {
-          setNeedsName(true);
-        }
-      });
+      .then(
+        (res: {
+          data: { display_name?: string | null } | null;
+        }) => {
+          if (res.data?.display_name) {
+            setDisplayName(res.data.display_name);
+            setNeedsName(false);
+          } else {
+            setNeedsName(true);
+          }
+        },
+      );
   }, [user]);
 
   async function signOut() {
@@ -100,9 +104,14 @@ export default function AuthChip() {
               .select("display_name")
               .eq("user_id", user.id)
               .maybeSingle()
-              .then(({ data }) => {
-                if (data?.display_name) setDisplayName(data.display_name);
-              });
+              .then(
+                (res: {
+                  data: { display_name?: string | null } | null;
+                }) => {
+                  if (res.data?.display_name)
+                    setDisplayName(res.data.display_name);
+                },
+              );
           }}
         />
       )}
