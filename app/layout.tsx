@@ -15,15 +15,16 @@ const inter = Inter({
 });
 
 const description =
-  "Six guesses to identify today's mystery pro golfer. New puzzle every day.";
+  "Track your golf bets live, see fair value tick every minute, and watch the tournament alongside other bettors.";
+const ogTitle = `${BRAND.name} — Live bet tracker + tournament feed`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(BRAND.url),
-  title: `${BRAND.name} — ${BRAND.tagline}`,
+  title: ogTitle,
   description,
   applicationName: BRAND.name,
   openGraph: {
-    title: BRAND.name,
+    title: ogTitle,
     description,
     url: BRAND.url,
     siteName: BRAND.name,
@@ -31,7 +32,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: BRAND.name,
+    title: ogTitle,
     description,
   },
 };
