@@ -74,6 +74,8 @@ export async function GET(req: Request) {
 
   const bundle = await getFeedBundle(tournament.id);
   const skillMap = await ensurePlayerSkill(tournament.id, bundle.leaderboard);
+  const snap = bundle.snapshot;
+  const pars = bundle.pars;
 
   // Substring match by lower-cased displayName.
   const matches = feed.playerIndex.filter((p) =>
@@ -106,6 +108,56 @@ export async function GET(req: Request) {
     const proj = projections[p.playerId];
     const sg = skillMap[p.playerId];
     const sd = proj ? Math.sqrt(proj.variance) : null;
+    // Raw snapshot slice + per-round score detection. This is the
+    // smoking-gun view: if R2/R3/R4 entries are present with par-like
+    // strokes, the model treats them as already played and variance
+    // collapses to zero.
+    const byRound = snap?.holes?.[p.playerId] ?? {};
+    const roundBreakdown: Array<{
+      round: number;
+      parsLoaded: boolean;
+      parsCount: number;
+      snapshotEntries: number;
+      snapshotSample: Record<string, string>;
+      detectedHolesPlayed: number;
+      detectedHolesRemaining: number;
+      detectedStrokes: number;
+    }> = [];
+    for (let r = 1; r <= 4; r++) {
+      const rp = pars?.[r] ?? {};
+      const rh = byRound?.[r] ?? {};
+      const entries = Object.entries(rh);
+      let played = 0;
+      let remaining = 0;
+      let strokes = 0;
+      for (const [hStr, _par] of Object.entries(rp)) {
+        const scoreStr = rh[hStr as keyof typeof rh];
+        const isPlayed =
+          scoreStr != null &&
+          scoreStr !== "" &&
+          scoreStr !== "-" &&
+          Number.isFinite(Number(scoreStr));
+        if (isPlayed) {
+          played++;
+          strokes += Number(scoreStr);
+        } else {
+          remaining++;
+        }
+      }
+      roundBreakdown.push({
+        round: r,
+        parsLoaded: Object.keys(rp).length > 0,
+        parsCount: Object.keys(rp).length,
+        snapshotEntries: entries.length,
+        snapshotSample: Object.fromEntries(entries.slice(0, 4)) as Record<
+          string,
+          string
+        >,
+        detectedHolesPlayed: played,
+        detectedHolesRemaining: remaining,
+        detectedStrokes: strokes,
+      });
+    }
     return {
       playerId: p.playerId,
       displayName: p.displayName,
@@ -139,6 +191,7 @@ export async function GET(req: Request) {
             top20: Number((halvedProbs[p.playerId].top20 * 100).toFixed(2)),
           }
         : null,
+      roundBreakdown,
     };
   });
 
