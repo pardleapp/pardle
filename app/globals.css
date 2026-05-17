@@ -1,13 +1,73 @@
 :root {
+  /* Brand */
   --green: #7BAE3F;
+  --green-strong: #5e9028;
   --warm: #B5D332;
   --yellow: #E8C547;
   --grey: #787C7E;
-  --bg: #FFFFFF;
-  --text: #121213;
-  --border: #D3D6DA;
-  --empty: #F4F4F5;
+
+  /* Semantic */
+  --bg: #F7F8FA;
+  --surface: #FFFFFF;
+  --surface-2: #F0F2F5;
+  --text: #0a0d12;
+  --text-soft: #2c3340;
   --muted: #6b7280;
+  --border: #e3e6ea;
+  --border-strong: #d3d6da;
+  --empty: #F0F2F5;
+
+  /* Status */
+  --up: #16a34a;
+  --up-soft: rgba(22, 163, 74, 0.12);
+  --down: #dc2626;
+  --down-soft: rgba(220, 38, 38, 0.12);
+
+  /* Elevation + shape */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --shadow-sm: 0 1px 2px rgba(10, 13, 18, 0.05);
+  --shadow-md:
+    0 1px 3px rgba(10, 13, 18, 0.07),
+    0 1px 2px rgba(10, 13, 18, 0.04);
+  --shadow-lg:
+    0 8px 24px rgba(10, 13, 18, 0.08),
+    0 2px 6px rgba(10, 13, 18, 0.04);
+
+  /* Type */
+  --font-display:
+    var(--font-sans, ""), -apple-system, BlinkMacSystemFont, "Inter",
+    system-ui, sans-serif;
+  --font-body:
+    var(--font-sans, ""), -apple-system, BlinkMacSystemFont, "Inter",
+    system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0e13;
+    --surface: #141821;
+    --surface-2: #1c2230;
+    --text: #e8eaed;
+    --text-soft: #c5cad3;
+    --muted: #8a93a3;
+    --border: #232a37;
+    --border-strong: #2e3645;
+    --empty: #1c2230;
+    --up: #4ade80;
+    --up-soft: rgba(74, 222, 128, 0.16);
+    --down: #f87171;
+    --down-soft: rgba(248, 113, 113, 0.16);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md:
+      0 1px 3px rgba(0, 0, 0, 0.45),
+      0 1px 2px rgba(0, 0, 0, 0.25);
+    --shadow-lg:
+      0 12px 32px rgba(0, 0, 0, 0.5),
+      0 2px 8px rgba(0, 0, 0, 0.3);
+  }
 }
 
 * {
@@ -24,9 +84,28 @@ html, body {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI",
-    system-ui, sans-serif;
+  font-family: var(--font-body);
+  font-feature-settings: "ss01", "cv11";
   min-height: 100dvh;
+}
+
+/* Utility — every number in a data-dense table or stat card should
+   use tabular figures so columns line up. */
+.tnum,
+.bd-pnl-pct,
+.bd-pnl-amt,
+.bd-pnl-value,
+.bets-row-value strong,
+.bets-row-value span,
+.bd-table-val,
+.bd-table-pct,
+.bd-table-swing,
+.pcard-stat-num,
+.ps-sg-headline-num,
+.ps-sg-bucket-num,
+.ps-round-total {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "ss01" 1;
 }
 
 .container {
@@ -8449,4 +8528,390 @@ footer {
   .auth-modal-label input {
     background: #1f1f20;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Design refresh — sportbook-data-app polish overlay
+   Applied late in the cascade so the new look wins without having
+   to rewrite every base class. Higher specificity intentional.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Page surface */
+html, body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ── Container + main spacing ─────────────────────────────────── */
+.container {
+  padding-top: 20px;
+  padding-bottom: 56px;
+}
+
+/* ── Live-page header polish ──────────────────────────────────── */
+.container-wide > header.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 4px 14px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.container-wide > header.brand h1 {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.container-wide > header.brand .subtitle {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 0;
+}
+
+.container-wide > header.brand .hub-nav-tabs {
+  margin-top: 12px;
+}
+
+/* ── Feed top row (tournament name + meta) ────────────────────── */
+.feed-tournament-name {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.feed-live-dot {
+  padding: 4px 10px;
+  background: var(--down-soft);
+  border-radius: 999px;
+  letter-spacing: 0.12em;
+  color: var(--down);
+}
+
+.feed-watching {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-soft);
+}
+
+.feed-odds-toggle {
+  border-radius: 999px;
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+
+/* ── Bet tracker card ─────────────────────────────────────────── */
+.bets {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: var(--shadow-md);
+}
+
+.bets-title {
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: -0.005em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bets-toggle {
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg);
+  border: none;
+  font-weight: 800;
+  padding: 8px 14px;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+
+.bets-toggle:hover {
+  opacity: 0.85;
+}
+
+.bets-row {
+  border-radius: var(--radius-md);
+  border-color: var(--border);
+  background: var(--surface-2);
+  transition: transform 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+
+.bets-row:hover {
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.bets-row-name {
+  font-weight: 800;
+  letter-spacing: -0.005em;
+}
+
+.bets-row-kind {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+.bets-row-value strong {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.bets-profit-up {
+  color: var(--up);
+}
+
+.bets-profit-down {
+  color: var(--down);
+}
+
+/* ── Bet detail header — big confident PnL display ────────────── */
+.bd-wrap {
+  gap: 18px;
+}
+
+.bd-head {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px 22px 20px;
+  box-shadow: var(--shadow-md);
+}
+
+.bd-overline {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  font-weight: 900;
+  color: var(--muted);
+}
+
+.bd-name {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 6px 0 4px;
+}
+
+.bd-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.bd-pnl-pct {
+  font-size: 36px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.bd-pnl-amt {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.bd-pnl-value {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+/* Status colour anchors on the PnL block. */
+.bd-pnl .bets-profit-up {
+  color: var(--up);
+}
+.bd-pnl .bets-profit-down {
+  color: var(--down);
+}
+
+/* ── Bet detail chart + table cards ───────────────────────────── */
+.bd-chart,
+.bd-table {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.bd-chart {
+  padding: 18px 18px 10px;
+}
+
+.bd-table {
+  padding: 16px 18px;
+}
+
+.bd-table-title {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+/* ── Feed event card polish ───────────────────────────────────── */
+.feed-event-row,
+.feed-row {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Player card surface polish ───────────────────────────────── */
+.pcard-stat-box,
+.ps-sg-card,
+.ps-round-card {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.pcard-stat-num,
+.ps-sg-headline-num {
+  letter-spacing: -0.03em;
+}
+
+/* ── Auth chip polish ─────────────────────────────────────────── */
+.auth-chip {
+  border-radius: 999px;
+  border-color: var(--border-strong);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.auth-chip-signin {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+/* ── Tab pills (Live feed / Games) — already styled, sharpen ──── */
+.hub-nav-tabs {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.hub-nav-tab {
+  letter-spacing: 0.01em;
+}
+
+.hub-nav-tab-active {
+  background: var(--text);
+  color: var(--bg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Buttons — share / remove / etc consistent style ──────────── */
+.bd-share {
+  border-radius: var(--radius-md);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  box-shadow: var(--shadow-sm);
+}
+
+.bd-remove {
+  border-radius: var(--radius-md);
+  font-weight: 800;
+}
+
+/* ── Catch-me-up banner punchier ──────────────────────────────── */
+.catchup-banner {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+/* ── Forms — give inputs the modern feel ──────────────────────── */
+.bets-form-input,
+.bets-form-label input,
+.bets-form-label select {
+  border-radius: var(--radius-sm);
+  border-color: var(--border);
+}
+
+.bets-form-submit {
+  border-radius: var(--radius-md);
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.bets-form-cancel {
+  border-radius: var(--radius-md);
+  border-color: var(--border-strong);
+}
+
+/* ── Auth modal polish ────────────────────────────────────────── */
+.auth-modal {
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+}
+
+.auth-modal-btn {
+  border-radius: var(--radius-md);
+  letter-spacing: 0.01em;
+}
+
+/* ── Feed tabs + filter buttons sharper ───────────────────────── */
+.feed-tab {
+  font-weight: 800;
+  letter-spacing: 0.005em;
+}
+
+/* ── Hub (games) page get the same polish ─────────────────────── */
+.hub-header {
+  padding: 20px 0;
+}
+
+.hub-wordmark {
+  font-size: 36px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.hub-subtitle {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.hub-card {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.hub-card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.hub-live-link {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
 }
