@@ -16,15 +16,19 @@ import {
 } from "@/lib/feed/store";
 import { simulateTopFinish } from "@/lib/feed/top-finish-model";
 import {
+  getCachedDgTopFinish,
   getHotTopFinish,
   getTopFinishHistory,
   HISTORY_MIN_GAP_MS,
   pushTopFinishSnapshot,
+  setCachedDgTopFinish,
   setHotTopFinish,
+  type DgTopFinishMap,
   type TopFinishSnapshot,
 } from "@/lib/feed/top-finish-cache";
 import { ensurePlayerSkill } from "@/lib/feed/skill-cache";
 import { findOddsShift } from "@/lib/feed/odds-store";
+import { getInPlayTopFinish } from "@/lib/golf-api/datagolf";
 import { eventPolarity, type FeedRow } from "@/lib/feed/types";
 
 export const dynamic = "force-dynamic";
@@ -218,9 +222,12 @@ async function handle(req: Request) {
   const playerSkill = await ensurePlayerSkill(tournament.id, leaderboard);
 
   // Live-round drift: how much harder/easier the field has scored in
-  // the most recent ~30 events vs the rest of the round. Used as a
-  // per-remaining-hole bump in the projection so afternoon-wave
-  // remaining holes don't get priced at the easier morning conditions.
+  // the most recent ~30 events vs the rest of the round. Currently
+  // surfaced for diagnostics only — the projection no longer applies
+  // it because the "recent events" sample is biased toward the late
+  // wave (= the leaders at majors), so a low recent mean reflects
+  // skill, not conditions. With the DataGolf top-X blend handling
+  // calibration, we don't need this naive bump.
   const fieldDrift = computeFieldDrift(allEvents);
 
   // Per-player round state from the (already-fetched) snapshot + par
@@ -234,7 +241,7 @@ async function handle(req: Request) {
       fieldStats,
       playerSkill,
       leaderboard,
-      fieldDrift,
+      null,
     );
 
   // Maintain a rolling history of the winning-score CDF for the bet
@@ -249,9 +256,20 @@ async function handle(req: Request) {
   // Top-finish probabilities (top-5 / top-10 / top-20) via 5K-sim MC
   // on the same per-player projections. Hot cache short-circuits when
   // a recent result is available; otherwise we run the MC inline.
-  const topFinish = await getOrComputeTopFinish(
+  const ourTopFinish = await getOrComputeTopFinish(
     tournament.id,
     tournamentProjections,
+  );
+  // Calibration anchor: DataGolf publishes their own in-play top-5 /
+  // top-10 probs. Our MC can disagree with them by ~5x for locked-in
+  // finishers (the leaders' projected means are too optimistic), so
+  // we blend toward DG. Top-20 isn't in their endpoint — that field
+  // remains ours.
+  const dgTopFinish = await getDgTopFinishMap(tournament.id, leaderboard);
+  const topFinish = blendTopFinish(
+    ourTopFinish,
+    dgTopFinish?.byPlayer ?? {},
+    DG_BLEND_WEIGHT,
   );
   const topFinishHistory = await getTopFinishHistory(tournament.id);
 
@@ -298,7 +316,11 @@ async function handle(req: Request) {
      *  endpoint so calibration can be eyeballed without a redeploy. */
     modelParams: {
       perHoleNoiseVariance: 0.3,
-      fieldDriftCap: 0.25,
+      dgBlendWeight: DG_BLEND_WEIGHT,
+      driftAppliedToProjections: false,
+      dgTopFinishCovered: dgTopFinish
+        ? Object.keys(dgTopFinish.byPlayer).length
+        : 0,
     },
     playerSkill,
     tournamentPars: bundle.pars,
@@ -701,6 +723,86 @@ function computeWinningScoreCdf(
     points.push({ line, probUnder });
   }
   return points;
+}
+
+// How heavily to weight DataGolf's published top-X probs vs our own
+// MC. 0 = pure ours, 1 = pure DG. Set high enough to dominate but
+// not so high that DG outages collapse the bet tracker — when DG
+// is missing for a player we silently fall back to our number.
+const DG_BLEND_WEIGHT = 0.7;
+
+function normaliseName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Fetch DataGolf's published in-play top-5 / top-10 probabilities
+ * and key them to PGA Tour playerIds via name matching against the
+ * current leaderboard. Cached for 5 minutes (DG refreshes their
+ * /preds/in-play every few minutes).
+ *
+ * Returns null on any failure — caller falls back to pure MC.
+ */
+async function getDgTopFinishMap(
+  tournamentId: string,
+  leaderboard: import("@/lib/feed/store").CachedLeaderboardRow[],
+): Promise<DgTopFinishMap | null> {
+  try {
+    const cached = await getCachedDgTopFinish(tournamentId);
+    if (cached) return cached;
+  } catch (err) {
+    console.error("[feed] DG top-finish cache read failed", err);
+  }
+  let dgRows;
+  try {
+    dgRows = await getInPlayTopFinish();
+  } catch (err) {
+    console.error("[feed] DG top-finish fetch failed", err);
+    return null;
+  }
+  const byNorm = new Map<string, { top5: number; top10: number }>();
+  for (const r of dgRows) {
+    byNorm.set(normaliseName(r.name), { top5: r.top5, top10: r.top10 });
+  }
+  const byPlayer: DgTopFinishMap["byPlayer"] = {};
+  for (const row of leaderboard) {
+    const match = byNorm.get(normaliseName(row.displayName));
+    if (match) byPlayer[row.playerId] = match;
+  }
+  const map: DgTopFinishMap = { ts: Date.now(), byPlayer };
+  try {
+    await setCachedDgTopFinish(tournamentId, map);
+  } catch (err) {
+    console.error("[feed] DG top-finish cache write failed", err);
+  }
+  return map;
+}
+
+function blendTopFinish(
+  ours: TopFinishSnapshot["byPlayer"],
+  dg: DgTopFinishMap["byPlayer"],
+  dgWeight: number,
+): TopFinishSnapshot["byPlayer"] {
+  const a = Math.max(0, Math.min(1, dgWeight));
+  const out: TopFinishSnapshot["byPlayer"] = {};
+  for (const [pid, oursP] of Object.entries(ours)) {
+    const dgP = dg[pid];
+    if (dgP) {
+      out[pid] = {
+        top5: a * dgP.top5 + (1 - a) * oursP.top5,
+        top10: a * dgP.top10 + (1 - a) * oursP.top10,
+        // DG's /preds/in-play doesn't expose top_20 — keep our MC value.
+        top20: oursP.top20,
+      };
+    } else {
+      out[pid] = oursP;
+    }
+  }
+  return out;
 }
 
 async function getOrComputeTopFinish(

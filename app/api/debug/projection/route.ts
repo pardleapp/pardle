@@ -71,7 +71,7 @@ export async function GET(req: Request) {
     >;
     topFinishCurrent?: Record<string, TopFinishProbs>;
     fieldDrift?: { round: number; drift: number } | null;
-    modelParams?: { perHoleNoiseVariance: number; fieldDriftCap: number };
+    modelParams?: Record<string, unknown>;
   };
 
   const bundle = await getFeedBundle(tournament.id);

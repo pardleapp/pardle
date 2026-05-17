@@ -84,3 +84,36 @@ export async function getTopFinishHistory(
 }
 
 export { HISTORY_MIN_GAP_MS };
+
+// ──────────────────────────────────────────────────────────────────
+// DataGolf in-play top-finish cache — used as a calibration anchor
+// that the feed route blends our MC output toward. DG publishes
+// top-5 / top-10 only; top-20 stays on our model.
+// ──────────────────────────────────────────────────────────────────
+
+const DG_HOT_TTL_S = 300; // DG refreshes their /preds/in-play roughly every few minutes
+
+export interface DgTopFinishMap {
+  ts: number;
+  /** Keyed by PGA Tour playerId (NOT DG dg_id). */
+  byPlayer: Record<string, { top5: number; top10: number }>;
+}
+
+function dgTopKey(t: string): string {
+  return `feed:topfin:dg:${t}`;
+}
+
+export async function getCachedDgTopFinish(
+  tournamentId: string,
+): Promise<DgTopFinishMap | null> {
+  return (
+    (await redis.get<DgTopFinishMap>(dgTopKey(tournamentId))) ?? null
+  );
+}
+
+export async function setCachedDgTopFinish(
+  tournamentId: string,
+  map: DgTopFinishMap,
+): Promise<void> {
+  await redis.set(dgTopKey(tournamentId), map, { ex: DG_HOT_TTL_S });
+}

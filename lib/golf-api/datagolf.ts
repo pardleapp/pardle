@@ -240,6 +240,53 @@ export interface InPlayProb {
   winProb: number;
 }
 
+export interface InPlayTopFinish {
+  dgId: string;
+  name: string;
+  /** Probabilities 0..1 — auto-normalised from DG's percent response. */
+  top5: number;
+  top10: number;
+}
+
+/**
+ * DataGolf's live in-play top-5 / top-10 finishing probabilities.
+ * Used as a calibration anchor: we blend toward these values from
+ * our own MC so locked-in finishers like Kitayama don't collapse
+ * to ~0 just because our skill prior / field-mean projection puts
+ * too many leaders artificially below the cutoff.
+ *
+ * DG publishes top-5 and top-10; top-20 isn't in this endpoint, so
+ * top-20 stays on our model.
+ */
+export async function getInPlayTopFinish(): Promise<InPlayTopFinish[]> {
+  const data = await fetchJson<DGInPlayResponse>(`/preds/in-play`);
+  const rows = data.data ?? [];
+  const raw = rows
+    .map((r) => ({
+      dgId: String(r.dg_id),
+      name: flipName(r.player_name),
+      top5: typeof r.top_5 === "number" ? r.top_5 : 0,
+      top10: typeof r.top_10 === "number" ? r.top_10 : 0,
+    }))
+    .filter(
+      (p) => Number.isFinite(p.top5) && Number.isFinite(p.top10),
+    );
+  // DG can return either decimal (0..1) or percent (0..100) depending
+  // on backend config. Detect via the max observed and normalise so
+  // downstream maths can always assume 0..1.
+  const maxVal = raw.reduce(
+    (m, r) => Math.max(m, r.top5, r.top10),
+    0,
+  );
+  const scale = maxVal > 1.5 ? 100 : 1;
+  return raw.map((r) => ({
+    dgId: r.dgId,
+    name: r.name,
+    top5: r.top5 / scale,
+    top10: r.top10 / scale,
+  }));
+}
+
 /**
  * Every active player's live win probability — same source as
  * getLiveContenders but unfiltered, used to populate the outright
