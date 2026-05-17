@@ -9085,7 +9085,7 @@ html, body {
   box-shadow: var(--shadow-md);
 }
 
-/* ── Split header: title left, section tabs right ─────────────── */
+/* ── Split header: title left, section tabs + auth chip right ─── */
 .container-wide > header.brand.brand-split,
 .hub-header.hub-header-split {
   flex-direction: row;
@@ -9095,30 +9095,66 @@ html, body {
   flex-wrap: wrap;
 }
 
+.brand-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .container-wide > header.brand.brand-split .hub-nav-tabs,
 .hub-header.hub-header-split .hub-nav-tabs {
   margin-top: 0;
 }
 
-/* Drop the now-redundant subtitle slot on the games hub when split */
 .hub-header.hub-header-split .hub-subtitle {
   display: none;
 }
 
-/* ── Feed header: wrap on narrow screens so LIVE never overflows ─ */
-@media (max-width: 560px) {
-  .feed-header-row {
-    flex-wrap: wrap;
-    row-gap: 8px;
-  }
-  .feed-tournament-name {
-    flex: 1 1 100%;
-    font-size: 18px;
-  }
-  .feed-header-meta {
-    flex-wrap: wrap;
-    row-gap: 6px;
-    width: 100%;
-    justify-content: flex-start;
+/* Compact AuthChip slot in the top nav — keeps tabs the visual
+   anchor and the auth state secondary. */
+.brand-nav .auth-chip,
+.brand-nav .auth-chip-btn {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* ── Inline LIVE indicator next to the tournament name ────────── */
+.feed-live-pulse-inline {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: #d23b3b;
+  box-shadow: 0 0 0 0 rgba(210, 59, 59, 0.6);
+  animation: feed-pulse 1.6s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.feed-tournament-name {
+  display: flex;
+  align-items: center;
+}
+
+/* ── Bets head: title left, odds picker + add button on right ─── */
+.bets-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.odds-segment-compact .odds-segment-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  min-height: 26px;
+}
+
+@media (max-width: 420px) {
+  .odds-segment-compact .odds-segment-btn {
+    padding: 3px 6px;
+    font-size: 10.5px;
   }
 }

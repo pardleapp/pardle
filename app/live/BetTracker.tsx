@@ -42,6 +42,7 @@ interface Props {
   /** Model's current top-5 / top-10 / top-20 prob per player. */
   topFinishCurrent?: Record<string, TopFinishProbs>;
   oddsFormat: OddsFormat;
+  onPickOddsFormat: (fmt: OddsFormat) => void;
 }
 
 function parseOdds(
@@ -69,6 +70,7 @@ export default function BetTracker({
   tournamentProjections,
   topFinishCurrent,
   oddsFormat,
+  onPickOddsFormat,
 }: Props) {
   const [bets, setBets] = useState<TrackedBet[]>([]);
   const [open, setOpen] = useState(false);
@@ -190,13 +192,39 @@ export default function BetTracker({
         <h3 className="bets-title">
           💷 My bets{bets.length > 0 ? ` · ${bets.length}` : ""}
         </h3>
-        <button
-          type="button"
-          className="bets-toggle"
-          onClick={() => setOpen((o) => !o)}
-        >
-          {open ? "Close" : bets.length === 0 ? "Add a bet" : "+ Add"}
-        </button>
+        <div className="bets-head-actions">
+          <div
+            className="odds-segment odds-segment-compact"
+            role="group"
+            aria-label="Odds format"
+          >
+            {(["american", "fractional", "decimal"] as const).map((fmt) => (
+              <button
+                key={fmt}
+                type="button"
+                className={`odds-segment-btn ${
+                  oddsFormat === fmt ? "odds-segment-btn-on" : ""
+                }`}
+                onClick={() => onPickOddsFormat(fmt)}
+                aria-pressed={oddsFormat === fmt}
+                title={`Show odds as ${fmt}`}
+              >
+                {fmt === "american"
+                  ? "+250"
+                  : fmt === "fractional"
+                    ? "5/2"
+                    : "3.5"}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="bets-toggle"
+            onClick={() => setOpen((o) => !o)}
+          >
+            {open ? "Close" : bets.length === 0 ? "Add a bet" : "+ Add"}
+          </button>
+        </div>
       </div>
 
       {bets.length > 0 && (

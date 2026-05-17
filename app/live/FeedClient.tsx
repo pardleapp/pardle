@@ -7,12 +7,10 @@ import type { FeedRow } from "@/lib/feed/types";
 import {
   DEFAULT_ODDS_FORMAT,
   formatOdds,
-  oddsFormatLabel,
   ODDS_FORMAT_STORAGE_KEY,
   type OddsFormat,
 } from "@/lib/odds-format";
 import BetTracker from "./BetTracker";
-import AuthChip from "./auth/AuthChip";
 import CatchMeUp from "./CatchMeUp";
 import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
@@ -305,33 +303,14 @@ export default function FeedClient() {
   return (
     <section className="feed-wrap">
       <div className="feed-header-row">
-        <h2 className="feed-tournament-name">{data.tournament.name}</h2>
-        <div className="feed-header-meta">
-          <div
-            className="odds-segment"
-            role="group"
-            aria-label="Odds format"
-          >
-            {(["american", "fractional", "decimal"] as const).map((fmt) => (
-              <button
-                key={fmt}
-                type="button"
-                className={`odds-segment-btn ${
-                  oddsFormat === fmt ? "odds-segment-btn-on" : ""
-                }`}
-                onClick={() => pickOddsFormat(fmt)}
-                aria-pressed={oddsFormat === fmt}
-                title={`Show odds as ${oddsFormatLabel(fmt)}`}
-              >
-                {fmt === "american" ? "+250" : fmt === "fractional" ? "5/2" : "3.5"}
-              </button>
-            ))}
-          </div>
-          <AuthChip />
-          <span className="feed-live-dot">
-            <span className="feed-live-pulse" /> LIVE
-          </span>
-        </div>
+        <h2 className="feed-tournament-name">
+          <span
+            className="feed-live-pulse feed-live-pulse-inline"
+            aria-label="Live"
+            title="Live"
+          />
+          {data.tournament.name}
+        </h2>
       </div>
 
       <PlayerSearch players={data.playerIndex ?? []} />
@@ -386,6 +365,7 @@ export default function FeedClient() {
         tournamentProjections={data.tournamentProjections ?? {}}
         topFinishCurrent={data.topFinishCurrent}
         oddsFormat={oddsFormat}
+        onPickOddsFormat={pickOddsFormat}
       />
 
       <div className="feed-filter-row">
