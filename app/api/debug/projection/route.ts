@@ -71,6 +71,7 @@ export async function GET(req: Request) {
     >;
     topFinishCurrent?: Record<string, TopFinishProbs>;
     fieldDrift?: { round: number; drift: number } | null;
+    modelParams?: { perHoleNoiseVariance: number; fieldDriftCap: number };
   };
 
   const bundle = await getFeedBundle(tournament.id);
@@ -204,6 +205,7 @@ export async function GET(req: Request) {
     activeFieldSize: Object.values(projections).filter((p) => p.active)
       .length,
     fieldDrift: feed.fieldDrift ?? null,
+    modelParams: feed.modelParams ?? null,
     matches: report,
   });
 }

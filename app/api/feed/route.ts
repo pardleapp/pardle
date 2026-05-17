@@ -294,6 +294,12 @@ async function handle(req: Request) {
      *  remaining-hole projections — measures how the most recent
      *  ~30 events scored vs the rest of the round. */
     fieldDrift,
+    /** Tunable model params surfaced for the /api/debug/projection
+     *  endpoint so calibration can be eyeballed without a redeploy. */
+    modelParams: {
+      perHoleNoiseVariance: 0.3,
+      fieldDriftCap: 0.25,
+    },
     playerSkill,
     tournamentPars: bundle.pars,
     watching,
@@ -406,6 +412,13 @@ function computePlayerRoundStates(
   ]);
   const MIN_SAMPLE = 10;
   const FALLBACK_VAR = 0.65;
+  // Per-player per-hole noise variance used in the projection sum.
+  // 0.30 ≈ 5.4 over 18 holes (per-round SD ≈ 2.3) which is in line
+  // with published per-pro round-score dispersion. Decoupled from
+  // field-wide variance (which double-counts skill spread); tune
+  // here and watch the debug endpoint's currentModel.top10 to
+  // calibrate against DataGolf without redeploying the model code.
+  const PER_HOLE_NOISE_VARIANCE = 0.3;
 
   /** Per-hole (mean, variance). Walks fall-back hierarchy if the
    *  current-round sample for this hole is too thin: try every prior
@@ -507,7 +520,15 @@ function computePlayerRoundStates(
           const driftBump =
             fieldDrift && fieldDrift.round === r ? fieldDrift.drift : 0;
           expectedRemaining += par + stat.mean + driftBump - skillPerHole;
-          variance += stat.variance;
+          // Use a constant per-hole player-noise variance instead of
+          // the field-wide variance. The field number mixes
+          // between-player skill spread with per-shot luck; we've
+          // already corrected for skill in the mean, so summing field
+          // variance double-counts it and inflates the simulator's
+          // tail width. The constant below is sized to a per-round
+          // SD ≈ 2.3 strokes (per-tournament SD ≈ 4.6), which lines
+          // up with the published per-pro round-score dispersion.
+          variance += PER_HOLE_NOISE_VARIANCE;
         }
       }
       rounds[r] = {
