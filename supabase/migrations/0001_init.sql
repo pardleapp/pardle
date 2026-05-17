@@ -41,6 +41,13 @@ create index if not exists bets_user_placed_idx
 alter table public.profiles enable row level security;
 alter table public.bets enable row level security;
 
+-- Base table grants. We disabled "Automatically expose new tables"
+-- at project setup so the authenticated role doesn't inherit
+-- permissions — without these grants, RLS doesn't matter because
+-- the role can't access the table at all.
+grant select, insert, update, delete on public.profiles to authenticated;
+grant select, insert, update, delete on public.bets to authenticated;
+
 drop policy if exists "Profiles: read own" on public.profiles;
 create policy "Profiles: read own" on public.profiles
   for select using (auth.uid() = user_id);
