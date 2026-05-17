@@ -146,6 +146,42 @@ export interface FieldHoleStat {
   variance: number;
 }
 
+export interface WinningScoreCdfPoint {
+  line: number;
+  probUnder: number;
+}
+
+export interface WinningScoreSnapshot {
+  ts: number;
+  points: WinningScoreCdfPoint[];
+}
+
+/**
+ * Look up P(winner < line) for a specific line in a CDF snapshot.
+ * Linearly interpolates between the two surrounding stored points
+ * when the requested line isn't on a half-integer grid step.
+ */
+export function probUnderAtLine(
+  snapshot: WinningScoreSnapshot,
+  line: number,
+): number | null {
+  const pts = snapshot.points;
+  if (pts.length === 0) return null;
+  if (line <= pts[0].line) return pts[0].probUnder;
+  if (line >= pts[pts.length - 1].line) {
+    return pts[pts.length - 1].probUnder;
+  }
+  for (let i = 1; i < pts.length; i++) {
+    if (pts[i].line >= line) {
+      const a = pts[i - 1];
+      const b = pts[i];
+      const t = (line - a.line) / (b.line - a.line);
+      return a.probUnder + (b.probUnder - a.probUnder) * t;
+    }
+  }
+  return null;
+}
+
 export interface BetScorecard {
   /** Played holes in completion order. */
   holes: { holeNumber: number; par: number; strokes: number }[];
@@ -523,6 +559,7 @@ export function reconstructHistory(
   nowValue: number | null,
   scorecard?: BetScorecard | null,
   dgWinProbs?: Record<string, DgProbHistorySample[] | null>,
+  winningScoreHistory?: WinningScoreSnapshot[],
 ): PnlSample[] {
   const series: PnlSample[] = [];
 
@@ -584,11 +621,28 @@ export function reconstructHistory(
   }
 
   if (bet.kind === "winning-score") {
-    // No per-hole chart history for v1 — the field-level state would
-    // need persisting per-poll for every player. Return a stub series.
-    series.push({ t: bet.placedAt, v: bet.stake });
+    // Build the trajectory from the server-cached CDF history. Each
+    // snapshot lets us read P(winner < line) at the bet's line; we
+    // convert to value via stake × prob × oddsTaken on the bet's
+    // chosen side, same way currentValueForBet does.
+    const snapshots = winningScoreHistory ?? [];
+    // Snapshots arrive newest-first from /api/feed; sort ascending.
+    const sorted = [...snapshots].sort((a, b) => a.ts - b.ts);
+    for (const snap of sorted) {
+      const probUnder = probUnderAtLine(snap, bet.line);
+      if (probUnder == null) continue;
+      const prob = bet.side === "under" ? probUnder : 1 - probUnder;
+      let v: number;
+      if (prob >= 1) v = bet.stake * bet.oddsTaken;
+      else if (prob <= 0) v = 0;
+      else v = bet.stake * prob * bet.oddsTaken;
+      series.push({ t: snap.ts, v, prob });
+    }
     if (nowValue != null) {
-      series.push({ t: Date.now(), v: nowValue });
+      const last = series[series.length - 1];
+      if (!last || Math.abs(nowValue - last.v) > 0.01) {
+        series.push({ t: Date.now(), v: nowValue });
+      }
     }
     return series;
   }

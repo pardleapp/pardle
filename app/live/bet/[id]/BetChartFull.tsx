@@ -103,6 +103,8 @@ export default function BetChartFull({ bet, history }: Props) {
         <div className="bd-chart-empty">
           {isRound
             ? "Chart will fill in as holes complete."
+            : bet.kind === "winning-score"
+            ? "Chart will fill in as scores move through the round."
             : "Chart will fill in as Polymarket odds move."}
         </div>
       </div>

@@ -8,9 +8,11 @@ import {
   getFeedBundle,
   getReactionsBulk,
   markSeenToday,
+  pushWinningScoreSnapshot,
   touchPresence,
   type FieldHoleStats,
   type PlayerSkillMap,
+  type WinningScoreSnapshot,
 } from "@/lib/feed/store";
 import { ensurePlayerSkill } from "@/lib/feed/skill-cache";
 import { findOddsShift } from "@/lib/feed/odds-store";
@@ -208,6 +210,15 @@ async function handle(req: Request) {
       leaderboard,
     );
 
+  // Maintain a rolling history of the winning-score CDF for the bet
+  // detail chart. Append at most one snapshot per minute regardless
+  // of how often /api/feed is hit.
+  const winningScoreHistory = await maybeAppendWinningScoreSnapshot(
+    tournament.id,
+    tournamentProjections,
+    bundle.winningScoreHistory,
+  );
+
   return NextResponse.json({
     tournament: {
       id: tournament.id,
@@ -233,6 +244,7 @@ async function handle(req: Request) {
     /** Per-player N(mean, variance) projection of final 4-round
      *  strokes. Powers the winning-score min-of-normals model. */
     tournamentProjections,
+    winningScoreHistory,
     fieldStats,
     playerSkill,
     tournamentPars: bundle.pars,
@@ -481,4 +493,90 @@ interface PlayerRoundState {
   ttdHoles: number;
   /** Per-round breakdown (1..4) — used by bets targeting a specific round. */
   rounds: Record<number, RoundSnapshot>;
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Winning-score CDF snapshot helpers
+// ──────────────────────────────────────────────────────────────────
+
+const WS_SNAPSHOT_INTERVAL_MS = 55_000;
+const WS_LINE_MIN = 250;
+const WS_LINE_MAX = 300;
+
+function _erf(x: number): number {
+  const sign = x < 0 ? -1 : 1;
+  const ax = Math.abs(x);
+  const t = 1 / (1 + 0.3275911 * ax);
+  const y =
+    1 -
+    (((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t -
+      0.284496736) *
+      t +
+      0.254829592) *
+      t) *
+      Math.exp(-ax * ax);
+  return sign * y;
+}
+
+function _normalCdf(x: number, mean: number, sd: number): number {
+  if (sd <= 0) return x >= mean ? 1 : 0;
+  return 0.5 * (1 + _erf((x - mean) / (sd * Math.SQRT2)));
+}
+
+/**
+ * Compute P(winner < line) at half-integer steps across the
+ * plausible range of winning scores, using the min-of-normals
+ * formula across active projections. Inline to keep this route's
+ * import graph server-only.
+ */
+function computeWinningScoreCdf(
+  projections: Record<string, TournamentProjection>,
+): WinningScoreSnapshot["points"] {
+  const active = Object.values(projections).filter((p) => p.active);
+  if (active.length === 0) return [];
+  const points: WinningScoreSnapshot["points"] = [];
+  for (let line = WS_LINE_MIN; line <= WS_LINE_MAX; line += 0.5) {
+    let logProdMissed = 0;
+    let probUnder = -1;
+    for (const p of active) {
+      if (p.variance <= 0) {
+        if (p.mean < line) {
+          probUnder = 1;
+          break;
+        }
+        continue;
+      }
+      const sd = Math.sqrt(p.variance);
+      const playerUnder = _normalCdf(line, p.mean, sd);
+      const playerAtLeast = 1 - playerUnder;
+      if (playerAtLeast <= 1e-9) {
+        probUnder = 1;
+        break;
+      }
+      logProdMissed += Math.log(playerAtLeast);
+    }
+    if (probUnder < 0) {
+      probUnder = 1 - Math.exp(logProdMissed);
+    }
+    points.push({ line, probUnder });
+  }
+  return points;
+}
+
+async function maybeAppendWinningScoreSnapshot(
+  tournamentId: string,
+  projections: Record<string, TournamentProjection>,
+  existing: WinningScoreSnapshot[],
+): Promise<WinningScoreSnapshot[]> {
+  const lastTs = existing[0]?.ts ?? 0;
+  if (Date.now() - lastTs < WS_SNAPSHOT_INTERVAL_MS) return existing;
+  const points = computeWinningScoreCdf(projections);
+  if (points.length === 0) return existing;
+  const snapshot: WinningScoreSnapshot = { ts: Date.now(), points };
+  try {
+    await pushWinningScoreSnapshot(tournamentId, snapshot);
+  } catch (err) {
+    console.error("[feed] pushWinningScoreSnapshot failed", err);
+  }
+  return [snapshot, ...existing].slice(0, 720);
 }

@@ -74,6 +74,10 @@ interface FeedResponse {
     string,
     { mean: number; variance: number; active: boolean }
   >;
+  winningScoreHistory?: Array<{
+    ts: number;
+    points: Array<{ line: number; probUnder: number }>;
+  }>;
   watching: number;
   seenToday: number;
   polled: boolean;

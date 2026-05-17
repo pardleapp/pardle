@@ -27,6 +27,7 @@ import {
   type TournamentProjection,
   type TrackedBet,
   type WinningScoreBet,
+  type WinningScoreSnapshot,
 } from "../../bet-shared";
 import BetChartFull from "./BetChartFull";
 
@@ -40,6 +41,7 @@ interface FeedResponse {
   dgWinProbs?: Record<string, DgProbHistorySample[] | null>;
   playerRoundStates: Record<string, PlayerRoundState>;
   tournamentProjections?: Record<string, TournamentProjection>;
+  winningScoreHistory?: WinningScoreSnapshot[];
 }
 
 const gbp = new Intl.NumberFormat("en-GB", {
@@ -182,6 +184,7 @@ export default function BetDetail({ betId }: { betId: string }) {
     nowValue,
     scorecard,
     data.dgWinProbs,
+    data.winningScoreHistory,
   );
   const profit = nowValue != null ? nowValue - bet.stake : null;
   const profitPct = profit != null ? (profit / bet.stake) * 100 : null;
@@ -240,11 +243,14 @@ export default function BetDetail({ betId }: { betId: string }) {
       </header>
 
       {bet.kind === "winning-score" ? (
-        <WinningScoreDetail
-          bet={bet}
-          projections={data.tournamentProjections ?? {}}
-          oddsFormat={oddsFormat}
-        />
+        <>
+          <BetChartFull bet={bet} history={history} />
+          <WinningScoreDetail
+            bet={bet}
+            projections={data.tournamentProjections ?? {}}
+            oddsFormat={oddsFormat}
+          />
+        </>
       ) : (
         <>
           <BetChartFull bet={bet} history={history} />

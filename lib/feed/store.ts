@@ -425,6 +425,60 @@ export async function getCachedPlayerSkill(
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Winning-score CDF snapshot — per-tournament rolling history of the
+// model's "P(eventual winner < L)" for L at half-integer steps. Used
+// to draw a trajectory chart on the bet detail page; not used in any
+// real-time decision path.
+// ──────────────────────────────────────────────────────────────────
+
+export interface WinningScoreCdfPoint {
+  line: number;
+  /** P(winner < line) at this snapshot. 0..1. */
+  probUnder: number;
+}
+
+export interface WinningScoreSnapshot {
+  ts: number;
+  points: WinningScoreCdfPoint[];
+}
+
+const WS_MAX_SNAPSHOTS = 720;
+
+function wsKey(tournamentId: string): string {
+  return `feed:wscdf:${tournamentId}`;
+}
+
+export async function pushWinningScoreSnapshot(
+  tournamentId: string,
+  snapshot: WinningScoreSnapshot,
+): Promise<void> {
+  const k = wsKey(tournamentId);
+  await redis.lpush(k, JSON.stringify(snapshot));
+  await redis.ltrim(k, 0, WS_MAX_SNAPSHOTS - 1);
+}
+
+export async function getCachedWinningScoreHistory(
+  tournamentId: string,
+): Promise<WinningScoreSnapshot[]> {
+  const raw = await redis.lrange<unknown>(
+    wsKey(tournamentId),
+    0,
+    WS_MAX_SNAPSHOTS - 1,
+  );
+  const out: WinningScoreSnapshot[] = [];
+  for (const r of raw) {
+    try {
+      const parsed =
+        typeof r === "string" ? (JSON.parse(r) as WinningScoreSnapshot) : (r as WinningScoreSnapshot);
+      if (parsed && typeof parsed.ts === "number" && Array.isArray(parsed.points)) {
+        out.push(parsed);
+      }
+    } catch {}
+  }
+  return out;
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Field hole stats — for the round-score bet model. Each entry is
 // the field-wide mean and variance of (strokes − par) on a given
 // (round, hole), aggregated across every player who's completed it
@@ -511,6 +565,8 @@ export interface FeedBundle {
   /** playerId → ordered DataGolf in-play prob samples — outright chart
    *  fallback when Polymarket is thin for a given player. */
   dgWinProbs: Record<string, FeedBundleDgSample[] | null>;
+  /** Rolling history of winning-score CDF snapshots (newest first). */
+  winningScoreHistory: WinningScoreSnapshot[];
 }
 
 interface FeedBundleDgSample {
@@ -557,6 +613,8 @@ export async function getFeedBundle(
   // Index 7 — DataGolf in-play win-prob buffer (per-player). Used as
   // outright chart fallback when Polymarket is thin.
   pipe.hgetall(`feed:dg:${tournamentId}`);
+  // Index 8 — Winning-score CDF rolling history (newest first).
+  pipe.lrange(wsKey(tournamentId), 0, WS_MAX_SNAPSHOTS - 1);
   const res = (await pipe.exec()) as unknown[];
 
   const eventsRaw = (res[0] ?? []) as unknown[];
@@ -575,6 +633,23 @@ export async function getFeedBundle(
     string,
     FeedBundleDgSample[] | null
   >;
+  const wsRaw = (res[8] ?? []) as unknown[];
+  const winningScoreHistory: WinningScoreSnapshot[] = [];
+  for (const r of wsRaw) {
+    try {
+      const parsed =
+        typeof r === "string"
+          ? (JSON.parse(r) as WinningScoreSnapshot)
+          : (r as WinningScoreSnapshot);
+      if (
+        parsed &&
+        typeof parsed.ts === "number" &&
+        Array.isArray(parsed.points)
+      ) {
+        winningScoreHistory.push(parsed);
+      }
+    } catch {}
+  }
 
   const events: FeedEvent[] = [];
   for (const r of eventsRaw) {
@@ -603,6 +678,7 @@ export async function getFeedBundle(
     pars: parsRaw,
     oddsBuffers: oddsRaw,
     dgWinProbs: dgRaw,
+    winningScoreHistory,
   };
 }
 
