@@ -365,6 +365,7 @@ export default function FeedClient() {
         rows={data.bestReel ?? []}
         myReactions={myReactions}
         onReact={sendReaction}
+        storageKey="best"
       />
 
       <Reel
@@ -372,6 +373,7 @@ export default function FeedClient() {
         rows={data.worstReel ?? []}
         myReactions={myReactions}
         onReact={sendReaction}
+        storageKey="worst"
       />
 
       <BetTracker

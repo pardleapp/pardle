@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { pgaTourHeadshotUrlById } from "@/lib/data/pga-tour-ids";
 import FollowButton from "./FollowButton";
 import ShotTracer from "./ShotTracer";
@@ -13,6 +13,9 @@ interface Props {
   rows: FeedRow[];
   myReactions: Record<string, "up" | "down">;
   onReact: (eventId: string, dir: "up" | "down") => void;
+  /** Unique key for persisting the user's expand/collapse choice in
+   *  localStorage. Pass a stable string per reel ("best", "worst"). */
+  storageKey?: string;
 }
 
 /** Player headshot with a graceful fallback when no image is available. */
@@ -51,16 +54,67 @@ function cardKind(e: FeedEvent): string {
  * wide window. The headline links to the player card; the 👍 / 👎
  * buttons share the feed's reaction handler so counts stay in sync.
  */
-export default function Reel({ title, rows, myReactions, onReact }: Props) {
+export default function Reel({
+  title,
+  rows,
+  myReactions,
+  onReact,
+  storageKey,
+}: Props) {
   const items = rows.slice(0, 24);
   // Which event's shot trace is expanded into the full-hole overlay.
   const [expandedTrace, setExpandedTrace] = useState<FeedRow | null>(null);
+  const fullKey = storageKey
+    ? `pardle_reel_collapsed_${storageKey}`
+    : null;
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Hydrate the collapse state from localStorage so the choice
+  // persists across refreshes. Defaults to expanded.
+  useEffect(() => {
+    if (!fullKey || typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(fullKey);
+    if (stored === "1") setCollapsed(true);
+  }, [fullKey]);
+
+  function toggle() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      if (fullKey && typeof window !== "undefined") {
+        if (next) {
+          window.localStorage.setItem(fullKey, "1");
+        } else {
+          window.localStorage.removeItem(fullKey);
+        }
+      }
+      return next;
+    });
+  }
+
   if (items.length === 0) return null;
 
   return (
     <section className="reel">
-      <h3 className="reel-title">{title}</h3>
-      <div className="reel-scroll">
+      <button
+        type="button"
+        className="reel-title-bar"
+        onClick={toggle}
+        aria-expanded={!collapsed}
+        title={collapsed ? "Show reel" : "Hide reel"}
+      >
+        <span className="reel-title">{title}</span>
+        <span className="reel-title-count">
+          {items.length}
+        </span>
+        <span
+          className={`reel-title-chev ${collapsed ? "reel-title-chev-collapsed" : ""}`}
+          aria-hidden="true"
+        >
+          ▾
+        </span>
+      </button>
+      {collapsed ? null : (
+        <div className="reel-scroll">
         {items.map(({ event, reactions }) => {
           const mine = myReactions[event.id];
           const hasTrace =
@@ -117,7 +171,8 @@ export default function Reel({ title, rows, myReactions, onReact }: Props) {
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {expandedTrace && expandedTrace.event.trace && (
         <div
