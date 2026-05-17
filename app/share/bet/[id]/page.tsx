@@ -101,7 +101,7 @@ export default async function SharedBetPage({ params }: PageProps) {
   return (
     <main className="container container-wide">
       <header className="brand">
-        <Link className="brand-back" href="/live" aria-label="Go to Pardle">
+        <Link className="brand-back" href="/" aria-label="Go to Pardle">
           ←
         </Link>
         <h1>{BRAND.name}</h1>

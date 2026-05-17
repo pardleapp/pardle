@@ -1,25 +1,11 @@
-import Link from "next/link";
-import { BRAND } from "@/lib/brand";
-import FeedClient from "./FeedClient";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: `Live shot feed — ${BRAND.name}`,
-  description:
-    "Every birdie, eagle and blow-up as it happens — react and chat with friends through the round.",
-};
-
-export default function LivePage() {
-  return (
-    <main className="container container-wide">
-      <header className="brand">
-        <Link className="brand-back" href="/" aria-label="All games">
-          ←
-        </Link>
-        <h1>{BRAND.name}</h1>
-        <p className="subtitle">Live · shot feed</p>
-      </header>
-
-      <FeedClient />
-    </main>
-  );
+/**
+ * /live used to be the live feed page. The feed is now the
+ * homepage at /, so this just redirects. Sub-routes like
+ * /live/bet/[id] and /live/player/[id] still live under app/live/
+ * and aren't affected — only the bare /live URL redirects.
+ */
+export default function LiveRedirect() {
+  redirect("/");
 }

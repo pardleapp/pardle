@@ -13,7 +13,7 @@ export default async function BetDetailPage({ params }: PageProps) {
   return (
     <main className="container container-wide">
       <header className="brand">
-        <Link className="brand-back" href="/live" aria-label="Back to live feed">
+        <Link className="brand-back" href="/" aria-label="Back to live feed">
           ←
         </Link>
         <h1>{BRAND.name}</h1>

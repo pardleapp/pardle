@@ -234,7 +234,7 @@ export default function BetDetail({ betId }: { betId: string }) {
           That bet isn&apos;t on this device. Bets are stored locally — if you
           placed it on a different browser or after clearing storage, it won&apos;t
           show here.{" "}
-          <Link href="/live">Go back to the live feed →</Link>
+          <Link href="/">Go back to the live feed →</Link>
         </p>
       </section>
     );

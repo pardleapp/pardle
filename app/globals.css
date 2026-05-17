@@ -8160,6 +8160,57 @@ footer {
   }
 }
 
+/* ── Section tabs (Live feed / Games) ─────────────────────────── */
+
+.hub-nav-tabs {
+  display: inline-flex;
+  margin-top: 14px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.03);
+  gap: 2px;
+}
+
+.hub-nav-tab {
+  display: inline-block;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--muted);
+  text-decoration: none;
+  border-radius: 999px;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+.hub-nav-tab:hover {
+  color: var(--text);
+}
+
+.hub-nav-tab-active {
+  background: var(--text);
+  color: var(--bg, white);
+}
+
+.hub-nav-tab-active:hover {
+  color: var(--bg, white);
+}
+
+@media (prefers-color-scheme: dark) {
+  .hub-nav-tabs {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .hub-nav-tab-active {
+    background: white;
+    color: #1f1f20;
+  }
+  .hub-nav-tab-active:hover {
+    color: #1f1f20;
+  }
+}
+
 /* ── Bet detail share action ─────────────────────────────────── */
 
 .bd-actions {

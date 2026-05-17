@@ -64,7 +64,7 @@ export default async function PlayerPage({ params }: PageProps) {
   return (
     <main className="container container-wide">
       <header className="brand">
-        <Link className="brand-back" href="/live" aria-label="Back to feed">
+        <Link className="brand-back" href="/" aria-label="Back to feed">
           ←
         </Link>
         <h1>{BRAND.name}</h1>

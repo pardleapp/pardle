@@ -205,7 +205,7 @@ export default function SharedBetView({ bet, ownerName }: Props) {
 
       <p className="bd-share-footer">
         Want to track your own bets like this?{" "}
-        <Link href="/live">Open Pardle →</Link>
+        <Link href="/">Open Pardle →</Link>
       </p>
     </section>
   );
