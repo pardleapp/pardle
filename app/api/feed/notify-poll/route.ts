@@ -282,6 +282,22 @@ function roundScoreSettlement(
 }
 
 export async function GET(req: Request) {
+  try {
+    return await handle(req);
+  } catch (err) {
+    console.error("[notify-poll] top-level failure", err);
+    return NextResponse.json(
+      {
+        error: "notify-poll-failed",
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack?.split("\n").slice(0, 5) : undefined,
+      },
+      { status: 500 },
+    );
+  }
+}
+
+async function handle(req: Request) {
   const expected = process.env.CRON_SECRET;
   if (expected) {
     const auth = req.headers.get("authorization") ?? "";
