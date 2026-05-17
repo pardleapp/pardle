@@ -58,6 +58,30 @@ const gbp = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 2,
 });
 
+/** Build the friendly WhatsApp-style message we drop into the share
+ *  sheet. Reads naturally as "I've got £50 on Rahm to win @ +1500.
+ *  Follow it live → URL". One sentence per bet kind plus the URL. */
+function buildShareText(
+  bet: TrackedBet,
+  oddsFormat: OddsFormat,
+  url: string,
+): string {
+  const stake = gbp.format(bet.stake);
+  const odds = formatOdds(bet.oddsTaken, oddsFormat);
+  let line: string;
+  if (bet.kind === "outright") {
+    line = `${stake} on ${bet.playerName} to win @ ${odds}`;
+  } else if (bet.kind === "round-score") {
+    const r = bet.round != null ? ` R${bet.round}` : "";
+    line = `${stake} on ${bet.playerName}${r} ${bet.side} ${bet.line} @ ${odds}`;
+  } else if (bet.kind === "winning-score") {
+    line = `${stake} on the winning score ${bet.side} ${bet.line} @ ${odds}`;
+  } else {
+    line = `${stake} on ${bet.playerName} top ${bet.cutoff} @ ${odds}`;
+  }
+  return `I've got ${line}.\n\nFollow it live → ${url}`;
+}
+
 export default function BetDetail({ betId }: { betId: string }) {
   const [bet, setBet] = useState<TrackedBet | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -144,13 +168,13 @@ export default function BetDetail({ betId }: { betId: string }) {
     setBet(next);
   }, [bet, data]);
 
-  const [shareStatus, setShareStatus] = useState<"idle" | "copied" | "err">(
-    "idle",
-  );
+  const [shareStatus, setShareStatus] = useState<
+    "idle" | "sending" | "sent" | "err"
+  >("idle");
 
   async function shareThis() {
     if (!bet) return;
-    setShareStatus("idle");
+    setShareStatus("sending");
     try {
       const res = await fetch(
         `/api/bets/${encodeURIComponent(bet.id)}/share`,
@@ -166,14 +190,28 @@ export default function BetDetail({ betId }: { betId: string }) {
         return;
       }
       const url = `${window.location.origin}/share/bet/${encodeURIComponent(bet.id)}`;
-      try {
-        await navigator.clipboard.writeText(url);
-        setShareStatus("copied");
-      } catch {
-        // Older browsers: fall back to prompt so the user can copy manually.
-        window.prompt("Copy this share link:", url);
-        setShareStatus("copied");
+      const text = buildShareText(bet, oddsFormat, url);
+
+      // Mobile: native share sheet opens with WhatsApp / iMessage /
+      // socials. Desktop usually doesn't support navigator.share so
+      // we fall back to wa.me — opens WhatsApp web pre-filled with
+      // the same text.
+      const nav = navigator as Navigator & {
+        share?: (data: ShareData) => Promise<void>;
+        canShare?: (data: ShareData) => boolean;
+      };
+      if (nav.share) {
+        try {
+          await nav.share({ title: "My Pardle bet", text, url });
+          setShareStatus("sent");
+          return;
+        } catch {
+          // User cancelled or share aborted — fall through to wa.me.
+        }
       }
+      const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+      window.open(waUrl, "_blank", "noopener");
+      setShareStatus("sent");
     } catch {
       setShareStatus("err");
     }
@@ -324,13 +362,16 @@ export default function BetDetail({ betId }: { betId: string }) {
           type="button"
           className="bd-share"
           onClick={shareThis}
-          title="Make this bet viewable to anyone with the link"
+          disabled={shareStatus === "sending"}
+          title="Send to a friend via WhatsApp / iMessage"
         >
-          {shareStatus === "copied"
-            ? "Link copied ✓"
+          {shareStatus === "sending"
+            ? "Opening…"
+            : shareStatus === "sent"
+            ? "Sent ✓"
             : shareStatus === "err"
             ? "Try again"
-            : "Share this bet"}
+            : "Send to a mate"}
         </button>
         <button type="button" className="bd-remove" onClick={removeThis}>
           Remove this bet
