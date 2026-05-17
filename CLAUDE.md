@@ -1,6 +1,22 @@
 # Pardle
 
-Daily Wordle-style golf game. Players get 6 guesses to identify a mystery PGA/LIV/LPGA pro. Each guess reveals match-state on attributes (country, age bracket, height, majors won, career wins, turned-pro decade, OWGR tier) with directional arrows for numeric ones.
+## What Pardle is now
+
+Pardle is a **live bettor's interface for pro golf tournaments**. A bettor opens it during a round, tracks the bets they've placed elsewhere (DraftKings, Polymarket, friends' books), sees the model's current view of each bet's fair value updating in near-real-time, and watches/reacts to the tournament alongside other bettors.
+
+Three things have to be world-class for that to work — every prioritisation call should be weighed against these:
+
+1. **Speed of the feed.** When McIlroy holes out from the fairway, the user must see it on Pardle before they'd have seen it on TV or Twitter. Sub-15-second freshness on shot-level events is the bar. That means tight orchestrator polling, mid-hole `playByPlay` shot detection (not just hole-completion events), no needless caching on the surfacing path. We prioritise "fresh" over "complete" when there's a trade-off.
+
+2. **Speed of the bet tracker.** When a player's odds shift, the user's bet PnL on screen has to move within seconds. This applies to every market we surface — outright (Polymarket), round-score (our model), winning-score (our model), top-X (DraftKings). The bet detail chart must show *today's* trajectory, not just from the moment they entered the bet, so a user who arrives mid-round still gets context.
+
+3. **Social interaction with the feed.** Likes, threaded chat, reactions, polls, communal wins/losses. Without this Pardle is a feed reader; with it, it's a place bettors hang out. Treat betting-adjacent talk ("I need three birdies", "if Scheffler bogeys 17 my parlay's dead") as a first-class use case for comments and threads, not an afterthought.
+
+The Real app is the comparison point — the engagement loop it captures for general sports is what we're building for golf specifically.
+
+## Heritage: the daily Wordle-style game
+
+The original Pardle was a daily golf-attribute guessing game (6 guesses to identify a mystery PGA/LIV/LPGA pro, reveals on country / age / height / majors / wins / decade / OWGR tier). That game still ships at the root and serves as a friction-free entry point — viral on share-card text, draws bettors into the live feed during tournament weeks. Don't tear it out; do let the live interface be the primary surface during live play.
 
 ## Audience: mobile-first
 
@@ -75,15 +91,17 @@ git push            # triggers Vercel deploy
 - Whether to use Expo Router or Next.js for web. (Leaning Expo for codebase reuse with future iOS — confirm before scaffolding.)
 - Whether the streak system needs server-side enforcement to prevent cheating. (Probably not for v0; trust localStorage.)
 
-## /live feed — product targets (model: the Real app)
+## /live feed — design lens
 
-The `/live` golf feed is being built to deliver the same engagement loop the Real app captures for general sports (Real is a real-time sports social app). When designing or pruning live-feed features, weigh them against these three drivers — they are what Real's team called out as the reasons users keep showing up:
+When designing or pruning live-feed and bet-tracker features, weigh them against the three pillars above (feed speed, bet-tracker speed, social interaction). Features that don't pull on at least one should be deprioritised; features that pull on multiple are the highest signal.
 
-1. **Betting talk is the magnet.** Bettors come in to discuss their picks and strategies — "I need three birdies", "if Scheffler bogeys 17 my parlay's dead". Treat betting-adjacent talk (props, live odds, "what I need") as a first-class use case for comments/threads, not an afterthought. Polls and prediction markets feed this directly.
-2. **Communal wins/losses are the glue.** Users celebrate hits and commiserate misses together. Reactions, threads, follow-a-player, and shareable "moment" cards should all make those emotional spikes social. A bogey on the wrong hole should be as fun to talk about as a birdie.
-3. **Speed beats TV and social.** Real's pitch: "usually faster than TV, faster than social media." Our live feed must consistently surface what's happening on the course before users see it on Twitter or a broadcast cut. That means: tight orchestrator polling cadence, no needless caching on event surfacing, and aggressively prioritising "fresh" over "complete" when there's a trade-off.
+External integrations the bet tracker depends on:
+- **PGA Tour orchestrator** (`orchestrator.pgatour.com/graphql`) — leaderboard, scorecards, playByPlay. Source of truth for the feed and for round-score / winning-score model inputs.
+- **Polymarket** (`gamma-api.polymarket.com`) — outright winner market prices.
+- **DraftKings** (`sportsbook-nash.draftkings.com/.../api/v5/`) — top-X market prices (top-5, top-10, top-20). Public-readable JSON. ToS-grey; treat as best-effort and fall back gracefully when markets don't exist for a given tournament.
+- **DataGolf** (`feeds.datagolf.com`) — pre-tournament SG decompositions, live SG breakdown for player pages. Note: their `/preds/in-play` lags real events by ~2 min, so we don't use it for bet pricing.
 
-Use these as the lens for prioritisation calls on `/live`. Features that don't pull on at least one of these three levers should be deprioritised; features that pull on multiple are the highest signal.
+When a market is thin or missing, fall back to our own model (per-player N(mean, variance) over final 4-round strokes) rather than going blank.
 
 ## Related files
 
