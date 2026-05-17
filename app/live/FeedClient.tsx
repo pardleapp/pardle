@@ -7,7 +7,6 @@ import type { FeedRow } from "@/lib/feed/types";
 import {
   DEFAULT_ODDS_FORMAT,
   formatOdds,
-  nextOddsFormat,
   oddsFormatLabel,
   ODDS_FORMAT_STORAGE_KEY,
   type OddsFormat,
@@ -152,14 +151,11 @@ export default function FeedClient() {
     }
   }, []);
 
-  const cycleOddsFormat = useCallback(() => {
-    setOddsFormat((cur) => {
-      const next = nextOddsFormat(cur);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(ODDS_FORMAT_STORAGE_KEY, next);
-      }
-      return next;
-    });
+  const pickOddsFormat = useCallback((fmt: OddsFormat) => {
+    setOddsFormat(fmt);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(ODDS_FORMAT_STORAGE_KEY, fmt);
+    }
   }, []);
 
   const authorKey = useRef<string>("");
@@ -311,14 +307,26 @@ export default function FeedClient() {
       <div className="feed-header-row">
         <h2 className="feed-tournament-name">{data.tournament.name}</h2>
         <div className="feed-header-meta">
-          <button
-            type="button"
-            className="feed-odds-toggle"
-            onClick={cycleOddsFormat}
-            title="Cycle odds format"
+          <div
+            className="odds-segment"
+            role="group"
+            aria-label="Odds format"
           >
-            {oddsFormatLabel(oddsFormat)} odds
-          </button>
+            {(["american", "fractional", "decimal"] as const).map((fmt) => (
+              <button
+                key={fmt}
+                type="button"
+                className={`odds-segment-btn ${
+                  oddsFormat === fmt ? "odds-segment-btn-on" : ""
+                }`}
+                onClick={() => pickOddsFormat(fmt)}
+                aria-pressed={oddsFormat === fmt}
+                title={`Show odds as ${oddsFormatLabel(fmt)}`}
+              >
+                {fmt === "american" ? "+250" : fmt === "fractional" ? "5/2" : "3.5"}
+              </button>
+            ))}
+          </div>
           <AuthChip />
           <span className="feed-live-dot">
             <span className="feed-live-pulse" /> LIVE

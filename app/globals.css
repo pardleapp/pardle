@@ -8336,6 +8336,47 @@ footer {
   }
 }
 
+/* ── Odds-format segmented control ───────────────────────────── */
+
+.odds-segment {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  gap: 1px;
+}
+
+.odds-segment-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s;
+  letter-spacing: 0;
+  min-width: 36px;
+}
+
+.odds-segment-btn:hover {
+  color: var(--text);
+}
+
+.odds-segment-btn-on {
+  background: var(--text);
+  color: var(--bg);
+  box-shadow: var(--shadow-sm);
+}
+
+.odds-segment-btn-on:hover {
+  color: var(--bg);
+}
+
 /* ── Notification permission prompt ──────────────────────────── */
 
 .notif-prompt {
