@@ -162,6 +162,30 @@ export const FEED_MAX_EVENTS = 1000;
 export const COMMENT_MAX_LEN = 280;
 export const COMMENTS_PER_EVENT_CAP = 200;
 
+/**
+ * Expected direction of the win-market price change for this event.
+ *  +1 → market should shorten (birdie, eagle, ace, hole-out, climb)
+ *  -1 → market should lengthen (bogey, double, lost ball, drop)
+ *   0 → no expectation (par, ambiguous milestone)
+ *
+ * Used to filter out spurious odds shifts attributed to an event when
+ * the move was actually driven by a different player's near-simultaneous
+ * action (e.g. the leader's hole-out re-pricing the rest of the field
+ * a few seconds after our player's birdie landed).
+ */
+export function eventPolarity(e: FeedEvent): 1 | -1 | 0 {
+  if (e.ace) return 1;
+  if (e.reelGreat) return 1;
+  if (e.reelWorthy) return -1;
+  if (e.result === "albatross" || e.result === "eagle" || e.result === "birdie") {
+    return 1;
+  }
+  if (e.result === "bogey" || e.result === "double" || e.result === "triple-plus") {
+    return -1;
+  }
+  return 0;
+}
+
 /** Map a (strokes - par) delta to a result label. */
 export function resultFor(strokes: number, par: number): ScoreResult {
   const d = strokes - par;

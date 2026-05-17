@@ -25,7 +25,7 @@ import {
 } from "@/lib/feed/top-finish-cache";
 import { ensurePlayerSkill } from "@/lib/feed/skill-cache";
 import { findOddsShift } from "@/lib/feed/odds-store";
-import type { FeedRow } from "@/lib/feed/types";
+import { eventPolarity, type FeedRow } from "@/lib/feed/types";
 
 export const dynamic = "force-dynamic";
 
@@ -170,6 +170,17 @@ async function handle(req: Request) {
     if (!shift) return event;
     const rel = Math.abs(shift.after - shift.before) / shift.before;
     if (rel < ODDS_MIN_PCT) return event;
+    // Direction sanity. Decimal odds: shorter = lower number. A birdie
+    // that's accompanied by the leader's hole-out can show a lengthening
+    // shift on the buffer; that move belongs to the leader, not us.
+    // If the shift contradicts the event's expected polarity, drop it
+    // rather than mislead the user.
+    const polarity = eventPolarity(event);
+    if (polarity !== 0) {
+      const shortened = shift.after < shift.before;
+      if (polarity === 1 && !shortened) return event;
+      if (polarity === -1 && shortened) return event;
+    }
     return { ...event, oddsBefore: shift.before, oddsAfter: shift.after };
   };
 

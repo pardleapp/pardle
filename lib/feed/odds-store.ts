@@ -128,7 +128,7 @@ export function findOddsShift(
   buf: OddsSample[],
   targetTs: number,
   windowBeforeMs = 120_000,
-  windowAfterMs = 180_000,
+  windowAfterMs = 90_000,
 ): { before: number; after: number } | null {
   if (buf.length < 2) return null;
   const before = [...buf]
