@@ -13,6 +13,7 @@ import {
   currentValueForBet,
   evaluateRoundScore,
   evaluateWinningScore,
+  findOutrightWinner,
   mergeServerAndLocal,
   patchLegacyPlacement,
   persistBet,
@@ -148,6 +149,11 @@ export default function BetTracker({
     void removeBetEverywhere(id);
   }
 
+  const tournamentWinner = useMemo(
+    () => findOutrightWinner(players, playerRoundStates),
+    [players, playerRoundStates],
+  );
+
   const valueByBet = useMemo(() => {
     const out = new Map<string, number | null>();
     for (const b of bets)
@@ -159,6 +165,7 @@ export default function BetTracker({
           playerRoundStates,
           tournamentProjections,
           topFinishCurrent,
+          tournamentWinner,
         ),
       );
     return out;
@@ -168,6 +175,7 @@ export default function BetTracker({
     playerRoundStates,
     tournamentProjections,
     topFinishCurrent,
+    tournamentWinner,
   ]);
 
   const totals = useMemo(() => {
@@ -236,6 +244,7 @@ export default function BetTracker({
                 bet={b}
                 currentOdds={currentOdds}
                 oddsFormat={oddsFormat}
+                tournamentWinner={tournamentWinner}
                 onRemove={() => removeBet(b.id)}
               />
             ) : b.kind === "winning-score" ? (
@@ -316,25 +325,39 @@ function OutrightRow({
   bet,
   currentOdds,
   oddsFormat,
+  tournamentWinner,
   onRemove,
 }: {
   bet: OutrightBet;
   currentOdds: Record<string, number>;
   oddsFormat: OddsFormat;
+  tournamentWinner: string | null;
   onRemove: () => void;
 }) {
+  // Tournament fully settled — short-circuit to a definite won/lost
+  // payout so a winning ticket doesn't keep showing ~0% against the
+  // last cached longshot market price, and a losing ticket clearly
+  // says £0 instead of clinging to a tiny residual.
+  const settled = tournamentWinner !== null;
+  const settledWon = settled && bet.playerId === tournamentWinner;
   const fair = currentOdds[bet.playerId];
   const haveFair = Number.isFinite(fair) && fair > 1;
-  const currentValue = haveFair ? bet.stake * (bet.oddsTaken / fair) : null;
+  const currentValue = settled
+    ? settledWon
+      ? bet.stake * bet.oddsTaken
+      : 0
+    : haveFair
+      ? bet.stake * (bet.oddsTaken / fair)
+      : null;
   const profit = currentValue !== null ? currentValue - bet.stake : null;
   const profitClass =
     profit === null
       ? ""
       : profit > 0
-      ? "bets-profit-up"
-      : profit < 0
-      ? "bets-profit-down"
-      : "";
+        ? "bets-profit-up"
+        : profit < 0
+          ? "bets-profit-down"
+          : "";
   return (
     <li className="bets-row-wrap">
       <Link href={`/live/bet/${bet.id}`} className="bets-row bets-row-link">
@@ -343,7 +366,11 @@ function OutrightRow({
           <p className="bets-row-meta">
             Win @ {formatOdds(bet.oddsTaken, oddsFormat)} ·{" "}
             {gbp.format(bet.stake)}
-            {haveFair && <> · now {formatOdds(fair, oddsFormat)}</>}
+            {settled ? (
+              <> · {settledWon ? "won ✓" : "lost"}</>
+            ) : (
+              haveFair && <> · now {formatOdds(fair, oddsFormat)}</>
+            )}
           </p>
         </div>
         <div className={`bets-row-value ${profitClass}`}>

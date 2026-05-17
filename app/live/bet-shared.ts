@@ -551,14 +551,54 @@ function probForCutoff(
   return Number.isFinite(v) ? v : null;
 }
 
+/**
+ * Detect a settled tournament from the live leaderboard. Returns the
+ * sole winner's playerId, or null if the tournament is still live or
+ * tied at the top (e.g. unresolved playoff). Once a player sits at
+ * position "1" with thru "F" and all four rounds in, the outright
+ * winner market has effectively settled.
+ *
+ * We use this on the client to short-circuit outright bet valuation
+ * once the tournament's done — otherwise we keep multiplying the
+ * stake by the last cached market price, which can leave a winning
+ * ticket showing ~0% (Polymarket's pre-settlement longshot price).
+ */
+export function findOutrightWinner(
+  players: Array<{
+    playerId: string;
+    position: string;
+    thru: string;
+    playerState?: string;
+  }>,
+  playerRoundStates: Record<string, PlayerRoundState>,
+): string | null {
+  const leaders = players.filter(
+    (p) => p.position === "1" && p.thru === "F",
+  );
+  if (leaders.length !== 1) return null;
+  const winner = leaders[0];
+  const state = playerRoundStates[winner.playerId];
+  if (!state) return null;
+  if (state.currentRound !== 4) return null;
+  if (state.holesRemaining !== 0) return null;
+  return winner.playerId;
+}
+
 export function currentValueForBet(
   b: TrackedBet,
   currentOdds: Record<string, number>,
   playerRoundStates: Record<string, PlayerRoundState>,
   tournamentProjections?: Record<string, TournamentProjection>,
   topFinishCurrent?: Record<string, TopFinishProbs>,
+  tournamentWinner?: string | null,
 ): number | null {
   if (b.kind === "outright") {
+    // Tournament has fully settled — pay out the winning ticket at
+    // the taken odds, zero out everyone else. Without this short
+    // circuit we'd keep valuing against the stale market price.
+    if (tournamentWinner) {
+      return b.playerId === tournamentWinner ? b.stake * b.oddsTaken : 0;
+    }
     const fair = currentOdds[b.playerId];
     if (!Number.isFinite(fair) || fair <= 1) return null;
     return b.stake * (b.oddsTaken / fair);

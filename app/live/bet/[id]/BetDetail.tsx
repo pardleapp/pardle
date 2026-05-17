@@ -10,6 +10,7 @@ import {
 } from "@/lib/odds-format";
 import {
   currentValueForBet,
+  findOutrightWinner,
   evaluateRoundScore,
   evaluateWinningScore,
   patchLegacyPlacement,
@@ -251,12 +252,17 @@ export default function BetDetail({ betId }: { betId: string }) {
     return <p className="feed-empty">Loading…</p>;
   }
 
+  const tournamentWinner = findOutrightWinner(
+    data.playerIndex ?? [],
+    data.playerRoundStates,
+  );
   const nowValue = currentValueForBet(
     bet,
     data.currentOdds,
     data.playerRoundStates,
     data.tournamentProjections,
     data.topFinishCurrent,
+    tournamentWinner,
   );
   const history = reconstructHistory(
     bet,
