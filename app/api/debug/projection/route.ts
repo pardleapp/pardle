@@ -124,14 +124,14 @@ export async function GET(req: Request) {
       detectedStrokes: number;
     }> = [];
     for (let r = 1; r <= 4; r++) {
-      const rp = pars?.[r] ?? {};
-      const rh = byRound?.[r] ?? {};
+      const rp = (pars?.[r] ?? {}) as Record<string, number>;
+      const rh = (byRound?.[r] ?? {}) as Record<string, string>;
       const entries = Object.entries(rh);
       let played = 0;
       let remaining = 0;
       let strokes = 0;
       for (const [hStr, _par] of Object.entries(rp)) {
-        const scoreStr = rh[hStr as keyof typeof rh];
+        const scoreStr = rh[hStr];
         const isPlayed =
           scoreStr != null &&
           scoreStr !== "" &&
