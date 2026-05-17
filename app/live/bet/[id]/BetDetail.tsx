@@ -368,10 +368,10 @@ export default function BetDetail({ betId }: { betId: string }) {
           {shareStatus === "sending"
             ? "Opening…"
             : shareStatus === "sent"
-            ? "Sent ✓"
+            ? "Shared ✓"
             : shareStatus === "err"
             ? "Try again"
-            : "Send to a mate"}
+            : "Share this bet"}
         </button>
         <button type="button" className="bd-remove" onClick={removeThis}>
           Remove this bet
