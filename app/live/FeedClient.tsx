@@ -320,11 +320,6 @@ export default function FeedClient() {
             {oddsFormatLabel(oddsFormat)} odds
           </button>
           <AuthChip />
-          {data.seenToday > 0 && (
-            <span className="feed-watching">
-              👀 {data.seenToday.toLocaleString()} here today
-            </span>
-          )}
           <span className="feed-live-dot">
             <span className="feed-live-pulse" /> LIVE
           </span>
