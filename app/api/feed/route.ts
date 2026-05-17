@@ -14,6 +14,15 @@ import {
   type PlayerSkillMap,
   type WinningScoreSnapshot,
 } from "@/lib/feed/store";
+import { simulateTopFinish } from "@/lib/feed/top-finish-model";
+import {
+  getHotTopFinish,
+  getTopFinishHistory,
+  HISTORY_MIN_GAP_MS,
+  pushTopFinishSnapshot,
+  setHotTopFinish,
+  type TopFinishSnapshot,
+} from "@/lib/feed/top-finish-cache";
 import { ensurePlayerSkill } from "@/lib/feed/skill-cache";
 import { findOddsShift } from "@/lib/feed/odds-store";
 import type { FeedRow } from "@/lib/feed/types";
@@ -219,6 +228,15 @@ async function handle(req: Request) {
     bundle.winningScoreHistory,
   );
 
+  // Top-finish probabilities (top-5 / top-10 / top-20) via 5K-sim MC
+  // on the same per-player projections. Hot cache short-circuits when
+  // a recent result is available; otherwise we run the MC inline.
+  const topFinish = await getOrComputeTopFinish(
+    tournament.id,
+    tournamentProjections,
+  );
+  const topFinishHistory = await getTopFinishHistory(tournament.id);
+
   return NextResponse.json({
     tournament: {
       id: tournament.id,
@@ -248,6 +266,11 @@ async function handle(req: Request) {
      *  strokes. Powers the winning-score min-of-normals model. */
     tournamentProjections,
     winningScoreHistory,
+    /** Per-player model probabilities for top-5 / top-10 / top-20.
+     *  Source: server-side 5K-sim Monte Carlo with fractional
+     *  dead-heat counting. Same projections as the winning-score model. */
+    topFinishCurrent: topFinish,
+    topFinishHistory,
     fieldStats,
     playerSkill,
     tournamentPars: bundle.pars,
@@ -564,6 +587,36 @@ function computeWinningScoreCdf(
     points.push({ line, probUnder });
   }
   return points;
+}
+
+async function getOrComputeTopFinish(
+  tournamentId: string,
+  projections: Record<string, TournamentProjection>,
+): Promise<TopFinishSnapshot["byPlayer"]> {
+  const hot = await getHotTopFinish(tournamentId);
+  if (hot) return hot.byPlayer;
+  const active = Object.values(projections).filter((p) => p.active);
+  if (active.length === 0) return {};
+  const byPlayer = simulateTopFinish(projections);
+  if (Object.keys(byPlayer).length === 0) return {};
+  const snapshot: TopFinishSnapshot = { ts: Date.now(), byPlayer };
+  try {
+    await setHotTopFinish(tournamentId, snapshot);
+  } catch (err) {
+    console.error("[feed] setHotTopFinish failed", err);
+  }
+  // Append to the rolling history only when the previous snapshot is
+  // old enough — same 1/min dedup as the winning-score CDF.
+  try {
+    const recent = await getTopFinishHistory(tournamentId);
+    const lastTs = recent[0]?.ts ?? 0;
+    if (Date.now() - lastTs >= HISTORY_MIN_GAP_MS) {
+      await pushTopFinishSnapshot(tournamentId, snapshot);
+    }
+  } catch (err) {
+    console.error("[feed] pushTopFinishSnapshot failed", err);
+  }
+  return byPlayer;
 }
 
 async function maybeAppendWinningScoreSnapshot(

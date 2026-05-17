@@ -485,12 +485,33 @@ function probAtPlacementFor(b: RoundScoreBet): number {
   return b.placement?.probAtPlacement ?? 1 / b.oddsTaken;
 }
 
+export interface TopFinishProbs {
+  top5: number;
+  top10: number;
+  top20: number;
+}
+
+export interface TopFinishSnapshot {
+  ts: number;
+  byPlayer: Record<string, TopFinishProbs>;
+}
+
+function probForCutoff(
+  cutoff: 5 | 10 | 20,
+  probs: TopFinishProbs | undefined,
+): number | null {
+  if (!probs) return null;
+  const v =
+    cutoff === 5 ? probs.top5 : cutoff === 10 ? probs.top10 : probs.top20;
+  return Number.isFinite(v) ? v : null;
+}
+
 export function currentValueForBet(
   b: TrackedBet,
   currentOdds: Record<string, number>,
   playerRoundStates: Record<string, PlayerRoundState>,
   tournamentProjections?: Record<string, TournamentProjection>,
-  dkTopCurrentOdds?: Partial<Record<5 | 10 | 20, Record<string, number>>>,
+  topFinishCurrent?: Record<string, TopFinishProbs>,
 ): number | null {
   if (b.kind === "outright") {
     const fair = currentOdds[b.playerId];
@@ -498,9 +519,11 @@ export function currentValueForBet(
     return b.stake * (b.oddsTaken / fair);
   }
   if (b.kind === "top-finish") {
-    const fair = dkTopCurrentOdds?.[b.cutoff]?.[b.playerId];
-    if (!Number.isFinite(fair) || fair == null || fair <= 1) return null;
-    return b.stake * (b.oddsTaken / fair);
+    const prob = probForCutoff(b.cutoff, topFinishCurrent?.[b.playerId]);
+    if (prob == null) return null;
+    if (prob >= 1) return b.stake * b.oddsTaken;
+    if (prob <= 0) return 0;
+    return b.stake * prob * b.oddsTaken;
   }
   if (b.kind === "winning-score") {
     if (!tournamentProjections) return null;
@@ -583,9 +606,7 @@ export function reconstructHistory(
   scorecard?: BetScorecard | null,
   dgWinProbs?: Record<string, DgProbHistorySample[] | null>,
   winningScoreHistory?: WinningScoreSnapshot[],
-  dkTopHistories?: Partial<
-    Record<5 | 10 | 20, Record<string, OddsHistorySample[] | null>>
-  >,
+  topFinishHistory?: TopFinishSnapshot[],
 ): PnlSample[] {
   const series: PnlSample[] = [];
 
@@ -647,28 +668,26 @@ export function reconstructHistory(
   }
 
   if (bet.kind === "top-finish") {
-    const buf = dkTopHistories?.[bet.cutoff]?.[bet.playerId] ?? [];
-    type Pt = { t: number; p: number };
-    const pts: Pt[] = [];
-    if (Date.now() - bet.placedAt < 24 * 60 * 60 * 1000) {
-      pts.push({ t: bet.placedAt, p: bet.oddsTaken });
-    }
-    if (Array.isArray(buf)) {
-      for (const s of buf) {
-        if (!Number.isFinite(s.p) || s.p <= 1) continue;
-        pts.push({ t: s.ts, p: s.p });
-      }
-    }
-    pts.sort((a, b) => a.t - b.t);
-    for (const pt of pts) {
-      const v = bet.stake * (bet.oddsTaken / pt.p);
-      const last = series[series.length - 1];
-      if (last && Math.abs(v - last.v) < 0.05 && pt.t - last.t < 60_000)
-        continue;
-      series.push({ t: pt.t, v });
+    // Build the trajectory from model snapshots. Each snapshot gives
+    // the model's prob this player makes the cutoff at that ts; we
+    // convert to fair value via stake × prob × oddsTaken (same
+    // convention as round-score and winning-score).
+    const snaps = topFinishHistory ?? [];
+    const sorted = [...snaps].sort((a, b) => a.ts - b.ts);
+    for (const snap of sorted) {
+      const prob = probForCutoff(bet.cutoff, snap.byPlayer[bet.playerId]);
+      if (prob == null) continue;
+      let v: number;
+      if (prob >= 1) v = bet.stake * bet.oddsTaken;
+      else if (prob <= 0) v = 0;
+      else v = bet.stake * prob * bet.oddsTaken;
+      series.push({ t: snap.ts, v, prob });
     }
     if (nowValue != null) {
-      series.push({ t: Date.now(), v: nowValue });
+      const last = series[series.length - 1];
+      if (!last || Math.abs(nowValue - last.v) > 0.01) {
+        series.push({ t: Date.now(), v: nowValue });
+      }
     }
     return series;
   }

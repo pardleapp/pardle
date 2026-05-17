@@ -106,7 +106,7 @@ export default function BetChartFull({ bet, history }: Props) {
             : bet.kind === "winning-score"
             ? "Chart will fill in as scores move through the round."
             : bet.kind === "top-finish"
-            ? "Chart will fill in as DraftKings re-prices."
+            ? "Chart will fill in as the model updates through the round."
             : "Chart will fill in as Polymarket odds move."}
         </div>
       </div>

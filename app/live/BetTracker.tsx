@@ -21,6 +21,7 @@ import {
   type PlayerRoundState,
   type RoundScoreBet,
   type TopFinishBet,
+  type TopFinishProbs,
   type TournamentProjection,
   type TrackedBet,
   type WinningScoreBet,
@@ -33,8 +34,8 @@ interface Props {
   currentOdds: Record<string, number>;
   playerRoundStates: Record<string, PlayerRoundState>;
   tournamentProjections: Record<string, TournamentProjection>;
-  /** DK top-X latest decimal odds: cutoff → playerId → odds. */
-  dkTopCurrentOdds?: Partial<Record<5 | 10 | 20, Record<string, number>>>;
+  /** Model's current top-5 / top-10 / top-20 prob per player. */
+  topFinishCurrent?: Record<string, TopFinishProbs>;
   oddsFormat: OddsFormat;
 }
 
@@ -61,7 +62,7 @@ export default function BetTracker({
   currentOdds,
   playerRoundStates,
   tournamentProjections,
-  dkTopCurrentOdds,
+  topFinishCurrent,
   oddsFormat,
 }: Props) {
   const [bets, setBets] = useState<TrackedBet[]>([]);
@@ -113,7 +114,7 @@ export default function BetTracker({
           currentOdds,
           playerRoundStates,
           tournamentProjections,
-          dkTopCurrentOdds,
+          topFinishCurrent,
         ),
       );
     return out;
@@ -122,7 +123,7 @@ export default function BetTracker({
     currentOdds,
     playerRoundStates,
     tournamentProjections,
-    dkTopCurrentOdds,
+    topFinishCurrent,
   ]);
 
   const totals = useMemo(() => {
@@ -179,9 +180,7 @@ export default function BetTracker({
               <TopFinishRow
                 key={b.id}
                 bet={b}
-                currentOdds={
-                  dkTopCurrentOdds?.[b.cutoff]?.[b.playerId] ?? null
-                }
+                probs={topFinishCurrent?.[b.playerId]}
                 oddsFormat={oddsFormat}
                 onRemove={() => removeBet(b.id)}
               />
@@ -304,19 +303,29 @@ function OutrightRow({
 
 function TopFinishRow({
   bet,
-  currentOdds,
+  probs,
   oddsFormat,
   onRemove,
 }: {
   bet: TopFinishBet;
-  currentOdds: number | null;
+  probs: TopFinishProbs | undefined;
   oddsFormat: OddsFormat;
   onRemove: () => void;
 }) {
-  const haveFair =
-    currentOdds != null && Number.isFinite(currentOdds) && currentOdds > 1;
-  const currentValue = haveFair
-    ? bet.stake * (bet.oddsTaken / (currentOdds as number))
+  const prob = probs
+    ? bet.cutoff === 5
+      ? probs.top5
+      : bet.cutoff === 10
+      ? probs.top10
+      : probs.top20
+    : null;
+  const haveModel = prob != null && Number.isFinite(prob);
+  const currentValue = haveModel
+    ? prob! >= 1
+      ? bet.stake * bet.oddsTaken
+      : prob! <= 0
+      ? 0
+      : bet.stake * prob! * bet.oddsTaken
     : null;
   const profit = currentValue !== null ? currentValue - bet.stake : null;
   const profitClass =
@@ -337,8 +346,12 @@ function TopFinishRow({
           </p>
           <p className="bets-row-meta">
             @ {formatOdds(bet.oddsTaken, oddsFormat)} · {gbp.format(bet.stake)}
-            {haveFair && (
-              <> · DK now {formatOdds(currentOdds as number, oddsFormat)}</>
+            {haveModel && prob! > 0 && prob! < 1 && (
+              <>
+                {" "}
+                · model {Math.round(prob! * 100)}% · fair{" "}
+                {formatOdds(1 / prob!, oddsFormat)}
+              </>
             )}
           </p>
         </div>
