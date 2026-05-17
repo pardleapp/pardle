@@ -214,7 +214,7 @@ export interface BetScorecard {
   skillPerHole: number;
 }
 
-// ── localStorage ────────────────────────────────────────────────────
+// ── Persistence (localStorage + optional server sync) ─────────────
 
 const STORAGE_KEY = "pardle_bets_v2";
 const LEGACY_KEY = "pardle_bets_v1";
@@ -245,6 +245,51 @@ export function writeBets(bets: TrackedBet[]): void {
 
 export function readBetById(id: string): TrackedBet | null {
   return readBets().find((b) => b.id === id) ?? null;
+}
+
+/** Fire-and-forget upsert to the server when signed in. Always writes
+ *  to localStorage too so the bet is visible immediately and survives
+ *  a brief offline period. */
+export async function persistBet(bet: TrackedBet): Promise<void> {
+  if (typeof window === "undefined") return;
+  const existing = readBets().filter((b) => b.id !== bet.id);
+  writeBets([...existing, bet]);
+  try {
+    await fetch("/api/bets", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(bet),
+    });
+  } catch {
+    // Anonymous users get a 401 here — that's fine, localStorage
+    // remains the source of truth until they sign in.
+  }
+}
+
+/** Soft-remove a bet from both local and (if authed) server. */
+export async function removeBetEverywhere(betId: string): Promise<void> {
+  if (typeof window === "undefined") return;
+  writeBets(readBets().filter((b) => b.id !== betId));
+  try {
+    await fetch(`/api/bets/${encodeURIComponent(betId)}`, {
+      method: "DELETE",
+    });
+  } catch {
+    // Anonymous — localStorage is the only place this lived anyway.
+  }
+}
+
+/** Server bets win on conflict (they're cross-device truth). Merges
+ *  any localStorage-only bets (anonymous-era) into the result so we
+ *  don't lose work between sessions. */
+export function mergeServerAndLocal(
+  serverBets: TrackedBet[],
+  localBets: TrackedBet[],
+): TrackedBet[] {
+  const byId = new Map<string, TrackedBet>();
+  for (const b of localBets) byId.set(b.id, b);
+  for (const b of serverBets) byId.set(b.id, b);
+  return Array.from(byId.values()).sort((a, b) => b.placedAt - a.placedAt);
 }
 
 // ── Valuation ───────────────────────────────────────────────────────

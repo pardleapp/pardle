@@ -13,8 +13,11 @@ import {
   currentValueForBet,
   evaluateRoundScore,
   evaluateWinningScore,
+  mergeServerAndLocal,
   patchLegacyPlacement,
+  persistBet,
   readBets,
+  removeBetEverywhere,
   snapshotForPlacement,
   writeBets,
   type OutrightBet,
@@ -26,6 +29,7 @@ import {
   type TrackedBet,
   type WinningScoreBet,
 } from "./bet-shared";
+import { useAuth } from "./auth/useAuth";
 
 type BetKind = "outright" | "round-score" | "winning-score" | "top-finish";
 
@@ -68,11 +72,45 @@ export default function BetTracker({
   const [bets, setBets] = useState<TrackedBet[]>([]);
   const [open, setOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     setBets(readBets());
     setHydrated(true);
   }, []);
+
+  // When the user signs in, migrate any localStorage-only bets to
+  // the server and then load the server's view as the source of
+  // truth. Sign-out leaves localStorage in place so anonymous bets
+  // still persist for the next session.
+  useEffect(() => {
+    if (!hydrated || !user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const local = readBets();
+        if (local.length > 0) {
+          await fetch("/api/bets/migrate", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ bets: local }),
+          });
+        }
+        const res = await fetch("/api/bets", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as { bets: TrackedBet[] };
+        if (cancelled) return;
+        const merged = mergeServerAndLocal(json.bets ?? [], local);
+        setBets(merged);
+        writeBets(merged);
+      } catch {
+        // Network blip — keep localStorage view for now.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, user]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -95,13 +133,16 @@ export default function BetTracker({
   function addBet(b: TrackedBet) {
     const next = [...bets, b];
     setBets(next);
-    writeBets(next);
+    // persistBet writes to localStorage AND fire-and-forget POSTs to
+    // the server. Anonymous users get a 401 and just keep the local
+    // copy; signed-in users get cross-device sync.
+    void persistBet(b);
   }
 
   function removeBet(id: string) {
     const next = bets.filter((b) => b.id !== id);
     setBets(next);
-    writeBets(next);
+    void removeBetEverywhere(id);
   }
 
   const valueByBet = useMemo(() => {

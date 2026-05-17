@@ -13,6 +13,7 @@ import {
   type OddsFormat,
 } from "@/lib/odds-format";
 import BetTracker from "./BetTracker";
+import AuthChip from "./auth/AuthChip";
 import CatchMeUp from "./CatchMeUp";
 import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
@@ -318,6 +319,7 @@ export default function FeedClient() {
           >
             {oddsFormatLabel(oddsFormat)} odds
           </button>
+          <AuthChip />
           {data.seenToday > 0 && (
             <span className="feed-watching">
               👀 {data.seenToday.toLocaleString()} here today
