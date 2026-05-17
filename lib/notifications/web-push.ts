@@ -22,15 +22,26 @@ function sanitizeVapidKey(raw: string | undefined): string {
 
 function ensureConfigured() {
   if (configured) return;
-  const publicKey = sanitizeVapidKey(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
-  const privateKey = sanitizeVapidKey(process.env.VAPID_PRIVATE_KEY);
+  const rawPub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const rawPriv = process.env.VAPID_PRIVATE_KEY;
+  const publicKey = sanitizeVapidKey(rawPub);
+  const privateKey = sanitizeVapidKey(rawPriv);
   const subject = (process.env.VAPID_SUBJECT || "mailto:hello@pardle.app").trim();
   if (!publicKey || !privateKey) {
     throw new Error(
-      "VAPID keys missing — set NEXT_PUBLIC_VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY",
+      `VAPID keys missing — pub_raw=${rawPub?.length ?? "undef"} pub_clean=${publicKey.length} priv_raw=${rawPriv?.length ?? "undef"} priv_clean=${privateKey.length}`,
     );
   }
-  webpush.setVapidDetails(subject, publicKey, privateKey);
+  try {
+    webpush.setVapidDetails(subject, publicKey, privateKey);
+  } catch (err) {
+    // Surface the sanitised key shape so we can tell whether the env
+    // var arrived in the expected form or if Vercel's mangling it.
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `setVapidDetails failed: ${msg} | pub_len=${publicKey.length} pub_head=${publicKey.slice(0, 4)} pub_tail=${publicKey.slice(-4)} priv_len=${privateKey.length} priv_head=${privateKey.slice(0, 4)} priv_tail=${privateKey.slice(-4)}`,
+    );
+  }
   configured = true;
 }
 
