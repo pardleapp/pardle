@@ -388,7 +388,7 @@ export async function GET(req: Request) {
       // Silent-prime decisions have an empty title — don't dispatch,
       // just apply the patch to baseline future diffs.
       if (decision.payload.title === "") {
-        await admin.from("bets").update(decision.patch).eq("id", row.id);
+        await admin.from("bets").update(decision.patch as never).eq("id", row.id);
         continue;
       }
 
@@ -404,7 +404,7 @@ export async function GET(req: Request) {
           notified++;
         }
       }
-      await admin.from("bets").update(decision.patch).eq("id", row.id);
+      await admin.from("bets").update(decision.patch as never).eq("id", row.id);
     }
   }
 
