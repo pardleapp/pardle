@@ -290,6 +290,7 @@ export default function BetTracker({
                 bet={b}
                 state={playerRoundStates[b.playerId]}
                 oddsFormat={oddsFormat}
+                settled={settledByBet.get(b.id) ?? null}
                 onRemove={() => removeBet(b.id)}
               />
             ),
@@ -639,11 +640,13 @@ function RoundScoreRow({
   bet,
   state,
   oddsFormat,
+  settled,
   onRemove,
 }: {
   bet: RoundScoreBet;
   state: PlayerRoundState | undefined;
   oddsFormat: OddsFormat;
+  settled: { won: boolean } | null;
   onRemove: () => void;
 }) {
   const ev = evaluateRoundScore(bet, state);
@@ -653,7 +656,20 @@ function RoundScoreRow({
   let valueBlock: JSX.Element;
   let profitClass = "";
 
-  if (!ev) {
+  // DB-stamped settled state (from notify-poll) wins over live model
+  // evaluation — covers bets from past tournaments where the active
+  // leaderboard no longer has the player's state.
+  if (settled) {
+    profitClass = settled.won ? "bets-profit-up" : "bets-profit-down";
+    stateText = settled.won ? "Won" : "Lost";
+    valueBlock = (
+      <strong className={profitClass}>
+        {settled.won
+          ? `+${gbp.format(bet.stake * (bet.oddsTaken - 1))}`
+          : `-${gbp.format(bet.stake)}`}
+      </strong>
+    );
+  } else if (!ev) {
     stateText = "Waiting on data…";
     valueBlock = <span className="bets-row-pending">—</span>;
   } else if (ev.kind === "not-started") {

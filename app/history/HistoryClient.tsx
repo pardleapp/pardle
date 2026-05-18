@@ -66,8 +66,8 @@ function buildPnlSeries(bets: HistoryBet[]): { ts: number; cum: number }[] {
 function PnlChart({ series }: { series: { ts: number; cum: number }[] }) {
   if (series.length < 2) return null;
   const W = 600;
-  const H = 160;
-  const PAD = { top: 14, right: 12, bottom: 22, left: 44 };
+  const H = 200;
+  const PAD = { top: 18, right: 16, bottom: 28, left: 56 };
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
   const xs = series.map((p) => p.ts);
@@ -76,7 +76,7 @@ function PnlChart({ series }: { series: { ts: number; cum: number }[] }) {
   const xMax = xs[xs.length - 1];
   const yMinRaw = Math.min(0, ...ys);
   const yMaxRaw = Math.max(0, ...ys);
-  const yPad = (yMaxRaw - yMinRaw) * 0.1 || 1;
+  const yPad = (yMaxRaw - yMinRaw) * 0.12 || 1;
   const yMin = yMinRaw - yPad;
   const yMax = yMaxRaw + yPad;
   const xToPx = (x: number) =>
@@ -84,11 +84,33 @@ function PnlChart({ series }: { series: { ts: number; cum: number }[] }) {
   const yToPx = (y: number) =>
     PAD.top + ((yMax - y) / Math.max(1, yMax - yMin)) * innerH;
   const linePath = series
-    .map((p, i) => `${i === 0 ? "M" : "L"}${xToPx(p.ts).toFixed(1)},${yToPx(p.cum).toFixed(1)}`)
+    .map(
+      (p, i) =>
+        `${i === 0 ? "M" : "L"}${xToPx(p.ts).toFixed(1)},${yToPx(p.cum).toFixed(1)}`,
+    )
     .join(" ");
   const zeroY = yToPx(0);
   const lastY = ys[ys.length - 1];
-  const lastColor = lastY >= 0 ? "var(--up)" : "var(--down)";
+  const lastColor = lastY >= 0 ? "var(--up, #4d8826)" : "var(--down, #c4322d)";
+  const fillColor =
+    lastY >= 0
+      ? "rgba(123, 174, 63, 0.18)"
+      : "rgba(248, 113, 113, 0.16)";
+  const firstX = xToPx(xs[0]);
+  const lastX = xToPx(xs[xs.length - 1]);
+  const areaPath = `M${firstX.toFixed(1)},${zeroY.toFixed(1)} ${series
+    .map((p) => `L${xToPx(p.ts).toFixed(1)},${yToPx(p.cum).toFixed(1)}`)
+    .join(" ")} L${lastX.toFixed(1)},${zeroY.toFixed(1)} Z`;
+
+  // Format the x-axis labels.
+  const startDate = new Date(xs[0]).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
+  const endDate = new Date(xs[xs.length - 1]).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
 
   return (
     <svg
@@ -99,6 +121,8 @@ function PnlChart({ series }: { series: { ts: number; cum: number }[] }) {
       role="img"
       aria-label="Cumulative profit and loss over time"
     >
+      {/* tinted area under the line */}
+      <path d={areaPath} fill={fillColor} />
       {/* zero baseline */}
       <line
         x1={PAD.left}
@@ -110,18 +134,20 @@ function PnlChart({ series }: { series: { ts: number; cum: number }[] }) {
         strokeDasharray="3,3"
       />
       <text
-        x={PAD.left - 8}
+        x={PAD.left - 10}
         y={zeroY + 4}
-        fontSize={11}
+        fontSize={12}
+        fontWeight={700}
         fill="var(--muted)"
         textAnchor="end"
       >
         £0
       </text>
       <text
-        x={PAD.left - 8}
+        x={PAD.left - 10}
         y={yToPx(yMax) + 4}
-        fontSize={11}
+        fontSize={12}
+        fontWeight={700}
         fill="var(--muted)"
         textAnchor="end"
       >
@@ -129,24 +155,114 @@ function PnlChart({ series }: { series: { ts: number; cum: number }[] }) {
       </text>
       {yMin < 0 && (
         <text
-          x={PAD.left - 8}
+          x={PAD.left - 10}
           y={yToPx(yMin) + 4}
-          fontSize={11}
+          fontSize={12}
+          fontWeight={700}
           fill="var(--muted)"
           textAnchor="end"
         >
           {gbp.format(yMin)}
         </text>
       )}
-      <path d={linePath} stroke={lastColor} strokeWidth={2} fill="none" />
+      {/* x-axis date labels */}
+      <text
+        x={PAD.left}
+        y={H - 8}
+        fontSize={11}
+        fontWeight={600}
+        fill="var(--muted)"
+      >
+        {startDate}
+      </text>
+      <text
+        x={W - PAD.right}
+        y={H - 8}
+        fontSize={11}
+        fontWeight={600}
+        fill="var(--muted)"
+        textAnchor="end"
+      >
+        {endDate}
+      </text>
+      {/* line on top */}
+      <path
+        d={linePath}
+        stroke={lastColor}
+        strokeWidth={2.5}
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* a faint dot per settled bet */}
+      {series.map((p, i) => (
+        <circle
+          key={i}
+          cx={xToPx(p.ts)}
+          cy={yToPx(p.cum)}
+          r={2.5}
+          fill="var(--bg, white)"
+          stroke={lastColor}
+          strokeWidth={1.5}
+        />
+      ))}
+      {/* prominent dot on the latest point */}
       <circle
         cx={xToPx(series[series.length - 1].ts)}
         cy={yToPx(lastY)}
-        r={3.5}
+        r={5}
         fill={lastColor}
       />
     </svg>
   );
+}
+
+interface KindBreakdown {
+  kind: string;
+  total: number;
+  settled: number;
+  won: number;
+  profit: number;
+}
+
+function bucketByKind(bets: HistoryBet[]): KindBreakdown[] {
+  const m = new Map<string, KindBreakdown>();
+  const label = (k: string) => {
+    switch (k) {
+      case "outright":
+        return "Outright";
+      case "top-finish":
+        return "Top finish";
+      case "round-score":
+        return "Round score";
+      case "winning-score":
+        return "Winning score";
+      default:
+        return k;
+    }
+  };
+  for (const b of bets) {
+    const key = label(b.kind);
+    const row = m.get(key) ?? {
+      kind: key,
+      total: 0,
+      settled: 0,
+      won: 0,
+      profit: 0,
+    };
+    row.total++;
+    if (b.settledAt !== null && b.settledWon !== null) {
+      row.settled++;
+      if (b.settledWon) {
+        row.won++;
+        row.profit += b.stake * b.oddsTaken - b.stake;
+      } else {
+        row.profit -= b.stake;
+      }
+    }
+    m.set(key, row);
+  }
+  return Array.from(m.values()).sort((a, b) => b.total - a.total);
 }
 
 /** Group bets into chunks by tournament-ish bucket. We don't store
@@ -227,6 +343,7 @@ export default function HistoryClient() {
 
   const series = useMemo(() => (bets ? buildPnlSeries(bets) : []), [bets]);
   const groups = useMemo(() => (bets ? groupByTournamentWeek(bets) : []), [bets]);
+  const byKind = useMemo(() => (bets ? bucketByKind(bets) : []), [bets]);
 
   if (authLoading || bets === null) {
     return <p className="feed-empty">Loading your history…</p>;
@@ -301,6 +418,49 @@ export default function HistoryClient() {
         <div className="history-chart-wrap">
           <h3 className="history-section-title">Running P&L</h3>
           <PnlChart series={series} />
+        </div>
+      )}
+
+      {byKind.length > 0 && (
+        <div className="history-breakdown">
+          <h3 className="history-section-title">By bet type</h3>
+          <ul className="history-breakdown-list">
+            {byKind.map((row) => {
+              const winRate =
+                row.settled > 0
+                  ? Math.round((row.won / row.settled) * 100)
+                  : null;
+              const profitClass =
+                row.profit > 0
+                  ? "bets-profit-up"
+                  : row.profit < 0
+                    ? "bets-profit-down"
+                    : "";
+              return (
+                <li key={row.kind} className="history-breakdown-row">
+                  <span className="history-breakdown-kind">{row.kind}</span>
+                  <span className="history-breakdown-stats">
+                    {row.total} bets
+                    {row.settled > 0 && (
+                      <>
+                        {" · "}
+                        {winRate}% win{" "}
+                        <span className="history-stat-sub">
+                          ({row.won}/{row.settled})
+                        </span>
+                      </>
+                    )}
+                  </span>
+                  {row.settled > 0 && (
+                    <span className={`history-breakdown-pnl ${profitClass}`}>
+                      {row.profit >= 0 ? "+" : ""}
+                      {gbp.format(row.profit)}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 
