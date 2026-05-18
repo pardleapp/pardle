@@ -18,7 +18,11 @@ import LeaderboardPanel from "./LeaderboardPanel";
 import PlayerSearch from "./PlayerSearch";
 import ReelGroup from "./ReelGroup";
 
-const REFRESH_MS = 6_000;
+// Faster ticks during live play so the feed feels close to real-time
+// alongside the IMG-ingest path; visibility-gated below so a backgrounded
+// tab doesn't keep burning Upstash quota.
+const REFRESH_MS = 3_000;
+const REFRESH_MS_HIDDEN = 30_000;
 const AUTHOR_KEY_STORAGE = "pardle_feed_author";
 const BURST_EMOJIS = ["🔥", "😱", "⛳", "👏", "💀", "🐐"];
 const FLOATER_LIFETIME_MS = 2600;
@@ -212,9 +216,24 @@ export default function FeedClient() {
   }, [spawnFloater]);
 
   useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const isHidden = () =>
+      typeof document !== "undefined" && document.hidden;
+    const schedule = () => {
+      if (timer) clearInterval(timer);
+      timer = setInterval(load, isHidden() ? REFRESH_MS_HIDDEN : REFRESH_MS);
+    };
+    const onVis = () => {
+      if (!isHidden()) load();
+      schedule();
+    };
     load();
-    const t = setInterval(load, REFRESH_MS);
-    return () => clearInterval(t);
+    schedule();
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      if (timer) clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, [load]);
 
   async function sendBurst(emoji: string) {
