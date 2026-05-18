@@ -69,6 +69,13 @@ async function handle(req: Request) {
   // are LPUSH'd with no TTL — just capped at 720 samples per key —
   // so they remain queryable indefinitely after the event ends.
   const tournamentIdOverride = url.searchParams.get("tournamentId");
+  // Bandwidth saver: by default we omit the heavy chart buffers
+  // (per-player odds histories, DG win-prob histories, DK/FD book
+  // histories, top-finish history, winning-score CDF history, field
+  // stats). The home feed doesn't need them; only the bet detail
+  // page does, and it opts in with ?include=charts. This drops the
+  // /api/feed payload from ~150 KB to ~20 KB per poll.
+  const includeChartData = url.searchParams.get("include") === "charts";
 
   let tournament: { id: string; name: string; startDate: number } | null;
   let isLive: boolean;
@@ -278,7 +285,9 @@ async function handle(req: Request) {
 
   // Maintain a rolling history of the winning-score CDF for the bet
   // detail chart. Append at most one snapshot per minute regardless
-  // of how often /api/feed is hit.
+  // of how often /api/feed is hit. We still append even when the
+  // caller didn't ask for chart data, so the chart endpoint sees a
+  // dense history when it next loads.
   const winningScoreHistory = await maybeAppendWinningScoreSnapshot(
     tournament.id,
     tournamentProjections,
@@ -303,7 +312,12 @@ async function handle(req: Request) {
     dgTopFinish?.byPlayer ?? {},
     DG_BLEND_WEIGHT,
   );
-  const topFinishHistory = await getTopFinishHistory(tournament.id);
+  // Skip the topFinishHistory Redis read when the caller isn't going
+  // to use it (home page) — saves an LRANGE per poll across every
+  // viewer.
+  const topFinishHistory = includeChartData
+    ? await getTopFinishHistory(tournament.id)
+    : [];
 
   return NextResponse.json({
     tournament: {
@@ -319,27 +333,14 @@ async function handle(req: Request) {
     leaderboard: leaderboard.slice(0, 30),
     playerIndex,
     currentOdds,
-    // Per-player rolling odds buffer (~last few hours of mid-price
-    // samples). Used by the bet tracker to reconstruct PnL history
-    // server-driven, so charts cover the period a user was off-page.
-    oddsHistories: oddsBuffers,
-    /** DataGolf in-play win-prob buffer per player — outright chart's
-     *  fallback when Polymarket is thin (longshots, illiquid markets). */
-    dgWinProbs: bundle.dgWinProbs,
-    /** DK + FD outright winner odds via The Odds API. Merged into
-     *  the outright bet chart alongside the Polymarket samples. */
-    bookOdds: bundle.bookOdds,
     playerRoundStates,
     /** Per-player N(mean, variance) projection of final 4-round
      *  strokes. Powers the winning-score min-of-normals model. */
     tournamentProjections,
-    winningScoreHistory,
     /** Per-player model probabilities for top-5 / top-10 / top-20.
      *  Source: server-side 5K-sim Monte Carlo with fractional
      *  dead-heat counting. Same projections as the winning-score model. */
     topFinishCurrent: topFinish,
-    topFinishHistory,
-    fieldStats,
     /** Live-round field-mean drift bump (strokes/hole) applied to
      *  remaining-hole projections — measures how the most recent
      *  ~30 events scored vs the rest of the round. */
@@ -354,11 +355,24 @@ async function handle(req: Request) {
         ? Object.keys(dgTopFinish.byPlayer).length
         : 0,
     },
-    playerSkill,
-    tournamentPars: bundle.pars,
     watching,
     seenToday,
     polled,
+    // Heavy chart buffers — opt-in via ?include=charts. Bet detail
+    // page passes it; the home feed doesn't need them and skipping
+    // them drops the response by an order of magnitude per poll.
+    ...(includeChartData
+      ? {
+          oddsHistories: oddsBuffers,
+          dgWinProbs: bundle.dgWinProbs,
+          bookOdds: bundle.bookOdds,
+          winningScoreHistory,
+          topFinishHistory,
+          fieldStats,
+          playerSkill,
+          tournamentPars: bundle.pars,
+        }
+      : {}),
   });
 }
 

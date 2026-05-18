@@ -139,9 +139,13 @@ export default function BetDetail({ betId }: { betId: string }) {
 
   const load = useCallback(async () => {
     try {
+      // include=charts asks the API for the heavy historical buffers
+      // (Polymarket odds, top-finish history, winning-score CDF) the
+      // chart reconstruction needs. The home feed doesn't ask for
+      // these — keeps the per-poll payload small for non-detail views.
       const url = pastTournamentId
-        ? `/api/feed?v=detail&tournamentId=${encodeURIComponent(pastTournamentId)}`
-        : `/api/feed?v=detail`;
+        ? `/api/feed?v=detail&tournamentId=${encodeURIComponent(pastTournamentId)}&include=charts`
+        : `/api/feed?v=detail&include=charts`;
       const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
       const json = (await res.json()) as FeedResponse;
