@@ -21,7 +21,18 @@ export interface PnlSample {
   prob?: number;
 }
 
-export interface OutrightBet {
+/** Server-side settlement fields written by notify-poll when a
+ *  tournament concludes. Present on every bet kind; null when the
+ *  bet is still pending. Stored on Supabase but threaded through
+ *  the wire response and into the in-memory bet object so the bet
+ *  tracker can render won/lost on bets from past tournaments where
+ *  the active-leaderboard-based client detector can't reach. */
+export interface BetSettlementFields {
+  settledAt?: number | null;
+  settledWon?: boolean | null;
+}
+
+export interface OutrightBet extends BetSettlementFields {
   id: string;
   kind: "outright";
   playerId: string;
@@ -45,7 +56,7 @@ export interface RoundScorePlacement {
   probAtPlacement: number;
 }
 
-export interface RoundScoreBet {
+export interface RoundScoreBet extends BetSettlementFields {
   id: string;
   kind: "round-score";
   playerId: string;
@@ -62,7 +73,7 @@ export interface RoundScoreBet {
   placement?: RoundScorePlacement;
 }
 
-export interface WinningScoreBet {
+export interface WinningScoreBet extends BetSettlementFields {
   id: string;
   kind: "winning-score";
   /** Total-strokes line for the eventual winner (e.g. 268.5). */
@@ -74,7 +85,7 @@ export interface WinningScoreBet {
   placedAt: number;
 }
 
-export interface TopFinishBet {
+export interface TopFinishBet extends BetSettlementFields {
   id: string;
   kind: "top-finish";
   playerId: string;

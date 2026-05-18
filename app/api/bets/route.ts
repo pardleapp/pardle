@@ -14,7 +14,7 @@ export async function GET() {
   }
   const { data, error } = await supabase
     .from("bets")
-    .select("id, kind, data, placed_at")
+    .select("id, kind, data, placed_at, settled_at, settled_won")
     .eq("user_id", user.id)
     .is("removed_at", null)
     .order("placed_at", { ascending: false });
@@ -26,6 +26,15 @@ export async function GET() {
     id: row.id,
     kind: row.kind,
     placedAt: new Date(row.placed_at).getTime(),
+    // Settlement state from notify-poll. The bet tracker reads these
+    // for bets from past tournaments — the client-side detector only
+    // works against the active leaderboard, so once the resolver
+    // rolls forward it loses sight of "did this PGA bet win?" without
+    // these columns.
+    settledAt: row.settled_at
+      ? new Date(row.settled_at as string).getTime()
+      : null,
+    settledWon: (row.settled_won as boolean | null) ?? null,
   }));
   return NextResponse.json({ bets });
 }

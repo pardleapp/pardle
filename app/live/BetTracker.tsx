@@ -152,6 +152,16 @@ export default function BetTracker({
   const settledByBet = useMemo(() => {
     const m = new Map<string, { won: boolean }>();
     for (const b of bets) {
+      // 1) Prefer server-stamped settlement (survives tournament
+      //    rollovers). Once a bet's settled_at column is set by
+      //    notify-poll, that's authoritative.
+      if (b.settledAt != null && b.settledWon != null) {
+        m.set(b.id, { won: b.settledWon });
+        continue;
+      }
+      // 2) Fall back to client-side detection against the active
+      //    tournament's leaderboard (covers bets that just settled
+      //    this minute, before notify-poll caught up).
       const s = detectBetSettlement(
         b,
         players,
