@@ -10,7 +10,7 @@ import {
 } from "@/lib/odds-format";
 import {
   currentValueForBet,
-  findOutrightWinner,
+  detectBetSettlement,
   evaluateRoundScore,
   evaluateWinningScore,
   patchLegacyPlacement,
@@ -47,6 +47,13 @@ interface FeedResponse {
   winningScoreHistory?: WinningScoreSnapshot[];
   topFinishCurrent?: Record<string, TopFinishProbs>;
   topFinishHistory?: TopFinishSnapshot[];
+  /** Slim leaderboard rows used to detect tournament settlement. */
+  playerIndex?: Array<{
+    playerId: string;
+    position: string;
+    thru: string;
+    playerState?: string;
+  }>;
   bookOdds?: {
     draftkings: Record<string, OddsHistorySample[] | null>;
     fanduel: Record<string, OddsHistorySample[] | null>;
@@ -252,9 +259,11 @@ export default function BetDetail({ betId }: { betId: string }) {
     return <p className="feed-empty">Loading…</p>;
   }
 
-  const tournamentWinner = findOutrightWinner(
+  const settled = detectBetSettlement(
+    bet,
     data.playerIndex ?? [],
     data.playerRoundStates,
+    data.tournamentProjections ?? {},
   );
   const nowValue = currentValueForBet(
     bet,
@@ -262,7 +271,7 @@ export default function BetDetail({ betId }: { betId: string }) {
     data.playerRoundStates,
     data.tournamentProjections,
     data.topFinishCurrent,
-    tournamentWinner,
+    settled,
   );
   const history = reconstructHistory(
     bet,

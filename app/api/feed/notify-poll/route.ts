@@ -9,6 +9,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { sendPush, type SubscriptionLike } from "@/lib/notifications/web-push";
 import {
   currentValueForBet,
+  detectBetSettlement,
   evaluateRoundScore,
   evaluateWinningScore,
   type RoundScoreBet,
@@ -375,12 +376,28 @@ async function handle(req: Request) {
     const bet = rowToBet(row);
     if (!bet) continue;
 
+    // Round-score has its own per-round settlement path; outright /
+    // top-finish / winning-score share the tournament-over detector
+    // so they all flip to "won/lost" once the leaderboard's final.
+    let settlement: { won: boolean } | null = null;
+    if (bet.kind === "round-score") {
+      settlement = roundScoreSettlement(bet, playerRoundStates);
+    } else {
+      settlement = detectBetSettlement(
+        bet,
+        bundle.leaderboard,
+        playerRoundStates,
+        tournamentProjections,
+      );
+    }
+
     const value = currentValueForBet(
       bet,
       currentOdds,
       playerRoundStates,
       tournamentProjections,
       topFinish,
+      settlement,
     );
     const prob = currentProbFor(
       bet,
@@ -389,11 +406,6 @@ async function handle(req: Request) {
       tournamentProjections,
       topFinish,
     );
-
-    let settlement: { won: boolean } | null = null;
-    if (bet.kind === "round-score") {
-      settlement = roundScoreSettlement(bet, playerRoundStates);
-    }
 
     const decisions = decideForBet(row, bet, prob, value, settlement);
     if (decisions.length === 0) continue;

@@ -551,6 +551,13 @@ function probForCutoff(
   return Number.isFinite(v) ? v : null;
 }
 
+export interface PlayerForSettlement {
+  playerId: string;
+  position: string;
+  thru: string;
+  playerState?: string;
+}
+
 /**
  * Detect a settled tournament from the live leaderboard. Returns the
  * sole winner's playerId, or null if the tournament is still live or
@@ -564,12 +571,7 @@ function probForCutoff(
  * ticket showing ~0% (Polymarket's pre-settlement longshot price).
  */
 export function findOutrightWinner(
-  players: Array<{
-    playerId: string;
-    position: string;
-    thru: string;
-    playerState?: string;
-  }>,
+  players: PlayerForSettlement[],
   playerRoundStates: Record<string, PlayerRoundState>,
 ): string | null {
   const leaders = players.filter(
@@ -584,21 +586,121 @@ export function findOutrightWinner(
   return winner.playerId;
 }
 
+/** Strip the optional "T" prefix and parse to int. "T10" → 10, "1" →
+ *  1, "T1" → 1, anything else → null. */
+function parseLeaderboardPosition(pos: string): number | null {
+  if (!pos) return null;
+  const m = pos.match(/^T?(\d+)$/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Top-finish bet settlement — returns { won } once the tournament
+ * leaderboard is final. A "Top N" bet wins when the player's final
+ * position (T-prefix stripped) is ≤ N. Players missing from the
+ * leaderboard (e.g. missed cut, WD) settle as lost.
+ *
+ * Returns null while the tournament is still in progress so the
+ * caller falls back to the live model prob.
+ */
+export function topFinishSettlement(
+  bet: TopFinishBet,
+  players: PlayerForSettlement[],
+  playerRoundStates: Record<string, PlayerRoundState>,
+): { won: boolean } | null {
+  // Same gate as outright: the leaderboard is only "final" once a
+  // sole position-1 finisher exists with R4 complete.
+  if (!findOutrightWinner(players, playerRoundStates)) return null;
+  const row = players.find((p) => p.playerId === bet.playerId);
+  if (!row) return { won: false };
+  const pos = parseLeaderboardPosition(row.position);
+  if (pos === null) return { won: false };
+  return { won: pos <= bet.cutoff };
+}
+
+/**
+ * Winning-score bet settlement — once the tournament's settled we
+ * read the winner's actual final stroke total from the projection
+ * (variance collapses to 0 when all 4 rounds are in, so mean = the
+ * real total). "Under L" wins when total < L; "over L" wins on ≥.
+ */
+export function winningScoreSettlement(
+  bet: WinningScoreBet,
+  players: PlayerForSettlement[],
+  playerRoundStates: Record<string, PlayerRoundState>,
+  tournamentProjections: Record<string, TournamentProjection>,
+): { won: boolean; winningStrokes: number } | null {
+  const winnerId = findOutrightWinner(players, playerRoundStates);
+  if (!winnerId) return null;
+  const proj = tournamentProjections[winnerId];
+  if (!proj || !Number.isFinite(proj.mean)) return null;
+  const winningStrokes = proj.mean;
+  const won =
+    bet.side === "under"
+      ? winningStrokes < bet.line
+      : winningStrokes >= bet.line;
+  return { won, winningStrokes };
+}
+
+/**
+ * Single entry point for "is this bet settled?" — returns the won
+ * flag for outright / top-finish / winning-score. Round-score bets
+ * settle per-round via evaluateRoundScore, so they go through the
+ * existing path. Used by both the client (bet-tracker display) and
+ * the notify-poll cron (push notifications + Supabase patch).
+ */
+export function detectBetSettlement(
+  bet: TrackedBet,
+  players: PlayerForSettlement[],
+  playerRoundStates: Record<string, PlayerRoundState>,
+  tournamentProjections: Record<string, TournamentProjection>,
+): { won: boolean } | null {
+  if (bet.kind === "outright") {
+    const winner = findOutrightWinner(players, playerRoundStates);
+    if (!winner) return null;
+    return { won: bet.playerId === winner };
+  }
+  if (bet.kind === "top-finish") {
+    return topFinishSettlement(bet, players, playerRoundStates);
+  }
+  if (bet.kind === "winning-score") {
+    const r = winningScoreSettlement(
+      bet,
+      players,
+      playerRoundStates,
+      tournamentProjections,
+    );
+    return r ? { won: r.won } : null;
+  }
+  return null;
+}
+
 export function currentValueForBet(
   b: TrackedBet,
   currentOdds: Record<string, number>,
   playerRoundStates: Record<string, PlayerRoundState>,
   tournamentProjections?: Record<string, TournamentProjection>,
   topFinishCurrent?: Record<string, TopFinishProbs>,
-  tournamentWinner?: string | null,
+  /** Per-bet settlement override. Pass non-null once the tournament's
+   *  finished + we've decided this bet won/lost — short-circuits the
+   *  live model maths to a definite payout or zero. */
+  settled?: { won: boolean } | null,
 ): number | null {
-  if (b.kind === "outright") {
-    // Tournament has fully settled — pay out the winning ticket at
-    // the taken odds, zero out everyone else. Without this short
-    // circuit we'd keep valuing against the stale market price.
-    if (tournamentWinner) {
-      return b.playerId === tournamentWinner ? b.stake * b.oddsTaken : 0;
+  // Tournament-over short-circuit applies uniformly to outright /
+  // top-finish / winning-score (round-score has its own per-round
+  // settlement path via evaluateRoundScore further down).
+  if (settled) {
+    if (
+      b.kind === "outright" ||
+      b.kind === "top-finish" ||
+      b.kind === "winning-score"
+    ) {
+      return settled.won ? b.stake * b.oddsTaken : 0;
     }
+  }
+  if (b.kind === "outright") {
     const fair = currentOdds[b.playerId];
     if (!Number.isFinite(fair) || fair <= 1) return null;
     return b.stake * (b.oddsTaken / fair);

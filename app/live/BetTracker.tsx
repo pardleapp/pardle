@@ -11,9 +11,9 @@ import {
 import {
   anchoredValue,
   currentValueForBet,
+  detectBetSettlement,
   evaluateRoundScore,
   evaluateWinningScore,
-  findOutrightWinner,
   mergeServerAndLocal,
   patchLegacyPlacement,
   persistBet,
@@ -149,10 +149,19 @@ export default function BetTracker({
     void removeBetEverywhere(id);
   }
 
-  const tournamentWinner = useMemo(
-    () => findOutrightWinner(players, playerRoundStates),
-    [players, playerRoundStates],
-  );
+  const settledByBet = useMemo(() => {
+    const m = new Map<string, { won: boolean }>();
+    for (const b of bets) {
+      const s = detectBetSettlement(
+        b,
+        players,
+        playerRoundStates,
+        tournamentProjections,
+      );
+      if (s) m.set(b.id, s);
+    }
+    return m;
+  }, [bets, players, playerRoundStates, tournamentProjections]);
 
   const valueByBet = useMemo(() => {
     const out = new Map<string, number | null>();
@@ -165,7 +174,7 @@ export default function BetTracker({
           playerRoundStates,
           tournamentProjections,
           topFinishCurrent,
-          tournamentWinner,
+          settledByBet.get(b.id) ?? null,
         ),
       );
     return out;
@@ -175,7 +184,7 @@ export default function BetTracker({
     playerRoundStates,
     tournamentProjections,
     topFinishCurrent,
-    tournamentWinner,
+    settledByBet,
   ]);
 
   const totals = useMemo(() => {
@@ -244,7 +253,7 @@ export default function BetTracker({
                 bet={b}
                 currentOdds={currentOdds}
                 oddsFormat={oddsFormat}
-                tournamentWinner={tournamentWinner}
+                settled={settledByBet.get(b.id) ?? null}
                 onRemove={() => removeBet(b.id)}
               />
             ) : b.kind === "winning-score" ? (
@@ -253,6 +262,7 @@ export default function BetTracker({
                 bet={b}
                 projections={tournamentProjections}
                 oddsFormat={oddsFormat}
+                settled={settledByBet.get(b.id) ?? null}
                 onRemove={() => removeBet(b.id)}
               />
             ) : b.kind === "top-finish" ? (
@@ -261,6 +271,7 @@ export default function BetTracker({
                 bet={b}
                 probs={topFinishCurrent?.[b.playerId]}
                 oddsFormat={oddsFormat}
+                settled={settledByBet.get(b.id) ?? null}
                 onRemove={() => removeBet(b.id)}
               />
             ) : (
@@ -325,25 +336,19 @@ function OutrightRow({
   bet,
   currentOdds,
   oddsFormat,
-  tournamentWinner,
+  settled,
   onRemove,
 }: {
   bet: OutrightBet;
   currentOdds: Record<string, number>;
   oddsFormat: OddsFormat;
-  tournamentWinner: string | null;
+  settled: { won: boolean } | null;
   onRemove: () => void;
 }) {
-  // Tournament fully settled — short-circuit to a definite won/lost
-  // payout so a winning ticket doesn't keep showing ~0% against the
-  // last cached longshot market price, and a losing ticket clearly
-  // says £0 instead of clinging to a tiny residual.
-  const settled = tournamentWinner !== null;
-  const settledWon = settled && bet.playerId === tournamentWinner;
   const fair = currentOdds[bet.playerId];
   const haveFair = Number.isFinite(fair) && fair > 1;
   const currentValue = settled
-    ? settledWon
+    ? settled.won
       ? bet.stake * bet.oddsTaken
       : 0
     : haveFair
@@ -367,7 +372,7 @@ function OutrightRow({
             Win @ {formatOdds(bet.oddsTaken, oddsFormat)} ·{" "}
             {gbp.format(bet.stake)}
             {settled ? (
-              <> · {settledWon ? "won ✓" : "lost"}</>
+              <> · {settled.won ? "won ✓" : "lost"}</>
             ) : (
               haveFair && <> · now {formatOdds(fair, oddsFormat)}</>
             )}
@@ -404,11 +409,13 @@ function TopFinishRow({
   bet,
   probs,
   oddsFormat,
+  settled,
   onRemove,
 }: {
   bet: TopFinishBet;
   probs: TopFinishProbs | undefined;
   oddsFormat: OddsFormat;
+  settled: { won: boolean } | null;
   onRemove: () => void;
 }) {
   const prob = probs
@@ -419,13 +426,17 @@ function TopFinishRow({
       : probs.top20
     : null;
   const haveModel = prob != null && Number.isFinite(prob);
-  const currentValue = haveModel
-    ? prob! >= 1
+  const currentValue = settled
+    ? settled.won
       ? bet.stake * bet.oddsTaken
-      : prob! <= 0
-      ? 0
-      : bet.stake * prob! * bet.oddsTaken
-    : null;
+      : 0
+    : haveModel
+      ? prob! >= 1
+        ? bet.stake * bet.oddsTaken
+        : prob! <= 0
+          ? 0
+          : bet.stake * prob! * bet.oddsTaken
+      : null;
   const profit = currentValue !== null ? currentValue - bet.stake : null;
   const profitClass =
     profit === null
@@ -445,12 +456,18 @@ function TopFinishRow({
           </p>
           <p className="bets-row-meta">
             @ {formatOdds(bet.oddsTaken, oddsFormat)} · {gbp.format(bet.stake)}
-            {haveModel && prob! > 0 && prob! < 1 && (
-              <>
-                {" "}
-                · model {Math.round(prob! * 100)}% · fair{" "}
-                {formatOdds(1 / prob!, oddsFormat)}
-              </>
+            {settled ? (
+              <> · {settled.won ? "won ✓" : "lost"}</>
+            ) : (
+              haveModel &&
+              prob! > 0 &&
+              prob! < 1 && (
+                <>
+                  {" "}
+                  · model {Math.round(prob! * 100)}% · fair{" "}
+                  {formatOdds(1 / prob!, oddsFormat)}
+                </>
+              )
             )}
           </p>
         </div>
@@ -523,22 +540,28 @@ function WinningScoreRow({
   bet,
   projections,
   oddsFormat,
+  settled,
   onRemove,
 }: {
   bet: WinningScoreBet;
   projections: Record<string, TournamentProjection>;
   oddsFormat: OddsFormat;
+  settled: { won: boolean } | null;
   onRemove: () => void;
 }) {
   const ev = evaluateWinningScore(bet, projections);
   const havModel = ev != null;
-  const currentValue = havModel
-    ? ev.prob >= 1
+  const currentValue = settled
+    ? settled.won
       ? bet.stake * bet.oddsTaken
-      : ev.prob <= 0
-      ? 0
-      : bet.stake * ev.prob * bet.oddsTaken
-    : null;
+      : 0
+    : havModel
+      ? ev.prob >= 1
+        ? bet.stake * bet.oddsTaken
+        : ev.prob <= 0
+          ? 0
+          : bet.stake * ev.prob * bet.oddsTaken
+      : null;
   const profit = currentValue !== null ? currentValue - bet.stake : null;
   const profitClass =
     profit === null
@@ -560,14 +583,18 @@ function WinningScoreRow({
           </p>
           <p className="bets-row-meta">
             @ {formatOdds(bet.oddsTaken, oddsFormat)} · {gbp.format(bet.stake)}
-            {havModel && (
-              <>
-                {" "}
-                · model {Math.round(ev.prob * 100)}% · fair{" "}
-                {ev.prob > 0 && ev.prob < 1
-                  ? formatOdds(1 / ev.prob, oddsFormat)
-                  : "—"}
-              </>
+            {settled ? (
+              <> · {settled.won ? "won ✓" : "lost"}</>
+            ) : (
+              havModel && (
+                <>
+                  {" "}
+                  · model {Math.round(ev.prob * 100)}% · fair{" "}
+                  {ev.prob > 0 && ev.prob < 1
+                    ? formatOdds(1 / ev.prob, oddsFormat)
+                    : "—"}
+                </>
+              )
             )}
           </p>
         </div>
