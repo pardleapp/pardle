@@ -84,6 +84,13 @@ export default function AuthChip() {
         {menuOpen && (
           <div className="auth-chip-menu">
             <Link
+              href="/history"
+              className="auth-chip-menu-item"
+              onClick={() => setMenuOpen(false)}
+            >
+              Your bets
+            </Link>
+            <Link
               href="/tipster"
               className="auth-chip-menu-item"
               onClick={() => setMenuOpen(false)}

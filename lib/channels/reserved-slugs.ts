@@ -47,6 +47,9 @@ const RESERVED = new Set<string>([
   "trending",
   "browse",
   "leaderboard",
+  "history",
+  "me",
+  "you",
 
   // Bet-flow nouns we use everywhere
   "bet",
