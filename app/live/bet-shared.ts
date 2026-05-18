@@ -32,6 +32,7 @@ export interface BetSettlementFields {
   settledWon?: boolean | null;
 }
 
+
 export interface OutrightBet extends BetSettlementFields {
   id: string;
   kind: "outright";
@@ -500,11 +501,32 @@ export type RoundScoreEval =
     }
   | { kind: "settled"; round: number; won: boolean; finalStrokes: number };
 
+/**
+ * Resolve which tournament round a round-score bet actually targets.
+ * When the bet was placed with `bet.round = null` (the UI calls this
+ * "current round at placement time"), we have to figure out what
+ * "current round" was for the bet AT placement time.
+ *
+ * For LIVE bets: use the player's currentRound from playerRoundStates.
+ *
+ * For PAST-TOURNAMENT replays: playerRoundStates.currentRound is
+ * usually R4 (the last completed round), which is wrong for an R2/R3
+ * bet. If `tournamentStartDate` is passed, fall back to a Thu/Fri/Sat/
+ * Sun heuristic: floor(days_since_start) + 1, clamped to [1, 4].
+ */
 export function resolveBetRound(
   bet: RoundScoreBet,
   state: PlayerRoundState | undefined,
+  tournamentStartDate?: number | null,
 ): number | null {
   if (bet.round != null) return bet.round;
+  if (tournamentStartDate != null) {
+    const diffDays =
+      (bet.placedAt - tournamentStartDate) / (24 * 60 * 60 * 1000);
+    if (Number.isFinite(diffDays)) {
+      return Math.min(4, Math.max(1, Math.floor(diffDays) + 1));
+    }
+  }
   return state?.currentRound ?? null;
 }
 

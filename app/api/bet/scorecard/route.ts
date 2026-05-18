@@ -9,7 +9,7 @@ import { ensurePlayerSkill } from "@/lib/feed/skill-cache";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/bet/scorecard?playerId=X&round=N
+ * GET /api/bet/scorecard?playerId=X&round=N[&tournamentId=Y]
  *
  * Targeted single-player scorecard for the bet detail page. The main
  * /api/feed events list is capped at 1000 entries and a busy tournament
@@ -17,12 +17,17 @@ export const dynamic = "force-dynamic";
  * get LTRIM'd off and the bet's PnL chart can't see them. The
  * orchestrator scorecard is authoritative — every played hole is in
  * the response — so for the round-score chart we read it directly.
+ *
+ * Pass tournamentId for past-tournament bet replays — without it, the
+ * route falls back to whichever tournament is currently active, which
+ * is the wrong tournament for any historical round-score chart.
  */
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const playerId = url.searchParams.get("playerId");
     const roundStr = url.searchParams.get("round");
+    const tournamentIdOverride = url.searchParams.get("tournamentId");
     if (!playerId || !roundStr) {
       return NextResponse.json(
         { error: "missing-params" },
@@ -34,12 +39,18 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "bad-round" }, { status: 400 });
     }
 
-    const active = await getActiveTournament();
-    if (!active) {
-      return NextResponse.json({ holes: [], roundPar: 0 });
+    let tournamentId: string;
+    if (tournamentIdOverride) {
+      tournamentId = tournamentIdOverride;
+    } else {
+      const active = await getActiveTournament();
+      if (!active) {
+        return NextResponse.json({ holes: [], roundPar: 0 });
+      }
+      tournamentId = active.tournament.id;
     }
 
-    const cards = await getScorecards(active.tournament.id, [playerId]);
+    const cards = await getScorecards(tournamentId, [playerId]);
     const card = cards[playerId];
     if (!card) {
       return NextResponse.json({ holes: [], roundPar: 0 });
@@ -84,10 +95,10 @@ export async function GET(req: Request) {
     // hole-by-hole reconstruction. Same prior-round fallback ladder
     // as /api/feed: thin samples for this round use the same hole's
     // average from any earlier round before falling back to par.
-    const bundle = await getFeedBundle(active.tournament.id);
+    const bundle = await getFeedBundle(tournamentId);
     const fieldStats = computeFieldStats(bundle.snapshot, bundle.pars);
     const skillMap = await ensurePlayerSkill(
-      active.tournament.id,
+      tournamentId,
       bundle.leaderboard,
     );
     const skillPerHole = (skillMap[playerId] ?? 0) / 18;

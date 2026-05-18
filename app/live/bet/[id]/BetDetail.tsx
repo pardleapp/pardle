@@ -16,6 +16,7 @@ import {
   patchLegacyPlacement,
   readBetById,
   reconstructHistory,
+  resolveBetRound,
   writeBets,
   readBets,
   type BetScorecard,
@@ -37,7 +38,7 @@ import BetChartFull from "./BetChartFull";
 const REFRESH_MS = 6_000;
 
 interface FeedResponse {
-  tournament: { name: string; isLive: boolean } | null;
+  tournament: { name: string; isLive: boolean; startDate?: number } | null;
   rows: FeedRowLike[];
   currentOdds: Record<string, number>;
   oddsHistories: Record<string, OddsHistorySample[] | null>;
@@ -164,12 +165,19 @@ export default function BetDetail({ betId }: { betId: string }) {
   // the events list on /api/feed is capped at 1000 entries, which a
   // busy tournament day can blow through in a few hours, leaving
   // early holes out of the chart.
+  //
+  // For "current round" bets (bet.round = null) we have to figure out
+  // what round the bet actually targeted at placement time. For past-
+  // tournament replays we can't trust playerRoundStates.currentRound
+  // (that's whatever round was last live, typically R4), so resolveBet
+  // -Round infers from placedAt vs tournament startDate.
   const roundForBet =
-    bet?.kind === "round-score"
-      ? bet.round ??
-        (data
-          ? data.playerRoundStates[bet.playerId]?.currentRound ?? null
-          : null)
+    bet?.kind === "round-score" && data
+      ? resolveBetRound(
+          bet,
+          data.playerRoundStates[bet.playerId],
+          data.tournament?.startDate ?? null,
+        )
       : null;
   const scorecardKey =
     bet?.kind === "round-score" && roundForBet != null && data != null
@@ -182,10 +190,17 @@ export default function BetDetail({ betId }: { betId: string }) {
     let cancelled = false;
     (async () => {
       try {
+        // Pass tournamentId for past-tournament replays — without it
+        // the scorecard endpoint queries whichever tournament is
+        // currently active, which for a settled bet is the wrong one
+        // (returns empty → chart collapses to "Hole 0" only).
+        const tParam = pastTournamentId
+          ? `&tournamentId=${encodeURIComponent(pastTournamentId)}`
+          : "";
         const res = await fetch(
           `/api/bet/scorecard?playerId=${encodeURIComponent(
             playerId,
-          )}&round=${roundStr}`,
+          )}&round=${roundStr}${tParam}`,
           { cache: "no-store" },
         );
         if (!res.ok) return;
@@ -359,8 +374,17 @@ export default function BetDetail({ betId }: { betId: string }) {
     data.playerRoundStates,
     data.tournamentProjections ?? {},
   );
+  // For round-score bets stored with round=null ("current round at
+  // placement time"), the chart needs the actual round number to walk
+  // through hole-by-hole. Resolve here so reconstructHistory doesn't
+  // fall back to the wrong round (typically the tournament's final
+  // round when replaying a past R3 bet).
+  const resolvedBet: TrackedBet =
+    bet.kind === "round-score" && bet.round == null && roundForBet != null
+      ? ({ ...bet, round: roundForBet } as TrackedBet)
+      : bet;
   const nowValue = currentValueForBet(
-    bet,
+    resolvedBet,
     data.currentOdds,
     data.playerRoundStates,
     data.tournamentProjections,
@@ -368,7 +392,7 @@ export default function BetDetail({ betId }: { betId: string }) {
     settled,
   );
   const history = reconstructHistory(
-    bet,
+    resolvedBet,
     data.oddsHistories,
     data.playerRoundStates,
     data.rows,
@@ -439,7 +463,7 @@ export default function BetDetail({ betId }: { betId: string }) {
 
       {bet.kind === "winning-score" ? (
         <>
-          <BetChartFull bet={bet} history={history} />
+          <BetChartFull bet={resolvedBet} history={history} />
           <WinningScoreDetail
             bet={bet}
             projections={data.tournamentProjections ?? {}}
@@ -448,10 +472,10 @@ export default function BetDetail({ betId }: { betId: string }) {
         </>
       ) : (
         <>
-          <BetChartFull bet={bet} history={history} />
+          <BetChartFull bet={resolvedBet} history={history} />
           {bet.kind === "round-score" ? (
             <RoundDetailTable
-              bet={bet}
+              bet={resolvedBet as RoundScoreBet}
               state={data.playerRoundStates[bet.playerId]}
               history={history}
               oddsFormat={oddsFormat}
