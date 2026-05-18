@@ -92,7 +92,7 @@ export default function BetTracker({
     let cancelled = false;
     (async () => {
       try {
-        const local = readBets();
+        let local = readBets();
         if (local.length > 0) {
           await fetch("/api/bets/migrate", {
             method: "POST",
@@ -102,8 +102,18 @@ export default function BetTracker({
         }
         const res = await fetch("/api/bets", { cache: "no-store" });
         if (!res.ok) return;
-        const json = (await res.json()) as { bets: TrackedBet[] };
+        const json = (await res.json()) as {
+          bets: TrackedBet[];
+          removedIds?: string[];
+        };
         if (cancelled) return;
+        // Drop any local bet the server says was removed elsewhere
+        // before merging — otherwise zombies (locally added but
+        // removed on another device) hang around forever.
+        if (json.removedIds && json.removedIds.length > 0) {
+          const removed = new Set(json.removedIds);
+          local = local.filter((b) => !removed.has(b.id));
+        }
         const merged = mergeServerAndLocal(json.bets ?? [], local);
         setBets(merged);
         writeBets(merged);
@@ -339,8 +349,19 @@ export default function BetTracker({
               // any settlement state notify-poll has already written.
               const r2 = await fetch("/api/bets", { cache: "no-store" });
               if (r2.ok) {
-                const json = (await r2.json()) as { bets: TrackedBet[] };
-                const merged = mergeServerAndLocal(json.bets ?? [], local);
+                const json = (await r2.json()) as {
+                  bets: TrackedBet[];
+                  removedIds?: string[];
+                };
+                let localPruned = local;
+                if (json.removedIds && json.removedIds.length > 0) {
+                  const removed = new Set(json.removedIds);
+                  localPruned = local.filter((b) => !removed.has(b.id));
+                }
+                const merged = mergeServerAndLocal(
+                  json.bets ?? [],
+                  localPruned,
+                );
                 setBets(merged);
                 writeBets(merged);
               }
