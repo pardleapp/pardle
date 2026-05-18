@@ -9275,3 +9275,660 @@ html, body {
     font-size: 12px;
   }
 }
+
+/* ── Tipster page (create + view) ─────────────────────────────── */
+
+.tipster-create {
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.tipster-create-intro {
+  font-size: 15px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+
+.tipster-create-gate {
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.tipster-create-hint {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.tipster-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.tipster-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tipster-field-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.tipster-field-optional {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.tipster-field-err {
+  font-size: 12px;
+  color: var(--down);
+  font-weight: 700;
+}
+
+.tipster-field-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tipster-handle-row {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg, #fff);
+}
+
+.tipster-handle-at {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  border-right: 1px solid var(--border);
+}
+
+.tipster-handle-row .tipster-input {
+  border: 0;
+  border-radius: 0;
+  flex: 1 1 auto;
+  font-weight: 700;
+}
+
+.tipster-input {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: inherit;
+  background: var(--bg, #fff);
+  color: var(--text);
+  outline: none;
+  min-height: 44px;
+}
+
+.tipster-input:focus {
+  border-color: var(--green, #7bae3f);
+  box-shadow: 0 0 0 3px rgba(123, 174, 63, 0.18);
+}
+
+.tipster-textarea {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.4;
+}
+
+.tipster-radio-group {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.tipster-radio {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.tipster-radio input {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.tipster-form-err {
+  padding: 10px 14px;
+  background: var(--down-soft);
+  color: var(--down);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tipster-submit {
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--text);
+  color: var(--bg, #fff);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  min-height: 48px;
+}
+
+.tipster-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tipster-input,
+  .tipster-handle-row {
+    background: #1f1f20;
+  }
+  .tipster-handle-at {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .tipster-submit {
+    background: white;
+    color: #1f1f20;
+  }
+}
+
+/* ── Tipster page view ────────────────────────────────────────── */
+
+.tipster-page {
+  margin-top: 4px;
+}
+
+.tipster-header {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  margin-bottom: 16px;
+}
+
+.tipster-header-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tipster-name {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin: 0;
+}
+
+.tipster-handle {
+  margin: 2px 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.tipster-bio {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.tipster-meta {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tipster-header-actions {
+  flex-shrink: 0;
+}
+
+.tipster-cta {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg, #fff);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  white-space: nowrap;
+}
+
+.tipster-cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tipster-cta-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+@media (prefers-color-scheme: dark) {
+  .tipster-cta {
+    background: white;
+    color: #1f1f20;
+  }
+  .tipster-cta-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+  }
+}
+
+.tipster-back {
+  color: inherit;
+  text-decoration: none;
+}
+
+.tipster-onboard {
+  padding: 12px 14px;
+  background: rgba(123, 174, 63, 0.14);
+  border: 1px solid rgba(123, 174, 63, 0.45);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 14px;
+}
+
+.tipster-locked {
+  padding: 18px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.tipster-locked-hint {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.tipster-tabs {
+  display: inline-flex;
+  margin-bottom: 12px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  gap: 2px;
+}
+
+/* ── Tipster tips list ────────────────────────────────────────── */
+
+.tipster-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tipster-tips-hint {
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+@media (prefers-color-scheme: dark) {
+  .tipster-tips-hint {
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.tipster-tip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tipster-tip-card {
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.tipster-tip-headline {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.tipster-tip-rationale {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
+
+.tipster-tip-foot {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tipster-tip-ts {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tipster-tip-track {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg, #fff);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.tipster-tip-track:disabled {
+  background: var(--up);
+  color: var(--bg, #fff);
+}
+
+@media (prefers-color-scheme: dark) {
+  .tipster-tip-track {
+    background: white;
+    color: #1f1f20;
+  }
+}
+
+/* ── Tipster chat ─────────────────────────────────────────────── */
+
+.tipster-chat {
+  display: flex;
+  flex-direction: column;
+  height: 60vh;
+  min-height: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.tipster-chat-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tipster-chat-empty {
+  align-self: center;
+  margin: auto !important;
+}
+
+.tipster-msg {
+  align-self: flex-start;
+  max-width: 80%;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.tipster-msg-mine {
+  align-self: flex-end;
+  background: var(--green-soft, rgba(123, 174, 63, 0.18));
+}
+
+.tipster-msg-author {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.tipster-msg-body {
+  color: var(--text);
+  word-wrap: break-word;
+}
+
+.tipster-msg-ts {
+  font-size: 10px;
+  color: var(--muted);
+  align-self: flex-end;
+}
+
+.tipster-chat-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.tipster-chat-input {
+  flex: 1 1 auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--bg, #fff);
+  color: var(--text);
+  outline: none;
+  min-height: 40px;
+}
+
+.tipster-chat-input:focus {
+  border-color: var(--green, #7bae3f);
+}
+
+.tipster-chat-send {
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg, #fff);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.tipster-chat-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tipster-chat-input {
+    background: #1f1f20;
+  }
+  .tipster-chat-send {
+    background: white;
+    color: #1f1f20;
+  }
+}
+
+/* ── Tipster hub (/tipster) ───────────────────────────────────── */
+
+.tipster-hub {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.tipster-hub-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tipster-hub-heading {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+
+.tipster-hub-empty {
+  padding: 14px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.tipster-hub-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tipster-hub-card,
+.tipster-hub-cta-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  text-decoration: none;
+  box-shadow: var(--shadow-sm);
+  transition:
+    background-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.tipster-hub-card:hover,
+.tipster-hub-cta-card:hover {
+  background: var(--surface-2);
+  box-shadow: var(--shadow-md);
+}
+
+.tipster-hub-card-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tipster-hub-card-name {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.tipster-hub-card-handle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.tipster-hub-card-bio {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--text-soft);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.tipster-hub-card-tag {
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.tipster-hub-cta-card {
+  background: rgba(123, 174, 63, 0.1);
+  border-color: rgba(123, 174, 63, 0.45);
+}
+
+.tipster-hub-cta-card strong {
+  font-size: 16px;
+  font-weight: 900;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.tipster-hub-cta-card p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+
+.tipster-hub-cta-arrow {
+  font-size: 22px;
+  color: var(--text);
+  flex-shrink: 0;
+}

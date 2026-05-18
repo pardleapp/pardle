@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { useAuth } from "./useAuth";
@@ -82,6 +83,13 @@ export default function AuthChip() {
         </button>
         {menuOpen && (
           <div className="auth-chip-menu">
+            <Link
+              href="/tipster"
+              className="auth-chip-menu-item"
+              onClick={() => setMenuOpen(false)}
+            >
+              Tipsters
+            </Link>
             <button
               type="button"
               className="auth-chip-menu-item"
