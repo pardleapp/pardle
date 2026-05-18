@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { Redis } from "@upstash/redis";
 import { getCachedLeaderboard } from "@/lib/feed/store";
 import {
   getSnapshot,
   pushEvents,
   putSnapshot,
 } from "@/lib/feed/store";
+
+const redis = Redis.fromEnv();
 import {
   classifyShot,
   type ParsedShot,
@@ -197,6 +200,12 @@ export async function POST(req: Request) {
   if (events.length > 0) {
     await pushEvents(body.tournamentId, events);
   }
+
+  // Heartbeat: record the moment we last accepted an ingest body so
+  // /api/feed/img-heartbeat can detect when the home daemon stops
+  // posting during live play. Stored without TTL — the heartbeat
+  // endpoint compares timestamp age, not key existence.
+  await redis.set(`feed:img-last-ingest:${body.tournamentId}`, Date.now());
 
   return NextResponse.json({
     received: body.shots.length,
