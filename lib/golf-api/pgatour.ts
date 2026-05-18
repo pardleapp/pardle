@@ -20,6 +20,7 @@
  */
 
 import "server-only";
+import { getCachedLeaderboard } from "@/lib/feed/store";
 
 const GQL_URL = "https://orchestrator.pgatour.com/graphql";
 
@@ -109,11 +110,40 @@ export async function getSchedule(
   };
 }
 
+const TOURNAMENT_INACTIVE_STATES = new Set([
+  "CUT",
+  "MC",
+  "WD",
+  "DQ",
+  "DNS",
+  "COMPLETE",
+  "FINISHED",
+]);
+
+/** "Concluded" = the cached leaderboard exists AND every player is
+ *  either at thru="F" or has a terminal playerState. We use this to
+ *  roll forward to the next tournament when one in its schedule
+ *  window has actually wrapped up — the PGA Tour schedule can lag
+ *  by a day or two moving a tournament from upcoming → completed,
+ *  so the 5-day window alone keeps a finished event "live" for
+ *  longer than we want. */
+async function isTournamentConcluded(
+  tournamentId: string,
+): Promise<boolean> {
+  const lb = await getCachedLeaderboard(tournamentId).catch(() => []);
+  if (lb.length === 0) return false;
+  return lb.every((r) => {
+    if (TOURNAMENT_INACTIVE_STATES.has(r.playerState)) return true;
+    return r.thru === "F" || r.thru === "—";
+  });
+}
+
 /**
  * Resolve the tournament we should be showing a live feed for: the
  * one whose window (startDate → startDate + 5 days, generous for
- * Mon finishes) contains "now". Falls back to the next upcoming
- * tournament so the /live page can show a countdown.
+ * Mon finishes) contains "now" AND that hasn't already fully wrapped
+ * up on the leaderboard. Falls back to the next upcoming tournament
+ * so the page can show a countdown.
  */
 export async function getActiveTournament(): Promise<{
   tournament: PGATournamentRef;
@@ -123,14 +153,21 @@ export async function getActiveTournament(): Promise<{
   const now = Date.now();
   const FIVE_DAYS = 5 * 24 * 60 * 60 * 1000;
 
-  // A tournament is "live" if now is within its 5-day window.
-  const all = [...completed, ...upcoming];
-  for (const t of all) {
-    if (now >= t.startDate && now <= t.startDate + FIVE_DAYS) {
+  // Walk all tournaments whose window contains "now", oldest start
+  // first, and return the first that isn't already concluded on
+  // the leaderboard.
+  const inWindow = [...completed, ...upcoming]
+    .filter((t) => now >= t.startDate && now <= t.startDate + FIVE_DAYS)
+    .sort((a, b) => a.startDate - b.startDate);
+  for (const t of inWindow) {
+    const concluded = await isTournamentConcluded(t.id);
+    if (!concluded) {
       return { tournament: t, isLive: true };
     }
   }
-  // Nothing live — return the soonest upcoming one for a countdown.
+
+  // Nothing live (or everything in-window has concluded) — return
+  // the soonest upcoming for a countdown.
   const next = upcoming
     .filter((t) => t.startDate > now)
     .sort((a, b) => a.startDate - b.startDate)[0];
