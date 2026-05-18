@@ -315,6 +315,44 @@ export default function BetTracker({
         </div>
       </div>
 
+      {user && bets.length > 0 && (
+        <button
+          type="button"
+          className="bets-sync-btn"
+          onClick={async () => {
+            const local = readBets();
+            try {
+              const res = await fetch("/api/bets/migrate", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ bets: local }),
+              });
+              if (!res.ok) {
+                alert(`Sync failed: HTTP ${res.status}`);
+                return;
+              }
+              const j = (await res.json()) as { migrated?: number };
+              alert(
+                `Synced ${j.migrated ?? 0} bet${j.migrated === 1 ? "" : "s"} to server. Reloading…`,
+              );
+              // Re-pull from server so the freshly-synced bets pick up
+              // any settlement state notify-poll has already written.
+              const r2 = await fetch("/api/bets", { cache: "no-store" });
+              if (r2.ok) {
+                const json = (await r2.json()) as { bets: TrackedBet[] };
+                const merged = mergeServerAndLocal(json.bets ?? [], local);
+                setBets(merged);
+                writeBets(merged);
+              }
+            } catch (err) {
+              alert(`Sync error: ${err instanceof Error ? err.message : err}`);
+            }
+          }}
+        >
+          Sync local bets to server
+        </button>
+      )}
+
       {bets.length > 0 && (
         <>
           {activeBets.length > 0 && (
