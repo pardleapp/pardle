@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/app/live/auth/useAuth";
+import FeedClient from "@/app/live/FeedClient";
 
 interface ChannelView {
   id: string;
@@ -88,7 +89,9 @@ export default function TipsterPageClient({
 }) {
   const { user, loading: authLoading } = useAuth();
   const [channel, setChannel] = useState<ChannelView>(initialChannel);
-  const [tab, setTab] = useState<"tips" | "chat">("tips");
+  // Default to "feed" so when followers land during live play they
+  // see the action immediately. Tips + Chat are one tap away.
+  const [tab, setTab] = useState<"feed" | "tips" | "chat">("feed");
   const [tips, setTips] = useState<Tip[]>([]);
   const [tipsLoading, setTipsLoading] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -353,6 +356,15 @@ export default function TipsterPageClient({
             <button
               type="button"
               role="tab"
+              aria-selected={tab === "feed"}
+              className={`feed-tab ${tab === "feed" ? "feed-tab-on" : ""}`}
+              onClick={() => setTab("feed")}
+            >
+              Feed
+            </button>
+            <button
+              type="button"
+              role="tab"
               aria-selected={tab === "tips"}
               className={`feed-tab ${tab === "tips" ? "feed-tab-on" : ""}`}
               onClick={() => setTab("tips")}
@@ -369,6 +381,12 @@ export default function TipsterPageClient({
               Chat
             </button>
           </nav>
+
+          {tab === "feed" && (
+            <div className="tipster-feed-tab">
+              <FeedClient />
+            </div>
+          )}
 
           {tab === "tips" && (
             <div className="tipster-tips">
