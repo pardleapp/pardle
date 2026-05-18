@@ -51,14 +51,26 @@ export async function GET(req: Request) {
   // `isLive` is a coarse flag based on the schedule window (Thu-Sun);
   // it stays true between rounds and during dead hours. Tighten it
   // here by checking the leaderboard for at least one player who's
-  // currently on the course (thru not yet "F"). If everyone's
-  // finished, we're between rounds or post-tournament — daemon not
-  // expected to be posting, no alert.
+  // currently on the course. If everyone's finished or cut, we're
+  // between rounds or post-tournament — daemon not expected to be
+  // posting, no alert.
+  const INACTIVE_STATES = new Set([
+    "CUT",
+    "MC",
+    "WD",
+    "DQ",
+    "DNS",
+    "COMPLETE",
+    "FINISHED",
+  ]);
   const leaderboard = await getCachedLeaderboard(tournamentId).catch(
     () => [],
   );
   const stillPlaying = leaderboard.some((r) => {
-    if (!r.thru) return true; // blank thru = pre-round, daemon should kick in soon
+    if (INACTIVE_STATES.has(r.playerState)) return false;
+    // Active player: blank/empty thru means pre-round (daemon should
+    // be running for the upcoming wave); a number 0-17 means mid-round.
+    // Only thru="F" or playerState=COMPLETE counts as done.
     return r.thru !== "F" && r.thru !== "—";
   });
   if (leaderboard.length > 0 && !stillPlaying) {
