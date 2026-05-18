@@ -7600,6 +7600,60 @@ footer {
   color: var(--muted);
 }
 
+/* ── Past-tournament replay chart ─────────────────────────────── */
+
+.bd-past-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.bd-past-tournament {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.bd-past-result {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bd-past-result-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bd-past-result-pnl {
+  font-size: 16px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.bd-past-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.bd-past-meta {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text);
+}
+
 .bd-table {
   border: 1px solid var(--border);
   border-radius: 12px;
