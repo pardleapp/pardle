@@ -97,6 +97,36 @@ export default function BetChartFull({ bet, history }: Props) {
   }, [history, isRound, bet.stake, mode, winningValue]);
 
   if (!data || history.length < 2) {
+    // Settled bets with no chart history (typically past-tournament
+    // bets whose odds buffer has aged out of Redis). Show the
+    // outcome clearly rather than the live-betting "will fill in"
+    // copy, which is meaningless for a finished bet.
+    if (bet.settledAt != null && bet.settledWon != null) {
+      const profit = bet.settledWon
+        ? bet.stake * bet.oddsTaken - bet.stake
+        : -bet.stake;
+      return (
+        <div className="bd-chart">
+          <div className="bd-chart-settled">
+            <div
+              className={`bd-chart-settled-headline ${
+                bet.settledWon ? "bets-profit-up" : "bets-profit-down"
+              }`}
+            >
+              {bet.settledWon ? "Won" : "Lost"}
+            </div>
+            <div className="bd-chart-settled-pnl">
+              {profit >= 0 ? "+" : ""}
+              {gbp.format(profit)}
+            </div>
+            <p className="bd-chart-settled-note">
+              Past tournament — odds chart isn&apos;t available, but
+              the result is final.
+            </p>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="bd-chart">
         <ChartToggle mode={mode} setMode={setMode} />

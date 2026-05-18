@@ -7571,6 +7571,35 @@ footer {
   font-style: italic;
 }
 
+.bd-chart-settled {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px 24px;
+  text-align: center;
+  background: var(--surface);
+}
+
+.bd-chart-settled-headline {
+  font-size: 36px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.bd-chart-settled-pnl {
+  margin-top: 4px;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.bd-chart-settled-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .bd-table {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -10139,6 +10168,52 @@ html, body {
   font-size: 14px;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Past tournament bets (collapsed inside the bet tracker) ──── */
+.bets-past {
+  margin-top: 14px;
+}
+
+.bets-past > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bets-past > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bets-past > summary::before {
+  content: "▸";
+  font-size: 10px;
+  transition: transform 0.15s;
+}
+
+.bets-past[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.bets-past > summary:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.bets-list-past {
+  margin-top: 10px;
+  opacity: 0.92;
 }
 
 .history-section-title {

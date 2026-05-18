@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
-import { getLeaderboard } from "@/lib/golf-api/pgatour";
+import { getLeaderboard, getScorecards } from "@/lib/golf-api/pgatour";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +87,37 @@ export async function POST(
     positionByPid.set(row.playerId, parsePosition(row.position));
   }
   const playerIdsInThisField = new Set(positionByPid.keys());
+
+  // Lazily fetch + cache scorecards so we only hit the orchestrator
+  // for the players who actually have a round-score bet pending.
+  const scorecardCache = new Map<string, Awaited<ReturnType<typeof getScorecards>>[string]>();
+  async function getScorecard(playerId: string) {
+    if (scorecardCache.has(playerId)) return scorecardCache.get(playerId);
+    const result = (await getScorecards(tournamentId, [playerId]).catch(
+      () => ({}),
+    )) as Record<string, Awaited<ReturnType<typeof getScorecards>>[string]>;
+    const sc = result[playerId];
+    scorecardCache.set(playerId, sc);
+    return sc;
+  }
+
+  /** Sum the strokes for one round of the scorecard. Returns null if
+   *  the round has any unscored holes or is missing entirely. */
+  function totalForRound(
+    sc: Awaited<ReturnType<typeof getScorecards>>[string] | undefined,
+    round: number,
+  ): number | null {
+    if (!sc) return null;
+    const holes = sc.rounds[round];
+    if (!holes || holes.length === 0) return null;
+    let total = 0;
+    for (const h of holes) {
+      const n = Number(h.score);
+      if (!Number.isFinite(n) || n <= 0) return null;
+      total += n;
+    }
+    return total;
+  }
 
   const soleLeader = leaderboard.find(
     (r) => r.position === "1" && r.thru === "F",
@@ -194,9 +225,60 @@ export async function POST(
         side === "under"
           ? { won: winnerStrokes < line }
           : { won: winnerStrokes >= line };
+    } else if (bet.kind === "round-score") {
+      const pid = bet.playerId as string;
+      if (!pid || !playerIdsInThisField.has(pid)) {
+        skipped.push(row.id);
+        continue;
+      }
+      // Round-score with bet.round set is straightforward. When
+      // bet.round is null ("current round" at placement time), we
+      // fall back to bet.placement to figure out which round it
+      // was — placement.holesPlayed implies the round was in
+      // progress when the bet was placed, so we want THAT round.
+      // The bet object's `data` JSON is the source of truth here.
+      let targetRound: number | null = null;
+      if (typeof bet.round === "number") {
+        targetRound = bet.round;
+      } else if (bet.placement && typeof (bet.placement as { round?: number }).round === "number") {
+        targetRound = (bet.placement as { round: number }).round;
+      } else {
+        // Last resort: scorecard shows currentHole/playerState. If
+        // currentHole is null but rounds[N] is fully scored, take
+        // the highest fully-scored round. Best-effort.
+        const sc = await getScorecard(pid);
+        if (sc) {
+          let highest: number | null = null;
+          for (const rStr of Object.keys(sc.rounds)) {
+            const r = Number(rStr);
+            const t = totalForRound(sc, r);
+            if (t !== null && (highest === null || r > highest))
+              highest = r;
+          }
+          targetRound = highest;
+        }
+      }
+      if (targetRound === null) {
+        skipped.push(row.id);
+        continue;
+      }
+      const sc = await getScorecard(pid);
+      const total = totalForRound(sc, targetRound);
+      if (total === null) {
+        skipped.push(row.id);
+        continue;
+      }
+      const side = bet.side as string;
+      const line = bet.line as number;
+      if (typeof line !== "number") {
+        skipped.push(row.id);
+        continue;
+      }
+      result =
+        side === "under"
+          ? { won: total < line }
+          : { won: total >= line };
     } else {
-      // round-score has its own per-round settlement path; not
-      // touched here.
       skipped.push(row.id);
       continue;
     }

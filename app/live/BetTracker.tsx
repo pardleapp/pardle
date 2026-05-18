@@ -197,6 +197,67 @@ export default function BetTracker({
     settledByBet,
   ]);
 
+  // Split bets into "still in play / pending this week" and "past
+  // tournament results". The active list is what the user is
+  // tracking for the current event; the settled list is read-only
+  // history they can collapse out of the way once the tournament
+  // moves on.
+  const { activeBets, settledBets } = useMemo(() => {
+    const active: TrackedBet[] = [];
+    const settled: TrackedBet[] = [];
+    for (const b of bets) {
+      if (settledByBet.has(b.id)) settled.push(b);
+      else active.push(b);
+    }
+    return { activeBets: active, settledBets: settled };
+  }, [bets, settledByBet]);
+
+  const renderRow = (b: TrackedBet) => {
+    if (b.kind === "outright")
+      return (
+        <OutrightRow
+          key={b.id}
+          bet={b}
+          currentOdds={currentOdds}
+          oddsFormat={oddsFormat}
+          settled={settledByBet.get(b.id) ?? null}
+          onRemove={() => removeBet(b.id)}
+        />
+      );
+    if (b.kind === "winning-score")
+      return (
+        <WinningScoreRow
+          key={b.id}
+          bet={b}
+          projections={tournamentProjections}
+          oddsFormat={oddsFormat}
+          settled={settledByBet.get(b.id) ?? null}
+          onRemove={() => removeBet(b.id)}
+        />
+      );
+    if (b.kind === "top-finish")
+      return (
+        <TopFinishRow
+          key={b.id}
+          bet={b}
+          probs={topFinishCurrent?.[b.playerId]}
+          oddsFormat={oddsFormat}
+          settled={settledByBet.get(b.id) ?? null}
+          onRemove={() => removeBet(b.id)}
+        />
+      );
+    return (
+      <RoundScoreRow
+        key={b.id}
+        bet={b}
+        state={playerRoundStates[b.playerId]}
+        oddsFormat={oddsFormat}
+        settled={settledByBet.get(b.id) ?? null}
+        onRemove={() => removeBet(b.id)}
+      />
+    );
+  };
+
   const totals = useMemo(() => {
     let stake = 0;
     let value = 0;
@@ -255,47 +316,24 @@ export default function BetTracker({
       </div>
 
       {bets.length > 0 && (
-        <ul className="bets-list">
-          {bets.map((b) =>
-            b.kind === "outright" ? (
-              <OutrightRow
-                key={b.id}
-                bet={b}
-                currentOdds={currentOdds}
-                oddsFormat={oddsFormat}
-                settled={settledByBet.get(b.id) ?? null}
-                onRemove={() => removeBet(b.id)}
-              />
-            ) : b.kind === "winning-score" ? (
-              <WinningScoreRow
-                key={b.id}
-                bet={b}
-                projections={tournamentProjections}
-                oddsFormat={oddsFormat}
-                settled={settledByBet.get(b.id) ?? null}
-                onRemove={() => removeBet(b.id)}
-              />
-            ) : b.kind === "top-finish" ? (
-              <TopFinishRow
-                key={b.id}
-                bet={b}
-                probs={topFinishCurrent?.[b.playerId]}
-                oddsFormat={oddsFormat}
-                settled={settledByBet.get(b.id) ?? null}
-                onRemove={() => removeBet(b.id)}
-              />
-            ) : (
-              <RoundScoreRow
-                key={b.id}
-                bet={b}
-                state={playerRoundStates[b.playerId]}
-                oddsFormat={oddsFormat}
-                settled={settledByBet.get(b.id) ?? null}
-                onRemove={() => removeBet(b.id)}
-              />
-            ),
+        <>
+          {activeBets.length > 0 && (
+            <ul className="bets-list">{activeBets.map(renderRow)}</ul>
           )}
-        </ul>
+          {settledBets.length > 0 && (
+            <details
+              className="bets-past"
+              open={activeBets.length === 0}
+            >
+              <summary>
+                Past tournament bets · {settledBets.length}
+              </summary>
+              <ul className="bets-list bets-list-past">
+                {settledBets.map(renderRow)}
+              </ul>
+            </details>
+          )}
+        </>
       )}
 
       {bets.length > 0 && totals.hasValue && (
