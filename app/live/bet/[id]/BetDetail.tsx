@@ -109,9 +109,39 @@ export default function BetDetail({ betId }: { betId: string }) {
     }
   }, [betId]);
 
+  // For settled bets from past tournaments, fetch that tournament's
+  // archived feed instead of the active one — so the same Polymarket
+  // odds / top-finish / winning-score history that drove the chart
+  // during live play is what the user sees here.
+  const [pastTournamentId, setPastTournamentId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!bet || bet.settledAt == null) {
+      setPastTournamentId(null);
+      return;
+    }
+    // Match the bet's placed_at against the schedule to figure out
+    // which past tournament it belongs to.
+    fetch(`/api/bets/${encodeURIComponent(bet.id)}/replay`, {
+      cache: "no-store",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (cancelled || !j?.tournament?.id) return;
+        setPastTournamentId(j.tournament.id as string);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [bet]);
+
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/feed?v=detail`, { cache: "no-store" });
+      const url = pastTournamentId
+        ? `/api/feed?v=detail&tournamentId=${encodeURIComponent(pastTournamentId)}`
+        : `/api/feed?v=detail`;
+      const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
       const json = (await res.json()) as FeedResponse;
       setData(json);
@@ -119,13 +149,16 @@ export default function BetDetail({ betId }: { betId: string }) {
     } catch {
       setError(true);
     }
-  }, []);
+  }, [pastTournamentId]);
 
   useEffect(() => {
     load();
+    // Live bets keep refreshing; past-tournament replays don't need
+    // periodic re-fetches.
+    if (pastTournamentId) return;
     const t = setInterval(load, REFRESH_MS);
     return () => clearInterval(t);
-  }, [load]);
+  }, [load, pastTournamentId]);
 
   // Pull the orchestrator scorecard alongside each feed refresh —
   // the events list on /api/feed is capped at 1000 entries, which a

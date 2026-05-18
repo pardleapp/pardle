@@ -59,24 +59,54 @@ export async function GET(req: Request) {
 }
 
 async function handle(req: Request) {
-  const visitorId = new URL(req.url).searchParams.get("v") ?? "";
+  const url = new URL(req.url);
+  const visitorId = url.searchParams.get("v") ?? "";
+  // Past-tournament replay: serve a specific tournament's Redis-cached
+  // data without running the resolver or polling fresh. Used by
+  // BetDetail to render the same chart a user saw live, for bets from
+  // tournaments that have since concluded. All the rolling buffers
+  // (Polymarket odds, top-finish history, winning-score CDF history)
+  // are LPUSH'd with no TTL — just capped at 720 samples per key —
+  // so they remain queryable indefinitely after the event ends.
+  const tournamentIdOverride = url.searchParams.get("tournamentId");
 
-  const active = await getActiveTournament();
-  if (!active) {
-    return NextResponse.json({
-      tournament: null,
-      rows: [],
-      bestReel: [],
-      worstReel: [],
-      bursts: [],
-      leaderboard: [],
-      watching: 0,
-      seenToday: 0,
-      polled: false,
-    });
+  let tournament: { id: string; name: string; startDate: number } | null;
+  let isLive: boolean;
+
+  if (tournamentIdOverride) {
+    // Look up the tournament metadata in the schedule.
+    const { upcoming, completed } = await import("@/lib/golf-api/pgatour").then(
+      (m) => m.getSchedule(),
+    );
+    const t = [...upcoming, ...completed].find(
+      (x) => x.id === tournamentIdOverride,
+    );
+    if (!t) {
+      return NextResponse.json(
+        { error: "tournament-not-found", id: tournamentIdOverride },
+        { status: 404 },
+      );
+    }
+    tournament = t;
+    isLive = false; // past replay always serves as "settled"
+  } else {
+    const active = await getActiveTournament();
+    if (!active) {
+      return NextResponse.json({
+        tournament: null,
+        rows: [],
+        bestReel: [],
+        worstReel: [],
+        bursts: [],
+        leaderboard: [],
+        watching: 0,
+        seenToday: 0,
+        polled: false,
+      });
+    }
+    tournament = active.tournament;
+    isLive = active.isLive;
   }
-
-  const { tournament, isLive } = active;
 
   let watching = 0;
   let seenToday = 0;
@@ -86,7 +116,9 @@ async function handle(req: Request) {
   }
 
   let polled = false;
-  if (isLive) {
+  // Skip the live poll when serving a past-tournament replay — we'd
+  // be writing fresh data into a concluded tournament's buffers.
+  if (isLive && !tournamentIdOverride) {
     const gotLock = await acquirePollLock(tournament.id);
     if (gotLock) {
       try {
