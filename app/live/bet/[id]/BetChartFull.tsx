@@ -285,7 +285,8 @@ export default function BetChartFull({ bet, history }: Props) {
             <strong>
               {isRound
                 ? `Hole ${hover.raw.holesPlayed ?? hover.xVal}`
-                : new Date(hover.raw.t).toLocaleTimeString(undefined, {
+                : new Date(hover.raw.t).toLocaleString(undefined, {
+                    weekday: "short",
                     hour: "2-digit",
                     minute: "2-digit",
                   })}
@@ -438,15 +439,32 @@ function buildTimeTicks(
   xMin: number,
   xMax: number,
 ): { x: number; label: string }[] {
-  const fmt = (t: number) =>
-    new Date(t).toLocaleTimeString(undefined, {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  const mid = xMin + (xMax - xMin) / 2;
-  return [
-    { x: xMin, label: fmt(xMin) },
-    { x: mid, label: fmt(mid) },
-    { x: xMax, label: fmt(xMax) },
-  ];
+  const span = xMax - xMin;
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+  // For multi-day ranges (past-tournament replays) show day + short
+  // time so the user can see "Thu 09:00 → Sun 17:30" rather than
+  // three confusing single-day clock times. For sub-day ranges
+  // (live within a single round) keep the compact HH:MM.
+  const fmt =
+    span >= ONE_DAY
+      ? (t: number) =>
+          new Date(t).toLocaleString(undefined, {
+            weekday: "short",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+      : (t: number) =>
+          new Date(t).toLocaleTimeString(undefined, {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+  // Use 4 ticks for a multi-day chart so each tournament day gets a
+  // label; 3 still works for the compact single-day case.
+  const nTicks = span >= ONE_DAY ? 4 : 3;
+  const ticks: { x: number; label: string }[] = [];
+  for (let i = 0; i < nTicks; i++) {
+    const x = xMin + ((xMax - xMin) * i) / (nTicks - 1);
+    ticks.push({ x, label: fmt(x) });
+  }
+  return ticks;
 }
