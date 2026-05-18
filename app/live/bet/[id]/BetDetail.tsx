@@ -180,6 +180,67 @@ export default function BetDetail({ betId }: { betId: string }) {
     "idle" | "sending" | "sent" | "err"
   >("idle");
 
+  // Owned tipster channels for the "Post as tip" button. Fetched
+  // once when the page loads + bet is hydrated; null until loaded,
+  // empty array = no channels (button hidden).
+  const [ownedChannels, setOwnedChannels] = useState<
+    { slug: string; name: string }[] | null
+  >(null);
+  const [tipPostOpen, setTipPostOpen] = useState(false);
+  const [tipRationale, setTipRationale] = useState("");
+  const [tipStatus, setTipStatus] = useState<
+    "idle" | "sending" | "sent" | "err"
+  >("idle");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/channels/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (cancelled || !j) return;
+        setOwnedChannels(
+          (j.owned ?? []).map((c: { slug: string; name: string }) => ({
+            slug: c.slug,
+            name: c.name,
+          })),
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function postAsTip() {
+    if (!bet || !ownedChannels || ownedChannels.length === 0) return;
+    // v0 assumes the user has at most one channel; first one wins.
+    // Multi-channel pickers are a follow-up.
+    const slug = ownedChannels[0].slug;
+    setTipStatus("sending");
+    try {
+      const res = await fetch(`/api/channels/${slug}/tips`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          bet,
+          rationale: tipRationale.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        setTipStatus("err");
+        return;
+      }
+      setTipStatus("sent");
+      setTipRationale("");
+      setTimeout(() => {
+        setTipPostOpen(false);
+        setTipStatus("idle");
+      }, 1400);
+    } catch {
+      setTipStatus("err");
+    }
+  }
+
   async function shareThis() {
     if (!bet) return;
     setShareStatus("sending");
@@ -370,6 +431,64 @@ export default function BetDetail({ betId }: { betId: string }) {
             />
           )}
         </>
+      )}
+
+      {ownedChannels && ownedChannels.length > 0 && (
+        <div className="bd-tip-post">
+          {!tipPostOpen ? (
+            <button
+              type="button"
+              className="bd-tip-post-btn"
+              onClick={() => setTipPostOpen(true)}
+            >
+              Post as tip on @{ownedChannels[0].slug}
+            </button>
+          ) : (
+            <div className="bd-tip-post-form">
+              <p className="bd-tip-post-label">
+                Add an optional "why I like it" — followers see this next to
+                the bet.
+              </p>
+              <textarea
+                className="tipster-input tipster-textarea"
+                value={tipRationale}
+                onChange={(e) => setTipRationale(e.target.value)}
+                placeholder="e.g. Form's been sharp + course fits him; I'd be happy down to +320."
+                rows={3}
+                maxLength={500}
+                disabled={tipStatus === "sending"}
+              />
+              <div className="bd-tip-post-actions">
+                <button
+                  type="button"
+                  className="bd-tip-post-cancel"
+                  onClick={() => {
+                    setTipPostOpen(false);
+                    setTipRationale("");
+                    setTipStatus("idle");
+                  }}
+                  disabled={tipStatus === "sending"}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="bd-tip-post-submit"
+                  onClick={postAsTip}
+                  disabled={tipStatus === "sending"}
+                >
+                  {tipStatus === "sending"
+                    ? "Posting…"
+                    : tipStatus === "sent"
+                      ? "Posted ✓"
+                      : tipStatus === "err"
+                        ? "Try again"
+                        : `Post to @${ownedChannels[0].slug}`}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       <div className="bd-actions">

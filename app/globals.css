@@ -9932,3 +9932,86 @@ html, body {
   color: var(--text);
   flex-shrink: 0;
 }
+
+/* ── Bet detail: post-as-tip widget ───────────────────────────── */
+
+.bd-tip-post {
+  margin-top: 14px;
+  padding: 14px;
+  background: rgba(123, 174, 63, 0.08);
+  border: 1px solid rgba(123, 174, 63, 0.4);
+  border-radius: var(--radius-md);
+}
+
+.bd-tip-post-btn {
+  width: 100%;
+  padding: 11px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--text);
+  color: var(--bg, #fff);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.bd-tip-post-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bd-tip-post-label {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.bd-tip-post-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.bd-tip-post-cancel,
+.bd-tip-post-submit {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.bd-tip-post-cancel {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.bd-tip-post-submit {
+  background: var(--text);
+  color: var(--bg, #fff);
+}
+
+.bd-tip-post-cancel:disabled,
+.bd-tip-post-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bd-tip-post-btn,
+  .bd-tip-post-submit {
+    background: white;
+    color: #1f1f20;
+  }
+  .bd-tip-post-cancel {
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+  }
+}
