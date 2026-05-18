@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
+import { getCachedLeaderboard } from "@/lib/feed/store";
 
 /**
  * GET /api/feed/img-heartbeat
@@ -46,6 +47,28 @@ export async function GET(req: Request) {
   }
 
   const tournamentId = active.tournament.id;
+
+  // `isLive` is a coarse flag based on the schedule window (Thu-Sun);
+  // it stays true between rounds and during dead hours. Tighten it
+  // here by checking the leaderboard for at least one player who's
+  // currently on the course (thru not yet "F"). If everyone's
+  // finished, we're between rounds or post-tournament — daemon not
+  // expected to be posting, no alert.
+  const leaderboard = await getCachedLeaderboard(tournamentId).catch(
+    () => [],
+  );
+  const stillPlaying = leaderboard.some((r) => {
+    if (!r.thru) return true; // blank thru = pre-round, daemon should kick in soon
+    return r.thru !== "F" && r.thru !== "—";
+  });
+  if (leaderboard.length > 0 && !stillPlaying) {
+    return NextResponse.json({
+      ok: true,
+      skipped: "no-active-play",
+      tournament: tournamentId,
+    });
+  }
+
   const lastTs = await redis.get<number>(
     `feed:img-last-ingest:${tournamentId}`,
   );
