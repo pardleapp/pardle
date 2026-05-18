@@ -162,13 +162,15 @@ async function fanoutTipPush(args: {
   rationale: string | null;
 }): Promise<void> {
   const admin = getSupabaseAdmin();
-  const { data: followers } = await admin
+  const { data: followersRaw } = await admin
     .from("channel_followers")
     .select("user_id, notify_on_new_tip")
     .eq("channel_id", args.channelId)
     .eq("notify_on_new_tip", true)
     .neq("user_id", args.ownerId);
-  const userIds = (followers ?? []).map((f) => f.user_id as string);
+  const followers =
+    (followersRaw as Array<{ user_id: string }> | null) ?? [];
+  const userIds = followers.map((f) => f.user_id);
   if (userIds.length === 0) return;
 
   const { data: subs } = await admin
