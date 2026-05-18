@@ -301,14 +301,28 @@ export default function FeedClient() {
       0,
       Math.ceil((data.tournament.startDate - Date.now()) / 86_400_000),
     );
+    // Show the countdown AND the bet tracker — users want to see
+    // their bets (especially recently-settled ones from the last
+    // tournament) regardless of whether the next event is live yet.
     return (
-      <section className="feed-status-card">
-        <h2 className="feed-tournament-name">{data.tournament.name}</h2>
-        <p className="feed-empty">
-          Tees off in {days} day{days === 1 ? "" : "s"}. The live feed
-          fires up when the first group hits the course.
-        </p>
-      </section>
+      <>
+        <section className="feed-status-card">
+          <h2 className="feed-tournament-name">{data.tournament.name}</h2>
+          <p className="feed-empty">
+            Tees off in {days} day{days === 1 ? "" : "s"}. The live feed
+            fires up when the first group hits the course.
+          </p>
+        </section>
+        <BetTracker
+          players={data.playerIndex ?? []}
+          currentOdds={data.currentOdds ?? {}}
+          playerRoundStates={data.playerRoundStates ?? {}}
+          tournamentProjections={data.tournamentProjections ?? {}}
+          topFinishCurrent={data.topFinishCurrent}
+          oddsFormat={oddsFormat}
+          onPickOddsFormat={pickOddsFormat}
+        />
+      </>
     );
   }
 
