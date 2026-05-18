@@ -50,6 +50,8 @@ const RESERVED = new Set<string>([
   "history",
   "me",
   "you",
+  "replay",
+  "archive",
 
   // Bet-flow nouns we use everywhere
   "bet",

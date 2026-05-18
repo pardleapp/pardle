@@ -127,7 +127,16 @@ function timeAgo(ts: number): string {
   return `${Math.floor(m / 60)}h ago`;
 }
 
-export default function FeedClient() {
+interface FeedClientProps {
+  /** Optional past-tournament id to replay. When set, the component
+   *  fetches /api/feed?tournamentId=X (skipping the active resolver
+   *  + poll path) and treats the resulting data as if it were live
+   *  for rendering purposes — used by /replay/[id] for demo /
+   *  screenshot work. */
+  forcedTournamentId?: string;
+}
+
+export default function FeedClient({ forcedTournamentId }: FeedClientProps = {}) {
   const [data, setData] = useState<FeedResponse | null>(null);
   const [error, setError] = useState(false);
   const [myReactions, setMyReactions] = useState<
@@ -191,11 +200,21 @@ export default function FeedClient() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/feed?v=${authorKey.current}`, {
+      const tParam = forcedTournamentId
+        ? `&tournamentId=${encodeURIComponent(forcedTournamentId)}`
+        : "";
+      const res = await fetch(`/api/feed?v=${authorKey.current}${tParam}`, {
         cache: "no-store",
       });
       if (!res.ok) throw new Error(String(res.status));
       const json = (await res.json()) as FeedResponse;
+      // When forcing a past tournament we want the full feed UI to
+      // render — but /api/feed sets isLive=false for those, which
+      // would short-circuit FeedClient into the countdown card.
+      // Override isLive=true locally so the page renders as if live.
+      if (forcedTournamentId && json.tournament) {
+        json.tournament = { ...json.tournament, isLive: true };
+      }
       setData(json);
       setError(false);
 
@@ -213,7 +232,7 @@ export default function FeedClient() {
     } catch {
       setError(true);
     }
-  }, [spawnFloater]);
+  }, [spawnFloater, forcedTournamentId]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
