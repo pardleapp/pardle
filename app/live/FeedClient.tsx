@@ -88,6 +88,12 @@ interface FeedResponse {
     ts: number;
     byPlayer: Record<string, { top5: number; top10: number; top20: number }>;
   }>;
+  /** "X% of Pardle bettors backing this player" — keyed by playerId.
+   *  Sparse: only players who pass the 2-backer / 5% floor. */
+  communityBackingPct?: Record<string, number>;
+  /** Total distinct bettors in the tournament window. Use to decide
+   *  if the population's big enough to surface the chip at all. */
+  communityTotalBettors?: number;
   watching: number;
   seenToday: number;
   polled: boolean;
@@ -476,45 +482,65 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                     className="feed-body feed-body-link"
                   >
                     <p className="feed-headline">{event.headline}</p>
-                    {event.tags && event.tags.length > 0 && (
-                      <p className="feed-tags">
-                        {event.tags.map((t) => (
-                          <span key={t} className="feed-tag">
-                            {t}
-                          </span>
-                        ))}
-                        {event.oddsBefore && event.oddsAfter && (
-                          <span
-                            className={`feed-tag feed-tag-odds ${
-                              event.oddsAfter < event.oddsBefore
-                                ? "feed-tag-odds-shorten"
-                                : "feed-tag-odds-drift"
-                            }`}
-                            title="Win-market odds shift"
-                          >
-                            odds {formatOdds(event.oddsBefore, oddsFormat)} →{" "}
-                            {formatOdds(event.oddsAfter, oddsFormat)}
-                          </span>
-                        )}
-                      </p>
-                    )}
-                    {!event.tags?.length &&
-                      event.oddsBefore &&
-                      event.oddsAfter && (
+                    {(() => {
+                      const backingPct =
+                        data.communityBackingPct?.[event.playerId];
+                      const showBacking =
+                        typeof backingPct === "number" &&
+                        (data.communityTotalBettors ?? 0) >= 5;
+                      const hasAny =
+                        event.tags?.length ||
+                        (event.oddsBefore && event.oddsAfter) ||
+                        (event.top10Before != null &&
+                          event.top10After != null) ||
+                        showBacking;
+                      if (!hasAny) return null;
+                      return (
                         <p className="feed-tags">
-                          <span
-                            className={`feed-tag feed-tag-odds ${
-                              event.oddsAfter < event.oddsBefore
-                                ? "feed-tag-odds-shorten"
-                                : "feed-tag-odds-drift"
-                            }`}
-                            title="Win-market odds shift"
-                          >
-                            odds {formatOdds(event.oddsBefore, oddsFormat)} →{" "}
-                            {formatOdds(event.oddsAfter, oddsFormat)}
-                          </span>
+                          {event.tags?.map((t) => (
+                            <span key={t} className="feed-tag">
+                              {t}
+                            </span>
+                          ))}
+                          {event.oddsBefore && event.oddsAfter && (
+                            <span
+                              className={`feed-tag feed-tag-odds ${
+                                event.oddsAfter < event.oddsBefore
+                                  ? "feed-tag-odds-shorten"
+                                  : "feed-tag-odds-drift"
+                              }`}
+                              title="Win-market odds shift"
+                            >
+                              odds {formatOdds(event.oddsBefore, oddsFormat)} →{" "}
+                              {formatOdds(event.oddsAfter, oddsFormat)}
+                            </span>
+                          )}
+                          {event.top10Before != null &&
+                            event.top10After != null && (
+                              <span
+                                className={`feed-tag feed-tag-odds ${
+                                  event.top10After > event.top10Before
+                                    ? "feed-tag-odds-shorten"
+                                    : "feed-tag-odds-drift"
+                                }`}
+                                title="Top-10 finish probability shift"
+                              >
+                                top 10{" "}
+                                {Math.round(event.top10Before * 100)}% →{" "}
+                                {Math.round(event.top10After * 100)}%
+                              </span>
+                            )}
+                          {showBacking && (
+                            <span
+                              className="feed-tag feed-tag-community"
+                              title={`Backed by ${backingPct}% of Pardle bettors this week`}
+                            >
+                              {backingPct}% of Pardle backs him
+                            </span>
+                          )}
                         </p>
-                      )}
+                      );
+                    })()}
                     <p className="feed-meta">
                       R{event.round} · {timeAgo(event.ts)} · view card →
                     </p>

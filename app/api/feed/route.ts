@@ -29,6 +29,7 @@ import {
 import { ensurePlayerSkill } from "@/lib/feed/skill-cache";
 import { findOddsShift } from "@/lib/feed/odds-store";
 import { getInPlayTopFinish } from "@/lib/golf-api/datagolf";
+import { computeCommunityBacking } from "@/lib/feed/community-backing";
 import { eventPolarity, type FeedRow } from "@/lib/feed/types";
 
 export const dynamic = "force-dynamic";
@@ -184,10 +185,19 @@ async function handle(req: Request) {
   for (const e of bestEvents) idSet.add(e.id);
   for (const e of worstEvents) idSet.add(e.id);
   const ids = [...idSet];
-  const [reactions, commentCounts] = await Promise.all([
-    getReactionsBulk(ids),
-    getCommentCountsBulk(ids),
-  ]);
+  const [reactions, commentCounts, topFinishHistoryFull, communityBacking] =
+    await Promise.all([
+      getReactionsBulk(ids),
+      getCommentCountsBulk(ids),
+      // Read here (early) so the top-10 shift attachment has the recent
+      // snapshot list ready by the time toRow runs. Full list is also
+      // what we'll conditionally include in the response further down.
+      getTopFinishHistory(tournament.id),
+      // "X% of Pardle bettors back him this week" — aggregated from
+      // the bets table for this tournament window. Returns {} when
+      // the population's too small to be meaningful.
+      computeCommunityBacking(tournament.startDate),
+    ]);
 
   // Pull odds buffers for the union of players in this response. We
   // compute the per-event "before / after" shift here at response
@@ -227,8 +237,48 @@ async function handle(req: Request) {
     return { ...event, oddsBefore: shift.before, oddsAfter: shift.after };
   };
 
+  // Top-10 prob shift attachment. Same architectural pattern as the
+  // odds shift — look at the topFinishHistory snapshots either side
+  // of the event's ts, pick a meaningful absolute swing (≥5pp), and
+  // discard if the direction contradicts the event's polarity.
+  const TOP10_MIN_PP = 0.05;
+  const TOP10_BEFORE_MS = 180_000;
+  const TOP10_AFTER_MS = 180_000;
+  // Most recent ~20 snapshots is enough to compute shifts around
+  // any score event in this response (events are at most a few
+  // minutes old by the time attachment runs).
+  const topFinishRecent = topFinishHistoryFull.slice(0, 20);
+  const attachTop10Shift = (event: FeedRow["event"]): FeedRow["event"] => {
+    if (event.type !== "score") return event;
+    if (topFinishRecent.length < 2) return event;
+    // Snapshots arrive newest-first from getTopFinishHistory.
+    const before = topFinishRecent.find(
+      (s) =>
+        s.ts <= event.ts - 30_000 &&
+        event.ts - s.ts <= TOP10_BEFORE_MS,
+    );
+    const after = [...topFinishRecent]
+      .reverse()
+      .find(
+        (s) =>
+          s.ts >= event.ts && s.ts - event.ts <= TOP10_AFTER_MS,
+      );
+    if (!before || !after || before.ts === after.ts) return event;
+    const b = before.byPlayer[event.playerId]?.top10;
+    const a = after.byPlayer[event.playerId]?.top10;
+    if (typeof b !== "number" || typeof a !== "number") return event;
+    if (Math.abs(a - b) < TOP10_MIN_PP) return event;
+    const polarity = eventPolarity(event);
+    if (polarity !== 0) {
+      const climbed = a > b;
+      if (polarity === 1 && !climbed) return event;
+      if (polarity === -1 && climbed) return event;
+    }
+    return { ...event, top10Before: b, top10After: a };
+  };
+
   const toRow = (event: FeedRow["event"]): FeedRow => ({
-    event: attachOdds(event),
+    event: attachTop10Shift(attachOdds(event)),
     reactions: reactions[event.id] ?? { up: 0, down: 0 },
     commentCount: commentCounts[event.id] ?? 0,
   });
@@ -312,12 +362,10 @@ async function handle(req: Request) {
     dgTopFinish?.byPlayer ?? {},
     DG_BLEND_WEIGHT,
   );
-  // Skip the topFinishHistory Redis read when the caller isn't going
-  // to use it (home page) — saves an LRANGE per poll across every
-  // viewer.
-  const topFinishHistory = includeChartData
-    ? await getTopFinishHistory(tournament.id)
-    : [];
+  // topFinishHistoryFull was read early (alongside reactions) so the
+  // top-10 shift attachment had it ready. Only ship it down the wire
+  // when the caller asked for chart data.
+  const topFinishHistory = includeChartData ? topFinishHistoryFull : [];
 
   return NextResponse.json({
     tournament: {
@@ -358,6 +406,12 @@ async function handle(req: Request) {
     watching,
     seenToday,
     polled,
+    /** Community-backing percentages keyed by playerId. Sparse —
+     *  only players who pass the 2-backer / 5% floor are included.
+     *  Tiny payload (a few dozen integers at most) so always
+     *  included regardless of slim/full. */
+    communityBackingPct: communityBacking.byPlayer,
+    communityTotalBettors: communityBacking.totalBettors,
     // Heavy chart buffers — opt-in via ?include=charts. Bet detail
     // page passes it; the home feed doesn't need them and skipping
     // them drops the response by an order of magnitude per poll.

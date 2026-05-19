@@ -86,6 +86,17 @@ export interface FeedEvent {
    */
   oddsBefore?: number;
   oddsAfter?: number;
+  /**
+   * Top-10 finishing probability just before and just after this
+   * event. Same attachment pattern as oddsBefore/After: attached at
+   * API response time from the topFinishHistory snapshot list. Only
+   * present when the shift is ≥5 percentage points absolute AND the
+   * direction matches the event's polarity (a birdie's top-10
+   * accidentally drops because the leader holed-out → discard).
+   * Renders as a chip: "top-10 prob 31% → 68%".
+   */
+  top10Before?: number;
+  top10After?: number;
 }
 
 /**

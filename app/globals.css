@@ -8036,6 +8036,19 @@ footer {
   color: #8a2a2a;
 }
 
+.feed-tag-community {
+  background: rgba(178, 116, 234, 0.18);
+  color: #6b3aa1;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-color-scheme: dark) {
+  .feed-tag-community {
+    background: rgba(178, 116, 234, 0.25);
+    color: #d4b6ff;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   .feed-tag {
     background: rgba(46, 167, 240, 0.2);
