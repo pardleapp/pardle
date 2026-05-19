@@ -157,6 +157,57 @@ export function playedInOrderForRound(
   return result;
 }
 
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+const RESULT_NOUN: Record<ScoreResult, string> = {
+  albatross: "albatross",
+  eagle: "eagle",
+  birdie: "birdie",
+  par: "par",
+  bogey: "bogey",
+  double: "double",
+  "triple-plus": "blow-up",
+};
+
+// Minimum running count of the SAME RESULT in the round before we
+// surface a "Xth of the round" tag. Routine outcomes need more to
+// be tag-worthy; rare ones surface from the 2nd onward.
+const MIN_COUNT_TO_SURFACE: Partial<Record<ScoreResult, number>> = {
+  eagle: 2,
+  birdie: 3,
+  bogey: 3,
+  double: 2,
+  "triple-plus": 1,
+};
+
+/**
+ * Within-round running stat. Emits "4th birdie of the round" /
+ * "2nd double in 6 holes" — the kind of context that turns a routine
+ * line into a moment. Each result type has a threshold under which
+ * we stay silent (a 1st birdie is just "Player birdies the 5th";
+ * the 3rd is where it starts being a story).
+ */
+export function withinRoundTag(args: {
+  playedInOrder: { result: ScoreResult; holeNumber: number }[];
+  freshResult: ScoreResult | null;
+}): string | null {
+  if (!args.freshResult) return null;
+  const result = args.freshResult;
+  const min = MIN_COUNT_TO_SURFACE[result];
+  if (!min) return null;
+  // Count how many of the same result type are in this round so far.
+  // playedInOrder already includes the fresh hole at the end.
+  const sameCount = args.playedInOrder.filter(
+    (h) => h.result === result,
+  ).length;
+  if (sameCount < min) return null;
+  return `${ordinal(sameCount)} ${RESULT_NOUN[result]} of the round`;
+}
+
 /**
  * Convenience: build the full tag list for an event given the
  * player's pre- and post-state. Returns a deduplicated array of 0-2
@@ -171,8 +222,18 @@ export function buildContextTags(args: {
   const pos = positionTag(args.prevPosition, args.freshPosition);
   if (pos) tags.push(pos);
   if (args.streak) {
-    const st = streakTag(args.streak);
-    if (st && !tags.includes(st)) tags.push(st);
+    // Prefer the running-count tag over the streak tag when both
+    // would surface — "4th birdie of the round" is more informative
+    // than "5 of last 7 in red" most of the time.
+    const wr = withinRoundTag({
+      playedInOrder: args.streak.playedInOrder,
+      freshResult: args.streak.freshResult,
+    });
+    if (wr && !tags.includes(wr)) tags.push(wr);
+    if (tags.length < 2) {
+      const st = streakTag(args.streak);
+      if (st && !tags.includes(st)) tags.push(st);
+    }
   }
   return tags.slice(0, 2);
 }
