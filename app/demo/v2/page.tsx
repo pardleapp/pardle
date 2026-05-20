@@ -1,14 +1,13 @@
 /**
- * /demo/v2 — three-way comparison of the current design, a "trading
- * terminal" v2 refresh, and an "editorial / Athletic" v3 refresh.
- * Five component groups (header, feed row, bet card, leaderboard,
- * putt poll) rendered in all three treatments.
+ * /demo/v2 — four-way comparison of design directions.
  *
- * v2 = dark default, monospace tabular numerals, uppercase labels,
- *      tight radii, SVG icons, cyan live accent — trading-terminal vibe.
- * v3 = light, generous typography, serif headlines, prose-style copy
- *      instead of chip-chains, deep forest green + gold accents —
- *      premium content destination vibe.
+ * v2 = trading terminal: dark, monospace tabular numerals, uppercase
+ *      labels, 4-6px radii, SVG icons, cyan live accent.
+ * v3 = editorial / Athletic: light, generous typography, serif
+ *      headlines, prose-style copy, deep forest green + gold accents.
+ * v4 = "Real" energy: deep black, big bold SANS numbers (not mono),
+ *      saturated electric colors, avatar circles, pill buttons,
+ *      glow effects, larger rounded corners — social-tech app vibe.
  *
  * Throwaway route. Delete after a direction's picked.
  */
@@ -731,9 +730,434 @@ const V2_CSS = `
   background: rgba(31, 74, 44, 0.04);
 }
 
+/* ──────────────────────────────────────────────────────────────── */
+/* V4 — "Real" energy                                                */
+/* Deep black, big bold SANS numbers (not mono), saturated colors,   */
+/* avatar circles, pill buttons, glow on hot indicators.             */
+/* ──────────────────────────────────────────────────────────────── */
+.v4-preview {
+  --v4-bg: #000;
+  --v4-bg-card: #0e0f12;
+  --v4-bg-card-hi: #15171b;
+  --v4-border: rgba(255, 255, 255, 0.06);
+  --v4-text: #f5f5f7;
+  --v4-text-dim: #9aa0a8;
+  --v4-text-faint: #5a606a;
+  --v4-green: #00d96e;
+  --v4-green-glow: rgba(0, 217, 110, 0.35);
+  --v4-red: #ff4b6b;
+  --v4-red-glow: rgba(255, 75, 107, 0.35);
+  --v4-amber: #ff9d2e;
+  --v4-amber-glow: rgba(255, 157, 46, 0.45);
+  --v4-purple: #a070ff;
+
+  background: var(--v4-bg);
+  color: var(--v4-text);
+  border-radius: 16px;
+  padding: 18px 16px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI',
+                Roboto, system-ui, sans-serif;
+  line-height: 1.35;
+}
+
+/* Header (v4) */
+.v4-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--v4-border);
+}
+
+.v4-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 217, 110, 0.12);
+  color: var(--v4-green);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.v4-live-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--v4-green);
+  box-shadow: 0 0 8px var(--v4-green-glow);
+  animation: v4-pulse 1.6s infinite;
+}
+
+@keyframes v4-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.v4-tournament {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v4-round-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--v4-bg-card-hi);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--v4-text-dim);
+}
+
+/* Feed row (v4) */
+.v4-feed-row {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--v4-border);
+}
+
+.v4-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #6b7df2, #c659d8);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+.v4-feed-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.v4-feed-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.v4-feed-name {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.v4-feed-hot-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--v4-amber);
+  box-shadow: 0 0 8px var(--v4-amber-glow);
+}
+
+.v4-feed-score {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--v4-green);
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.v4-feed-score-hole {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--v4-text-dim);
+  letter-spacing: 0;
+}
+
+.v4-feed-action {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--v4-text);
+  line-height: 1.3;
+}
+
+.v4-feed-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.v4-feed-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--v4-bg-card-hi);
+  color: var(--v4-text-dim);
+}
+
+.v4-feed-pill-hot {
+  background: rgba(255, 157, 46, 0.15);
+  color: var(--v4-amber);
+}
+
+.v4-feed-pill-community {
+  background: rgba(160, 112, 255, 0.15);
+  color: var(--v4-purple);
+}
+
+.v4-feed-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--v4-text-faint);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.v4-feed-meta-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Bet card (v4) */
+.v4-bet-card {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--v4-bg-card);
+  align-items: center;
+}
+
+.v4-bet-name {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.v4-bet-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--v4-text-dim);
+  margin-top: 2px;
+}
+
+.v4-bet-value {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-align: right;
+  line-height: 1;
+}
+
+.v4-bet-pnl {
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+  margin-top: 4px;
+  color: var(--v4-green);
+}
+
+/* Leaderboard (v4) */
+.v4-lb-row {
+  display: grid;
+  grid-template-columns: 30px 32px 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--v4-border);
+}
+
+.v4-lb-pos {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--v4-text-dim);
+}
+
+.v4-avatar-sm {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #4f6df0, #b252d2);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.v4-lb-name {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v4-lb-name-cold {
+  color: var(--v4-text-dim);
+}
+
+.v4-lb-spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 16px;
+}
+
+.v4-lb-spark > span {
+  width: 4px;
+  border-radius: 1px;
+  background: var(--v4-text-dim);
+}
+
+.v4-lb-total {
+  font-size: 16px;
+  font-weight: 800;
+  text-align: right;
+  letter-spacing: -0.01em;
+  min-width: 36px;
+  color: var(--v4-green);
+}
+
+/* Putt poll (v4) */
+.v4-poll {
+  padding: 18px;
+  border-radius: 16px;
+  background: var(--v4-bg-card);
+  position: relative;
+  overflow: hidden;
+}
+
+.v4-poll-glow {
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 140px;
+  height: 140px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(0, 217, 110, 0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.v4-poll-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 217, 110, 0.12);
+  color: var(--v4-green);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.v4-poll-eyebrow::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--v4-green);
+  box-shadow: 0 0 6px var(--v4-green-glow);
+}
+
+.v4-poll-meta {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--v4-text-dim);
+  display: inline-block;
+  margin-left: 8px;
+}
+
+.v4-poll-question {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 10px 0 8px;
+  line-height: 1.2;
+}
+
+.v4-poll-baseline {
+  font-size: 12px;
+  color: var(--v4-text-dim);
+  margin-bottom: 14px;
+}
+
+.v4-poll-baseline strong {
+  color: var(--v4-text);
+  font-weight: 800;
+}
+
+.v4-poll-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.v4-poll-btn {
+  padding: 12px 16px;
+  border: none;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 100ms, box-shadow 200ms;
+}
+
+.v4-poll-btn:active {
+  transform: scale(0.97);
+}
+
+.v4-poll-btn-yes {
+  background: var(--v4-green);
+  color: #04130a;
+  box-shadow: 0 4px 20px var(--v4-green-glow);
+}
+
+.v4-poll-btn-no {
+  background: var(--v4-bg-card-hi);
+  color: var(--v4-text);
+}
+
+.v4-poll-btn-no:hover {
+  background: rgba(255, 75, 107, 0.12);
+  color: var(--v4-red);
+}
+
 /* Wrapper grid */
 .demo-wrap {
-  max-width: 1400px;
+  max-width: 1680px;
   margin: 0 auto;
   padding: 24px 16px 60px;
 }
@@ -755,8 +1179,8 @@ const V2_CSS = `
 
 .demo-pair {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 14px;
   margin-bottom: 36px;
   align-items: start;
 }
@@ -783,7 +1207,13 @@ const V2_CSS = `
   background: var(--bg);
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1400px) {
+  .demo-pair {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 720px) {
   .demo-pair {
     grid-template-columns: 1fr;
   }
@@ -823,22 +1253,30 @@ export default function V2DesignDemo() {
         <Link href="/" style={{ fontSize: 12, color: "var(--muted)" }}>
           ← back
         </Link>
-        <h1 className="demo-h1">Design refresh · three directions</h1>
+        <h1 className="demo-h1">Design refresh · four directions</h1>
         <p
           style={{
             margin: "4px 0 28px",
             color: "var(--muted)",
             fontSize: 13,
             lineHeight: 1.5,
+            maxWidth: 920,
           }}
         >
-          Same content, three visual treatments side-by-side. Stacks
-          vertically on narrower screens. <strong>Current</strong>:
-          today on pardle.app. <strong>V2</strong>: trading-terminal —
-          dark, monospace, tabular. <strong>V3</strong>: editorial /
-          Athletic — light, serif, prose-style, premium publication
-          energy. Throwaway route — delete once a direction&apos;s
-          picked.
+          Same content, four visual treatments side-by-side. Stacks to
+          two-up on narrower screens, single column on mobile.
+          {" "}
+          <strong>Current</strong>: today on pardle.app.
+          {" "}
+          <strong>V2</strong>: trading-terminal — dark, monospace,
+          tabular, Bloomberg-sober.
+          {" "}
+          <strong>V3</strong>: editorial / Athletic — light, serif,
+          prose-style, premium publication.
+          {" "}
+          <strong>V4</strong>: "Real" energy — deep black, big bold
+          sans (no monospace), saturated electric green, avatar
+          circles, pill CTAs, glow indicators, social-tech-app vibe.
         </p>
 
         {/* ── 1. Tournament header ──────────────────────────────── */}
@@ -890,6 +1328,18 @@ export default function V2DesignDemo() {
                   <p className="v3-header-meta">
                     Colonial Country Club · Fort Worth · 78 in the field
                   </p>
+                </div>
+              </div>
+            </div>
+            <div className="demo-side">
+              <p className="demo-side-label">V4 · Real energy</p>
+              <div className="v4-preview">
+                <div className="v4-header">
+                  <span className="v4-live-pill">Live</span>
+                  <span className="v4-tournament">
+                    Charles Schwab
+                  </span>
+                  <span className="v4-round-pill">R3</span>
                 </div>
               </div>
             </div>
@@ -988,6 +1438,42 @@ export default function V2DesignDemo() {
                 </div>
               </div>
             </div>
+            <div className="demo-side">
+              <p className="demo-side-label">V4 · Real energy</p>
+              <div className="v4-preview">
+                <div className="v4-feed-row">
+                  <div className="v4-avatar">JN</div>
+                  <div className="v4-feed-body">
+                    <div className="v4-feed-top">
+                      <span className="v4-feed-name">
+                        Joaquin Niemann
+                        <span className="v4-feed-hot-dot" aria-hidden />
+                      </span>
+                      <span className="v4-feed-score">
+                        −1
+                        <span className="v4-feed-score-hole">H14</span>
+                      </span>
+                    </div>
+                    <div className="v4-feed-action">Birdies the 14th</div>
+                    <div className="v4-feed-tags">
+                      <span className="v4-feed-pill">4th of rd</span>
+                      <span className="v4-feed-pill">Most in field</span>
+                      <span className="v4-feed-pill v4-feed-pill-hot">
+                        Hot today
+                      </span>
+                      <span className="v4-feed-pill v4-feed-pill-community">
+                        28% backing
+                      </span>
+                    </div>
+                    <div className="v4-feed-meta">
+                      <span>2m ago</span>
+                      <span className="v4-feed-meta-action">▲ 12</span>
+                      <span className="v4-feed-meta-action">💬 3</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1066,6 +1552,27 @@ export default function V2DesignDemo() {
                     placed 36h ago
                   </div>
                   <div />
+                </div>
+              </div>
+            </div>
+            <div className="demo-side">
+              <p className="demo-side-label">V4 · Real energy</p>
+              <div className="v4-preview">
+                <div className="v4-bet-card">
+                  <div className="v4-avatar">JN</div>
+                  <div>
+                    <div className="v4-bet-name">
+                      Joaquin Niemann
+                      <span className="v4-feed-hot-dot" aria-hidden />
+                    </div>
+                    <div className="v4-bet-meta">
+                      Win @ +1500 · £20
+                    </div>
+                  </div>
+                  <div>
+                    <div className="v4-bet-value">£42.00</div>
+                    <div className="v4-bet-pnl">+110%</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1201,6 +1708,65 @@ export default function V2DesignDemo() {
                 </div>
               </div>
             </div>
+            <div className="demo-side">
+              <p className="demo-side-label">V4 · Real energy</p>
+              <div className="v4-preview">
+                <div className="v4-lb-row">
+                  <span className="v4-lb-pos">1</span>
+                  <div className="v4-avatar-sm">JN</div>
+                  <span className="v4-lb-name">
+                    Niemann
+                    <span className="v4-feed-hot-dot" aria-hidden />
+                  </span>
+                  <span className="v4-lb-spark">
+                    <span style={{ height: "50%" }} />
+                    <span style={{ height: "70%" }} />
+                    <span style={{ height: "70%" }} />
+                    <span style={{ height: "100%", background: "var(--v4-green)" }} />
+                  </span>
+                  <span className="v4-lb-total">−10</span>
+                </div>
+                <div className="v4-lb-row">
+                  <span className="v4-lb-pos">T2</span>
+                  <div
+                    className="v4-avatar-sm"
+                    style={{ background: "linear-gradient(135deg,#f29a4f,#d44a4a)" }}
+                  >
+                    SS
+                  </div>
+                  <span className="v4-lb-name">Scheffler</span>
+                  <span className="v4-lb-spark">
+                    <span style={{ height: "100%" }} />
+                    <span style={{ height: "100%" }} />
+                    <span style={{ height: "70%" }} />
+                    <span style={{ height: "50%" }} />
+                  </span>
+                  <span className="v4-lb-total">−8</span>
+                </div>
+                <div className="v4-lb-row">
+                  <span className="v4-lb-pos">T2</span>
+                  <div
+                    className="v4-avatar-sm"
+                    style={{ background: "linear-gradient(135deg,#56b0e8,#3a4f9b)" }}
+                  >
+                    PC
+                  </div>
+                  <span className="v4-lb-name v4-lb-name-cold">Cantlay</span>
+                  <span className="v4-lb-spark">
+                    <span style={{ height: "70%" }} />
+                    <span style={{ height: "50%" }} />
+                    <span style={{ height: "30%" }} />
+                    <span style={{ height: "20%" }} />
+                  </span>
+                  <span
+                    className="v4-lb-total"
+                    style={{ color: "var(--v4-text-dim)" }}
+                  >
+                    −8
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1288,14 +1854,39 @@ export default function V2DesignDemo() {
                 </div>
               </div>
             </div>
+            <div className="demo-side">
+              <p className="demo-side-label">V4 · Real energy</p>
+              <div className="v4-preview">
+                <div className="v4-poll">
+                  <div className="v4-poll-glow" />
+                  <span className="v4-poll-eyebrow">Live poll</span>
+                  <span className="v4-poll-meta">14 ft · birdie</span>
+                  <p className="v4-poll-question">
+                    Niemann's 14-footer. Drops?
+                  </p>
+                  <p className="v4-poll-baseline">
+                    Tour <strong>22%</strong> from here · Niemann{" "}
+                    <strong>+1.8 SG putt/rd</strong> this week
+                  </p>
+                  <div className="v4-poll-buttons">
+                    <button type="button" className="v4-poll-btn v4-poll-btn-yes">
+                      Yes · drops
+                    </button>
+                    <button type="button" className="v4-poll-btn v4-poll-btn-no">
+                      No · misses
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
-            gap: 16,
+            gridTemplateColumns: "1fr 1fr 1fr 1fr",
+            gap: 14,
             margin: "32px 0 0",
             fontSize: 12,
             color: "var(--muted)",
@@ -1309,18 +1900,26 @@ export default function V2DesignDemo() {
             heritage — friendly, social, casual.
           </div>
           <div>
-            <p style={{ fontWeight: 800, marginBottom: 4 }}>V2 · trading terminal</p>
-            Dark default. Monospace tabular numerals, uppercase letter-
-            spaced labels, 4-6px radii, SVG icons replacing chrome emoji,
-            cyan live indicators, magenta community accent. Feels like
-            a power tool for serious bettors.
+            <p style={{ fontWeight: 800, marginBottom: 4 }}>
+              V2 · trading terminal
+            </p>
+            Dark default. Monospace tabular numerals, uppercase
+            letter-spaced labels, 4-6px radii, SVG icons, cyan live
+            indicators. Feels like a power tool for serious bettors.
           </div>
           <div>
             <p style={{ fontWeight: 800, marginBottom: 4 }}>V3 · editorial</p>
-            Light, generous typography, serif headlines (Charter / Source
-            Serif), prose-style copy in place of chip chains, deep forest
-            green + gold accents, gold rule above poll cards. Feels like
-            a premium publication that happens to be live.
+            Light, generous typography, serif headlines (Charter /
+            Source Serif), prose-style copy, deep forest green + gold
+            accents. Feels like a premium publication that happens to
+            be live.
+          </div>
+          <div>
+            <p style={{ fontWeight: 800, marginBottom: 4 }}>V4 · Real energy</p>
+            Deep black, big bold sans (no monospace), saturated
+            electric green, avatar circles for players, pill-shaped
+            CTAs with shadow glow, hot-dot indicators. Feels like a
+            social-tech app you tap on tap on tap.
           </div>
         </div>
       </main>
