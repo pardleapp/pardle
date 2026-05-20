@@ -91,48 +91,69 @@ function outrightInsight(
   const myPos = parsePosition(me.position);
   if (myToPar === null) return null;
 
-  // Find leader (someone at position "1", solo or tied).
-  const leader = args.leaderboard.find(
-    (r) => r.position === "1" || r.position === "T1",
-  );
-  if (!leader) return null;
-  const leaderToPar = parseToPar(leader.total);
-  if (leaderToPar === null) return null;
-  const gap = myToPar - leaderToPar;
+  // "Gap" should always be measured against the strongest *competitor*,
+  // never against the bet's own player — otherwise a solo leader's
+  // bet card reads "leading by 0" because the position-1 lookup
+  // returned themselves. Take the best to-par among everyone else.
+  let bestRivalToPar: number | null = null;
+  let bestRivalName: string | null = null;
+  for (const row of args.leaderboard) {
+    if (row.playerId === bet.playerId) continue;
+    const tp = parseToPar(row.total);
+    if (tp === null) continue;
+    if (bestRivalToPar === null || tp < bestRivalToPar) {
+      bestRivalToPar = tp;
+      bestRivalName = row.displayName;
+    }
+  }
+  if (bestRivalToPar === null) return null;
 
   const remaining = holesRemainingTotal(
     args.playerRoundStates[bet.playerId],
   );
   const playerName = me.displayName;
 
+  // Negative = bet player is ahead of the field; positive = behind.
+  const deficit = myToPar - bestRivalToPar;
+
   // Tournament's over for this player.
   if (remaining === 0) {
-    if (gap === 0 && myPos === 1) {
+    if (deficit < 0 || (deficit === 0 && myPos === 1)) {
       return {
         headline: `${playerName} won. Bet's settled.`,
         status: "settled",
       };
     }
     return {
-      headline: `${playerName} finished ${gap} stroke${gap === 1 ? "" : "s"} back. Out of reach.`,
+      headline: `${playerName} finished ${deficit} stroke${deficit === 1 ? "" : "s"} back. Out of reach.`,
       status: "long-shot",
     };
   }
 
-  // Leading right now.
-  if (gap <= 0) {
-    if (myPos === 1) {
-      return {
-        headline: `${playerName} leading by ${Math.abs(gap)} with ${plural(remaining, "hole")} to play`,
-        hint: "Hold the lead and this lands",
-        status: "favourable",
-      };
-    }
+  // Leading the field outright.
+  if (deficit < 0) {
+    const lead = Math.abs(deficit);
     return {
-      headline: `${playerName} tied for the lead with ${plural(remaining, "hole")} to play`,
+      headline: `${playerName} leading by ${plural(lead, "stroke")} with ${plural(remaining, "hole")} to play`,
+      hint:
+        lead >= 3
+          ? "Just needs to stay upright — comfortable cushion"
+          : `${bestRivalName ?? "Field"} ${plural(lead, "stroke")} back and closest`,
       status: "favourable",
     };
   }
+
+  // Tied with the closest rival.
+  if (deficit === 0) {
+    return {
+      headline: `${playerName} tied for the lead with ${plural(remaining, "hole")} to play`,
+      hint: bestRivalName
+        ? `Level with ${bestRivalName} — one birdie ahead of the field and ${playerName} is out front`
+        : undefined,
+      status: "favourable",
+    };
+  }
+  const gap = deficit;
 
   // Behind — need to make up ground.
   // Crude framing: each "birdie ahead of the leader" closes one stroke.
