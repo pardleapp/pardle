@@ -11257,15 +11257,71 @@ html, body {
   --purple: #a070ff;
   --purple-soft: rgba(160, 112, 255, 0.15);
 
-  background: var(--bg);
+  background: #000 !important;
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI",
                Roboto, system-ui, sans-serif;
+  min-height: 100dvh;
 }
 
-/* Body bg follows when the theme is on the root */
+/* Body bg follows when the theme is anywhere on the page — paints the
+   viewport-fill area outside the main container black so the page
+   doesn't have a grey halo. */
+html:has(.v4-theme),
 body:has(.v4-theme) {
-  background: #000;
+  background: #000 !important;
+}
+
+/* Hub nav tabs (Live feed / Games) inside v4 — dark pill rail */
+.v4-theme .hub-nav-tabs {
+  background: var(--bg-card-hi);
+  border-color: var(--border);
+}
+
+.v4-theme .hub-nav-tab {
+  color: var(--muted);
+}
+
+.v4-theme .hub-nav-tab:hover {
+  color: var(--text);
+}
+
+.v4-theme .hub-nav-tab-active {
+  background: var(--text);
+  color: #000;
+}
+
+/* AuthChip / user pill */
+.v4-theme .auth-chip,
+.v4-theme .auth-chip-btn {
+  background: var(--bg-card-hi);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+/* Status card (countdown to next tournament) */
+.v4-theme .feed-status-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  margin: 8px 14px;
+  padding: 28px 18px;
+}
+
+.v4-theme .feed-status-card .feed-tournament-name {
+  display: block;
+  text-align: center;
+  font-size: 20px;
+  margin-bottom: 8px;
+  padding: 0;
+  border: none;
+}
+
+.v4-theme .feed-status-card .feed-empty {
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
 }
 
 /* ── Avatar (used by feed rows, bet cards, leaderboard) ──────────── */

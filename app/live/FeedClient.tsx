@@ -446,19 +446,27 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   // ── Empty / loading / not-live states ───────────────────────────
   if (error && !data) {
     return (
-      <p className="feed-empty">
-        Couldn&apos;t load the feed. It&apos;ll retry automatically.
-      </p>
+      <section className="feed-wrap v4-theme">
+        <p className="feed-empty">
+          Couldn&apos;t load the feed. It&apos;ll retry automatically.
+        </p>
+      </section>
     );
   }
   if (!data) {
-    return <p className="feed-empty">Loading the feed…</p>;
+    return (
+      <section className="feed-wrap v4-theme">
+        <p className="feed-empty">Loading the feed…</p>
+      </section>
+    );
   }
   if (!data.tournament) {
     return (
-      <p className="feed-empty">
-        No tournament on the schedule right now. Check back on a tour week.
-      </p>
+      <section className="feed-wrap v4-theme">
+        <p className="feed-empty">
+          No tournament on the schedule right now. Check back on a tour week.
+        </p>
+      </section>
     );
   }
   if (!data.tournament.isLive) {
@@ -470,7 +478,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     // their bets (especially recently-settled ones from the last
     // tournament) regardless of whether the next event is live yet.
     return (
-      <>
+      <section className="feed-wrap v4-theme">
         <section className="feed-status-card">
           <h2 className="feed-tournament-name">{data.tournament.name}</h2>
           <p className="feed-empty">
@@ -489,7 +497,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           oddsFormat={oddsFormat}
           onPickOddsFormat={pickOddsFormat}
         />
-      </>
+      </section>
     );
   }
 
