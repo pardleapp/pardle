@@ -830,10 +830,14 @@ export function evaluateWinningScore(
 function trimTrailingFlat(series: PnlSample[]): PnlSample[] {
   if (series.length < 3) return series;
   const lastV = series[series.length - 1].v;
-  const EPS = 0.05;
+  // Relative tolerance — 3% of the last value, floor £0.50. A £290
+  // settled bet allows £8.70 of wobble in the flat tail (Polymarket
+  // = 290 exactly but DK/FD secondary samples can sit a few quid off);
+  // a £10 round-score bet still gets a 50p floor.
+  const eps = Math.max(0.5, Math.abs(lastV) * 0.03);
   let firstConstantIdx = series.length - 1;
   for (let i = series.length - 2; i >= 0; i--) {
-    if (Math.abs(series[i].v - lastV) > EPS) break;
+    if (Math.abs(series[i].v - lastV) > eps) break;
     firstConstantIdx = i;
   }
   // Need a few samples worth of constancy AND a meaningful time span
