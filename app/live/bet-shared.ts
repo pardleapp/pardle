@@ -833,6 +833,11 @@ export function reconstructHistory(
   },
 ): PnlSample[] {
   const series: PnlSample[] = [];
+  // For settled bets the chart should stop at settlement, not at
+  // "right now" — otherwise the x-axis stretches days into the
+  // post-tournament void as the page keeps re-rendering. Falls back
+  // to Date.now() for live bets where settledAt is null.
+  const chartNow = bet.settledAt ?? Date.now();
 
   if (bet.kind === "outright") {
     // Source preference: Polymarket primary, DataGolf in-play prob
@@ -893,6 +898,10 @@ export function reconstructHistory(
     }
     pts.sort((a, b) => a.t - b.t);
     for (const pt of pts) {
+      // Drop sample ticks that arrived after the bet settled — they
+      // don't represent a tradable price anymore and just extend the
+      // chart's right edge into post-tournament dead air.
+      if (bet.settledAt != null && pt.t > bet.settledAt) continue;
       const v = bet.stake * bet.oddsTaken * pt.prob;
       const last = series[series.length - 1];
       if (last && Math.abs(v - last.v) < 0.05 && pt.t - last.t < 60_000)
@@ -901,9 +910,10 @@ export function reconstructHistory(
     }
     // Always append the current value as the rightmost sample so a
     // thin buffer (e.g. a market we just started tracking) still
-    // gives the chart two points to draw a line between.
+    // gives the chart two points to draw a line between. For settled
+    // bets the tip lands at settledAt instead of "now".
     if (nowValue != null) {
-      series.push({ t: Date.now(), v: nowValue });
+      series.push({ t: chartNow, v: nowValue });
     }
     return series;
   }
@@ -916,6 +926,7 @@ export function reconstructHistory(
     const snaps = topFinishHistory ?? [];
     const sorted = [...snaps].sort((a, b) => a.ts - b.ts);
     for (const snap of sorted) {
+      if (bet.settledAt != null && snap.ts > bet.settledAt) continue;
       const prob = probForCutoff(bet.cutoff, snap.byPlayer[bet.playerId]);
       if (prob == null) continue;
       let v: number;
@@ -927,7 +938,7 @@ export function reconstructHistory(
     if (nowValue != null) {
       const last = series[series.length - 1];
       if (!last || Math.abs(nowValue - last.v) > 0.01) {
-        series.push({ t: Date.now(), v: nowValue });
+        series.push({ t: chartNow, v: nowValue });
       }
     }
     return series;
@@ -942,6 +953,7 @@ export function reconstructHistory(
     // Snapshots arrive newest-first from /api/feed; sort ascending.
     const sorted = [...snapshots].sort((a, b) => a.ts - b.ts);
     for (const snap of sorted) {
+      if (bet.settledAt != null && snap.ts > bet.settledAt) continue;
       const probUnder = probUnderAtLine(snap, bet.line);
       if (probUnder == null) continue;
       const prob = bet.side === "under" ? probUnder : 1 - probUnder;
@@ -954,7 +966,7 @@ export function reconstructHistory(
     if (nowValue != null) {
       const last = series[series.length - 1];
       if (!last || Math.abs(nowValue - last.v) > 0.01) {
-        series.push({ t: Date.now(), v: nowValue });
+        series.push({ t: chartNow, v: nowValue });
       }
     }
     return series;
@@ -971,7 +983,7 @@ export function reconstructHistory(
       holesPlayed: 0,
       prob: probAtP,
     });
-    if (nowValue != null) series.push({ t: Date.now(), v: nowValue });
+    if (nowValue != null) series.push({ t: chartNow, v: nowValue });
     return series;
   }
   const roundSnap = state?.rounds?.[round];
