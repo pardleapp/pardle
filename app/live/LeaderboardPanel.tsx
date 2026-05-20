@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { CachedLeaderboardRow } from "@/lib/feed/store";
+import PlayerAvatar from "./PlayerAvatar";
 import RecentFormSparkline, {
   type RecentEvent,
 } from "./RecentFormSparkline";
@@ -56,6 +57,12 @@ export default function LeaderboardPanel({
           return (
             <li key={r.playerId} className="lb-row">
               <span className="lb-pos">{r.position}</span>
+              <PlayerAvatar
+                playerId={r.playerId}
+                playerName={r.displayName}
+                size="sm"
+                state={hand ?? null}
+              />
               <Link
                 href={`/live/player/${r.playerId}`}
                 className="lb-name"

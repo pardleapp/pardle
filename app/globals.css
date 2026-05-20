@@ -6153,7 +6153,7 @@ footer {
 
 .lb-row {
   display: grid;
-  grid-template-columns: 38px 1fr auto auto auto;
+  grid-template-columns: 38px 32px 1fr auto auto auto;
   align-items: center;
   gap: 8px;
   padding: 7px 14px;
@@ -6162,11 +6162,11 @@ footer {
 }
 
 /* On mobile the sparkline can collide with the name in narrow viewports
-   — collapse to 4 columns and hide the sparkline column. The hot/cold
+   — collapse to 5 columns and hide the sparkline column. The hot/cold
    badge inside .lb-name still shows the momentum signal. */
 @media (max-width: 480px) {
   .lb-row {
-    grid-template-columns: 38px 1fr auto auto;
+    grid-template-columns: 38px 32px 1fr auto auto;
   }
   .lb-row .recent-form {
     display: none;
@@ -11624,4 +11624,494 @@ body:has(.v4-theme) {
 .v4-theme .feed-tab-on {
   background: var(--text);
   color: #000;
+}
+
+/* ── Bet tracker ─────────────────────────────────────────────── */
+.v4-theme .bets-head {
+  padding: 14px 14px 8px;
+  margin-bottom: 0;
+}
+
+.v4-theme .bets-title {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.v4-theme .bets-toggle,
+.v4-theme .bets-sync-btn {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  min-height: 32px;
+}
+
+.v4-theme .bets-toggle:hover,
+.v4-theme .bets-sync-btn:hover {
+  background: var(--bg-card-hi);
+  color: var(--text);
+}
+
+.v4-theme .bets-list {
+  gap: 8px;
+  padding: 0 14px;
+}
+
+.v4-theme .bets-row {
+  display: grid;
+  grid-template-columns: 1fr auto 28px;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: background 120ms;
+}
+
+.v4-theme .bets-row:hover {
+  background: var(--bg-card-hi);
+}
+
+.v4-theme .bets-row-main {
+  min-width: 0;
+}
+
+.v4-theme .bets-row-name {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v4-theme .bets-row-kind {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-card-hi);
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-left: 4px;
+}
+
+.v4-theme .bets-row-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+.v4-theme .bets-row-value {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-self: center;
+}
+
+.v4-theme .bets-row-value strong {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1;
+}
+
+.v4-theme .bets-row-value span {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.v4-theme .bets-profit-up,
+.v4-theme .bets-profit-up * {
+  color: var(--green) !important;
+}
+
+.v4-theme .bets-profit-down,
+.v4-theme .bets-profit-down * {
+  color: var(--red) !important;
+}
+
+.v4-theme .bets-row-pending {
+  color: var(--text-faint);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.v4-theme .bets-row-x,
+.v4-theme .bets-row-x-detached {
+  align-self: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: none;
+  background: var(--bg-card-hi);
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.v4-theme .bets-row-x:hover {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.v4-theme .bets-totals {
+  padding: 10px 14px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+  border-top: 1px solid var(--border);
+}
+
+.v4-theme .bets-empty {
+  margin: 8px 14px;
+  padding: 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  text-align: center;
+  font-style: normal;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.v4-theme .bets-past {
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 8px 14px;
+}
+
+.v4-theme .bets-past:hover {
+  color: var(--text);
+}
+
+/* Bet chart (mini sparkline-ish PnL chart on each expanded row) */
+.v4-theme .bets-chart {
+  border: 1px solid var(--border);
+  border-top: none;
+  background: var(--bg-card);
+  border-radius: 0 0 12px 12px;
+}
+
+.v4-theme .bets-chart-summary,
+.v4-theme .bets-chart-meta,
+.v4-theme .bets-chart-empty {
+  color: var(--muted);
+}
+
+/* Add-bet form */
+.v4-theme .bets-form-input,
+.v4-theme .bets-form-suggest {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  color: var(--text);
+}
+
+.v4-theme .bets-form-input::placeholder {
+  color: var(--text-faint);
+}
+
+.v4-theme .bets-form-suggest button {
+  color: var(--text);
+}
+
+.v4-theme .bets-form-suggest button:hover {
+  background: var(--bg-card-hi);
+}
+
+.v4-theme .bets-form-suggest-meta {
+  color: var(--muted);
+}
+
+.v4-theme .bets-form-picked {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+}
+
+.v4-theme .bets-form-change {
+  color: var(--muted);
+}
+
+/* ── Leaderboard panel ───────────────────────────────────────── */
+.v4-theme .lb-panel {
+  padding: 0 14px;
+}
+
+.v4-theme .lb-header {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 8px 0;
+}
+
+.v4-theme .lb-row {
+  grid-template-columns: 32px 32px 1fr auto auto;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .v4-theme .lb-row {
+    grid-template-columns: 32px 32px 1fr auto;
+  }
+  .v4-theme .lb-row .recent-form {
+    display: none;
+  }
+}
+
+.v4-theme .lb-pos {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-faint);
+}
+
+.v4-theme .lb-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v4-theme .lb-total {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--green);
+}
+
+.v4-theme .lb-thru {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Recent-form sparkline tint inside v4 */
+.v4-theme .recent-form-bar {
+  background: var(--text-faint);
+}
+
+.v4-theme .recent-form-arrow.spark-arrow-up {
+  color: var(--green);
+}
+
+.v4-theme .recent-form-arrow.spark-arrow-down {
+  color: var(--red);
+}
+
+.v4-theme .recent-form-arrow.spark-arrow-flat {
+  color: var(--muted);
+}
+
+/* ── Momentum strip (hottest in field) ──────────────────────── */
+.v4-theme .momentum-strip {
+  padding: 12px 14px;
+  margin: 0 0 10px;
+}
+
+.v4-theme .momentum-row-label-text {
+  color: var(--muted);
+}
+
+.v4-theme .momentum-chip {
+  border: none;
+  background: var(--green-soft);
+  color: var(--green);
+  font-weight: 700;
+}
+
+.v4-theme .momentum-chip:hover {
+  background: rgba(0, 217, 110, 0.22);
+}
+
+.v4-theme .momentum-chip-cold {
+  background: rgba(123, 178, 230, 0.15);
+  color: #a8c9eb;
+}
+
+.v4-theme .momentum-chip-cold:hover {
+  background: rgba(123, 178, 230, 0.22);
+}
+
+.v4-theme .momentum-chip-name {
+  color: inherit;
+}
+
+.v4-theme .momentum-chip-sg {
+  color: inherit;
+  opacity: 0.7;
+}
+
+/* ── Putt poll widget ─────────────────────────────────────────── */
+.v4-theme .putt-poll {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.v4-theme .putt-poll::before {
+  content: "";
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 140px;
+  height: 140px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(0, 217, 110, 0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.v4-theme .putt-poll-prompt {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.v4-theme .putt-poll-prompt::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green-glow);
+}
+
+.v4-theme .putt-poll-prompt-hint {
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.v4-theme .putt-poll-baseline {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 8px 0 12px;
+}
+
+.v4-theme .putt-poll-buttons {
+  gap: 8px;
+}
+
+.v4-theme .putt-poll-btn {
+  padding: 11px 16px;
+  border-radius: 999px;
+  border: none;
+  background: var(--bg-card-hi);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  min-height: 42px;
+}
+
+.v4-theme .putt-poll-btn-yes.putt-poll-btn-on {
+  background: var(--green);
+  color: #04130a;
+  box-shadow: 0 4px 16px var(--green-glow);
+  border-color: var(--green);
+}
+
+.v4-theme .putt-poll-btn-no.putt-poll-btn-on {
+  background: var(--red);
+  color: #1a050a;
+  border-color: var(--red);
+}
+
+.v4-theme .putt-poll-bar {
+  background: var(--bg-card-hi);
+}
+
+.v4-theme .putt-poll-bar-yes {
+  background: var(--green);
+}
+
+.v4-theme .putt-poll-bar-no {
+  background: var(--red);
+}
+
+.v4-theme .putt-poll-totals {
+  color: var(--muted);
+}
+
+.v4-theme .putt-poll-closed {
+  background: var(--bg-card);
+}
+
+.v4-theme .putt-poll-closed.putt-poll-made {
+  border-color: rgba(0, 217, 110, 0.35);
+}
+
+.v4-theme .putt-poll-closed.putt-poll-missed {
+  border-color: rgba(255, 75, 107, 0.35);
+}
+
+.v4-theme .putt-poll-result {
+  color: var(--text);
+}
+
+.v4-theme .putt-poll-crowd-wrong {
+  color: var(--amber);
+}
+
+/* ── Putt-IQ chip ────────────────────────────────────────────── */
+.v4-theme .puttiq-chip {
+  background: var(--green-soft);
+  border-color: rgba(0, 217, 110, 0.3);
+  color: var(--green);
+}
+
+.v4-theme .puttiq-chip:hover {
+  background: rgba(0, 217, 110, 0.22);
+}
+
+.v4-theme .puttiq-chip-acc {
+  color: var(--green);
+  opacity: 0.85;
+}
+
+.v4-theme .puttiq-chip-streak {
+  color: var(--amber);
+}
+
+.v4-theme .puttiq-chip-rank {
+  background: var(--green);
+  color: #04130a;
 }
