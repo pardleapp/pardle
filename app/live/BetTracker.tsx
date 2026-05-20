@@ -32,8 +32,16 @@ import {
 } from "./bet-shared";
 import { useAuth } from "./auth/useAuth";
 import NotificationPrompt from "./notifications/NotificationPrompt";
+import RecentFormSparkline, {
+  type RecentEvent,
+} from "./RecentFormSparkline";
 
 type BetKind = "outright" | "round-score" | "winning-score" | "top-finish";
+
+interface RecentFormEntry {
+  name: string;
+  recent: RecentEvent[];
+}
 
 interface Props {
   players: CachedLeaderboardRow[];
@@ -42,8 +50,63 @@ interface Props {
   tournamentProjections: Record<string, TournamentProjection>;
   /** Model's current top-5 / top-10 / top-20 prob per player. */
   topFinishCurrent?: Record<string, TopFinishProbs>;
+  /** Last-N-starts recent form keyed by playerId — sparkline + arrow. */
+  recentForm?: Record<string, RecentFormEntry>;
+  /** Hot/cold-hand status keyed by playerId. */
+  handStatus?: Record<string, "hot" | "cold">;
   oddsFormat: OddsFormat;
   onPickOddsFormat: (fmt: OddsFormat) => void;
+}
+
+function recentTrendFor(recent: RecentEvent[]): "up" | "down" | "flat" {
+  if (recent.length < 5) return "flat";
+  const scoreOf = (e: RecentEvent) =>
+    e.finishPos ?? (e.madeCut ? 80 : 90);
+  const newer = (scoreOf(recent[0]) + scoreOf(recent[1]) + scoreOf(recent[2])) / 3;
+  const older = (scoreOf(recent[3]) + scoreOf(recent[4])) / 2;
+  const diff = older - newer;
+  if (diff > 8) return "up";
+  if (diff < -8) return "down";
+  return "flat";
+}
+
+function PlayerRowName({
+  bet,
+  recentForm,
+  handStatus,
+  children,
+}: {
+  bet: { playerId: string; playerName: string };
+  recentForm: Record<string, RecentFormEntry> | undefined;
+  handStatus: Record<string, "hot" | "cold"> | undefined;
+  /** Optional override for the name slot — used by top-finish and
+   *  round-score rows to include their sub-label inline. */
+  children?: JSX.Element | string;
+}) {
+  const form = recentForm?.[bet.playerId];
+  const hand = handStatus?.[bet.playerId];
+  return (
+    <>
+      <p className="bets-row-name">
+        {hand && (
+          <span
+            className={`hand-badge hand-badge-${hand}`}
+            aria-hidden="true"
+          >
+            {hand === "hot" ? "🔥" : "🥶"}
+          </span>
+        )}
+        {children ?? bet.playerName}
+      </p>
+      {form && (
+        <RecentFormSparkline
+          recent={form.recent}
+          trend={recentTrendFor(form.recent)}
+          mode="compact"
+        />
+      )}
+    </>
+  );
 }
 
 function parseOdds(
@@ -70,6 +133,8 @@ export default function BetTracker({
   playerRoundStates,
   tournamentProjections,
   topFinishCurrent,
+  recentForm,
+  handStatus,
   oddsFormat,
   onPickOddsFormat,
 }: Props) {
@@ -232,6 +297,8 @@ export default function BetTracker({
           oddsFormat={oddsFormat}
           settled={settledByBet.get(b.id) ?? null}
           onRemove={() => removeBet(b.id)}
+          recentForm={recentForm}
+          handStatus={handStatus}
         />
       );
     if (b.kind === "winning-score")
@@ -254,6 +321,8 @@ export default function BetTracker({
           oddsFormat={oddsFormat}
           settled={settledByBet.get(b.id) ?? null}
           onRemove={() => removeBet(b.id)}
+          recentForm={recentForm}
+          handStatus={handStatus}
         />
       );
     return (
@@ -264,6 +333,8 @@ export default function BetTracker({
         oddsFormat={oddsFormat}
         settled={settledByBet.get(b.id) ?? null}
         onRemove={() => removeBet(b.id)}
+        recentForm={recentForm}
+        handStatus={handStatus}
       />
     );
   };
@@ -419,6 +490,8 @@ export default function BetTracker({
           players={players}
           playerRoundStates={playerRoundStates}
           tournamentProjections={tournamentProjections}
+          recentForm={recentForm}
+          handStatus={handStatus}
           oddsFormat={oddsFormat}
           onAdd={(b) => {
             addBet(b);
@@ -446,12 +519,16 @@ function OutrightRow({
   oddsFormat,
   settled,
   onRemove,
+  recentForm,
+  handStatus,
 }: {
   bet: OutrightBet;
   currentOdds: Record<string, number>;
   oddsFormat: OddsFormat;
   settled: { won: boolean } | null;
   onRemove: () => void;
+  recentForm: Record<string, RecentFormEntry> | undefined;
+  handStatus: Record<string, "hot" | "cold"> | undefined;
 }) {
   const fair = currentOdds[bet.playerId];
   const haveFair = Number.isFinite(fair) && fair > 1;
@@ -475,7 +552,11 @@ function OutrightRow({
     <li className="bets-row-wrap">
       <Link href={`/live/bet/${bet.id}`} className="bets-row bets-row-link">
         <div className="bets-row-main">
-          <p className="bets-row-name">{bet.playerName}</p>
+          <PlayerRowName
+            bet={bet}
+            recentForm={recentForm}
+            handStatus={handStatus}
+          />
           <p className="bets-row-meta">
             Win @ {formatOdds(bet.oddsTaken, oddsFormat)} ·{" "}
             {gbp.format(bet.stake)}
@@ -519,12 +600,16 @@ function TopFinishRow({
   oddsFormat,
   settled,
   onRemove,
+  recentForm,
+  handStatus,
 }: {
   bet: TopFinishBet;
   probs: TopFinishProbs | undefined;
   oddsFormat: OddsFormat;
   settled: { won: boolean } | null;
   onRemove: () => void;
+  recentForm: Record<string, RecentFormEntry> | undefined;
+  handStatus: Record<string, "hot" | "cold"> | undefined;
 }) {
   const prob = probs
     ? bet.cutoff === 5
@@ -558,10 +643,16 @@ function TopFinishRow({
     <li className="bets-row-wrap">
       <Link href={`/live/bet/${bet.id}`} className="bets-row bets-row-link">
         <div className="bets-row-main">
-          <p className="bets-row-name">
-            {bet.playerName}{" "}
-            <span className="bets-row-kind">Top {bet.cutoff}</span>
-          </p>
+          <PlayerRowName
+            bet={bet}
+            recentForm={recentForm}
+            handStatus={handStatus}
+          >
+            <>
+              {bet.playerName}{" "}
+              <span className="bets-row-kind">Top {bet.cutoff}</span>
+            </>
+          </PlayerRowName>
           <p className="bets-row-meta">
             @ {formatOdds(bet.oddsTaken, oddsFormat)} · {gbp.format(bet.stake)}
             {settled ? (
@@ -739,12 +830,16 @@ function RoundScoreRow({
   oddsFormat,
   settled,
   onRemove,
+  recentForm,
+  handStatus,
 }: {
   bet: RoundScoreBet;
   state: PlayerRoundState | undefined;
   oddsFormat: OddsFormat;
   settled: { won: boolean } | null;
   onRemove: () => void;
+  recentForm: Record<string, RecentFormEntry> | undefined;
+  handStatus: Record<string, "hot" | "cold"> | undefined;
 }) {
   const ev = evaluateRoundScore(bet, state);
   const roundLabel = bet.round != null ? `R${bet.round}` : "current round";
@@ -815,12 +910,18 @@ function RoundScoreRow({
     <li className="bets-row-wrap">
       <Link href={`/live/bet/${bet.id}`} className="bets-row bets-row-link">
         <div className="bets-row-main">
-          <p className="bets-row-name">
-            {bet.playerName}{" "}
-            <span className="bets-row-kind">
-              {bet.side} {bet.line} · {roundLabel}
-            </span>
-          </p>
+          <PlayerRowName
+            bet={bet}
+            recentForm={recentForm}
+            handStatus={handStatus}
+          >
+            <>
+              {bet.playerName}{" "}
+              <span className="bets-row-kind">
+                {bet.side} {bet.line} · {roundLabel}
+              </span>
+            </>
+          </PlayerRowName>
           <p className="bets-row-meta">
             @ {formatOdds(bet.oddsTaken, oddsFormat)} · {gbp.format(bet.stake)} ·{" "}
             {stateText}
@@ -855,6 +956,8 @@ function AddBetForm({
   players,
   playerRoundStates,
   tournamentProjections,
+  recentForm,
+  handStatus,
   oddsFormat,
   onAdd,
   onCancel,
@@ -862,6 +965,8 @@ function AddBetForm({
   players: CachedLeaderboardRow[];
   playerRoundStates: Record<string, PlayerRoundState>;
   tournamentProjections: Record<string, TournamentProjection>;
+  recentForm: Record<string, RecentFormEntry> | undefined;
+  handStatus: Record<string, "hot" | "cold"> | undefined;
   oddsFormat: OddsFormat;
   onAdd: (b: TrackedBet) => void;
   onCancel: () => void;
@@ -1089,9 +1194,25 @@ function AddBetForm({
         </>
       ) : pickedPlayer ? (
         <div className="bets-form-picked">
-          <span>
+          <div className="bets-form-picked-main">
+            {handStatus?.[pickedPlayer.id] && (
+              <span
+                className={`hand-badge hand-badge-${handStatus[pickedPlayer.id]}`}
+                aria-hidden="true"
+              >
+                {handStatus[pickedPlayer.id] === "hot" ? "🔥" : "🥶"}
+              </span>
+            )}
             <strong>{pickedPlayer.name}</strong>
-          </span>
+            {recentForm?.[pickedPlayer.id] && (
+              <RecentFormSparkline
+                recent={recentForm[pickedPlayer.id].recent}
+                trend={recentTrendFor(recentForm[pickedPlayer.id].recent)}
+                mode="full"
+                showList
+              />
+            )}
+          </div>
           <button
             type="button"
             className="bets-form-change"
@@ -1112,21 +1233,42 @@ function AddBetForm({
           />
           {filtered.length > 0 && (
             <ul className="bets-form-suggest">
-              {filtered.map((p) => (
-                <li key={p.playerId}>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPickedPlayer({ id: p.playerId, name: p.displayName })
-                    }
-                  >
-                    {p.displayName}
-                    <span className="bets-form-suggest-meta">
-                      {p.position} · {p.total}
-                    </span>
-                  </button>
-                </li>
-              ))}
+              {filtered.map((p) => {
+                const form = recentForm?.[p.playerId];
+                const hand = handStatus?.[p.playerId];
+                return (
+                  <li key={p.playerId}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPickedPlayer({ id: p.playerId, name: p.displayName })
+                      }
+                    >
+                      <span className="bets-form-suggest-name">
+                        {hand && (
+                          <span
+                            className={`hand-badge hand-badge-${hand}`}
+                            aria-hidden="true"
+                          >
+                            {hand === "hot" ? "🔥" : "🥶"}
+                          </span>
+                        )}
+                        {p.displayName}
+                      </span>
+                      {form && (
+                        <RecentFormSparkline
+                          recent={form.recent}
+                          trend={recentTrendFor(form.recent)}
+                          mode="compact"
+                        />
+                      )}
+                      <span className="bets-form-suggest-meta">
+                        {p.position} · {p.total}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </>

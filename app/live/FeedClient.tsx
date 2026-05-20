@@ -128,6 +128,21 @@ interface FeedResponse {
     hot: Array<{ playerId: string; displayName: string; sgTotal: number }>;
     cold: Array<{ playerId: string; displayName: string; sgTotal: number }>;
   };
+  /** Recent-form sparkline data — last 8 PGA Tour starts per player.
+   *  Sparse: only top-30 leaderboard players are mapped. */
+  recentForm?: Record<
+    string,
+    {
+      name: string;
+      recent: Array<{
+        season: number;
+        tournament: string;
+        finishText: string;
+        finishPos: number | null;
+        madeCut: boolean;
+      }>;
+    }
+  >;
   watching: number;
   seenToday: number;
   polled: boolean;
@@ -456,6 +471,8 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           playerRoundStates={data.playerRoundStates ?? {}}
           tournamentProjections={data.tournamentProjections ?? {}}
           topFinishCurrent={data.topFinishCurrent}
+          recentForm={data.recentForm}
+          handStatus={data.handStatus}
           oddsFormat={oddsFormat}
           onPickOddsFormat={pickOddsFormat}
         />
@@ -512,7 +529,12 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       </nav>
 
       {view === "leaderboard" ? (
-        <LeaderboardPanel rows={data.leaderboard ?? []} mode="tab" />
+        <LeaderboardPanel
+          rows={data.leaderboard ?? []}
+          mode="tab"
+          recentForm={data.recentForm}
+          handStatus={data.handStatus}
+        />
       ) : (
         <>
       <ReelGroup

@@ -7,11 +7,13 @@ import {
   getScorecards,
 } from "@/lib/golf-api/pgatour";
 import { getPlayerReelRows } from "@/lib/feed/player-rows";
+import { getRecentFormByName } from "@/lib/feed/recent-form";
 import { getRecentHoles } from "@/lib/feed/recent-holes";
 import { derivePlayerStats } from "@/lib/feed/scorecard-stats";
 import { resultFor } from "@/lib/feed/types";
 import FollowButton from "../../FollowButton";
 import PlayerHighlights from "../../PlayerHighlights";
+import PlayerRecentForm from "../../PlayerRecentForm";
 import PlayerStats from "../../PlayerStats";
 import RecentHoles from "../../RecentHoles";
 
@@ -51,6 +53,7 @@ export default async function PlayerPage({ params }: PageProps) {
   if (!row && !scorecard) notFound();
 
   const playerName = row?.displayName ?? "Player";
+  const recentForm = getRecentFormByName(playerName);
   const stats = scorecard
     ? derivePlayerStats(scorecard)
     : null;
@@ -95,6 +98,8 @@ export default async function PlayerPage({ params }: PageProps) {
           </div>
         )}
       </section>
+
+      <PlayerRecentForm recent={recentForm?.recent ?? []} />
 
       <PlayerHighlights best={reelRows.best} worst={reelRows.worst} />
 

@@ -6153,12 +6153,24 @@ footer {
 
 .lb-row {
   display: grid;
-  grid-template-columns: 38px 1fr auto auto;
+  grid-template-columns: 38px 1fr auto auto auto;
   align-items: center;
   gap: 8px;
   padding: 7px 14px;
   font-size: 14px;
   border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* On mobile the sparkline can collide with the name in narrow viewports
+   — collapse to 4 columns and hide the sparkline column. The hot/cold
+   badge inside .lb-name still shows the momentum signal. */
+@media (max-width: 480px) {
+  .lb-row {
+    grid-template-columns: 38px 1fr auto auto;
+  }
+  .lb-row .recent-form {
+    display: none;
+  }
 }
 
 .lb-pos {
@@ -7250,15 +7262,30 @@ footer {
   color: var(--muted);
 }
 
+.bets-form-suggest-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
 .bets-form-picked {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: rgba(123, 174, 63, 0.08);
   font-size: 14px;
+}
+
+.bets-form-picked-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .bets-form-change {
@@ -8273,6 +8300,178 @@ footer {
   .momentum-chip-cold {
     color: #b0c8e8;
     background: rgba(123, 178, 230, 0.14);
+  }
+}
+
+/* ── Player-page recent-form section ─────────────────────────────── */
+.pcard-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pcard-form-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pcard-form-trend {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.pcard-form-trend-up {
+  color: #2f8d3f;
+  background: rgba(123, 174, 63, 0.16);
+}
+
+.pcard-form-trend-down {
+  color: #b94b4b;
+  background: rgba(217, 123, 91, 0.16);
+}
+
+.pcard-form-trend-flat {
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.pcard-form-spark .recent-form-bars {
+  height: 28px;
+}
+
+.pcard-form-spark .recent-form-bar {
+  width: 8px;
+  border-radius: 2px;
+}
+
+.pcard-form-list {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pcard-form-row {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  font-size: 13px;
+}
+
+.pcard-form-finish {
+  font-weight: 800;
+  color: #2f8d3f;
+  font-variant-numeric: tabular-nums;
+}
+
+.pcard-form-finish-mc {
+  color: #b94b4b;
+}
+
+.pcard-form-tournament {
+  color: var(--text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pcard-form-season {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+@media (prefers-color-scheme: dark) {
+  .pcard-form-trend-up {
+    color: #a4d56e;
+    background: rgba(123, 174, 63, 0.22);
+  }
+  .pcard-form-trend-down {
+    color: #e89595;
+    background: rgba(217, 123, 91, 0.22);
+  }
+  .pcard-form-finish {
+    color: #a4d56e;
+  }
+  .pcard-form-finish-mc {
+    color: #e89595;
+  }
+}
+
+/* ── Recent-form sparkline ───────────────────────────────────────── */
+.recent-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  vertical-align: middle;
+}
+
+.recent-form-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 16px;
+}
+
+.recent-form-compact .recent-form-bars {
+  height: 12px;
+}
+
+.recent-form-bar {
+  width: 4px;
+  border-radius: 1px;
+  min-height: 1px;
+  display: block;
+}
+
+.recent-form-compact .recent-form-bar {
+  width: 3px;
+}
+
+.recent-form-arrow {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.spark-arrow-up {
+  color: #2f8d3f;
+}
+
+.spark-arrow-down {
+  color: #b94b4b;
+}
+
+.spark-arrow-flat {
+  color: var(--muted);
+}
+
+.recent-form-list {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (prefers-color-scheme: dark) {
+  .spark-arrow-up {
+    color: #a4d56e;
+  }
+  .spark-arrow-down {
+    color: #e89595;
   }
 }
 

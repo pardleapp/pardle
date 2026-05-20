@@ -43,6 +43,7 @@ import {
   getUserStats,
   type PuttIqStats,
 } from "@/lib/feed/putt-iq";
+import { getRecentFormBulk, type RecentForm } from "@/lib/feed/recent-form";
 
 export const dynamic = "force-dynamic";
 
@@ -448,6 +449,18 @@ async function handle(req: Request) {
   // a noisy "hottest".
   const fieldMomentum = deriveFieldMomentum(playerSgBreakdown, leaderboard);
 
+  // Recent-form sparkline data — last 8 starts per leaderboard player.
+  // Pure JSON lookup from a pre-baked file (server-only); no API
+  // calls, no per-shot latency. Top 30 of the leaderboard covers
+  // everyone shown on the leaderboard panel + practically every
+  // tracked bet (bets are placed on prominent players).
+  const recentForm = getRecentFormBulk(
+    leaderboard.slice(0, 30).map((r) => ({
+      playerId: r.playerId,
+      displayName: r.displayName,
+    })),
+  );
+
   return NextResponse.json({
     tournament: {
       id: tournament.id,
@@ -513,6 +526,12 @@ async function handle(req: Request) {
     /** Top 3 / bottom 3 by week-to-date sg_total. Powers the
      *  "🔥 hottest this week / 🥶 coldest" strip near the top of /live. */
     fieldMomentum,
+    /** Recent-form sparkline data keyed by playerId. Last 8 PGA Tour
+     *  starts: finish text + numeric position + made-cut flag. Sparse
+     *  — only top-30 leaderboard players are mapped. Powers the
+     *  sparkline next to player names on leaderboard rows + bet
+     *  tracker cards. */
+    recentForm,
     // Heavy chart buffers — opt-in via ?include=charts. Bet detail
     // page passes it; the home feed doesn't need them and skipping
     // them drops the response by an order of magnitude per poll.
