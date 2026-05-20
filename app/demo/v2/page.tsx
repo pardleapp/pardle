@@ -1,12 +1,14 @@
 /**
- * /demo/v2 — side-by-side comparison of the current design vs the
- * proposed v2 refresh. Five component pairs in a stacked grid so
- * the visual deltas are immediately legible.
+ * /demo/v2 — three-way comparison of the current design, a "trading
+ * terminal" v2 refresh, and an "editorial / Athletic" v3 refresh.
+ * Five component groups (header, feed row, bet card, leaderboard,
+ * putt poll) rendered in all three treatments.
  *
- * "Current" side uses live globals.css classes — what /live looks
- * like right now. "V2" side uses scoped classes defined inline at
- * the top of this file: dark bg, tabular figures, monospace numbers,
- * tighter radii, bigger data + smaller labels, SVG icons.
+ * v2 = dark default, monospace tabular numerals, uppercase labels,
+ *      tight radii, SVG icons, cyan live accent — trading-terminal vibe.
+ * v3 = light, generous typography, serif headlines, prose-style copy
+ *      instead of chip-chains, deep forest green + gold accents —
+ *      premium content destination vibe.
  *
  * Throwaway route. Delete after a direction's picked.
  */
@@ -415,9 +417,323 @@ const V2_CSS = `
   color: var(--v2-red);
 }
 
+/* ──────────────────────────────────────────────────────────────── */
+/* V3 — editorial / Athletic                                         */
+/* Light, serif headlines, generous typography, prose-style copy.    */
+/* ──────────────────────────────────────────────────────────────── */
+.v3-preview {
+  --v3-bg: #faf8f4;
+  --v3-bg-elevated: #ffffff;
+  --v3-border: #e5e1d8;
+  --v3-border-strong: #c9c2b4;
+  --v3-text: #1a1a1a;
+  --v3-text-dim: #6f6a64;
+  --v3-text-label: #918a82;
+  --v3-green: #1f4a2c;
+  --v3-green-soft: #5a7d3a;
+  --v3-red: #7a2932;
+  --v3-gold: #a47d2b;
+  --v3-serif: 'Charter', 'Source Serif Pro', 'Source Serif 4',
+               'Iowan Old Style', 'Apple Garamond', Georgia,
+               'Times New Roman', serif;
+  --v3-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+              Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  background: var(--v3-bg);
+  color: var(--v3-text);
+  border-radius: 4px;
+  padding: 22px 20px;
+  font-family: var(--v3-sans);
+  line-height: 1.4;
+}
+
+/* Tournament header (v3) */
+.v3-header {
+  border-bottom: 1px solid var(--v3-border-strong);
+  padding-bottom: 14px;
+}
+
+.v3-header-eyebrow {
+  font-family: var(--v3-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--v3-green);
+  margin: 0 0 4px;
+}
+
+.v3-tournament {
+  font-family: var(--v3-serif);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--v3-text);
+  margin: 0;
+  line-height: 1.15;
+}
+
+.v3-header-meta {
+  font-family: var(--v3-sans);
+  font-size: 12px;
+  color: var(--v3-text-dim);
+  margin: 8px 0 0;
+}
+
+/* Feed row (v3) — prose style, no chips */
+.v3-feed-row {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--v3-border);
+}
+
+.v3-feed-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.v3-feed-name {
+  font-family: var(--v3-serif);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--v3-text);
+  line-height: 1.1;
+}
+
+.v3-feed-name-dot {
+  color: var(--v3-gold);
+  margin-right: 6px;
+}
+
+.v3-feed-actions {
+  display: flex;
+  gap: 14px;
+  font-family: var(--v3-sans);
+  font-size: 12px;
+  color: var(--v3-text-dim);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.v3-feed-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.v3-feed-prose {
+  font-family: var(--v3-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--v3-text);
+  margin: 6px 0 10px;
+  max-width: 50ch;
+}
+
+.v3-feed-emphasis {
+  color: var(--v3-green);
+  font-weight: 700;
+}
+
+.v3-feed-emphasis-bad {
+  color: var(--v3-red);
+  font-weight: 700;
+}
+
+.v3-feed-meta {
+  font-family: var(--v3-sans);
+  font-size: 11px;
+  color: var(--v3-text-label);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Bet card (v3) */
+.v3-bet-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--v3-border);
+  border-radius: 4px;
+  background: var(--v3-bg-elevated);
+}
+
+.v3-bet-name {
+  font-family: var(--v3-serif);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--v3-text);
+  line-height: 1.2;
+}
+
+.v3-bet-meta {
+  font-family: var(--v3-sans);
+  font-size: 12px;
+  color: var(--v3-text-dim);
+}
+
+.v3-bet-meta-fine {
+  font-size: 11px;
+  color: var(--v3-text-label);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.v3-bet-value {
+  font-family: var(--v3-serif);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--v3-text);
+  text-align: right;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.v3-bet-pnl {
+  font-family: var(--v3-sans);
+  font-size: 12px;
+  color: var(--v3-green);
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Leaderboard (v3) */
+.v3-lb-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto auto;
+  align-items: baseline;
+  gap: 14px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--v3-border);
+  font-family: var(--v3-sans);
+}
+
+.v3-lb-pos {
+  font-family: var(--v3-serif);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--v3-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.v3-lb-name {
+  font-family: var(--v3-serif);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--v3-text);
+  letter-spacing: -0.01em;
+}
+
+.v3-lb-form {
+  font-family: var(--v3-sans);
+  font-size: 10px;
+  color: var(--v3-text-label);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+.v3-lb-total {
+  font-family: var(--v3-serif);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--v3-green);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.v3-lb-thru {
+  font-family: var(--v3-sans);
+  font-size: 11px;
+  color: var(--v3-text-dim);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Putt poll (v3) — framed as a journalism prompt */
+.v3-poll {
+  padding: 22px;
+  border: 1px solid var(--v3-border-strong);
+  border-radius: 4px;
+  background: var(--v3-bg-elevated);
+  position: relative;
+}
+
+.v3-poll-rule {
+  position: absolute;
+  top: 0;
+  left: 22px;
+  right: 22px;
+  border-top: 2px solid var(--v3-gold);
+}
+
+.v3-poll-eyebrow {
+  font-family: var(--v3-sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--v3-gold);
+  margin: 6px 0 8px;
+}
+
+.v3-poll-question {
+  font-family: var(--v3-serif);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  color: var(--v3-text);
+  margin: 0 0 14px;
+}
+
+.v3-poll-context {
+  font-family: var(--v3-sans);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--v3-text-dim);
+  margin: 0 0 16px;
+}
+
+.v3-poll-context strong {
+  color: var(--v3-text);
+}
+
+.v3-poll-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.v3-poll-btn {
+  padding: 12px 18px;
+  border: 1px solid var(--v3-border-strong);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--v3-text);
+  font-family: var(--v3-serif);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 100ms, border-color 100ms, color 100ms;
+}
+
+.v3-poll-btn:hover {
+  border-color: var(--v3-green);
+  color: var(--v3-green);
+  background: rgba(31, 74, 44, 0.04);
+}
+
 /* Wrapper grid */
 .demo-wrap {
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 24px 16px 60px;
 }
@@ -439,9 +755,10 @@ const V2_CSS = `
 
 .demo-pair {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 16px;
   margin-bottom: 36px;
+  align-items: start;
 }
 
 .demo-side {
@@ -466,7 +783,7 @@ const V2_CSS = `
   background: var(--bg);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 1100px) {
   .demo-pair {
     grid-template-columns: 1fr;
   }
@@ -506,18 +823,22 @@ export default function V2DesignDemo() {
         <Link href="/" style={{ fontSize: 12, color: "var(--muted)" }}>
           ← back
         </Link>
-        <h1 className="demo-h1">Design refresh · v2 preview</h1>
+        <h1 className="demo-h1">Design refresh · three directions</h1>
         <p
           style={{
             margin: "4px 0 28px",
             color: "var(--muted)",
             fontSize: 13,
+            lineHeight: 1.5,
           }}
         >
-          Same content, two visual treatments. Left: today on pardle.app.
-          Right: proposed v2 — dark default, tabular monospace numbers,
-          tighter radii, bigger data with smaller labels, SVG icons. Throwaway
-          route — delete once a direction's picked.
+          Same content, three visual treatments side-by-side. Stacks
+          vertically on narrower screens. <strong>Current</strong>:
+          today on pardle.app. <strong>V2</strong>: trading-terminal —
+          dark, monospace, tabular. <strong>V3</strong>: editorial /
+          Athletic — light, serif, prose-style, premium publication
+          energy. Throwaway route — delete once a direction&apos;s
+          picked.
         </p>
 
         {/* ── 1. Tournament header ──────────────────────────────── */}
@@ -545,7 +866,7 @@ export default function V2DesignDemo() {
               </div>
             </div>
             <div className="demo-side">
-              <p className="demo-side-label">V2</p>
+              <p className="demo-side-label">V2 · trading terminal</p>
               <div className="v2-preview">
                 <div className="v2-header">
                   <div className="v2-header-left">
@@ -555,6 +876,20 @@ export default function V2DesignDemo() {
                     </span>
                   </div>
                   <span className="v2-elapsed">R3 · 14:23 ET</span>
+                </div>
+              </div>
+            </div>
+            <div className="demo-side">
+              <p className="demo-side-label">V3 · editorial</p>
+              <div className="v3-preview">
+                <div className="v3-header">
+                  <p className="v3-header-eyebrow">Live · Round 3</p>
+                  <h3 className="v3-tournament">
+                    Charles Schwab Challenge
+                  </h3>
+                  <p className="v3-header-meta">
+                    Colonial Country Club · Fort Worth · 78 in the field
+                  </p>
                 </div>
               </div>
             </div>
@@ -595,7 +930,7 @@ export default function V2DesignDemo() {
               </div>
             </div>
             <div className="demo-side">
-              <p className="demo-side-label">V2</p>
+              <p className="demo-side-label">V2 · trading terminal</p>
               <div className="v2-preview">
                 <div className="v2-feed-row">
                   <div className="v2-feed-icon">
@@ -625,6 +960,31 @@ export default function V2DesignDemo() {
                       <IconComment /> 3
                     </span>
                   </div>
+                </div>
+              </div>
+            </div>
+            <div className="demo-side">
+              <p className="demo-side-label">V3 · editorial</p>
+              <div className="v3-preview">
+                <div className="v3-feed-row">
+                  <div className="v3-feed-head">
+                    <h4 className="v3-feed-name">
+                      <span className="v3-feed-name-dot">●</span>
+                      Joaquin Niemann
+                    </h4>
+                    <div className="v3-feed-actions">
+                      <span className="v3-feed-action">▲ 12</span>
+                      <span className="v3-feed-action">💬 3</span>
+                    </div>
+                  </div>
+                  <p className="v3-feed-prose">
+                    <span className="v3-feed-emphasis">Birdies the 14th</span>
+                    {" "}— his 4th of the round, more than any other player
+                    in the field today. Backed by 28% of Pardle bettors this
+                    week, and registering hot on the course (top five by
+                    strokes gained today).
+                  </p>
+                  <p className="v3-feed-meta">R3 · 2 min ago</p>
                 </div>
               </div>
             </div>
@@ -661,7 +1021,7 @@ export default function V2DesignDemo() {
               </div>
             </div>
             <div className="demo-side">
-              <p className="demo-side-label">V2</p>
+              <p className="demo-side-label">V2 · trading terminal</p>
               <div className="v2-preview">
                 <div className="v2-bet-card">
                   <div className="v2-bet-name">
@@ -684,6 +1044,28 @@ export default function V2DesignDemo() {
                   <div className="v2-bet-meta">
                     WIN  +1500  ·  £20 STAKE
                   </div>
+                </div>
+              </div>
+            </div>
+            <div className="demo-side">
+              <p className="demo-side-label">V3 · editorial</p>
+              <div className="v3-preview">
+                <div className="v3-bet-card">
+                  <div className="v3-bet-name">Joaquin Niemann</div>
+                  <div className="v3-bet-value">
+                    £42.00
+                    <div className="v3-bet-pnl">+110.0%</div>
+                  </div>
+                  <div className="v3-bet-meta">
+                    Win @ +1500 · £20 stake
+                  </div>
+                  <div className="v3-bet-pnl" style={{ alignSelf: "end" }}>
+                    +£22.00
+                  </div>
+                  <div className="v3-bet-meta-fine">
+                    placed 36h ago
+                  </div>
+                  <div />
                 </div>
               </div>
             </div>
@@ -736,7 +1118,7 @@ export default function V2DesignDemo() {
               </div>
             </div>
             <div className="demo-side">
-              <p className="demo-side-label">V2</p>
+              <p className="demo-side-label">V2 · trading terminal</p>
               <div className="v2-preview">
                 <div className="v2-lb-row">
                   <span className="v2-lb-pos">01</span>
@@ -781,6 +1163,44 @@ export default function V2DesignDemo() {
                 </div>
               </div>
             </div>
+            <div className="demo-side">
+              <p className="demo-side-label">V3 · editorial</p>
+              <div className="v3-preview">
+                <div className="v3-lb-row">
+                  <span className="v3-lb-pos">1</span>
+                  <div>
+                    <div className="v3-lb-name">Joaquin Niemann</div>
+                    <div className="v3-lb-form">
+                      Form: T6 · MC · T19 · T17 · T28
+                    </div>
+                  </div>
+                  <span className="v3-lb-total">−10</span>
+                  <span className="v3-lb-thru">thru 11</span>
+                </div>
+                <div className="v3-lb-row">
+                  <span className="v3-lb-pos">T2</span>
+                  <div>
+                    <div className="v3-lb-name">Scottie Scheffler</div>
+                    <div className="v3-lb-form">
+                      Form: T3 · Win · T11 · T28 · MC
+                    </div>
+                  </div>
+                  <span className="v3-lb-total">−8</span>
+                  <span className="v3-lb-thru">thru 13</span>
+                </div>
+                <div className="v3-lb-row">
+                  <span className="v3-lb-pos">T2</span>
+                  <div>
+                    <div className="v3-lb-name">Patrick Cantlay</div>
+                    <div className="v3-lb-form">
+                      Form: T42 · MC · T35 · T19 · T56
+                    </div>
+                  </div>
+                  <span className="v3-lb-total">−8</span>
+                  <span className="v3-lb-thru">F</span>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -820,7 +1240,7 @@ export default function V2DesignDemo() {
               </div>
             </div>
             <div className="demo-side">
-              <p className="demo-side-label">V2</p>
+              <p className="demo-side-label">V2 · trading terminal</p>
               <div className="v2-preview">
                 <div className="v2-poll">
                   <div className="v2-poll-head">
@@ -842,24 +1262,67 @@ export default function V2DesignDemo() {
                 </div>
               </div>
             </div>
+            <div className="demo-side">
+              <p className="demo-side-label">V3 · editorial</p>
+              <div className="v3-preview">
+                <div className="v3-poll">
+                  <span className="v3-poll-rule" />
+                  <p className="v3-poll-eyebrow">A prediction for the field</p>
+                  <h4 className="v3-poll-question">
+                    Will Niemann sink this 14-footer for birdie?
+                  </h4>
+                  <p className="v3-poll-context">
+                    The tour averages <strong>22%</strong> from this
+                    distance. Niemann ranks in the top decile on the
+                    greens this week, gaining <strong>+1.8 strokes per
+                    round</strong> on the field.
+                  </p>
+                  <div className="v3-poll-buttons">
+                    <button type="button" className="v3-poll-btn">
+                      Make
+                    </button>
+                    <button type="button" className="v3-poll-btn">
+                      Miss
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
-        <p
+        <div
           style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 16,
             margin: "32px 0 0",
             fontSize: 12,
             color: "var(--muted)",
-            lineHeight: 1.5,
+            lineHeight: 1.55,
           }}
         >
-          v2 design language: dark default, monospace tabular numerals
-          throughout, uppercase + letter-spaced labels, 4-6px radii, SVG
-          icons replacing chrome emoji, cyan live indicators, magenta
-          community accent, amber/cyan hot-cold instead of fire/snowflake
-          emoji as chrome (kept inside the data card as accent). Same
-          content, different category.
-        </p>
+          <div>
+            <p style={{ fontWeight: 800, marginBottom: 4 }}>Current</p>
+            Light mode default. Green chips and emoji-led chrome.
+            Generous padding, rounded cards. Carries the daily-puzzle
+            heritage — friendly, social, casual.
+          </div>
+          <div>
+            <p style={{ fontWeight: 800, marginBottom: 4 }}>V2 · trading terminal</p>
+            Dark default. Monospace tabular numerals, uppercase letter-
+            spaced labels, 4-6px radii, SVG icons replacing chrome emoji,
+            cyan live indicators, magenta community accent. Feels like
+            a power tool for serious bettors.
+          </div>
+          <div>
+            <p style={{ fontWeight: 800, marginBottom: 4 }}>V3 · editorial</p>
+            Light, generous typography, serif headlines (Charter / Source
+            Serif), prose-style copy in place of chip chains, deep forest
+            green + gold accents, gold rule above poll cards. Feels like
+            a premium publication that happens to be live.
+          </div>
+        </div>
       </main>
     </>
   );
