@@ -34,6 +34,7 @@ import {
   type WinningScoreSnapshot,
 } from "../../bet-shared";
 import BetChartFull from "./BetChartFull";
+import { computeBetInsight } from "@/lib/feed/bet-insights";
 
 const REFRESH_MS = 6_000;
 
@@ -48,10 +49,13 @@ interface FeedResponse {
   winningScoreHistory?: WinningScoreSnapshot[];
   topFinishCurrent?: Record<string, TopFinishProbs>;
   topFinishHistory?: TopFinishSnapshot[];
-  /** Slim leaderboard rows used to detect tournament settlement. */
+  /** Slim leaderboard rows used to detect tournament settlement and
+   *  drive the "what needs to happen" insight panel. */
   playerIndex?: Array<{
     playerId: string;
+    displayName: string;
     position: string;
+    total: string;
     thru: string;
     playerState?: string;
   }>;
@@ -407,6 +411,25 @@ export default function BetDetail({ betId }: { betId: string }) {
     data.topFinishHistory,
     data.bookOdds,
   );
+  // "What needs to happen" insight — only for live (unsettled) bets.
+  // Settled bets already show the final result in the header PnL, so a
+  // second sentence telling them the bet won/lost would just be noise.
+  const insight =
+    bet.settledAt == null && settled == null
+      ? computeBetInsight({
+          bet: resolvedBet,
+          leaderboard: (data.playerIndex ?? []).map((r) => ({
+            playerId: r.playerId,
+            displayName: r.displayName,
+            position: r.position,
+            total: r.total,
+            thru: r.thru,
+            playerState: r.playerState,
+          })),
+          playerRoundStates: data.playerRoundStates,
+          tournamentProjections: data.tournamentProjections,
+        })
+      : null;
   const profit = nowValue != null ? nowValue - bet.stake : null;
   const profitPct = profit != null ? (profit / bet.stake) * 100 : null;
   const profitClass =
@@ -468,6 +491,7 @@ export default function BetDetail({ betId }: { betId: string }) {
       {bet.kind === "winning-score" ? (
         <>
           <BetChartFull bet={resolvedBet} history={history} />
+          {insight && <InsightCard insight={insight} />}
           <WinningScoreDetail
             bet={bet}
             projections={data.tournamentProjections ?? {}}
@@ -477,6 +501,7 @@ export default function BetDetail({ betId }: { betId: string }) {
       ) : (
         <>
           <BetChartFull bet={resolvedBet} history={history} />
+          {insight && <InsightCard insight={insight} />}
           {bet.kind === "round-score" ? (
             <RoundDetailTable
               bet={resolvedBet as RoundScoreBet}
@@ -796,3 +821,18 @@ function WinningScoreDetail({
   );
 }
 
+// ── "What needs to happen" insight card ────────────────────────────
+
+function InsightCard({
+  insight,
+}: {
+  insight: import("@/lib/feed/bet-insights").BetInsight;
+}) {
+  return (
+    <div className={`bd-insight bd-insight-${insight.status}`}>
+      <p className="bd-insight-label">What needs to happen</p>
+      <p className="bd-insight-headline">{insight.headline}</p>
+      {insight.hint && <p className="bd-insight-hint">{insight.hint}</p>}
+    </div>
+  );
+}

@@ -7734,6 +7734,85 @@ footer {
   font-style: italic;
 }
 
+/* "What needs to happen" insight card — sits between the chart and
+   the detail table, tells the bettor in plain English what would flip
+   the bet from losing to winning right now. Status-coloured left edge
+   tracks how plausible the path is. */
+.bd-insight {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0 4px;
+  padding: 14px 16px 14px 14px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--border);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.015);
+}
+
+.bd-insight-label {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.bd-insight-headline {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.bd-insight-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.bd-insight-favourable {
+  border-left-color: #2f8d3f;
+  background: rgba(47, 141, 63, 0.07);
+}
+
+.bd-insight-needs-work {
+  border-left-color: #b88500;
+  background: rgba(184, 133, 0, 0.07);
+}
+
+.bd-insight-long-shot {
+  border-left-color: #b13838;
+  background: rgba(177, 56, 56, 0.06);
+}
+
+.bd-insight-settled {
+  border-left-color: var(--muted);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.bd-insight-neutral {
+  border-left-color: var(--border);
+}
+
+@media (prefers-color-scheme: dark) {
+  .bd-insight {
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .bd-insight-favourable {
+    background: rgba(112, 196, 128, 0.08);
+  }
+  .bd-insight-needs-work {
+    background: rgba(232, 178, 70, 0.08);
+  }
+  .bd-insight-long-shot {
+    background: rgba(220, 102, 102, 0.08);
+  }
+}
+
 .bd-missing {
   border: 1px dashed var(--border);
   border-radius: 12px;
