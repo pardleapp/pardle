@@ -623,7 +623,7 @@ export default function HolesPage() {
       )}
 
       <header className="brand">
-        <Link className="brand-back" href="/" aria-label="All games">
+        <Link className="brand-back" href="/games" aria-label="All games">
           ←
         </Link>
         <h1>{BRAND.name}</h1>

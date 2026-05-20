@@ -722,7 +722,7 @@ export default function Page() {
       )}
 
       <header className="brand">
-        <a className="brand-back" href="/" aria-label="All games">
+        <a className="brand-back" href="/games" aria-label="All games">
           ←
         </a>
         <button
