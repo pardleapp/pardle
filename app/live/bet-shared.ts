@@ -817,6 +817,34 @@ export function evaluateWinningScore(
 
 // ── History reconstruction ──────────────────────────────────────────
 
+/**
+ * Trim a trailing run of effectively-constant values from a PnL
+ * series. Catches the "Polymarket price hit 1.0 on Sunday and kept
+ * ticking the same value through Wednesday" case where the chart
+ * would otherwise stretch days past tournament end.
+ *
+ * Only trims when the constant tail spans more than `minTailMs` of
+ * wall-clock time — that's the signal that the market resolved and
+ * the buffer is just recording a flat post-settlement value.
+ */
+function trimTrailingFlat(series: PnlSample[]): PnlSample[] {
+  if (series.length < 3) return series;
+  const lastV = series[series.length - 1].v;
+  const EPS = 0.05;
+  let firstConstantIdx = series.length - 1;
+  for (let i = series.length - 2; i >= 0; i--) {
+    if (Math.abs(series[i].v - lastV) > EPS) break;
+    firstConstantIdx = i;
+  }
+  // Need a few samples worth of constancy AND a meaningful time span
+  // (>1 hour) before we call it a post-settlement flatline.
+  if (series.length - firstConstantIdx < 3) return series;
+  const tailSpan =
+    series[series.length - 1].t - series[firstConstantIdx].t;
+  if (tailSpan < 60 * 60 * 1000) return series;
+  return series.slice(0, firstConstantIdx + 1);
+}
+
 export function reconstructHistory(
   bet: TrackedBet,
   oddsHistories: Record<string, OddsHistorySample[] | null>,
@@ -915,7 +943,7 @@ export function reconstructHistory(
     if (nowValue != null) {
       series.push({ t: chartNow, v: nowValue });
     }
-    return series;
+    return trimTrailingFlat(series);
   }
 
   if (bet.kind === "top-finish") {
@@ -941,7 +969,7 @@ export function reconstructHistory(
         series.push({ t: chartNow, v: nowValue });
       }
     }
-    return series;
+    return trimTrailingFlat(series);
   }
 
   if (bet.kind === "winning-score") {
@@ -969,7 +997,7 @@ export function reconstructHistory(
         series.push({ t: chartNow, v: nowValue });
       }
     }
-    return series;
+    return trimTrailingFlat(series);
   }
 
   const probAtP = probAtPlacementFor(bet);
