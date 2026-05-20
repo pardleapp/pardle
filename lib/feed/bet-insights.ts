@@ -42,11 +42,31 @@ interface LeaderboardLite {
   playerState?: string;
 }
 
+/**
+ * Tournament-to-date strokes-gained breakdown for one player.
+ * Values are per-round averages vs the field (positive = better).
+ * Any sub-component may be null if DataGolf hasn't reported it yet
+ * (first holes of R1 are typically null).
+ */
+export interface SgBreakdown {
+  total: number | null;
+  /** Off the tee. */
+  ott: number | null;
+  /** Approach. */
+  app: number | null;
+  /** Around the green. */
+  arg: number | null;
+  putt: number | null;
+}
+
 interface InsightInputs {
   bet: TrackedBet;
   leaderboard: LeaderboardLite[];
   playerRoundStates: Record<string, PlayerRoundState>;
   tournamentProjections?: Record<string, TournamentProjection>;
+  /** Per-player tournament-to-date SG breakdown, keyed by playerId.
+   *  Optional: when absent the insight falls back to a non-SG hint. */
+  playerSgBreakdown?: Record<string, SgBreakdown>;
 }
 
 // ── helpers ────────────────────────────────────────────────────────
@@ -79,6 +99,105 @@ function holesRemainingTotal(state: PlayerRoundState | undefined): number {
   return state.holesRemaining + roundsLeft * 18;
 }
 
+const SG_CATEGORIES: Array<{
+  key: "ott" | "app" | "arg" | "putt";
+  /** Natural-language fragment for "...on the greens", "...off the tee", etc. */
+  phrase: string;
+  /** Short label used standalone ("Approach", "Putting"). */
+  label: string;
+}> = [
+  { key: "ott", phrase: "off the tee", label: "Driving" },
+  { key: "app", phrase: "on approach", label: "Approach" },
+  { key: "arg", phrase: "around the green", label: "Short game" },
+  { key: "putt", phrase: "on the greens", label: "Putting" },
+];
+
+function formatSg(v: number): string {
+  const r = Math.round(v * 10) / 10;
+  return `${r >= 0 ? "+" : ""}${r.toFixed(1)}`;
+}
+
+/**
+ * Pick the SG category that explains the deficit best:
+ *   1. The category where the rival has the biggest edge over the bet
+ *      player (positive gap). If we can identify one, frame it as
+ *      "where the shots have leaked".
+ *   2. Fall back to the bet player's worst category (most negative SG)
+ *      — frame as "where they're losing strokes to the field".
+ *
+ * Returns null when no SG data is available either side.
+ */
+function sgLeakHint(
+  me: SgBreakdown | undefined,
+  rival: SgBreakdown | undefined,
+  meName: string,
+  rivalName: string | null,
+): string | undefined {
+  if (!me) return undefined;
+  // Try gap-vs-rival first when we have both sides.
+  if (rival && rivalName) {
+    let bestGap = -Infinity;
+    let bestCat: (typeof SG_CATEGORIES)[number] | null = null;
+    let bestMe = 0;
+    let bestRival = 0;
+    for (const c of SG_CATEGORIES) {
+      const mv = me[c.key];
+      const rv = rival[c.key];
+      if (mv == null || rv == null) continue;
+      const gap = rv - mv;
+      if (gap > bestGap) {
+        bestGap = gap;
+        bestCat = c;
+        bestMe = mv;
+        bestRival = rv;
+      }
+    }
+    // Only surface if the gap is meaningful (>0.4 SG/round) — otherwise
+    // a near-zero gap reads as forced narrative.
+    if (bestCat && bestGap >= 0.4) {
+      return `${rivalName} ${formatSg(bestRival)} SG ${bestCat.phrase} this week vs ${meName} ${formatSg(bestMe)} — biggest gap to close`;
+    }
+  }
+  // Fall back to me's worst category (most negative SG).
+  let worstVal = Infinity;
+  let worstCat: (typeof SG_CATEGORIES)[number] | null = null;
+  for (const c of SG_CATEGORIES) {
+    const mv = me[c.key];
+    if (mv == null) continue;
+    if (mv < worstVal) {
+      worstVal = mv;
+      worstCat = c;
+    }
+  }
+  if (worstCat && worstVal < -0.2) {
+    return `${worstCat.label} has been the leak (${formatSg(worstVal)} SG/round this week)`;
+  }
+  return undefined;
+}
+
+/**
+ * Identify the bet player's *best* SG category — used for "this is
+ * the engine" hints when they're already favoured (leading / inside
+ * the cut with cushion).
+ */
+function sgEngineHint(me: SgBreakdown | undefined): string | undefined {
+  if (!me) return undefined;
+  let bestVal = -Infinity;
+  let bestCat: (typeof SG_CATEGORIES)[number] | null = null;
+  for (const c of SG_CATEGORIES) {
+    const mv = me[c.key];
+    if (mv == null) continue;
+    if (mv > bestVal) {
+      bestVal = mv;
+      bestCat = c;
+    }
+  }
+  if (bestCat && bestVal >= 0.5) {
+    return `${bestCat.label} ${formatSg(bestVal)} SG/round has been the engine this week`;
+  }
+  return undefined;
+}
+
 // ── per-kind insight composers ────────────────────────────────────
 
 function outrightInsight(
@@ -95,23 +214,26 @@ function outrightInsight(
   // never against the bet's own player — otherwise a solo leader's
   // bet card reads "leading by 0" because the position-1 lookup
   // returned themselves. Take the best to-par among everyone else.
+  let rival: LeaderboardLite | null = null;
   let bestRivalToPar: number | null = null;
-  let bestRivalName: string | null = null;
   for (const row of args.leaderboard) {
     if (row.playerId === bet.playerId) continue;
     const tp = parseToPar(row.total);
     if (tp === null) continue;
     if (bestRivalToPar === null || tp < bestRivalToPar) {
       bestRivalToPar = tp;
-      bestRivalName = row.displayName;
+      rival = row;
     }
   }
-  if (bestRivalToPar === null) return null;
+  if (bestRivalToPar === null || !rival) return null;
 
   const remaining = holesRemainingTotal(
     args.playerRoundStates[bet.playerId],
   );
   const playerName = me.displayName;
+  const rivalName = rival.displayName;
+  const meSg = args.playerSgBreakdown?.[bet.playerId];
+  const rivalSg = args.playerSgBreakdown?.[rival.playerId];
 
   // Negative = bet player is ahead of the field; positive = behind.
   const deficit = myToPar - bestRivalToPar;
@@ -136,9 +258,10 @@ function outrightInsight(
     return {
       headline: `${playerName} leading by ${plural(lead, "stroke")} with ${plural(remaining, "hole")} to play`,
       hint:
-        lead >= 3
-          ? "Just needs to stay upright — comfortable cushion"
-          : `${bestRivalName ?? "Field"} ${plural(lead, "stroke")} back and closest`,
+        sgEngineHint(meSg) ??
+        (lead >= 3
+          ? `${rivalName} the closest threat, ${plural(lead, "stroke")} back`
+          : `${rivalName} ${plural(lead, "stroke")} back and closing`),
       status: "favourable",
     };
   }
@@ -146,38 +269,29 @@ function outrightInsight(
   // Tied with the closest rival.
   if (deficit === 0) {
     return {
-      headline: `${playerName} tied for the lead with ${plural(remaining, "hole")} to play`,
-      hint: bestRivalName
-        ? `Level with ${bestRivalName} — one birdie ahead of the field and ${playerName} is out front`
-        : undefined,
+      headline: `${playerName} tied with ${rivalName} for the lead, ${plural(remaining, "hole")} to play`,
+      hint: sgEngineHint(meSg),
       status: "favourable",
     };
   }
+
+  // Behind — needs to make up ground. Frame as "play these N holes
+  // X shots better than [rival]" — that's the actual ask.
   const gap = deficit;
+  const realisticBirdies = Math.min(remaining, 8);
+  const longShot = gap > Math.floor(realisticBirdies / 2);
 
-  // Behind — need to make up ground.
-  // Crude framing: each "birdie ahead of the leader" closes one stroke.
-  const birdiesNeeded = gap;
-  const realisticBirdies = Math.min(remaining, 8); // pros rarely make >8 birdies
-  const longShot = birdiesNeeded > Math.floor(realisticBirdies / 2);
-
-  // Try to pick a textual sense of "how hard": 1 stroke back = easy,
-  // 2-3 back = "feasible", 4+ back = "needs a charge".
   let headline: string;
-  let hint: string | undefined;
   if (gap === 1) {
-    headline = `${playerName} 1 stroke back with ${plural(remaining, "hole")} left`;
-    hint = "One birdie ahead of the leader and it's even";
+    headline = `${playerName} 1 stroke back — needs to play these ${plural(remaining, "hole")} one shot better than ${rivalName}`;
   } else if (gap <= 3) {
-    headline = `${playerName} ${gap} strokes back with ${plural(remaining, "hole")} left`;
-    hint = `Roughly ${plural(gap, "birdie")} ahead of the leader's pace to tie`;
+    headline = `${playerName} ${gap} strokes back — needs to outscore ${rivalName} by ${gap} over the last ${plural(remaining, "hole")}`;
   } else {
-    headline = `${playerName} ${gap} back with ${plural(remaining, "hole")} left — needs a charge`;
-    hint = `Looking at ${plural(gap, "birdie")} ahead of the leader's remaining holes`;
+    headline = `${playerName} ${gap} back with ${plural(remaining, "hole")} left — needs a real charge to catch ${rivalName}`;
   }
   return {
     headline,
-    hint,
+    hint: sgLeakHint(meSg, rivalSg, playerName, rivalName),
     status: longShot ? "long-shot" : "needs-work",
   };
 }
@@ -197,6 +311,7 @@ function topFinishInsight(
   const remaining = holesRemainingTotal(
     args.playerRoundStates[bet.playerId],
   );
+  const meSg = args.playerSgBreakdown?.[bet.playerId];
 
   // Already inside the cut — comfort or coast message.
   if (myPos <= cutoff) {
@@ -206,44 +321,56 @@ function topFinishInsight(
         status: "settled",
       };
     }
-    // How much room is there? Find the player one outside top-N.
+    // How much room is there? Find the first player outside top-N.
     const bubble = args.leaderboard.find((r) => {
       const p = parsePosition(r.position);
       return p === cutoff + 1 || (p ?? 99) > cutoff;
     });
     const bubbleToPar = bubble ? parseToPar(bubble.total) : null;
+    const bubbleSg = bubble
+      ? args.playerSgBreakdown?.[bubble.playerId]
+      : undefined;
     const cushion = bubbleToPar !== null ? bubbleToPar - myToPar : null;
     if (cushion !== null && cushion >= 0) {
+      const engine = sgEngineHint(meSg);
       return {
-        headline: `${playerName} is ${me.position} with a ${cushion}-stroke cushion outside Top ${cutoff}`,
-        hint: `${plural(remaining, "hole")} left to defend the position`,
+        headline: `${playerName} ${me.position} with a ${plural(cushion, "stroke")} cushion over the cut line, ${plural(remaining, "hole")} left`,
+        hint:
+          engine ??
+          (bubble
+            ? `${bubble.displayName} the closest threat from outside Top ${cutoff}`
+            : undefined),
         status: cushion >= 2 ? "favourable" : "needs-work",
       };
     }
     return {
-      headline: `${playerName} is currently ${me.position} (inside Top ${cutoff}) with ${plural(remaining, "hole")} left`,
+      headline: `${playerName} ${me.position} (inside Top ${cutoff}), ${plural(remaining, "hole")} left to defend`,
+      hint: sgEngineHint(meSg),
       status: "favourable",
     };
+    void bubbleSg;
   }
 
-  // Outside the cut — need to climb. Estimate the strokes-gap to
-  // top-N's CURRENT score.
+  // Outside the cut — need to climb. Find the worst player still
+  // inside the cut (highest to-par) — that's who they need to leapfrog.
   const lastInside = args.leaderboard
     .filter((r) => {
       const p = parsePosition(r.position);
       return p !== null && p <= cutoff;
     })
     .sort((a, b) => {
-      // worst player still inside the cut
       const aP = parseToPar(a.total) ?? 99;
       const bP = parseToPar(b.total) ?? 99;
       return aP - bP;
     })
     .at(-1);
   const cutoffToPar = lastInside ? parseToPar(lastInside.total) : null;
+  const cutoffSg = lastInside
+    ? args.playerSgBreakdown?.[lastInside.playerId]
+    : undefined;
   if (cutoffToPar === null) {
     return {
-      headline: `${playerName} sits ${me.position} — needs to climb into Top ${cutoff}`,
+      headline: `${playerName} ${me.position} — needs to climb into Top ${cutoff}`,
       status: "needs-work",
     };
   }
@@ -256,28 +383,29 @@ function topFinishInsight(
     };
   }
   if (gap <= 0) {
-    // Tied with the cut player
     return {
       headline: `${playerName} tied with the Top ${cutoff} cut line — ${plural(remaining, "hole")} left to break free`,
+      hint: sgLeakHint(meSg, cutoffSg, playerName, lastInside?.displayName ?? "cut-line player"),
       status: "needs-work",
     };
   }
   if (gap === 1) {
     return {
-      headline: `${playerName} 1 stroke off Top ${cutoff} — one birdie in the next ${plural(remaining, "hole")} does it`,
+      headline: `${playerName} 1 stroke off Top ${cutoff} — needs to play these ${plural(remaining, "hole")} one shot better than the cut line`,
+      hint: sgLeakHint(meSg, cutoffSg, playerName, lastInside?.displayName ?? "cut-line player"),
       status: "needs-work",
     };
   }
   if (gap <= 3) {
     return {
-      headline: `${playerName} ${gap} strokes off Top ${cutoff} with ${plural(remaining, "hole")} left`,
-      hint: `Needs about ${plural(gap, "birdie")} more than the cut-line players`,
+      headline: `${playerName} ${gap} strokes off Top ${cutoff} — needs to outscore the cut line by ${gap} over the last ${plural(remaining, "hole")}`,
+      hint: sgLeakHint(meSg, cutoffSg, playerName, lastInside?.displayName ?? "cut-line player"),
       status: "needs-work",
     };
   }
   return {
-    headline: `${playerName} ${gap} strokes off Top ${cutoff} — needs a strong finish`,
-    hint: `${plural(remaining, "hole")} left to climb ${gap} shots`,
+    headline: `${playerName} ${gap} back from Top ${cutoff} — needs a real charge over the last ${plural(remaining, "hole")}`,
+    hint: sgLeakHint(meSg, cutoffSg, playerName, lastInside?.displayName ?? "cut-line player"),
     status: "long-shot",
   };
 }

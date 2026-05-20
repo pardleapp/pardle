@@ -11,7 +11,11 @@
  * copy with real mid-round data (Charles Schwab, Thu morning).
  */
 
-import { computeBetInsight, type BetInsight } from "@/lib/feed/bet-insights";
+import {
+  computeBetInsight,
+  type BetInsight,
+  type SgBreakdown,
+} from "@/lib/feed/bet-insights";
 import type {
   OutrightBet,
   PlayerRoundState,
@@ -38,6 +42,17 @@ interface Scenario {
   leaderboard: LeaderboardRow[];
   playerRoundStates: Record<string, PlayerRoundState>;
   tournamentProjections?: Record<string, TournamentProjection>;
+  playerSgBreakdown?: Record<string, SgBreakdown>;
+}
+
+function sg(args: Partial<SgBreakdown> & { total?: number | null }): SgBreakdown {
+  return {
+    total: args.total ?? null,
+    ott: args.ott ?? null,
+    app: args.app ?? null,
+    arg: args.arg ?? null,
+    putt: args.putt ?? null,
+  };
 }
 
 // ── Fixture helpers ───────────────────────────────────────────────
@@ -211,6 +226,10 @@ const SCENARIOS: Scenario[] = [
         },
       }),
     },
+    playerSgBreakdown: {
+      p1: sg({ total: 2.8, ott: 1.4, app: 0.6, arg: 0.1, putt: 0.7 }),
+      p2: sg({ total: 2.1, ott: 0.5, app: 1.2, arg: 0.2, putt: 0.2 }),
+    },
   },
   {
     title: "Outright · 1 stroke back",
@@ -229,6 +248,10 @@ const SCENARIOS: Scenario[] = [
         },
       }),
     },
+    playerSgBreakdown: {
+      p0: sg({ total: 2.2, ott: 0.4, app: 2.1, arg: 0.1, putt: -0.4 }),
+      p1: sg({ total: 1.8, ott: 0.9, app: 0.3, arg: 0.2, putt: 0.4 }),
+    },
   },
   {
     title: "Outright · 3 strokes back, 14 holes left",
@@ -246,6 +269,10 @@ const SCENARIOS: Scenario[] = [
           3: inProgress({ holesPlayed: 4, strokes: 14, parPlayed: 16, parRemaining: 54 }),
         },
       }),
+    },
+    playerSgBreakdown: {
+      p0: sg({ total: 1.7, ott: 0.3, app: 0.6, arg: 0.2, putt: 0.6 }),
+      p1: sg({ total: 0.8, ott: 0.5, app: 0.6, arg: 0.2, putt: -0.5 }),
     },
   },
   {
@@ -294,7 +321,7 @@ const SCENARIOS: Scenario[] = [
     bet: topFinishBet({ playerId: "p1", playerName: "Justin Thomas", cutoff: 5 }),
     leaderboard: [
       { playerId: "p0", displayName: "Leader", position: "1", total: "-10", thru: "F" },
-      { playerId: "p_cut", displayName: "Cut player", position: "T5", total: "-6", thru: "F" },
+      { playerId: "p_cut", displayName: "Akshay Bhatia", position: "T5", total: "-6", thru: "F" },
       { playerId: "p1", displayName: "Justin Thomas", position: "T7", total: "-5", thru: "F" },
     ],
     playerRoundStates: {
@@ -308,13 +335,17 @@ const SCENARIOS: Scenario[] = [
         },
       }),
     },
+    playerSgBreakdown: {
+      p_cut: sg({ total: 1.6, ott: 0.5, app: 0.4, arg: 0.3, putt: 0.4 }),
+      p1: sg({ total: 1.1, ott: 0.6, app: 0.3, arg: 0.4, putt: -0.2 }),
+    },
   },
   {
     title: "Top 10 · 4 strokes off, R4 fight",
     bet: topFinishBet({ playerId: "p1", playerName: "Brian Harman", cutoff: 10 }),
     leaderboard: [
       { playerId: "p0", displayName: "Leader", position: "1", total: "-13", thru: "F" },
-      { playerId: "p_cut", displayName: "Cut player", position: "T10", total: "-7", thru: "F" },
+      { playerId: "p_cut", displayName: "Sungjae Im", position: "T10", total: "-7", thru: "F" },
       { playerId: "p1", displayName: "Brian Harman", position: "T22", total: "-3", thru: "12" },
     ],
     playerRoundStates: {
@@ -327,6 +358,10 @@ const SCENARIOS: Scenario[] = [
           4: inProgress({ holesPlayed: 12, strokes: 42, parPlayed: 43, parRemaining: 28 }),
         },
       }),
+    },
+    playerSgBreakdown: {
+      p_cut: sg({ total: 1.4, ott: 0.4, app: 0.7, arg: 0.2, putt: 0.1 }),
+      p1: sg({ total: 0.3, ott: 0.7, app: -0.6, arg: 0.4, putt: -0.2 }),
     },
   },
 
@@ -450,6 +485,7 @@ export default function InsightsDemoPage() {
       leaderboard: s.leaderboard,
       playerRoundStates: s.playerRoundStates,
       tournamentProjections: s.tournamentProjections,
+      playerSgBreakdown: s.playerSgBreakdown,
     }),
   }));
 

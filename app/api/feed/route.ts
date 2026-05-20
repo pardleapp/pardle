@@ -29,6 +29,7 @@ import {
 import { ensurePlayerSkill } from "@/lib/feed/skill-cache";
 import { findOddsShift } from "@/lib/feed/odds-store";
 import { getInPlayTopFinish } from "@/lib/golf-api/datagolf";
+import { getLiveStatsCached } from "@/lib/feed/live-stats-cache";
 import { computeCommunityBacking } from "@/lib/feed/community-backing";
 import { eventPolarity, type FeedRow } from "@/lib/feed/types";
 
@@ -367,6 +368,16 @@ async function handle(req: Request) {
   // when the caller asked for chart data.
   const topFinishHistory = includeChartData ? topFinishHistoryFull : [];
 
+  // Per-player tournament-to-date SG breakdown (per-round averages
+  // vs the field). Powers the "where it's leaking" hint on the bet-
+  // detail insight card. Lookup is cached server-side for 5 min; we
+  // only build/ship the map when ?include=charts so the home feed
+  // payload stays slim. Map keyed by orchestrator playerId via name
+  // match against the leaderboard.
+  const playerSgBreakdown = includeChartData
+    ? await buildSgBreakdownMap(tournament.id, leaderboard)
+    : null;
+
   return NextResponse.json({
     tournament: {
       id: tournament.id,
@@ -425,6 +436,7 @@ async function handle(req: Request) {
           fieldStats,
           playerSkill,
           tournamentPars: bundle.pars,
+          playerSgBreakdown,
         }
       : {}),
   });
@@ -933,6 +945,74 @@ async function getOrComputeTopFinish(
     console.error("[feed] pushTopFinishSnapshot failed", err);
   }
   return byPlayer;
+}
+
+/**
+ * Build a per-player SG breakdown map keyed by orchestrator playerId.
+ *
+ * Source: DataGolf's live-tournament-stats endpoint with round=event_avg
+ * (per-round averages aggregated across played rounds). DataGolf names
+ * are matched to orchestrator IDs via the leaderboard.
+ *
+ * Returns null if DataGolf is unavailable so the insight card degrades
+ * to its no-SG hint rather than blocking the route.
+ */
+async function buildSgBreakdownMap(
+  tournamentId: string,
+  leaderboard: import("@/lib/feed/store").CachedLeaderboardRow[],
+): Promise<Record<
+  string,
+  {
+    total: number | null;
+    ott: number | null;
+    app: number | null;
+    arg: number | null;
+    putt: number | null;
+  }
+> | null> {
+  let stats;
+  try {
+    stats = await getLiveStatsCached(tournamentId, "event_avg");
+  } catch (err) {
+    console.error("[feed] live-stats fetch failed", err);
+    return null;
+  }
+  if (stats.length === 0) return null;
+  const byNorm = new Map<string, (typeof stats)[number]>();
+  for (const s of stats) byNorm.set(normaliseName(s.name), s);
+  const out: Record<
+    string,
+    {
+      total: number | null;
+      ott: number | null;
+      app: number | null;
+      arg: number | null;
+      putt: number | null;
+    }
+  > = {};
+  for (const row of leaderboard) {
+    const s = byNorm.get(normaliseName(row.displayName));
+    if (!s) continue;
+    // Only include the row if at least one SG component is present —
+    // otherwise it's noise for the bet detail card.
+    if (
+      s.sgTotal == null &&
+      s.sgOtt == null &&
+      s.sgApp == null &&
+      s.sgArg == null &&
+      s.sgPutt == null
+    ) {
+      continue;
+    }
+    out[row.playerId] = {
+      total: s.sgTotal,
+      ott: s.sgOtt,
+      app: s.sgApp,
+      arg: s.sgArg,
+      putt: s.sgPutt,
+    };
+  }
+  return out;
 }
 
 async function maybeAppendWinningScoreSnapshot(

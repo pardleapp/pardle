@@ -63,6 +63,19 @@ interface FeedResponse {
     draftkings: Record<string, OddsHistorySample[] | null>;
     fanduel: Record<string, OddsHistorySample[] | null>;
   };
+  /** Per-player tournament-to-date SG breakdown — keyed by playerId.
+   *  Only present when ?include=charts was passed. Drives the SG-
+   *  flavoured hint on the insight card. */
+  playerSgBreakdown?: Record<
+    string,
+    {
+      total: number | null;
+      ott: number | null;
+      app: number | null;
+      arg: number | null;
+      putt: number | null;
+    }
+  > | null;
 }
 
 const gbp = new Intl.NumberFormat("en-GB", {
@@ -428,6 +441,7 @@ export default function BetDetail({ betId }: { betId: string }) {
           })),
           playerRoundStates: data.playerRoundStates,
           tournamentProjections: data.tournamentProjections,
+          playerSgBreakdown: data.playerSgBreakdown ?? undefined,
         })
       : null;
   const profit = nowValue != null ? nowValue - bet.stake : null;
