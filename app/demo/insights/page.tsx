@@ -302,7 +302,7 @@ const SCENARIOS: Scenario[] = [
     leaderboard: [
       { playerId: "p0", displayName: "Leader", position: "1", total: "-11", thru: "F" },
       { playerId: "p1", displayName: "Patrick Cantlay", position: "T5", total: "-8", thru: "F" },
-      { playerId: "p2", displayName: "Bubble Player", position: "T11", total: "-4", thru: "F" },
+      { playerId: "p2", displayName: "Tyrrell Hatton", position: "T11", total: "-4", thru: "F" },
     ],
     playerRoundStates: {
       p1: playerState({

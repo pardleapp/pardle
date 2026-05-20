@@ -92,6 +92,12 @@ function plural(n: number, single: string, multi?: string): string {
   return `${n} ${n === 1 ? single : multi ?? `${single}s`}`;
 }
 
+/** Attributive form: "4-stroke cushion" rather than "4 strokes cushion".
+ *  Used when the count + unit modify a following noun. */
+function adjectival(n: number, single: string): string {
+  return `${n}-${single}`;
+}
+
 function holesRemainingTotal(state: PlayerRoundState | undefined): number {
   if (!state) return 0;
   // Current round's remaining + 18 per round not yet played.
@@ -334,7 +340,7 @@ function topFinishInsight(
     if (cushion !== null && cushion >= 0) {
       const engine = sgEngineHint(meSg);
       return {
-        headline: `${playerName} ${me.position} with a ${plural(cushion, "stroke")} cushion over the cut line, ${plural(remaining, "hole")} left`,
+        headline: `${playerName} ${me.position} with a ${adjectival(cushion, "stroke")} cushion over the cut line, ${plural(remaining, "hole")} left`,
         hint:
           engine ??
           (bubble
