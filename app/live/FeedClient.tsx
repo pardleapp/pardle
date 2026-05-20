@@ -15,6 +15,7 @@ import CatchMeUp from "./CatchMeUp";
 import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
 import LeaderboardPanel from "./LeaderboardPanel";
+import PlayerAvatar from "./PlayerAvatar";
 import PlayerSearch from "./PlayerSearch";
 import PuttPollWidget from "./PuttPollWidget";
 import ReelGroup from "./ReelGroup";
@@ -180,6 +181,18 @@ function timeAgo(ts: number): string {
   if (m < 6) return "few min ago";
   if (m < 60) return `${m}m ago`;
   return `${Math.floor(m / 60)}h ago`;
+}
+
+/**
+ * Strip the leading player name from an engine-generated headline so
+ * the v4 row can render the name in its own slot. Falls back to the
+ * full headline if the name isn't a prefix (unusual but possible).
+ */
+function stripPlayerName(headline: string, playerName: string): string {
+  if (!headline.startsWith(playerName)) return headline;
+  const rest = headline.slice(playerName.length).trim();
+  if (rest.length === 0) return headline;
+  return rest[0].toUpperCase() + rest.slice(1);
 }
 
 interface FeedClientProps {
@@ -488,7 +501,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       : data.rows;
 
   return (
-    <section className="feed-wrap">
+    <section className="feed-wrap v4-theme">
       <div className="feed-header-row">
         <h2 className="feed-tournament-name">
           <span
@@ -614,16 +627,31 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                   <span className="feed-emoji" aria-hidden="true">
                     {event.emoji}
                   </span>
+                  <PlayerAvatar
+                    playerId={event.playerId}
+                    playerName={event.playerName}
+                    size="md"
+                    state={data.handStatus?.[event.playerId] ?? null}
+                  />
                   <Link
                     href={`/live/player/${event.playerId}`}
                     className="feed-body feed-body-link"
                   >
-                    <p className="feed-headline">
-                      {data.handStatus?.[event.playerId] && (
-                        <HandBadge
-                          status={data.handStatus[event.playerId]}
-                        />
-                      )}
+                    <div className="feed-row-head">
+                      <span className="feed-row-name">
+                        {event.playerName}
+                        {data.handStatus?.[event.playerId] && (
+                          <HandBadge
+                            status={data.handStatus[event.playerId]}
+                          />
+                        )}
+                      </span>
+                      <ScoreChip event={event} />
+                    </div>
+                    <p className="feed-row-action">
+                      {stripPlayerName(event.headline, event.playerName)}
+                    </p>
+                    <p className="feed-headline" hidden>
                       {event.headline}
                     </p>
                     {(() => {
@@ -843,6 +871,52 @@ function MomentumStrip({
       )}
     </div>
   );
+}
+
+// ── Score chip — score vs par + hole, hero-treatment in v4 rows ───
+
+function ScoreChip({ event }: { event: FeedRow["event"] }) {
+  // Type-event signal: birdie = −1, eagle = −2, etc. Computed from
+  // (strokes - par) on score events; "ACE" on aces; just the hole
+  // on shot-only events with no score.
+  if (event.ace) {
+    return (
+      <span className="feed-row-score">
+        ACE
+        {event.hole && (
+          <span className="feed-row-score-hole">H{event.hole}</span>
+        )}
+      </span>
+    );
+  }
+  if (
+    event.type === "score" &&
+    typeof event.strokes === "number" &&
+    typeof event.par === "number"
+  ) {
+    const diff = event.strokes - event.par;
+    const sign = diff > 0 ? "+" : "";
+    const isBad = diff > 0;
+    return (
+      <span
+        className={`feed-row-score${isBad ? " feed-row-score-bad" : ""}`}
+      >
+        {sign}
+        {diff}
+        {event.hole && (
+          <span className="feed-row-score-hole">H{event.hole}</span>
+        )}
+      </span>
+    );
+  }
+  if (event.hole) {
+    return (
+      <span className="feed-row-score">
+        <span className="feed-row-score-hole">H{event.hole}</span>
+      </span>
+    );
+  }
+  return null;
 }
 
 // ── Hot/cold hand badge ────────────────────────────────────────────

@@ -11223,3 +11223,405 @@ html, body {
   font-weight: 900;
   font-variant-numeric: tabular-nums;
 }
+
+/* ──────────────────────────────────────────────────────────────────
+   V4 THEME — "Real energy"
+   Scoped to ancestors with .v4-theme so it doesn't bleed into the
+   daily-puzzle games (/pros, /holes, /games) which stay friendly.
+   Inside .v4-theme: deep black canvas, big bold sans numbers (not
+   monospace), saturated electric green, avatar circles, pill CTAs,
+   glow indicators.
+   ────────────────────────────────────────────────────────────────── */
+
+.v4-theme {
+  /* Tokens — override the base CSS variables so any component using
+     var(--bg) / var(--text) / etc gets the v4 palette automatically. */
+  --bg: #000;
+  --bg-elevated: #0e0f12;
+  --bg-card: #0e0f12;
+  --bg-card-hi: #15171b;
+  --text: #f5f5f7;
+  --muted: #9aa0a8;
+  --text-faint: #5a606a;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --green: #00d96e;
+  --green-glow: rgba(0, 217, 110, 0.35);
+  --green-soft: rgba(0, 217, 110, 0.12);
+  --red: #ff4b6b;
+  --red-glow: rgba(255, 75, 107, 0.35);
+  --red-soft: rgba(255, 75, 107, 0.12);
+  --amber: #ff9d2e;
+  --amber-glow: rgba(255, 157, 46, 0.45);
+  --amber-soft: rgba(255, 157, 46, 0.15);
+  --purple: #a070ff;
+  --purple-soft: rgba(160, 112, 255, 0.15);
+
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI",
+               Roboto, system-ui, sans-serif;
+}
+
+/* Body bg follows when the theme is on the root */
+body:has(.v4-theme) {
+  background: #000;
+}
+
+/* ── Avatar (used by feed rows, bet cards, leaderboard) ──────────── */
+.v4-theme .avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* ── Tournament header (FeedClient top) ─────────────────────────── */
+.v4-theme .feed-wrap {
+  background: transparent;
+}
+
+.v4-theme .feed-header-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.v4-theme .feed-tournament-name {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.v4-theme .feed-live-pulse {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  width: auto;
+  height: auto;
+  position: static;
+  animation: none;
+  vertical-align: baseline;
+}
+
+.v4-theme .feed-live-pulse::before {
+  content: "Live";
+  margin-right: 0;
+}
+
+.v4-theme .feed-live-pulse-inline {
+  display: inline-flex;
+}
+
+.v4-theme .feed-live-pulse::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green-glow);
+  animation: v4-pulse 1.6s infinite;
+  order: -1;
+}
+
+@keyframes v4-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ── Feed row — the big one ─────────────────────────────────────── */
+.v4-theme .feed-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.v4-theme .feed-row-wrap {
+  margin: 0;
+  padding: 0;
+}
+
+.v4-theme .feed-row {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  grid-template-areas:
+    "avatar body actions"
+    "poll   poll poll";
+  gap: 6px 12px;
+  padding: 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+  align-items: start;
+}
+
+.v4-theme .feed-row::before {
+  display: none;
+}
+
+.v4-theme .feed-row > .avatar {
+  grid-area: avatar;
+}
+
+.v4-theme .feed-row > .feed-body {
+  grid-area: body;
+  min-width: 0;
+}
+
+.v4-theme .feed-row > .feed-actions {
+  grid-area: actions;
+  align-self: start;
+}
+
+.v4-theme .feed-row > .putt-poll {
+  grid-area: poll;
+}
+
+/* Suppress the old emoji prefix — replaced by avatar in JSX */
+.v4-theme .feed-emoji {
+  display: none;
+}
+
+.v4-theme .feed-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.v4-theme .feed-body-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.v4-theme .feed-headline {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  line-height: 1.35;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Feed row name slot (set by FeedRowName helper). The big bold
+   player name + an inline score chip live in this header row above
+   the action sentence. */
+.v4-theme .feed-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.v4-theme .feed-row-name {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v4-theme .feed-row-score {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--green);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.v4-theme .feed-row-score-bad {
+  color: var(--red);
+}
+
+.v4-theme .feed-row-score-hole {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+
+.v4-theme .feed-row-action {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.35;
+  margin: 0;
+}
+
+/* Hot/cold halo dot inline next to the name */
+.v4-theme .hand-badge {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  display: inline-block;
+  margin-right: 0;
+  font-size: 0;
+  line-height: 0;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.v4-theme .hand-badge-hot {
+  background: var(--amber);
+  box-shadow: 0 0 8px var(--amber-glow);
+}
+
+.v4-theme .hand-badge-cold {
+  background: #7bb2e6;
+  box-shadow: 0 0 8px rgba(123, 178, 230, 0.55);
+}
+
+/* Tags → pills */
+.v4-theme .feed-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.v4-theme .feed-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--bg-card-hi);
+  color: var(--muted);
+  border: none;
+}
+
+.v4-theme .feed-tag-odds {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.v4-theme .feed-tag-odds-drift {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.v4-theme .feed-tag-community {
+  background: var(--purple-soft);
+  color: var(--purple);
+}
+
+.v4-theme .feed-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-faint);
+  margin: 2px 0 0;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Actions row (reactions + comment) */
+.v4-theme .feed-actions {
+  display: flex;
+  gap: 4px;
+  align-self: end;
+  margin-top: 4px;
+}
+
+.v4-theme .feed-react {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 100ms, color 100ms;
+}
+
+.v4-theme .feed-react:hover {
+  background: var(--bg-card-hi);
+  color: var(--text);
+}
+
+.v4-theme .feed-react-on {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+/* Empty / footnote tweaks */
+.v4-theme .feed-empty {
+  color: var(--muted);
+  text-align: center;
+  padding: 24px 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  margin: 12px 14px;
+}
+
+.v4-theme .feed-footnote {
+  font-size: 11px;
+  color: var(--text-faint);
+  text-align: center;
+  padding: 14px;
+  margin: 0;
+}
+
+/* Tab bar */
+.v4-theme .feed-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 14px;
+  margin: 6px 0 8px;
+}
+
+.v4-theme .feed-tab {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: none;
+  background: var(--bg-card-hi);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.v4-theme .feed-tab-on {
+  background: var(--text);
+  color: #000;
+}
