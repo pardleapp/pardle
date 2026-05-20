@@ -38,6 +38,11 @@ import {
   type PuttPoll,
   type PuttPollCounts,
 } from "@/lib/feed/putt-polls";
+import {
+  crowdConsensusWasWrong,
+  getUserStats,
+  type PuttIqStats,
+} from "@/lib/feed/putt-iq";
 
 export const dynamic = "force-dynamic";
 
@@ -207,6 +212,7 @@ async function handle(req: Request) {
     communityBacking,
     puttPollBulk,
     puttPollMyVotes,
+    myPuttIq,
   ] = await Promise.all([
     getReactionsBulk(ids),
     getCommentCountsBulk(ids),
@@ -229,6 +235,10 @@ async function handle(req: Request) {
     pollIds.length > 0 && visitorId
       ? getMyVotesBulk(pollIds, visitorId)
       : Promise.resolve({} as Record<string, "yes" | "no" | null>),
+    // Caller's putt-prediction accuracy + streak + tournament rank.
+    visitorId
+      ? getUserStats(visitorId, tournament.id)
+      : Promise.resolve(null as PuttIqStats | null),
   ]);
 
   // Pull odds buffers for the union of players in this response. We
@@ -458,6 +468,10 @@ async function handle(req: Request) {
      *  the caller's own vote. Sparse — only includes polls referenced
      *  by events in this response. */
     puttPolls: composePuttPollPayload(puttPollBulk, puttPollMyVotes),
+    /** Caller's putt-prediction stats — total / correct / streak +
+     *  tournament rank. Drives the header chip + recap toasts. Null
+     *  when no visitorId is supplied. */
+    myPuttIq,
     // Heavy chart buffers — opt-in via ?include=charts. Bet detail
     // page passes it; the home feed doesn't need them and skipping
     // them drops the response by an order of magnitude per poll.
@@ -486,6 +500,10 @@ interface PuttPollWire {
   /** Stroke count when the poll opened — lets the client tell a viewer
    *  arriving late whether the poll's still actionable. */
   polledAtStroke: number;
+  /** True when the closed poll's community consensus opposed the
+   *  outcome (≥60% vote one way, opposite result, ≥6 voters). Powers
+   *  the "🤡 crowd called it wrong" chip on closed rows. */
+  crowdWasWrong: boolean;
 }
 
 function composePuttPollPayload(
@@ -494,12 +512,21 @@ function composePuttPollPayload(
 ): Record<string, PuttPollWire> {
   const out: Record<string, PuttPollWire> = {};
   for (const [id, { poll, counts }] of Object.entries(bulk)) {
+    const crowdWasWrong =
+      poll.closedAt != null && poll.made != null
+        ? crowdConsensusWasWrong({
+            yes: counts.yes,
+            no: counts.no,
+            made: poll.made,
+          })
+        : false;
     out[id] = {
       counts,
       closedAt: poll.closedAt ?? null,
       made: poll.made ?? null,
       myVote: myVotes[id] ?? null,
       polledAtStroke: poll.polledAtStroke,
+      crowdWasWrong,
     };
   }
   return out;

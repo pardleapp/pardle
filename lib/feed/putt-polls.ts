@@ -24,6 +24,7 @@
 
 import "server-only";
 import { Redis } from "@upstash/redis";
+import { recordVoter, settlePollStats } from "./putt-iq";
 
 const redis = Redis.fromEnv();
 
@@ -205,6 +206,11 @@ export async function votePuttPoll(
     await redis.hincrby(key, vote, 1);
   }
   await redis.set(marker, want, { ex: VOTED_TTL });
+  // Track the voter explicitly so settlement can sweep all voters and
+  // update their personal accuracy stats. Stored separately from the
+  // dedup marker so a single Redis lookup at settle-time enumerates
+  // everyone who voted (rather than scanning per-author keys).
+  await recordVoter(pollId, authorKey, vote);
   return getPuttPollCounts(pollId);
 }
 
@@ -276,5 +282,17 @@ export async function settlePuttPoll(
   await redis.del(
     lookupKey(poll.tournamentId, poll.playerId, poll.round, poll.hole),
   );
+  // Sweep voters → personal stats + tournament leaderboard. Best-effort:
+  // a settlement-stats failure must not block the poll close itself
+  // (the poll is already marked closed in Redis).
+  try {
+    await settlePollStats({
+      pollId,
+      tournamentId: poll.tournamentId,
+      made,
+    });
+  } catch (err) {
+    console.error("[feed] settlePollStats failed", err);
+  }
   return updated;
 }

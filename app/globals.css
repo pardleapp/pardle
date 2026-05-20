@@ -8147,6 +8147,252 @@ footer {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #5a8a2f;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.putt-poll-prompt-hint {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.putt-poll-crowd-wrong {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #c97a2a;
+}
+
+/* ── Putt-IQ chip in the feed header ─────────────────────────────── */
+.puttiq-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid rgba(123, 174, 63, 0.4);
+  border-radius: 999px;
+  background: rgba(123, 174, 63, 0.10);
+  text-decoration: none;
+  color: #2f5a13;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: background 120ms, border-color 120ms;
+}
+
+.puttiq-chip:hover {
+  background: rgba(123, 174, 63, 0.18);
+  border-color: rgba(123, 174, 63, 0.6);
+}
+
+.puttiq-chip-num {
+  font-weight: 800;
+}
+
+.puttiq-chip-acc {
+  color: #5a8a2f;
+}
+
+.puttiq-chip-streak {
+  color: #c0500a;
+  font-weight: 800;
+}
+
+.puttiq-chip-rank {
+  background: #2f5a13;
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+@media (prefers-color-scheme: dark) {
+  .puttiq-chip {
+    color: #cdec9a;
+    background: rgba(123, 174, 63, 0.18);
+  }
+  .puttiq-chip-acc {
+    color: #a4d56e;
+  }
+  .puttiq-chip-streak {
+    color: #ffb273;
+  }
+  .puttiq-chip-rank {
+    background: #cdec9a;
+    color: #2f5a13;
+  }
+}
+
+/* ── Putt-call leaderboard page ──────────────────────────────────── */
+.puttlb-you {
+  margin: 16px 0 20px;
+  padding: 14px 16px;
+  border: 1px solid rgba(123, 174, 63, 0.4);
+  border-radius: 12px;
+  background: rgba(123, 174, 63, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.puttlb-you-label {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.puttlb-you-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.puttlb-you-record {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.puttlb-you-acc {
+  font-size: 14px;
+  font-weight: 800;
+  color: #2f5a13;
+}
+
+.puttlb-you-streak {
+  font-size: 13px;
+  font-weight: 800;
+  color: #c0500a;
+}
+
+.puttlb-you-rank {
+  font-size: 12px;
+  font-weight: 800;
+  background: #2f5a13;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.puttlb-you-need {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.puttlb-name-row {
+  display: flex;
+  gap: 8px;
+}
+
+.puttlb-name-save {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.puttlb-name-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.puttlb-h {
+  margin: 24px 0 12px;
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.puttlb-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.puttlb-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg, var(--bg));
+  font-variant-numeric: tabular-nums;
+}
+
+.puttlb-row-me {
+  border-color: #7bae3f;
+  background: rgba(123, 174, 63, 0.10);
+}
+
+.puttlb-rank {
+  font-weight: 800;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.puttlb-name {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.puttlb-acc {
+  font-weight: 800;
+  color: #2f5a13;
+  font-size: 14px;
+}
+
+.puttlb-record {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+@media (prefers-color-scheme: dark) {
+  .puttlb-you {
+    background: rgba(123, 174, 63, 0.14);
+  }
+  .puttlb-you-acc,
+  .puttlb-acc {
+    color: #a4d56e;
+  }
+  .puttlb-you-rank {
+    background: #cdec9a;
+    color: #2f5a13;
+  }
+  .puttlb-row-me {
+    background: rgba(123, 174, 63, 0.16);
+  }
 }
 
 .putt-poll-buttons {

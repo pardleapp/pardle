@@ -16,6 +16,10 @@ export interface PuttPollServerState {
   made: boolean | null;
   myVote: "yes" | "no" | null;
   polledAtStroke: number;
+  /** True when the crowd consensus opposed the outcome (≥60% one way,
+   *  opposite result). Surfaces the "crowd called it wrong" chip on
+   *  closed rows. */
+  crowdWasWrong?: boolean;
 }
 
 export interface PuttPollWidgetProps {
@@ -38,6 +42,7 @@ export default function PuttPollWidget({
   const myVote = optimisticVote ?? serverState?.myVote ?? null;
   const closed = serverState?.closedAt != null;
   const made = serverState?.made ?? null;
+  const crowdWasWrong = serverState?.crowdWasWrong ?? false;
   const total = counts.yes + counts.no;
   const yesPct = total > 0 ? Math.round((counts.yes / total) * 100) : 50;
   const noPct = total > 0 ? 100 - yesPct : 50;
@@ -60,6 +65,11 @@ export default function PuttPollWidget({
               : "You called the other way."
             : ""}
         </p>
+        {crowdWasWrong && (
+          <p className="putt-poll-crowd-wrong">
+            🤡 Crowd called it wrong
+          </p>
+        )}
         <div className="putt-poll-bar" aria-hidden="true">
           <span
             className={`putt-poll-bar-yes ${made ? "putt-poll-bar-win" : ""}`}
@@ -78,10 +88,20 @@ export default function PuttPollWidget({
     );
   }
 
-  // Open poll: vote buttons + live community split.
+  // Open poll: vote buttons; community split stays hidden until the
+  // caller has voted. Commitment-first beats sheep-voting on whatever
+  // the crowd is showing.
+  const revealed = myVote != null;
   return (
     <div className="putt-poll" aria-label="Putt prediction poll">
-      <p className="putt-poll-prompt">Will it drop?</p>
+      <p className="putt-poll-prompt">
+        Will it drop?
+        {!revealed && (
+          <span className="putt-poll-prompt-hint">
+            Vote to see what others said
+          </span>
+        )}
+      </p>
       <div className="putt-poll-buttons">
         <button
           type="button"
@@ -104,7 +124,7 @@ export default function PuttPollWidget({
           {myVote === "no" && <span className="putt-poll-btn-check"> ✓</span>}
         </button>
       </div>
-      {total > 0 && (
+      {revealed && total > 0 && (
         <>
           <div className="putt-poll-bar" aria-hidden="true">
             <span
@@ -121,6 +141,9 @@ export default function PuttPollWidget({
             {total === 1 ? "vote" : "votes"}
           </p>
         </>
+      )}
+      {revealed && total === 0 && (
+        <p className="putt-poll-totals">First vote in — be the bellwether</p>
       )}
       {/* Suppress the otherwise-unused param warning. */}
       <span hidden>{pollId}</span>

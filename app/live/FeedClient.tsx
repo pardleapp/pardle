@@ -106,8 +106,19 @@ interface FeedResponse {
       made: boolean | null;
       myVote: "yes" | "no" | null;
       polledAtStroke: number;
+      crowdWasWrong?: boolean;
     }
   >;
+  /** Caller's putt-prediction accuracy + streak + tournament rank.
+   *  Null when no visitorId in the request. */
+  myPuttIq?: {
+    total: number;
+    correct: number;
+    currentStreak: number;
+    longestStreak: number;
+    tournament?: { total: number; correct: number };
+    tournamentRank?: number | null;
+  } | null;
   watching: number;
   seenToday: number;
   polled: boolean;
@@ -461,6 +472,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           />
           {data.tournament.name}
         </h2>
+        <PuttIqChip stats={data.myPuttIq ?? null} />
       </div>
 
       <PlayerSearch players={data.playerIndex ?? []} />
@@ -728,6 +740,38 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         ))}
       </div>
     </section>
+  );
+}
+
+// ── Putt-IQ chip ────────────────────────────────────────────────────
+
+function PuttIqChip({
+  stats,
+}: {
+  stats: FeedResponse["myPuttIq"] | null;
+}) {
+  // Don't render anything until the user has cast at least one vote —
+  // nobody wants to see "0/0" advertised to them.
+  const tTotal = stats?.tournament?.total ?? 0;
+  const tCorrect = stats?.tournament?.correct ?? 0;
+  if (!stats || tTotal === 0) return null;
+  const acc = tTotal > 0 ? Math.round((tCorrect / tTotal) * 100) : 0;
+  const streak = stats.currentStreak;
+  return (
+    <Link href="/leaderboard/polls" className="puttiq-chip" title="Putt-call stats">
+      <span className="puttiq-chip-num">
+        {tCorrect}/{tTotal}
+      </span>
+      <span className="puttiq-chip-acc">{acc}%</span>
+      {streak >= 2 && (
+        <span className="puttiq-chip-streak" title={`${streak} in a row`}>
+          🔥 {streak}
+        </span>
+      )}
+      {typeof stats.tournamentRank === "number" && (
+        <span className="puttiq-chip-rank">#{stats.tournamentRank}</span>
+      )}
+    </Link>
   );
 }
 

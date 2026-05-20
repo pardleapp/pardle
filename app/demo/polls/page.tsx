@@ -26,13 +26,13 @@ interface Scenario {
 
 const SCENARIOS: Scenario[] = [
   {
-    title: "Open · no votes yet",
+    title: "Open · pre-vote (community hidden)",
     headline:
       "Joaquin Niemann has 18 ft for birdie on the 14th — will it drop?",
     emoji: "🎯",
     meta: "R3 · just now",
     state: {
-      counts: { yes: 0, no: 0 },
+      counts: { yes: 92, no: 41 },
       closedAt: null,
       made: null,
       myVote: null,
@@ -40,27 +40,13 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
-    title: "Open · split 64 / 36",
+    title: "Open · post-vote · community revealed",
     headline:
       "Scottie Scheffler has 24 ft for birdie on the 17th — will it drop?",
     emoji: "🎯",
     meta: "R4 · 12s ago",
     state: {
       counts: { yes: 87, no: 49 },
-      closedAt: null,
-      made: null,
-      myVote: null,
-      polledAtStroke: 2,
-    },
-  },
-  {
-    title: "Open · you voted yes",
-    headline:
-      "Tommy Fleetwood has 31 ft for eagle on the 11th — will it drop?",
-    emoji: "🎯",
-    meta: "R3 · 8s ago",
-    state: {
-      counts: { yes: 22, no: 41 },
       closedAt: null,
       made: null,
       myVote: "yes",
@@ -135,6 +121,36 @@ const SCENARIOS: Scenario[] = [
       made: false,
       myVote: "no",
       polledAtStroke: 2,
+    },
+  },
+  {
+    title: "Closed · crowd was wrong (said yes, missed)",
+    headline:
+      "Sahith Theegala has 26 ft for birdie on the 8th — will it drop?",
+    emoji: "🎯",
+    meta: "R3 · 1m ago",
+    state: {
+      counts: { yes: 81, no: 18 },
+      closedAt: Date.now(),
+      made: false,
+      myVote: "no",
+      polledAtStroke: 2,
+      crowdWasWrong: true,
+    },
+  },
+  {
+    title: "Closed · crowd was wrong (said no, dropped)",
+    headline:
+      "Min Woo Lee has 34 ft for eagle on the 15th — will it drop?",
+    emoji: "🎯",
+    meta: "R4 · 30s ago",
+    state: {
+      counts: { yes: 12, no: 67 },
+      closedAt: Date.now(),
+      made: true,
+      myVote: "yes",
+      polledAtStroke: 2,
+      crowdWasWrong: true,
     },
   },
   {
