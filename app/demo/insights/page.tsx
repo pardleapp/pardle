@@ -495,6 +495,10 @@ const SCENARIOS: Scenario[] = [
     bet: winningScoreBet({ line: 270.5, side: "under" }),
     leaderboard: [
       { playerId: "leader", displayName: "Scottie Scheffler", position: "1", total: "-12", thru: "11" },
+      { playerId: "p2", displayName: "Tony Finau", position: "T2", total: "-10", thru: "13" },
+      { playerId: "p3", displayName: "Sam Burns", position: "T2", total: "-10", thru: "12" },
+      { playerId: "p4", displayName: "Cameron Young", position: "4", total: "-9", thru: "14" },
+      { playerId: "p5", displayName: "Russell Henley", position: "T5", total: "-8", thru: "15" },
     ],
     playerRoundStates: {
       leader: playerState({
@@ -502,13 +506,25 @@ const SCENARIOS: Scenario[] = [
         rounds: { 4: inProgress({ holesPlayed: 11, strokes: 38, parPlayed: 40, parRemaining: 29 }) },
       }),
     },
-    tournamentProjections: { leader: { mean: 268.2, variance: 5, active: true } },
+    tournamentProjections: {
+      leader: { mean: 268.2, variance: 5, active: true },
+      p2: { mean: 269.6, variance: 5, active: true },
+      p3: { mean: 270.1, variance: 5, active: true },
+      p4: { mean: 271.4, variance: 5, active: true },
+      p5: { mean: 272.0, variance: 5, active: true },
+    },
+    fieldHoleStats: {
+      4: fakeFieldStats({ easyHoles: [11, 14, 18], hardHoles: [12, 17] }),
+    },
+    tournamentPars: { 4: fakeParLayout() },
   },
   {
     title: "Winning score · Over 270.5, projection 268 (long shot)",
     bet: winningScoreBet({ line: 270.5, side: "over" }),
     leaderboard: [
       { playerId: "leader", displayName: "Ludvig Aberg", position: "1", total: "-12", thru: "11" },
+      { playerId: "p2", displayName: "Viktor Hovland", position: "T2", total: "-10", thru: "13" },
+      { playerId: "p3", displayName: "Tom Kim", position: "T2", total: "-10", thru: "12" },
     ],
     playerRoundStates: {
       leader: playerState({
@@ -516,7 +532,15 @@ const SCENARIOS: Scenario[] = [
         rounds: { 4: inProgress({ holesPlayed: 11, strokes: 38, parPlayed: 40, parRemaining: 29 }) },
       }),
     },
-    tournamentProjections: { leader: { mean: 268.2, variance: 5, active: true } },
+    tournamentProjections: {
+      leader: { mean: 268.2, variance: 5, active: true },
+      p2: { mean: 269.4, variance: 5, active: true },
+      p3: { mean: 270.0, variance: 5, active: true },
+    },
+    fieldHoleStats: {
+      4: fakeFieldStats({ easyHoles: [11, 14, 18], hardHoles: [12, 17] }),
+    },
+    tournamentPars: { 4: fakeParLayout() },
   },
 ];
 

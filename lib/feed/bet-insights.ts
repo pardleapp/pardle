@@ -650,6 +650,58 @@ function roundScoreInsight(
   };
 }
 
+/**
+ * Count active players whose projected total lands the bet's side of
+ * the line. For under-bets these are "still-viable winners" that
+ * would settle the bet won; for over-bets they're the field still
+ * projected at or above the line.
+ *
+ * Excludes the leader if `excludeLeaderId` is supplied — the leader
+ * is named separately in the headline.
+ */
+function contendersFor(
+  side: "under" | "over",
+  line: number,
+  projections: Record<string, TournamentProjection>,
+  excludeLeaderId: string | null,
+): number {
+  let count = 0;
+  for (const [pid, p] of Object.entries(projections)) {
+    if (!p.active) continue;
+    if (pid === excludeLeaderId) continue;
+    if (!Number.isFinite(p.mean)) continue;
+    if (side === "under" ? p.mean < line : p.mean >= line) count++;
+  }
+  return count;
+}
+
+/**
+ * Leader's most-feared remaining hole this round — hardest by field
+ * mean. Surfaces the "where the bet could slip" in winning-score
+ * under-bets, and "where the bogeys are likely" in over-bets.
+ */
+function leaderDangerHole(
+  leaderId: string,
+  args: InsightInputs,
+): UpcomingHole | null {
+  const state = args.playerRoundStates[leaderId];
+  if (!state) return null;
+  const upcoming = upcomingHoles(
+    state.currentRound,
+    state.holesPlayed,
+    args.fieldHoleStats,
+    args.tournamentPars,
+  );
+  const hard = pickStandoutHoles(upcoming, "over", 1);
+  return hard[0] ?? null;
+}
+
+function joinHints(...parts: Array<string | undefined | null>): string | undefined {
+  const filtered = parts.filter((p): p is string => !!p && p.length > 0);
+  if (filtered.length === 0) return undefined;
+  return filtered.join(". ");
+}
+
 function winningScoreInsight(
   bet: WinningScoreBet,
   args: InsightInputs,
@@ -663,29 +715,61 @@ function winningScoreInsight(
   const proj = args.tournamentProjections[leader.playerId];
   if (!proj || !Number.isFinite(proj.mean)) return null;
   const projectedWinner = Math.round(proj.mean);
+  const danger = leaderDangerHole(leader.playerId, args);
+  const dangerStr = danger
+    ? `${leader.displayName}'s biggest danger spot: Hole ${danger.hole} (par ${danger.par}, playing ${fmtMean(danger.mean)} for the field)`
+    : null;
+
   if (bet.side === "under") {
     const diff = projectedWinner - bet.line;
+    const otherContenders = contendersFor(
+      "under",
+      bet.line,
+      args.tournamentProjections,
+      leader.playerId,
+    );
+    const contenderStr =
+      otherContenders > 0
+        ? `${plural(otherContenders, "other player")} also projected under ${bet.line} — bet stays alive even if ${leader.displayName} fades`
+        : null;
     if (diff < 0) {
       return {
         headline: `Projected winner total ${projectedWinner} — already under ${bet.line}`,
-        hint: `${leader.displayName} on pace; line ${Math.abs(diff)} away from being safe`,
+        hint: joinHints(contenderStr, dangerStr),
         status: "favourable",
       };
     }
     return {
-      headline: `Projected winner total ${projectedWinner} — needs to drop ${diff}+ for under ${bet.line}`,
+      headline: `Projected winner total ${projectedWinner} — needs the leader to drop ${plural(diff, "stroke")} for under ${bet.line}`,
+      hint: joinHints(dangerStr, contenderStr),
       status: diff <= 2 ? "needs-work" : "long-shot",
     };
   }
+
+  // Over side — bet wins when nobody comes in under the line.
   const diff = bet.line - projectedWinner;
+  // For over bets, "threats" are players still projected UNDER the line
+  // who could take the tournament before the bet lands.
+  const threats = contendersFor(
+    "under",
+    bet.line,
+    args.tournamentProjections,
+    null,
+  );
+  const threatStr =
+    threats > 0
+      ? `${plural(threats, "player")} still projected under ${bet.line} — any of them winning kills the bet`
+      : null;
   if (diff < 0) {
     return {
       headline: `Projected winner total ${projectedWinner} — already over ${bet.line}`,
-      status: "favourable",
+      hint: joinHints(threatStr, dangerStr),
+      status: threats <= 2 ? "favourable" : "needs-work",
     };
   }
   return {
-    headline: `Projected winner total ${projectedWinner} — line ${bet.line} needs the field to give back ${diff}+`,
+    headline: `Projected winner total ${projectedWinner} — line ${bet.line} needs the field to give back ${plural(diff, "stroke")}`,
+    hint: joinHints(dangerStr, threatStr),
     status: diff <= 2 ? "needs-work" : "long-shot",
   };
 }
