@@ -43,6 +43,45 @@ interface Scenario {
   playerRoundStates: Record<string, PlayerRoundState>;
   tournamentProjections?: Record<string, TournamentProjection>;
   playerSgBreakdown?: Record<string, SgBreakdown>;
+  fieldHoleStats?: Record<
+    number,
+    Record<number, { mean: number; count: number }>
+  >;
+  tournamentPars?: Record<number, Record<number, number>>;
+}
+
+/** Build a fake Charles Schwab-ish par layout (18 holes, par 70). */
+function fakeParLayout(): Record<number, number> {
+  // par-3s at 4, 8, 13, 16 (total -4 from par 4); par-5s at 1, 11 (+2)
+  const pars: Record<number, number> = {};
+  for (let h = 1; h <= 18; h++) {
+    if (h === 1 || h === 11) pars[h] = 5;
+    else if (h === 4 || h === 8 || h === 13 || h === 16) pars[h] = 3;
+    else pars[h] = 4;
+  }
+  return pars;
+}
+
+/** Build a fake field-stats map for one round.
+ *  `easyHoles` get a -0.3 mean (playing well under par),
+ *  `hardHoles` get a +0.25 mean,
+ *  the rest float around 0. */
+function fakeFieldStats(args: {
+  easyHoles?: number[];
+  hardHoles?: number[];
+  count?: number;
+}): Record<number, { mean: number; count: number }> {
+  const count = args.count ?? 60;
+  const easy = new Set(args.easyHoles ?? []);
+  const hard = new Set(args.hardHoles ?? []);
+  const out: Record<number, { mean: number; count: number }> = {};
+  for (let h = 1; h <= 18; h++) {
+    let mean = 0.02 + (h % 5) * 0.01 - 0.04; // jitter near zero
+    if (easy.has(h)) mean = -0.32;
+    if (hard.has(h)) mean = 0.28;
+    out[h] = { mean, count };
+  }
+  return out;
 }
 
 function sg(args: Partial<SgBreakdown> & { total?: number | null }): SgBreakdown {
@@ -384,6 +423,10 @@ const SCENARIOS: Scenario[] = [
         rounds: { 1: completeR(67), 2: completeR(70), 3: notStarted() },
       }),
     },
+    fieldHoleStats: {
+      3: fakeFieldStats({ easyHoles: [1, 11, 18], hardHoles: [12, 17] }),
+    },
+    tournamentPars: { 3: fakeParLayout() },
   },
   {
     title: "Round-score · Under 68, thru 12 — needs 1 birdie",
@@ -409,6 +452,12 @@ const SCENARIOS: Scenario[] = [
         },
       }),
     },
+    // Easiest remaining: par-5 13... wait, hole 13 is a par-3. Easiest
+    // remaining are 14 (par 4 playing easy) and 18 (par 4 playing easy).
+    fieldHoleStats: {
+      3: fakeFieldStats({ easyHoles: [14, 18], hardHoles: [17] }),
+    },
+    tournamentPars: { 3: fakeParLayout() },
   },
   {
     title: "Round-score · Under 67, already over budget",
@@ -434,6 +483,10 @@ const SCENARIOS: Scenario[] = [
         },
       }),
     },
+    fieldHoleStats: {
+      3: fakeFieldStats({ easyHoles: [18], hardHoles: [15, 17] }),
+    },
+    tournamentPars: { 3: fakeParLayout() },
   },
 
   // ── Winning-score ──
@@ -486,6 +539,8 @@ export default function InsightsDemoPage() {
       playerRoundStates: s.playerRoundStates,
       tournamentProjections: s.tournamentProjections,
       playerSgBreakdown: s.playerSgBreakdown,
+      fieldHoleStats: s.fieldHoleStats,
+      tournamentPars: s.tournamentPars,
     }),
   }));
 

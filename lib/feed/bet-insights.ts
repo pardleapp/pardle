@@ -67,6 +67,12 @@ interface InsightInputs {
   /** Per-player tournament-to-date SG breakdown, keyed by playerId.
    *  Optional: when absent the insight falls back to a non-SG hint. */
   playerSgBreakdown?: Record<string, SgBreakdown>;
+  /** Per-(round,hole) mean of (strokes − par) across the field this
+   *  tournament. Lets the round-score insight name specific holes as
+   *  birdie chances or trouble spots. */
+  fieldHoleStats?: Record<number, Record<number, { mean: number; count: number }>>;
+  /** Per-(round,hole) par values for this tournament's course. */
+  tournamentPars?: Record<number, Record<number, number>>;
 }
 
 // ── helpers ────────────────────────────────────────────────────────
@@ -179,6 +185,117 @@ function sgLeakHint(
     return `${worstCat.label} has been the leak (${formatSg(worstVal)} SG/round this week)`;
   }
   return undefined;
+}
+
+interface UpcomingHole {
+  hole: number;
+  par: number;
+  /** Field's strokes-vs-par mean. Negative = playing easier than par. */
+  mean: number;
+  count: number;
+}
+
+/**
+ * Best-effort list of the holes still ahead of the player this round,
+ * paired with the field's strokes-vs-par mean and the par value.
+ *
+ * Assumes straight order: if the player has finished `holesPlayed`,
+ * their next hole is `holesPlayed + 1`. That's right for weekend
+ * rounds (single tee) and most Thu/Fri tee-1 groups; it's wrong for
+ * shotgun-start or tee-10 groups, but those caveats only really bite
+ * mid-week — and the worst that happens is we name holes the player
+ * won't actually play. Acceptable downside for v1.
+ */
+function upcomingHoles(
+  round: number,
+  holesPlayed: number,
+  fieldHoleStats: InsightInputs["fieldHoleStats"],
+  tournamentPars: InsightInputs["tournamentPars"],
+): UpcomingHole[] {
+  const roundStats = fieldHoleStats?.[round];
+  const roundPars = tournamentPars?.[round];
+  if (!roundStats || !roundPars) return [];
+  const out: UpcomingHole[] = [];
+  for (let h = holesPlayed + 1; h <= 18; h++) {
+    const stat = roundStats[h];
+    const par = roundPars[h];
+    if (!stat || par == null) continue;
+    out.push({ hole: h, par, mean: stat.mean, count: stat.count });
+  }
+  return out;
+}
+
+function fmtMean(mean: number): string {
+  const r = Math.round(mean * 10) / 10;
+  if (r === 0) return "even";
+  return `${r > 0 ? "+" : ""}${r.toFixed(1)}`;
+}
+
+/**
+ * One-sentence summary of how the field is scoring the player's round.
+ * Returns null when the sample is too small (early in R1) to read.
+ */
+function courseToneHint(
+  round: number,
+  fieldHoleStats: InsightInputs["fieldHoleStats"],
+): string | null {
+  const roundStats = fieldHoleStats?.[round];
+  if (!roundStats) return null;
+  const entries = Object.values(roundStats);
+  if (entries.length < 9) return null; // need at least half the course
+  const totalCount = entries.reduce((s, e) => s + e.count, 0);
+  if (totalCount < 100) return null; // ~6 players' worth — too thin
+  const weighted = entries.reduce((s, e) => s + e.mean * e.count, 0);
+  const meanPerHole = weighted / totalCount;
+  const fullRound = meanPerHole * 18;
+  // ~0.05 strokes/hole = ~1 stroke over the round, the readable bar
+  if (Math.abs(meanPerHole) < 0.04) {
+    return "Course playing close to par overall today";
+  }
+  return `Course playing ${fmtMean(fullRound)} over par for the field today`;
+}
+
+/**
+ * Pick the most exploitable holes still ahead. Under bets care about
+ * the easiest holes (lowest mean); over bets care about the hardest.
+ * Returns up to `n` holes ordered by usefulness for the side.
+ */
+function pickStandoutHoles(
+  upcoming: UpcomingHole[],
+  side: "under" | "over",
+  n: number,
+): UpcomingHole[] {
+  if (upcoming.length === 0) return [];
+  const sorted = [...upcoming].sort((a, b) =>
+    side === "under" ? a.mean - b.mean : b.mean - a.mean,
+  );
+  return sorted.slice(0, Math.min(n, sorted.length));
+}
+
+function describeHole(h: UpcomingHole, side: "under" | "over"): string {
+  // For under-bets call out par-5s explicitly — they're naturally the
+  // easiest scoring holes regardless of field mean. For over-bets,
+  // any hole playing notably over par is the headline.
+  const meaningful =
+    side === "under" ? h.mean <= -0.05 : h.mean >= 0.1;
+  if (meaningful) {
+    return `Hole ${h.hole} (par ${h.par}, playing ${fmtMean(h.mean)})`;
+  }
+  return `Hole ${h.hole} (par ${h.par})`;
+}
+
+/** Render the upcoming-hole list as "Hole 13 (par 5, -0.4) and Hole 16 (par 4)". */
+function joinHoles(holes: UpcomingHole[], side: "under" | "over"): string {
+  if (holes.length === 0) return "";
+  if (holes.length === 1) return describeHole(holes[0], side);
+  if (holes.length === 2) {
+    return `${describeHole(holes[0], side)} and ${describeHole(holes[1], side)}`;
+  }
+  const head = holes
+    .slice(0, -1)
+    .map((h) => describeHole(h, side))
+    .join(", ");
+  return `${head}, and ${describeHole(holes[holes.length - 1], side)}`;
 }
 
 /**
@@ -455,47 +572,80 @@ function roundScoreInsight(
   }
   // In progress — interesting case.
   const { holesPlayed, holesRemaining, strokes, parRemaining } = roundSnap;
-  // Strokes the player can still take and stay under (for under bets).
   const playerName = (
     args.leaderboard.find((r) => r.playerId === bet.playerId)?.displayName ??
     bet.playerName
   );
+
+  const upcoming = upcomingHoles(
+    targetRound,
+    holesPlayed,
+    args.fieldHoleStats,
+    args.tournamentPars,
+  );
+  const tone = courseToneHint(targetRound, args.fieldHoleStats);
+
   if (bet.side === "under") {
     const remainingBudget = bet.line - strokes;
     if (remainingBudget <= 0) {
-      // Already broken the line on the under side.
       return {
         headline: `${playerName} already at ${strokes} thru ${holesPlayed} — under ${bet.line} no longer possible`,
         status: "long-shot",
       };
     }
-    // Need to play remaining holesRemaining at avg <= remainingBudget/holesRemaining
     const avgNeeded = remainingBudget / holesRemaining;
     const parAvg = parRemaining / holesRemaining;
     const diff = parAvg - avgNeeded; // positive = need to beat par
+
+    // Already on track — pars the rest of the way bring it home.
     if (diff < 0) {
+      const escapes = pickStandoutHoles(upcoming, "under", 2);
+      const escapeStr = escapes.length > 0 ? joinHoles(escapes, "under") : null;
       return {
-        headline: `${playerName} on cruise — needs to average ${avgNeeded.toFixed(1)} on remaining ${plural(holesRemaining, "hole")} (par is ${parAvg.toFixed(1)})`,
+        headline: `${playerName} on track — par ${plural(holesRemaining, "more hole")} to be under ${bet.line}`,
+        hint: escapeStr
+          ? `${escapeStr} ${escapes.length === 1 ? "is" : "are"} the get-out${escapes.length === 1 ? "" : "s"} if anything goes wrong`
+          : tone ?? undefined,
         status: "favourable",
       };
     }
+
+    // Needs to beat par to come in under the line. How many birdies?
     const needBirdies = Math.ceil(diff * holesRemaining);
+    const easy = pickStandoutHoles(upcoming, "under", Math.min(3, needBirdies + 1));
+    const easyStr = easy.length > 0 ? joinHoles(easy, "under") : null;
+    const longShot = needBirdies > 3;
+    const headline = `${playerName} needs ${plural(needBirdies, "birdie")} in ${plural(holesRemaining, "hole")} to be under ${bet.line}`;
+    let hint: string | undefined;
+    if (easyStr) {
+      hint = `Best birdie chances coming up: ${easyStr}`;
+      if (tone) hint = `${tone}. ${hint}`;
+    } else if (tone) {
+      hint = tone;
+    }
     return {
-      headline: `${playerName} needs ${plural(needBirdies, "more birdie")} in ${plural(holesRemaining, "hole")} to be under ${bet.line}`,
-      hint: `Currently ${strokes} thru ${holesPlayed} — needs to play remaining ${plural(holesRemaining, "hole")} in ${(remainingBudget - parRemaining).toFixed(0)} under par`,
-      status: needBirdies <= 2 ? "needs-work" : "long-shot",
+      headline,
+      hint,
+      status: longShot ? "long-shot" : "needs-work",
     };
   }
-  // Over side
+
+  // Over side — needs strokes given back. Hardest holes are the friend.
   const needAtLeast = bet.line - strokes;
+  const hard = pickStandoutHoles(upcoming, "over", 2);
+  const hardStr = hard.length > 0 ? joinHoles(hard, "over") : null;
   if (needAtLeast <= parRemaining - 4) {
     return {
-      headline: `${playerName} on track to shoot over ${bet.line} (currently ${strokes} thru ${holesPlayed})`,
+      headline: `${playerName} on track to shoot over ${bet.line} (${strokes} thru ${holesPlayed})`,
+      hint: hardStr ? `${hardStr} the toughest holes left` : tone ?? undefined,
       status: "favourable",
     };
   }
   return {
     headline: `${playerName} ${strokes} thru ${holesPlayed} — needs to play remaining ${plural(holesRemaining, "hole")} in ${needAtLeast.toFixed(0)} or more`,
+    hint: hardStr
+      ? `Where the bogeys come: ${hardStr}${tone ? `. ${tone}` : ""}`
+      : tone ?? undefined,
     status: "needs-work",
   };
 }

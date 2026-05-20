@@ -76,6 +76,15 @@ interface FeedResponse {
       putt: number | null;
     }
   > | null;
+  /** Per-(round,hole) field stats — strokes-vs-par mean, count.
+   *  Already passed for the existing round-score model; we reuse it
+   *  here to name specific birdie / trouble holes on the insight card. */
+  fieldStats?: Record<
+    number,
+    Record<number, { mean: number; variance: number; count: number }>
+  >;
+  /** Per-(round,hole) par values for this tournament. */
+  tournamentPars?: Record<number, Record<number, number>>;
 }
 
 const gbp = new Intl.NumberFormat("en-GB", {
@@ -442,6 +451,8 @@ export default function BetDetail({ betId }: { betId: string }) {
           playerRoundStates: data.playerRoundStates,
           tournamentProjections: data.tournamentProjections,
           playerSgBreakdown: data.playerSgBreakdown ?? undefined,
+          fieldHoleStats: data.fieldStats,
+          tournamentPars: data.tournamentPars,
         })
       : null;
   const profit = nowValue != null ? nowValue - bet.stake : null;
