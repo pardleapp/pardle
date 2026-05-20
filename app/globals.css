@@ -8128,6 +8128,153 @@ footer {
   }
 }
 
+/* ── Putt prediction poll widget ────────────────────────────────── */
+.putt-poll {
+  margin: 8px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(123, 174, 63, 0.35);
+  border-radius: 10px;
+  background: rgba(123, 174, 63, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.putt-poll-prompt {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5a8a2f;
+}
+
+.putt-poll-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.putt-poll-btn {
+  flex: 1;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms, transform 80ms;
+}
+
+.putt-poll-btn:active {
+  transform: scale(0.97);
+}
+
+.putt-poll-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.putt-poll-btn-on {
+  border-color: #7bae3f;
+  background: rgba(123, 174, 63, 0.18);
+  color: #2f5a13;
+}
+
+.putt-poll-btn-yes.putt-poll-btn-on {
+  border-color: #7bae3f;
+  background: rgba(123, 174, 63, 0.18);
+}
+
+.putt-poll-btn-no.putt-poll-btn-on {
+  border-color: #d97b5b;
+  background: rgba(217, 123, 91, 0.18);
+  color: #803618;
+}
+
+.putt-poll-btn-check {
+  font-weight: 900;
+}
+
+.putt-poll-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.putt-poll-bar-yes {
+  background: #7bae3f;
+  height: 100%;
+  transition: width 280ms ease;
+}
+
+.putt-poll-bar-no {
+  background: #d97b5b;
+  height: 100%;
+  transition: width 280ms ease;
+}
+
+.putt-poll-bar-win {
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.25) inset;
+}
+
+.putt-poll-totals {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.putt-poll-closed {
+  border-color: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.025);
+}
+
+.putt-poll-closed.putt-poll-made {
+  border-color: rgba(123, 174, 63, 0.45);
+  background: rgba(123, 174, 63, 0.10);
+}
+
+.putt-poll-closed.putt-poll-missed {
+  border-color: rgba(217, 123, 91, 0.45);
+  background: rgba(217, 123, 91, 0.08);
+}
+
+.putt-poll-result {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+@media (prefers-color-scheme: dark) {
+  .putt-poll {
+    border-color: rgba(123, 174, 63, 0.45);
+    background: rgba(123, 174, 63, 0.10);
+  }
+  .putt-poll-prompt {
+    color: #b8d990;
+  }
+  .putt-poll-btn-on {
+    color: #d2efaa;
+  }
+  .putt-poll-btn-no.putt-poll-btn-on {
+    color: #f4c2ad;
+  }
+  .putt-poll-bar {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .putt-poll-closed {
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   .feed-tag {
     background: rgba(46, 167, 240, 0.2);

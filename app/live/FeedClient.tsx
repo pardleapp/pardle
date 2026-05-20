@@ -94,6 +94,19 @@ interface FeedResponse {
   /** Total distinct bettors in the tournament window. Use to decide
    *  if the population's big enough to surface the chip at all. */
   communityTotalBettors?: number;
+  /** Putt prediction poll state keyed by pollId. Counts + close
+   *  status + outcome + the caller's own vote. Sparse — only includes
+   *  polls referenced by events in this response. */
+  puttPolls?: Record<
+    string,
+    {
+      counts: { yes: number; no: number };
+      closedAt: number | null;
+      made: boolean | null;
+      myVote: "yes" | "no" | null;
+      polledAtStroke: number;
+    }
+  >;
   watching: number;
   seenToday: number;
   polled: boolean;
@@ -147,6 +160,14 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   const [error, setError] = useState(false);
   const [myReactions, setMyReactions] = useState<
     Record<string, "up" | "down">
+  >({});
+  // Optimistic putt-poll state — overlays server data for instant
+  // feedback when the user clicks yes/no. Keyed by pollId.
+  const [myPollVotes, setMyPollVotes] = useState<
+    Record<string, "yes" | "no">
+  >({});
+  const [pollCounts, setPollCounts] = useState<
+    Record<string, { yes: number; no: number }>
   >({});
   const [expanded, setExpanded] = useState<string | null>(null);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>(
@@ -224,6 +245,33 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       setData(json);
       setError(false);
 
+      // Once the server has a recorded vote for a poll, drop the
+      // optimistic overlay so closed-poll outcomes (made/missed)
+      // and the canonical community counts take over the render.
+      const serverPolls = json.puttPolls ?? {};
+      setMyPollVotes((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const [pid, p] of Object.entries(serverPolls)) {
+          if (next[pid] && (p.myVote === next[pid] || p.closedAt != null)) {
+            delete next[pid];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+      setPollCounts((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const pid of Object.keys(prev)) {
+          if (serverPolls[pid]?.closedAt != null) {
+            delete next[pid];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+
       // Animate any bursts we haven't shown yet (others' taps).
       for (const b of json.bursts ?? []) {
         if (!seenBursts.current.has(b.id)) {
@@ -300,6 +348,49 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       });
     } catch {
       /* optimistic update stays; next refresh corrects it */
+    }
+  }
+
+  /**
+   * Cast a vote on a putt prediction poll. Optimistic — increment the
+   * chosen side immediately and snap back on error. Server response
+   * (next /api/feed refresh) re-syncs the canonical counts.
+   */
+  async function sendPollVote(pollId: string, vote: "yes" | "no") {
+    const baseCounts =
+      pollCounts[pollId] ??
+      data?.puttPolls?.[pollId]?.counts ??
+      { yes: 0, no: 0 };
+    const prevVote = myPollVotes[pollId] ?? data?.puttPolls?.[pollId]?.myVote ?? null;
+    if (prevVote === vote) return;
+    setMyPollVotes((m) => ({ ...m, [pollId]: vote }));
+    setPollCounts((m) => {
+      const c = { ...baseCounts };
+      if (prevVote === "yes") c.yes = Math.max(0, c.yes - 1);
+      if (prevVote === "no") c.no = Math.max(0, c.no - 1);
+      c[vote] += 1;
+      return { ...m, [pollId]: c };
+    });
+    try {
+      const res = await fetch(
+        `/api/polls/${encodeURIComponent(pollId)}/vote`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ vote, authorKey: authorKey.current }),
+        },
+      );
+      if (!res.ok) {
+        // Poll closed or rate-limited — revert.
+        setMyPollVotes((m) => {
+          const out = { ...m };
+          delete out[pollId];
+          return out;
+        });
+        setPollCounts((m) => ({ ...m, [pollId]: baseCounts }));
+      }
+    } catch {
+      // Network blip — leave optimistic state; next refresh corrects.
     }
   }
 
@@ -545,6 +636,15 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                       R{event.round} · {timeAgo(event.ts)} · view card →
                     </p>
                   </Link>
+                  {event.type === "putt-poll" && event.pollId && (
+                    <PuttPollWidget
+                      pollId={event.pollId}
+                      serverState={data.puttPolls?.[event.pollId]}
+                      optimisticVote={myPollVotes[event.pollId]}
+                      optimisticCounts={pollCounts[event.pollId]}
+                      onVote={(v) => sendPollVote(event.pollId!, v)}
+                    />
+                  )}
                   <div className="feed-actions">
                     <button
                       type="button"
@@ -627,5 +727,123 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         ))}
       </div>
     </section>
+  );
+}
+
+// ── Putt prediction poll widget ────────────────────────────────────
+
+interface PuttPollServerState {
+  counts: { yes: number; no: number };
+  closedAt: number | null;
+  made: boolean | null;
+  myVote: "yes" | "no" | null;
+  polledAtStroke: number;
+}
+
+function PuttPollWidget({
+  pollId,
+  serverState,
+  optimisticVote,
+  optimisticCounts,
+  onVote,
+}: {
+  pollId: string;
+  serverState: PuttPollServerState | undefined;
+  optimisticVote: "yes" | "no" | undefined;
+  optimisticCounts: { yes: number; no: number } | undefined;
+  onVote: (v: "yes" | "no") => void;
+}) {
+  const counts =
+    optimisticCounts ?? serverState?.counts ?? { yes: 0, no: 0 };
+  const myVote = optimisticVote ?? serverState?.myVote ?? null;
+  const closed = serverState?.closedAt != null;
+  const made = serverState?.made ?? null;
+  const total = counts.yes + counts.no;
+  const yesPct = total > 0 ? Math.round((counts.yes / total) * 100) : 50;
+  const noPct = total > 0 ? 100 - yesPct : 50;
+
+  // Closed poll: show the result + who was right.
+  if (closed && made != null) {
+    const youWon = (made && myVote === "yes") || (!made && myVote === "no");
+    return (
+      <div
+        className={`putt-poll putt-poll-closed ${
+          made ? "putt-poll-made" : "putt-poll-missed"
+        }`}
+        aria-label="Putt poll result"
+      >
+        <p className="putt-poll-result">
+          {made ? "Drained it." : "Missed."}{" "}
+          {myVote
+            ? youWon
+              ? "You called it."
+              : "You called the other way."
+            : ""}
+        </p>
+        <div className="putt-poll-bar" aria-hidden="true">
+          <span
+            className={`putt-poll-bar-yes ${made ? "putt-poll-bar-win" : ""}`}
+            style={{ width: `${yesPct}%` }}
+          />
+          <span
+            className={`putt-poll-bar-no ${!made ? "putt-poll-bar-win" : ""}`}
+            style={{ width: `${noPct}%` }}
+          />
+        </div>
+        <p className="putt-poll-totals">
+          {yesPct}% made / {noPct}% missed · {total}{" "}
+          {total === 1 ? "vote" : "votes"}
+        </p>
+      </div>
+    );
+  }
+
+  // Open poll: vote buttons + live community split.
+  return (
+    <div className="putt-poll" aria-label="Putt prediction poll">
+      <p className="putt-poll-prompt">Will it drop?</p>
+      <div className="putt-poll-buttons">
+        <button
+          type="button"
+          className={`putt-poll-btn putt-poll-btn-yes ${myVote === "yes" ? "putt-poll-btn-on" : ""}`}
+          onClick={() => onVote("yes")}
+          disabled={closed}
+          aria-label="Vote yes"
+        >
+          Yes · drops
+          {myVote === "yes" && <span className="putt-poll-btn-check"> ✓</span>}
+        </button>
+        <button
+          type="button"
+          className={`putt-poll-btn putt-poll-btn-no ${myVote === "no" ? "putt-poll-btn-on" : ""}`}
+          onClick={() => onVote("no")}
+          disabled={closed}
+          aria-label="Vote no"
+        >
+          No · misses
+          {myVote === "no" && <span className="putt-poll-btn-check"> ✓</span>}
+        </button>
+      </div>
+      {total > 0 && (
+        <>
+          <div className="putt-poll-bar" aria-hidden="true">
+            <span
+              className="putt-poll-bar-yes"
+              style={{ width: `${yesPct}%` }}
+            />
+            <span
+              className="putt-poll-bar-no"
+              style={{ width: `${noPct}%` }}
+            />
+          </div>
+          <p className="putt-poll-totals">
+            {yesPct}% / {noPct}% · {total}{" "}
+            {total === 1 ? "vote" : "votes"}
+          </p>
+        </>
+      )}
+      {/* Suppress the otherwise-unused param warning. */}
+      <span hidden>{pollId}</span>
+    </div>
   );
 }

@@ -50,6 +50,13 @@ import {
 } from "./types";
 import { classifyShot, parsePlayByPlay } from "./shot-pbp";
 import {
+  findOpenPollForHole,
+  MAX_PUTT_FT,
+  MIN_PUTT_FT,
+  openPuttPoll,
+  settlePuttPoll,
+} from "./putt-polls";
+import {
   buildContextTags,
   playedInOrderForRound,
 } from "./event-context";
@@ -275,6 +282,67 @@ export async function pollAndDiff(
       null;
 
     const shotNumber = Number(sc.currentShotDisplay) || 0;
+
+    // ── Putt prediction polls ────────────────────────────────────
+    // Whenever an approach (or par-3 tee shot) lands on the green at
+    // a "guessable" distance, open a poll asking "will the putt drop?"
+    // and emit a putt-poll feed event so the UI can render the vote
+    // widget. The actual shot may still also qualify as a "stuffed"
+    // event below — that's fine, they're separate rows.
+    if (
+      parsed.endsAt === "green" &&
+      parsed.toHoleFeet !== null &&
+      parsed.toHoleFeet >= MIN_PUTT_FT &&
+      parsed.toHoleFeet <= MAX_PUTT_FT &&
+      shotNumber >= 1
+    ) {
+      const playerName = nameById.get(pid) ?? "Unknown";
+      const distFt = Math.round(parsed.toHoleFeet);
+      // "For" label — what's at stake on this putt.
+      let puttFor: "birdie" | "eagle" | "par save" | "the hole" = "the hole";
+      if (par != null) {
+        const next = shotNumber + 1;
+        if (next === par - 1) puttFor = "eagle";
+        else if (next === par) puttFor = "birdie";
+        else if (next === par + 1) puttFor = "par save";
+      }
+      try {
+        const pollId = await openPuttPoll({
+          tournamentId,
+          playerId: pid,
+          playerName,
+          round,
+          hole: sc.currentHole,
+          distanceFt: distFt,
+          polledAtStroke: shotNumber,
+          holePar: par,
+        });
+        if (pollId) {
+          events.push({
+            id: newEventId(now),
+            tournamentId,
+            ts: now,
+            type: "putt-poll",
+            playerId: pid,
+            playerName,
+            round,
+            hole: sc.currentHole,
+            par: par ?? undefined,
+            pollId,
+            puttDistanceFt: distFt,
+            puttFor,
+            headline:
+              puttFor === "the hole"
+                ? `${playerName} has ${distFt} ft on the ${ordinalHole(sc.currentHole)} — will it drop?`
+                : `${playerName} has ${distFt} ft for ${puttFor} on the ${ordinalHole(sc.currentHole)} — will it drop?`,
+            emoji: "🎯",
+          });
+        }
+      } catch (err) {
+        console.error("[feed] openPuttPoll failed", err);
+      }
+    }
+
     const verdict = classifyShot(parsed, shotNumber, par);
     if (!verdict) continue;
 
@@ -354,6 +422,31 @@ export async function pollAndDiff(
     return 0;
   };
   events.sort((a, b) => interestOf(a) - interestOf(b));
+
+  // ── Settle any open putt polls whose hole just completed ──────
+  // Score events tell us the final strokes for a hole; if there was
+  // an open poll waiting on that hole, we know whether the putt
+  // dropped (finalStrokes === polledAtStroke + 1).
+  const scoreEventsThisPoll = events.filter(
+    (e) => e.type === "score" && e.hole != null && e.strokes != null,
+  );
+  if (scoreEventsThisPoll.length > 0) {
+    await Promise.all(
+      scoreEventsThisPoll.map(async (e) => {
+        try {
+          const pollId = await findOpenPollForHole(
+            tournamentId,
+            e.playerId,
+            e.round,
+            e.hole!,
+          );
+          if (pollId) await settlePuttPoll(pollId, e.strokes!);
+        } catch (err) {
+          console.error("[feed] settlePuttPoll failed", err);
+        }
+      }),
+    );
+  }
 
   await putSnapshot(tournamentId, fresh);
   await pushEvents(tournamentId, events);

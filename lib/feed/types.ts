@@ -18,7 +18,12 @@ export type ScoreResult =
   | "double"
   | "triple-plus";
 
-export type FeedEventType = "score" | "shot" | "position" | "milestone";
+export type FeedEventType =
+  | "score"
+  | "shot"
+  | "position"
+  | "milestone"
+  | "putt-poll";
 
 export interface FeedEvent {
   /** Sortable unique id: `${ts}-${rand}`. */
@@ -97,6 +102,16 @@ export interface FeedEvent {
    */
   top10Before?: number;
   top10After?: number;
+
+  // ── putt-poll events ──
+  /** ID of the putt prediction poll (Redis key suffix). Renders an
+   *  interactive yes/no widget in the feed row, with live community
+   *  results polled alongside the feed. */
+  pollId?: string;
+  /** Distance of the putt the poll is about, in feet (rounded). */
+  puttDistanceFt?: number;
+  /** What the putt is for, label-ready: "birdie", "eagle", "par save". */
+  puttFor?: "birdie" | "eagle" | "par save" | "the hole";
 }
 
 /**

@@ -32,6 +32,12 @@ import { getInPlayTopFinish } from "@/lib/golf-api/datagolf";
 import { getLiveStatsCached } from "@/lib/feed/live-stats-cache";
 import { computeCommunityBacking } from "@/lib/feed/community-backing";
 import { eventPolarity, type FeedRow } from "@/lib/feed/types";
+import {
+  getMyVotesBulk,
+  getPuttPollBulk,
+  type PuttPoll,
+  type PuttPollCounts,
+} from "@/lib/feed/putt-polls";
 
 export const dynamic = "force-dynamic";
 
@@ -186,19 +192,44 @@ async function handle(req: Request) {
   for (const e of bestEvents) idSet.add(e.id);
   for (const e of worstEvents) idSet.add(e.id);
   const ids = [...idSet];
-  const [reactions, commentCounts, topFinishHistoryFull, communityBacking] =
-    await Promise.all([
-      getReactionsBulk(ids),
-      getCommentCountsBulk(ids),
-      // Read here (early) so the top-10 shift attachment has the recent
-      // snapshot list ready by the time toRow runs. Full list is also
-      // what we'll conditionally include in the response further down.
-      getTopFinishHistory(tournament.id),
-      // "X% of Pardle bettors back him this week" — aggregated from
-      // the bets table for this tournament window. Returns {} when
-      // the population's too small to be meaningful.
-      computeCommunityBacking(tournament.startDate),
-    ]);
+
+  // Putt-poll IDs from any putt-poll event in the response — used to
+  // attach current counts + the caller's own vote in one bulk read.
+  const pollIds: string[] = [];
+  for (const e of feedMerged) {
+    if (e.type === "putt-poll" && e.pollId) pollIds.push(e.pollId);
+  }
+
+  const [
+    reactions,
+    commentCounts,
+    topFinishHistoryFull,
+    communityBacking,
+    puttPollBulk,
+    puttPollMyVotes,
+  ] = await Promise.all([
+    getReactionsBulk(ids),
+    getCommentCountsBulk(ids),
+    // Read here (early) so the top-10 shift attachment has the recent
+    // snapshot list ready by the time toRow runs. Full list is also
+    // what we'll conditionally include in the response further down.
+    getTopFinishHistory(tournament.id),
+    // "X% of Pardle bettors back him this week" — aggregated from
+    // the bets table for this tournament window. Returns {} when
+    // the population's too small to be meaningful.
+    computeCommunityBacking(tournament.startDate),
+    // Putt poll state for the rows in this response — counts + close
+    // status + outcome. Skipped when there are no putt-poll events.
+    pollIds.length > 0
+      ? getPuttPollBulk(pollIds)
+      : Promise.resolve(
+          {} as Record<string, { poll: PuttPoll; counts: PuttPollCounts }>,
+        ),
+    // The caller's own vote on each poll (null if they haven't voted).
+    pollIds.length > 0 && visitorId
+      ? getMyVotesBulk(pollIds, visitorId)
+      : Promise.resolve({} as Record<string, "yes" | "no" | null>),
+  ]);
 
   // Pull odds buffers for the union of players in this response. We
   // compute the per-event "before / after" shift here at response
@@ -423,6 +454,10 @@ async function handle(req: Request) {
      *  included regardless of slim/full. */
     communityBackingPct: communityBacking.byPlayer,
     communityTotalBettors: communityBacking.totalBettors,
+    /** Putt prediction polls keyed by pollId. Counts + close status +
+     *  the caller's own vote. Sparse — only includes polls referenced
+     *  by events in this response. */
+    puttPolls: composePuttPollPayload(puttPollBulk, puttPollMyVotes),
     // Heavy chart buffers — opt-in via ?include=charts. Bet detail
     // page passes it; the home feed doesn't need them and skipping
     // them drops the response by an order of magnitude per poll.
@@ -440,6 +475,34 @@ async function handle(req: Request) {
         }
       : {}),
   });
+}
+
+/** Compact wire shape for one putt poll the client renders. */
+interface PuttPollWire {
+  counts: PuttPollCounts;
+  closedAt: number | null;
+  made: boolean | null;
+  myVote: "yes" | "no" | null;
+  /** Stroke count when the poll opened — lets the client tell a viewer
+   *  arriving late whether the poll's still actionable. */
+  polledAtStroke: number;
+}
+
+function composePuttPollPayload(
+  bulk: Record<string, { poll: PuttPoll; counts: PuttPollCounts }>,
+  myVotes: Record<string, "yes" | "no" | null>,
+): Record<string, PuttPollWire> {
+  const out: Record<string, PuttPollWire> = {};
+  for (const [id, { poll, counts }] of Object.entries(bulk)) {
+    out[id] = {
+      counts,
+      closedAt: poll.closedAt ?? null,
+      made: poll.made ?? null,
+      myVote: myVotes[id] ?? null,
+      polledAtStroke: poll.polledAtStroke,
+    };
+  }
+  return out;
 }
 
 interface FieldDrift {
