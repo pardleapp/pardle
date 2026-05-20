@@ -12115,3 +12115,506 @@ body:has(.v4-theme) {
   background: var(--green);
   color: #04130a;
 }
+
+/* ── Page chrome ─────────────────────────────────────────────────── */
+.v4-theme .brand {
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  margin-bottom: 16px;
+}
+
+.v4-theme .brand h1 {
+  color: var(--text);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.v4-theme .brand .subtitle,
+.v4-theme .brand p {
+  color: var(--muted);
+}
+
+.v4-theme .brand-back {
+  color: var(--text);
+  background: var(--bg-card-hi);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.v4-theme .brand-back:hover {
+  background: var(--bg-card);
+}
+
+.v4-theme .brand-help {
+  color: var(--muted);
+  background: var(--bg-card-hi);
+  border: 1px solid var(--border);
+}
+
+.v4-theme .hub-nav-tab {
+  color: var(--muted);
+}
+
+.v4-theme .hub-nav-tab:hover {
+  color: var(--text);
+}
+
+/* ── Bet detail page ─────────────────────────────────────────────── */
+.v4-theme .bd-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.v4-theme .bd-head {
+  background: var(--bg-card);
+  border: none;
+  border-radius: 16px;
+  padding: 18px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.v4-theme .bd-overline {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+
+.v4-theme .bd-name {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin: 0 0 6px;
+}
+
+.v4-theme .bd-name a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.v4-theme .bd-sub {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  margin: 0;
+}
+
+.v4-theme .bd-pnl {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.v4-theme .bd-pnl-pct {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.v4-theme .bd-pnl-amt {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.v4-theme .bd-pnl-value {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* Bet detail chart */
+.v4-theme .bd-chart {
+  background: var(--bg-card);
+  border: none;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.v4-theme .bd-chart-summary {
+  color: var(--muted);
+}
+
+/* Insight card */
+.v4-theme .bd-insight {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  background: var(--bg-card);
+  border-radius: 12px;
+}
+
+.v4-theme .bd-insight-favourable {
+  border-left-color: var(--green);
+  background: rgba(0, 217, 110, 0.05);
+}
+
+.v4-theme .bd-insight-needs-work {
+  border-left-color: var(--amber);
+  background: rgba(255, 157, 46, 0.05);
+}
+
+.v4-theme .bd-insight-long-shot {
+  border-left-color: var(--red);
+  background: rgba(255, 75, 107, 0.05);
+}
+
+.v4-theme .bd-insight-label {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.v4-theme .bd-insight-headline {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.v4-theme .bd-insight-hint {
+  color: var(--muted);
+}
+
+/* Detail tables (hole-by-hole, biggest swings, nearby lines) */
+.v4-theme .bd-table {
+  background: var(--bg-card);
+  border: none;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.v4-theme .bd-table-title {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.v4-theme .bd-table ul {
+  border-color: var(--border);
+}
+
+.v4-theme .bd-table-row {
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.v4-theme .bd-table-row:first-child {
+  border-top: none;
+}
+
+.v4-theme .bd-table-hole,
+.v4-theme .bd-table-val,
+.v4-theme .bd-table-pct,
+.v4-theme .bd-table-swing {
+  color: var(--text);
+}
+
+.v4-theme .bd-table-foot {
+  color: var(--muted);
+}
+
+.v4-theme .bd-empty {
+  background: var(--bg-card);
+  border: 1px dashed var(--border-strong);
+  color: var(--muted);
+  border-radius: 12px;
+}
+
+.v4-theme .bd-missing {
+  background: var(--bg-card);
+  border: 1px dashed var(--border-strong);
+  color: var(--muted);
+  border-radius: 12px;
+}
+
+.v4-theme .bd-missing a {
+  color: var(--green);
+}
+
+.v4-theme .bd-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.v4-theme .bd-share {
+  background: var(--green);
+  color: #04130a;
+  border: none;
+  border-radius: 999px;
+  padding: 11px 18px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 16px var(--green-glow);
+}
+
+.v4-theme .bd-share:hover {
+  filter: brightness(1.1);
+}
+
+.v4-theme .bd-remove {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 11px 18px;
+  font-weight: 700;
+}
+
+.v4-theme .bd-remove:hover {
+  background: var(--red-soft);
+  color: var(--red);
+  border-color: rgba(255, 75, 107, 0.3);
+}
+
+/* "Post as tip" form on bet detail */
+.v4-theme .bd-tip-post {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.v4-theme .bd-tip-post-btn {
+  background: var(--bg-card-hi);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+}
+
+/* ── Player page ─────────────────────────────────────────────────── */
+.v4-theme .pcard-head,
+.v4-theme .pcard-section {
+  background: var(--bg-card);
+  border: none;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.v4-theme .pcard-name {
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.v4-theme .pcard-statline {
+  color: var(--muted);
+}
+
+.v4-theme .pcard-stat strong {
+  color: var(--text);
+}
+
+.v4-theme .pcard-section-title {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.v4-theme .pcard-form-trend-up {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.v4-theme .pcard-form-trend-down {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.v4-theme .pcard-form-trend-flat {
+  color: var(--muted);
+  background: var(--bg-card-hi);
+}
+
+.v4-theme .pcard-form-finish {
+  color: var(--green);
+}
+
+.v4-theme .pcard-form-finish-mc {
+  color: var(--red);
+}
+
+.v4-theme .pcard-form-row {
+  border-bottom-color: var(--border);
+}
+
+.v4-theme .pcard-form-tournament {
+  color: var(--text);
+}
+
+.v4-theme .pcard-form-season {
+  color: var(--muted);
+}
+
+/* ── History page ────────────────────────────────────────────────── */
+.v4-theme .history-stats,
+.v4-theme .history-chart,
+.v4-theme .history-section {
+  background: var(--bg-card);
+  border: none;
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.v4-theme .history-stat-num {
+  color: var(--text);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.v4-theme .history-stat-label {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.v4-theme .history-row,
+.v4-theme .history-row-link {
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.v4-theme .history-row-name {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.v4-theme .history-row-meta {
+  color: var(--muted);
+}
+
+.v4-theme .history-row-pnl {
+  font-weight: 800;
+}
+
+.v4-theme .history-empty {
+  background: var(--bg-card);
+  border: 1px dashed var(--border-strong);
+  color: var(--muted);
+  border-radius: 12px;
+}
+
+/* ── Polls leaderboard page ──────────────────────────────────────── */
+.v4-theme .puttlb-you {
+  background: var(--bg-card);
+  border: 1px solid rgba(0, 217, 110, 0.25);
+  border-radius: 16px;
+}
+
+.v4-theme .puttlb-you-label {
+  color: var(--muted);
+}
+
+.v4-theme .puttlb-you-record {
+  color: var(--text);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.v4-theme .puttlb-you-acc {
+  color: var(--green);
+}
+
+.v4-theme .puttlb-you-streak {
+  color: var(--amber);
+}
+
+.v4-theme .puttlb-you-rank {
+  background: var(--green);
+  color: #04130a;
+}
+
+.v4-theme .puttlb-you-need {
+  color: var(--muted);
+}
+
+.v4-theme .puttlb-name-save {
+  background: var(--green);
+  color: #04130a;
+  border: none;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.v4-theme .puttlb-name-save:disabled {
+  background: var(--bg-card-hi);
+  color: var(--muted);
+}
+
+.v4-theme .puttlb-row {
+  background: var(--bg-card);
+  border: none;
+  border-radius: 12px;
+}
+
+.v4-theme .puttlb-row-me {
+  background: rgba(0, 217, 110, 0.08);
+  border: 1px solid rgba(0, 217, 110, 0.3);
+}
+
+.v4-theme .puttlb-rank {
+  color: var(--text-faint);
+  font-weight: 800;
+}
+
+.v4-theme .puttlb-name {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.v4-theme .puttlb-acc {
+  color: var(--green);
+}
+
+.v4-theme .puttlb-record {
+  color: var(--muted);
+}
+
+.v4-theme .puttlb-h {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+/* Tipster-input on the leaderboard name set */
+.v4-theme .tipster-input {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  border-radius: 8px;
+}
+
+.v4-theme .tipster-input::placeholder {
+  color: var(--text-faint);
+}
+
+/* Reels — keep the existing tile style but darken backgrounds */
+.v4-theme .reel-group,
+.v4-theme .reel-pane {
+  background: transparent;
+}
+
+.v4-theme .reel-pane-title {
+  color: var(--muted);
+}
+
+/* Catch-me-up banner */
+.v4-theme .catchup-banner {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+}

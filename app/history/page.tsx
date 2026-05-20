@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default function HistoryPage() {
   return (
-    <main className="container">
+    <main className="container v4-theme">
       <header className="brand brand-split">
         <h1>Your bet history</h1>
         <Link href="/" className="hub-nav-tab">

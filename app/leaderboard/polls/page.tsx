@@ -99,7 +99,10 @@ export default function PollsLeaderboardPage() {
   }
 
   return (
-    <main style={{ maxWidth: 720, margin: "0 auto", padding: "24px 16px 60px" }}>
+    <main
+      className="v4-theme"
+      style={{ maxWidth: 720, margin: "0 auto", padding: "24px 16px 60px" }}
+    >
       <header className="brand">
         <Link className="brand-back" href="/" aria-label="Back to feed">
           ←

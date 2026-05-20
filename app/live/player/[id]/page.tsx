@@ -65,7 +65,7 @@ export default async function PlayerPage({ params }: PageProps) {
   );
 
   return (
-    <main className="container container-wide">
+    <main className="container container-wide v4-theme">
       <header className="brand">
         <Link className="brand-back" href="/" aria-label="Back to feed">
           ←
