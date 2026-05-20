@@ -209,14 +209,64 @@ export function withinRoundTag(args: {
 }
 
 /**
+ * Field-relative ranking for the player's running count of this result
+ * type in the current round. Reads "most in field today" / "tied for
+ * most" / "2nd-most" / "top 5 in field" and surfaces only when the
+ * player is genuinely standing out (top 5 in their result category).
+ *
+ * Caller is responsible for computing rank/tied — engine has the
+ * per-player snapshot data to do this in a single pass per poll.
+ */
+export function fieldRankTag(args: {
+  /** Player's count of this result type this round. */
+  count: number;
+  /** Number of *other* players with strictly more of this result. */
+  strictlyMore: number;
+  /** Number of *other* players tied at this count. */
+  tiedWith: number;
+  /** Friendly noun — "birdies", "eagles", "bogeys", "blow-ups". */
+  noun: string;
+}): string | null {
+  if (args.count < 2) return null;
+  if (args.strictlyMore === 0) {
+    if (args.tiedWith === 0) return `most ${args.noun} in field today`;
+    if (args.tiedWith <= 2) return `tied for most ${args.noun} in field`;
+    // 4+ players tied at the top — too noisy to claim "leading", but
+    // they're still top of the pack.
+    return `among most ${args.noun} in field`;
+  }
+  if (args.strictlyMore === 1) return `2nd-most ${args.noun} in field`;
+  if (args.strictlyMore === 2) return `3rd-most ${args.noun} in field`;
+  if (args.strictlyMore <= 4) return `top 5 in field today`;
+  return null;
+}
+
+const RESULT_NOUN_PLURAL: Record<ScoreResult, string> = {
+  albatross: "albatrosses",
+  eagle: "eagles",
+  birdie: "birdies",
+  par: "pars",
+  bogey: "bogeys",
+  double: "doubles",
+  "triple-plus": "blow-ups",
+};
+
+/**
  * Convenience: build the full tag list for an event given the
- * player's pre- and post-state. Returns a deduplicated array of 0-2
- * tags (more than two starts to feel cluttered).
+ * player's pre- and post-state. Returns a deduplicated array of 0-3
+ * tags (more than three starts to feel cluttered).
  */
 export function buildContextTags(args: {
   prevPosition: string | undefined;
   freshPosition: string | undefined;
   streak: StreakInputs | null;
+  /** Field-relative rank inputs for this event's result. Optional —
+   *  when omitted no field-rank chip is emitted. */
+  fieldRank?: {
+    count: number;
+    strictlyMore: number;
+    tiedWith: number;
+  } | null;
 }): string[] {
   const tags: string[] = [];
   const pos = positionTag(args.prevPosition, args.freshPosition);
@@ -235,7 +285,14 @@ export function buildContextTags(args: {
       if (st && !tags.includes(st)) tags.push(st);
     }
   }
-  return tags.slice(0, 2);
+  // Field rank goes last — it's a contextual layer on top of the
+  // ordinal/streak tags above.
+  if (args.fieldRank && args.streak?.freshResult) {
+    const noun = RESULT_NOUN_PLURAL[args.streak.freshResult] ?? "of those";
+    const fr = fieldRankTag({ ...args.fieldRank, noun });
+    if (fr && !tags.includes(fr)) tags.push(fr);
+  }
+  return tags.slice(0, 3);
 }
 
 /** Re-export the leaderboard row shape used by callers — same as the orchestrator's. */

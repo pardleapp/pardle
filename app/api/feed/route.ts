@@ -411,13 +411,42 @@ async function handle(req: Request) {
 
   // Per-player tournament-to-date SG breakdown (per-round averages
   // vs the field). Powers the "where it's leaking" hint on the bet-
-  // detail insight card. Lookup is cached server-side for 5 min; we
-  // only build/ship the map when ?include=charts so the home feed
-  // payload stays slim. Map keyed by orchestrator playerId via name
-  // match against the leaderboard.
-  const playerSgBreakdown = includeChartData
-    ? await buildSgBreakdownMap(tournament.id, leaderboard)
-    : null;
+  // detail insight card AND the per-poll putting-SG anchor that
+  // sits under the putt-prediction widget question. Lookup is cached
+  // server-side for 5 min; the full map only ships down the wire on
+  // ?include=charts, but we always need it server-side to enrich
+  // any open polls with the bet player's putting SG. Map keyed by
+  // orchestrator playerId via name match against the leaderboard.
+  const playerSgBreakdown = await buildSgBreakdownMap(
+    tournament.id,
+    leaderboard,
+  );
+
+  // Hot/cold-hand badges. Pulls current-round SG (not week-to-date)
+  // so "hot" reflects what's happening right now, not what happened
+  // Thursday. Reads from the same 5-min DG cache as everything else;
+  // never blocks shot emission. Top 5 with sgTotal ≥ +1.5 → 🔥;
+  // bottom 5 with sgTotal ≤ −1.5 → 🥶. Magnitude floors avoid
+  // labelling marginal players in a flat scoring round.
+  // "Today's round" = max currentRound seen across active players in
+  // playerRoundStates. Robust to weather delays / two-tee starts (a
+  // back-9 starter sitting on the same round as a front-9 starter).
+  let currentRound = 1;
+  for (const state of Object.values(playerRoundStates)) {
+    if (state.currentRound > currentRound) currentRound = state.currentRound;
+  }
+  const handStatus = await buildHandStatusMap(
+    tournament.id,
+    currentRound,
+    leaderboard,
+  );
+
+  // "Hottest in field this week" strip. Reads from the same cached
+  // event_avg SG breakdown we already pull for the bet-insight card
+  // — no new DataGolf call. Top 3 / bottom 3 by sg_total with a
+  // ±0.5 SG/round magnitude floor so a flat field doesn't surface
+  // a noisy "hottest".
+  const fieldMomentum = deriveFieldMomentum(playerSgBreakdown, leaderboard);
 
   return NextResponse.json({
     tournament: {
@@ -467,11 +496,23 @@ async function handle(req: Request) {
     /** Putt prediction polls keyed by pollId. Counts + close status +
      *  the caller's own vote. Sparse — only includes polls referenced
      *  by events in this response. */
-    puttPolls: composePuttPollPayload(puttPollBulk, puttPollMyVotes),
+    puttPolls: composePuttPollPayload(
+      puttPollBulk,
+      puttPollMyVotes,
+      playerSgBreakdown,
+    ),
     /** Caller's putt-prediction stats — total / correct / streak +
      *  tournament rank. Drives the header chip + recap toasts. Null
      *  when no visitorId is supplied. */
     myPuttIq,
+    /** Hot/cold-hand status keyed by playerId. Sparse — only contains
+     *  the top 5 by sg_total today (🔥) and bottom 5 (🥶), magnitude
+     *  floors applied. Renders as a small emoji prefix next to player
+     *  names anywhere they appear. */
+    handStatus,
+    /** Top 3 / bottom 3 by week-to-date sg_total. Powers the
+     *  "🔥 hottest this week / 🥶 coldest" strip near the top of /live. */
+    fieldMomentum,
     // Heavy chart buffers — opt-in via ?include=charts. Bet detail
     // page passes it; the home feed doesn't need them and skipping
     // them drops the response by an order of magnitude per poll.
@@ -504,11 +545,25 @@ interface PuttPollWire {
    *  outcome (≥60% vote one way, opposite result, ≥6 voters). Powers
    *  the "🤡 crowd called it wrong" chip on closed rows. */
   crowdWasWrong: boolean;
+  /** Bet player's week-to-date putting SG per round (positive = better
+   *  than field on the greens). Null when DataGolf hasn't reported
+   *  yet — widget hides the anchor line in that case. */
+  playerPuttSg: number | null;
 }
 
 function composePuttPollPayload(
   bulk: Record<string, { poll: PuttPoll; counts: PuttPollCounts }>,
   myVotes: Record<string, "yes" | "no" | null>,
+  sgBreakdown: Record<
+    string,
+    {
+      total: number | null;
+      ott: number | null;
+      app: number | null;
+      arg: number | null;
+      putt: number | null;
+    }
+  > | null,
 ): Record<string, PuttPollWire> {
   const out: Record<string, PuttPollWire> = {};
   for (const [id, { poll, counts }] of Object.entries(bulk)) {
@@ -520,6 +575,7 @@ function composePuttPollPayload(
             made: poll.made,
           })
         : false;
+    const playerPuttSg = sgBreakdown?.[poll.playerId]?.putt ?? null;
     out[id] = {
       counts,
       closedAt: poll.closedAt ?? null,
@@ -527,6 +583,7 @@ function composePuttPollPayload(
       myVote: myVotes[id] ?? null,
       polledAtStroke: poll.polledAtStroke,
       crowdWasWrong,
+      playerPuttSg,
     };
   }
   return out;
@@ -1103,6 +1160,105 @@ async function buildSgBreakdownMap(
     };
   }
   return out;
+}
+
+/**
+ * Build a `playerId → "hot" | "cold"` map for today's current round.
+ *
+ * Pulls cached DataGolf live-stats for the current round (5-min TTL).
+ * Marks the top 5 by sg_total with a magnitude floor at +1.5 as 🔥;
+ * bottom 5 with floor at −1.5 as 🥶. Magnitude floors stop us
+ * labelling marginal players in a flat scoring round.
+ *
+ * Returns {} if DataGolf is unreachable — never blocks shot emission.
+ */
+async function buildHandStatusMap(
+  tournamentId: string,
+  currentRound: number,
+  leaderboard: import("@/lib/feed/store").CachedLeaderboardRow[],
+): Promise<Record<string, "hot" | "cold">> {
+  if (!Number.isFinite(currentRound) || currentRound < 1) return {};
+  let stats;
+  try {
+    stats = await getLiveStatsCached(tournamentId, currentRound);
+  } catch (err) {
+    console.error("[feed] hand-status DG fetch failed", err);
+    return {};
+  }
+  if (stats.length === 0) return {};
+  // Match DG rows back to orchestrator playerIds via name.
+  const byNorm = new Map<string, (typeof stats)[number]>();
+  for (const s of stats) byNorm.set(normaliseName(s.name), s);
+  const rows: Array<{ playerId: string; sgTotal: number }> = [];
+  for (const r of leaderboard) {
+    const s = byNorm.get(normaliseName(r.displayName));
+    if (!s || s.sgTotal == null || !Number.isFinite(s.sgTotal)) continue;
+    rows.push({ playerId: r.playerId, sgTotal: s.sgTotal });
+  }
+  if (rows.length < 10) return {}; // too few players reporting — noisy
+  rows.sort((a, b) => b.sgTotal - a.sgTotal);
+  const out: Record<string, "hot" | "cold"> = {};
+  const HOT_FLOOR = 1.5;
+  const COLD_FLOOR = -1.5;
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    if (rows[i].sgTotal >= HOT_FLOOR) out[rows[i].playerId] = "hot";
+  }
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    const r = rows[rows.length - 1 - i];
+    if (r.sgTotal <= COLD_FLOOR) out[r.playerId] = "cold";
+  }
+  return out;
+}
+
+interface MomentumRow {
+  playerId: string;
+  displayName: string;
+  sgTotal: number;
+}
+
+/**
+ * Derive the top 3 / bottom 3 SG_total players for the
+ * "🔥 hottest in field" / "🥶 coldest" strip on /live. Reads from
+ * the SG map we already build for the bet-insight card — no extra
+ * DataGolf call. Magnitude floor (±0.5 SG/round) so a flat field
+ * doesn't surface a noisy "hottest".
+ */
+function deriveFieldMomentum(
+  sgBreakdown: Record<
+    string,
+    {
+      total: number | null;
+      ott: number | null;
+      app: number | null;
+      arg: number | null;
+      putt: number | null;
+    }
+  > | null,
+  leaderboard: import("@/lib/feed/store").CachedLeaderboardRow[],
+): { hot: MomentumRow[]; cold: MomentumRow[] } {
+  const empty = { hot: [], cold: [] };
+  if (!sgBreakdown) return empty;
+  const nameByPid = new Map(
+    leaderboard.map((r) => [r.playerId, r.displayName]),
+  );
+  const rows: MomentumRow[] = [];
+  for (const [pid, sg] of Object.entries(sgBreakdown)) {
+    if (sg.total == null || !Number.isFinite(sg.total)) continue;
+    const displayName = nameByPid.get(pid);
+    if (!displayName) continue;
+    rows.push({ playerId: pid, displayName, sgTotal: sg.total });
+  }
+  if (rows.length < 10) return empty;
+  rows.sort((a, b) => b.sgTotal - a.sgTotal);
+  const HOT_FLOOR = 0.5;
+  const COLD_FLOOR = -0.5;
+  const hot = rows.slice(0, 5).filter((r) => r.sgTotal >= HOT_FLOOR).slice(0, 3);
+  const cold = rows
+    .slice(-5)
+    .filter((r) => r.sgTotal <= COLD_FLOOR)
+    .slice(-3)
+    .reverse(); // present worst-first
+  return { hot, cold };
 }
 
 async function maybeAppendWinningScoreSnapshot(

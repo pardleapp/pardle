@@ -119,6 +119,15 @@ interface FeedResponse {
     tournament?: { total: number; correct: number };
     tournamentRank?: number | null;
   } | null;
+  /** Hot/cold hand status keyed by playerId — sparse (only the top 5
+   *  / bottom 5 by today's sg_total who clear the magnitude floor). */
+  handStatus?: Record<string, "hot" | "cold">;
+  /** Top 3 / bottom 3 by week-to-date sg_total — powers the
+   *  "🔥 hottest this week / 🥶 coldest" strip. */
+  fieldMomentum?: {
+    hot: Array<{ playerId: string; displayName: string; sgTotal: number }>;
+    cold: Array<{ playerId: string; displayName: string; sgTotal: number }>;
+  };
   watching: number;
   seenToday: number;
   polled: boolean;
@@ -477,6 +486,8 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
       <PlayerSearch players={data.playerIndex ?? []} />
 
+      <MomentumStrip momentum={data.fieldMomentum} />
+
       <CatchMeUp rows={data.rows ?? []} />
 
       <nav className="feed-tabs" role="tablist">
@@ -585,7 +596,14 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                     href={`/live/player/${event.playerId}`}
                     className="feed-body feed-body-link"
                   >
-                    <p className="feed-headline">{event.headline}</p>
+                    <p className="feed-headline">
+                      {data.handStatus?.[event.playerId] && (
+                        <HandBadge
+                          status={data.handStatus[event.playerId]}
+                        />
+                      )}
+                      {event.headline}
+                    </p>
                     {(() => {
                       const backingPct =
                         data.communityBackingPct?.[event.playerId];
@@ -652,6 +670,8 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                   {event.type === "putt-poll" && event.pollId && (
                     <PuttPollWidget
                       pollId={event.pollId}
+                      puttDistanceFt={event.puttDistanceFt}
+                      playerName={event.playerName}
                       serverState={data.puttPolls?.[event.pollId]}
                       optimisticVote={myPollVotes[event.pollId]}
                       optimisticCounts={pollCounts[event.pollId]}
@@ -740,6 +760,84 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         ))}
       </div>
     </section>
+  );
+}
+
+// ── Hottest-in-field strip ─────────────────────────────────────────
+
+function MomentumStrip({
+  momentum,
+}: {
+  momentum: FeedResponse["fieldMomentum"] | undefined;
+}) {
+  const hot = momentum?.hot ?? [];
+  const cold = momentum?.cold ?? [];
+  if (hot.length === 0 && cold.length === 0) return null;
+  const fmt = (n: number) => {
+    const r = Math.round(n * 10) / 10;
+    return `${r >= 0 ? "+" : ""}${r.toFixed(1)}`;
+  };
+  return (
+    <div className="momentum-strip" aria-label="Field momentum this week">
+      {hot.length > 0 && (
+        <div className="momentum-row momentum-row-hot">
+          <span className="momentum-row-label" aria-hidden="true">
+            🔥
+          </span>
+          <span className="momentum-row-label-text">Hottest this week</span>
+          <div className="momentum-chips">
+            {hot.map((r) => (
+              <Link
+                key={r.playerId}
+                href={`/live/player/${r.playerId}`}
+                className="momentum-chip"
+              >
+                <span className="momentum-chip-name">{r.displayName}</span>
+                <span className="momentum-chip-sg">{fmt(r.sgTotal)}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+      {cold.length > 0 && (
+        <div className="momentum-row momentum-row-cold">
+          <span className="momentum-row-label" aria-hidden="true">
+            🥶
+          </span>
+          <span className="momentum-row-label-text">Coldest</span>
+          <div className="momentum-chips">
+            {cold.map((r) => (
+              <Link
+                key={r.playerId}
+                href={`/live/player/${r.playerId}`}
+                className="momentum-chip momentum-chip-cold"
+              >
+                <span className="momentum-chip-name">{r.displayName}</span>
+                <span className="momentum-chip-sg">{fmt(r.sgTotal)}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Hot/cold hand badge ────────────────────────────────────────────
+
+function HandBadge({ status }: { status: "hot" | "cold" }) {
+  const label =
+    status === "hot"
+      ? "Hot hand today — top 5 by strokes gained"
+      : "Cold today — bottom 5 by strokes gained";
+  return (
+    <span
+      className={`hand-badge hand-badge-${status}`}
+      aria-label={label}
+      title={label}
+    >
+      {status === "hot" ? "🔥" : "🥶"}
+    </span>
   );
 }
 

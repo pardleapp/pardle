@@ -383,6 +383,68 @@ export async function pollAndDiff(
     leaderboard.map((r) => [r.playerId, r.position]),
   );
   const thruByPid = new Map(leaderboard.map((r) => [r.playerId, r.thru]));
+
+  // Field-rank pre-pass. For each (result, round) combo referenced by
+  // any score event in this poll, build a `playerId → count` map by
+  // sweeping every player's scorecard once. Lets us tag "most birdies
+  // in field today" / "2nd-most" etc. without a per-event re-scan.
+  const interestingResults = new Set<string>();
+  const interestingRounds = new Set<number>();
+  for (const ev of events) {
+    if (ev.type === "score" && ev.result != null && ev.round != null) {
+      interestingResults.add(ev.result);
+      interestingRounds.add(ev.round);
+    }
+  }
+  const fieldCounts: Record<string, Record<number, Map<string, number>>> = {};
+  if (interestingResults.size > 0 && interestingRounds.size > 0) {
+    for (const r of interestingResults) {
+      fieldCounts[r] = {};
+      for (const round of interestingRounds) {
+        fieldCounts[r][round] = new Map();
+      }
+    }
+    for (const [pid, sc] of Object.entries(scorecards)) {
+      for (const [roundStr, holes] of Object.entries(sc.rounds)) {
+        const round = Number(roundStr);
+        if (!interestingRounds.has(round)) continue;
+        for (const h of holes) {
+          const score = Number(h.score);
+          if (!Number.isFinite(score) || score <= 0) continue;
+          const r = resultFor(score, h.par);
+          if (!interestingResults.has(r)) continue;
+          const cur = fieldCounts[r][round].get(pid) ?? 0;
+          fieldCounts[r][round].set(pid, cur + 1);
+        }
+      }
+    }
+  }
+  function rankForEvent(ev: FeedEvent):
+    | { count: number; strictlyMore: number; tiedWith: number }
+    | null {
+    if (
+      ev.type !== "score" ||
+      ev.result == null ||
+      ev.round == null
+    ) {
+      return null;
+    }
+    const byRound = fieldCounts[ev.result];
+    if (!byRound) return null;
+    const counts = byRound[ev.round];
+    if (!counts) return null;
+    const myCount = counts.get(ev.playerId) ?? 0;
+    if (myCount === 0) return null;
+    let strictlyMore = 0;
+    let tiedWith = 0;
+    for (const [pid, c] of counts.entries()) {
+      if (pid === ev.playerId) continue;
+      if (c > myCount) strictlyMore++;
+      else if (c === myCount) tiedWith++;
+    }
+    return { count: myCount, strictlyMore, tiedWith };
+  }
+
   for (const ev of events) {
     const freshPos = positionByPid.get(ev.playerId);
     const prevPos = prev.positions[ev.playerId];
@@ -399,6 +461,7 @@ export async function pollAndDiff(
       prevPosition: prevPos,
       freshPosition: freshPos,
       streak,
+      fieldRank: rankForEvent(ev),
     });
     if (tags.length > 0) ev.tags = tags;
   }

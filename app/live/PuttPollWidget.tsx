@@ -10,6 +10,8 @@
  * without dragging in FeedClient's tournament/leaderboard machinery.
  */
 
+import { tourPuttMakeRate } from "@/lib/feed/tour-baselines";
+
 export interface PuttPollServerState {
   counts: { yes: number; no: number };
   closedAt: number | null;
@@ -20,23 +22,76 @@ export interface PuttPollServerState {
    *  opposite result). Surfaces the "crowd called it wrong" chip on
    *  closed rows. */
   crowdWasWrong?: boolean;
+  /** Bet player's week-to-date putting SG per round (positive = better
+   *  than field on the greens). Anchors the "tour avg 22% from 14ft ·
+   *  Niemann +1.8 SG putting this week" line under the question. */
+  playerPuttSg?: number | null;
 }
 
 export interface PuttPollWidgetProps {
   pollId: string;
+  /** Distance of the putt in feet — drives the tour-baseline anchor
+   *  ("tour avg 22% from 14ft"). Pulled from the feed event. */
+  puttDistanceFt?: number;
+  /** Player name — used in the SG anchor sentence. */
+  playerName?: string;
   serverState: PuttPollServerState | undefined;
   optimisticVote: "yes" | "no" | undefined;
   optimisticCounts: { yes: number; no: number } | undefined;
   onVote: (v: "yes" | "no") => void;
 }
 
+function formatSg(v: number): string {
+  const r = Math.round(v * 10) / 10;
+  return `${r >= 0 ? "+" : ""}${r.toFixed(1)}`;
+}
+
+/**
+ * Build the small "Tour avg 22% from 14ft · Niemann +1.8 SG putting"
+ * anchor that sits under the prompt. Returns null when neither side
+ * of the comparison has data to show — keeps the widget clean.
+ */
+function buildBaselineLine(args: {
+  distanceFt: number | undefined;
+  playerName: string | undefined;
+  playerPuttSg: number | null | undefined;
+}): string | null {
+  const parts: string[] = [];
+  if (typeof args.distanceFt === "number" && args.distanceFt > 0) {
+    const rate = tourPuttMakeRate(args.distanceFt);
+    if (rate != null) {
+      parts.push(
+        `Tour avg ${Math.round(rate * 100)}% from ${Math.round(args.distanceFt)} ft`,
+      );
+    }
+  }
+  if (
+    typeof args.playerPuttSg === "number" &&
+    Number.isFinite(args.playerPuttSg) &&
+    args.playerName
+  ) {
+    parts.push(
+      `${args.playerName} ${formatSg(args.playerPuttSg)} SG putting this week`,
+    );
+  }
+  if (parts.length === 0) return null;
+  return parts.join(" · ");
+}
+
 export default function PuttPollWidget({
   pollId,
+  puttDistanceFt,
+  playerName,
   serverState,
   optimisticVote,
   optimisticCounts,
   onVote,
 }: PuttPollWidgetProps) {
+  const baseline = buildBaselineLine({
+    distanceFt: puttDistanceFt,
+    playerName,
+    playerPuttSg: serverState?.playerPuttSg,
+  });
   const counts =
     optimisticCounts ?? serverState?.counts ?? { yes: 0, no: 0 };
   const myVote = optimisticVote ?? serverState?.myVote ?? null;
@@ -102,6 +157,7 @@ export default function PuttPollWidget({
           </span>
         )}
       </p>
+      {baseline && <p className="putt-poll-baseline">{baseline}</p>}
       <div className="putt-poll-buttons">
         <button
           type="button"

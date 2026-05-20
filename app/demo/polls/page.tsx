@@ -22,21 +22,28 @@ interface Scenario {
   emoji: string;
   meta: string;
   state: PuttPollServerState;
+  /** Distance feeds the tour-baseline anchor line. */
+  distanceFt?: number;
+  /** Player name pulled from the headline for the SG sentence. */
+  playerName?: string;
 }
 
 const SCENARIOS: Scenario[] = [
   {
-    title: "Open · pre-vote (community hidden)",
+    title: "Open · pre-vote (community hidden, baseline shown)",
     headline:
       "Joaquin Niemann has 18 ft for birdie on the 14th — will it drop?",
     emoji: "🎯",
     meta: "R3 · just now",
+    distanceFt: 18,
+    playerName: "Niemann",
     state: {
       counts: { yes: 92, no: 41 },
       closedAt: null,
       made: null,
       myVote: null,
       polledAtStroke: 2,
+      playerPuttSg: 1.4,
     },
   },
   {
@@ -45,26 +52,32 @@ const SCENARIOS: Scenario[] = [
       "Scottie Scheffler has 24 ft for birdie on the 17th — will it drop?",
     emoji: "🎯",
     meta: "R4 · 12s ago",
+    distanceFt: 24,
+    playerName: "Scheffler",
     state: {
       counts: { yes: 87, no: 49 },
       closedAt: null,
       made: null,
       myVote: "yes",
       polledAtStroke: 2,
+      playerPuttSg: 0.8,
     },
   },
   {
-    title: "Open · you voted no",
+    title: "Open · you voted no, cold putter",
     headline:
       "Justin Thomas has 38 ft for par save on the 7th — will it drop?",
     emoji: "🎯",
     meta: "R2 · 22s ago",
+    distanceFt: 38,
+    playerName: "Thomas",
     state: {
       counts: { yes: 14, no: 71 },
       closedAt: null,
       made: null,
       myVote: "no",
       polledAtStroke: 4,
+      playerPuttSg: -1.2,
     },
   },
   {
@@ -204,6 +217,8 @@ function Row({ scenario, index }: { scenario: Scenario; index: number }) {
         </div>
         <PuttPollWidget
           pollId={pollId}
+          puttDistanceFt={scenario.distanceFt}
+          playerName={scenario.playerName}
           serverState={scenario.state}
           optimisticVote={optimisticVote}
           optimisticCounts={optimisticCounts}
