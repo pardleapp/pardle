@@ -659,9 +659,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                     <p className="feed-row-action">
                       {stripPlayerName(event.headline, event.playerName)}
                     </p>
-                    <p className="feed-headline" hidden>
-                      {event.headline}
-                    </p>
                     {(() => {
                       const backingPct =
                         data.communityBackingPct?.[event.playerId];
