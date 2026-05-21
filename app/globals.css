@@ -12592,9 +12592,14 @@ body:has(.v4-theme) {
   color: var(--text);
 }
 
-/* Clickable recent-form row */
+/* Clickable recent-form row — the <li> is a wrapper, the <a>
+   inside owns the grid layout for finish | tournament | season.
+   Override the base .pcard-form-row { display: grid } so the
+   anchor isn't squeezed into the first 60px column. */
 .v4-theme .pcard-form-row-link {
+  display: block;
   padding: 0;
+  border-bottom: 1px solid var(--border);
 }
 
 .v4-theme .pcard-form-row-anchor {
