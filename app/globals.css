@@ -12950,6 +12950,32 @@ body:has(.v4-theme) {
   color: var(--muted);
 }
 
+/* Reel tabs (Shots / Worst of the day). The base CSS uses
+   --surface-2 for the active background which doesn't exist in v4
+   and falls through to white — producing white-on-white text. */
+.v4-theme .reel-group-tab {
+  color: var(--muted);
+}
+
+.v4-theme .reel-group-tab:hover {
+  color: var(--text);
+}
+
+.v4-theme .reel-group-tab-on {
+  background: var(--text);
+  color: #000;
+}
+
+.v4-theme .reel-group-tab-count {
+  background: var(--bg-card-hi);
+  color: var(--muted);
+}
+
+.v4-theme .reel-group-tab-on .reel-group-tab-count {
+  background: rgba(0, 0, 0, 0.12);
+  color: #000;
+}
+
 /* Catch-me-up banner */
 .v4-theme .catchup-banner {
   background: var(--bg-card);
