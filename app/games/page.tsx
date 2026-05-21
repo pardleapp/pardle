@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import AuthChip from "../live/auth/AuthChip";
+import MainNav from "../MainNav";
 import { todayDayNumber } from "@/lib/day-index";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
 import { getEvents } from "@/lib/feed/store";
@@ -149,18 +150,7 @@ export default async function HubHome() {
       <header className="hub-header hub-header-split">
         <h1 className="hub-wordmark">{BRAND.name}</h1>
         <div className="brand-nav">
-          <nav className="hub-nav-tabs" aria-label="Section">
-            <Link href="/" className="hub-nav-tab">
-              Live feed
-            </Link>
-            <Link
-              href="/games"
-              className="hub-nav-tab hub-nav-tab-active"
-              aria-current="page"
-            >
-              Games
-            </Link>
-          </nav>
+          <MainNav active="games" />
           <AuthChip />
         </div>
       </header>

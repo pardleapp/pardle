@@ -10,7 +10,6 @@ import {
   ODDS_FORMAT_STORAGE_KEY,
   type OddsFormat,
 } from "@/lib/odds-format";
-import BetTracker from "./BetTracker";
 import CatchMeUp from "./CatchMeUp";
 import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
@@ -486,17 +485,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
             fires up when the first group hits the course.
           </p>
         </section>
-        <BetTracker
-          players={data.playerIndex ?? []}
-          currentOdds={data.currentOdds ?? {}}
-          playerRoundStates={data.playerRoundStates ?? {}}
-          tournamentProjections={data.tournamentProjections ?? {}}
-          topFinishCurrent={data.topFinishCurrent}
-          recentForm={data.recentForm}
-          handStatus={data.handStatus}
-          oddsFormat={oddsFormat}
-          onPickOddsFormat={pickOddsFormat}
-        />
       </section>
     );
   }
@@ -574,16 +562,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         myReactions={myReactions}
         onReact={sendReaction}
         storageKey="homefeed"
-      />
-
-      <BetTracker
-        players={data.playerIndex ?? []}
-        currentOdds={data.currentOdds ?? {}}
-        playerRoundStates={data.playerRoundStates ?? {}}
-        tournamentProjections={data.tournamentProjections ?? {}}
-        topFinishCurrent={data.topFinishCurrent}
-        oddsFormat={oddsFormat}
-        onPickOddsFormat={pickOddsFormat}
       />
 
       <div className="feed-filter-row">
