@@ -496,6 +496,19 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       ? data.rows.filter((r) => followSet.has(r.event.playerId))
       : data.rows;
 
+  // Only show the vote widget on the LATEST open putt poll in the
+  // feed. Older open polls (their putt was struck minutes ago) and
+  // closed polls (already resolved) render as plain rows. Rationale:
+  // the widget only does work when the putt is still live; on a
+  // 10-minute-old poll the answer is already known.
+  const latestOpenPollId: string | null =
+    data.rows.find((r) => {
+      const ev = r.event;
+      if (ev.type !== "putt-poll" || !ev.pollId) return false;
+      const ps = data.puttPolls?.[ev.pollId];
+      return !ps || ps.closedAt == null;
+    })?.event.pollId ?? null;
+
   return (
     <section className="feed-wrap v4-theme">
       <div className="feed-header-row">
@@ -700,17 +713,23 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                       R{event.round} · {timeAgo(event.ts)} · view card →
                     </p>
                   </Link>
-                  {event.type === "putt-poll" && event.pollId && (
-                    <PuttPollWidget
-                      pollId={event.pollId}
-                      puttDistanceFt={event.puttDistanceFt}
-                      playerName={event.playerName}
-                      serverState={data.puttPolls?.[event.pollId]}
-                      optimisticVote={myPollVotes[event.pollId]}
-                      optimisticCounts={pollCounts[event.pollId]}
-                      onVote={(v) => sendPollVote(event.pollId!, v)}
-                    />
-                  )}
+                  {event.type === "putt-poll" &&
+                    event.pollId &&
+                    // Latest open poll → render widget for live voting.
+                    // Closed poll → render widget showing the result.
+                    // Older open poll (putt already struck offscreen) → skip.
+                    (event.pollId === latestOpenPollId ||
+                      data.puttPolls?.[event.pollId]?.closedAt != null) && (
+                      <PuttPollWidget
+                        pollId={event.pollId}
+                        puttDistanceFt={event.puttDistanceFt}
+                        playerName={event.playerName}
+                        serverState={data.puttPolls?.[event.pollId]}
+                        optimisticVote={myPollVotes[event.pollId]}
+                        optimisticCounts={pollCounts[event.pollId]}
+                        onVote={(v) => sendPollVote(event.pollId!, v)}
+                      />
+                    )}
                   <div className="feed-actions">
                     <button
                       type="button"

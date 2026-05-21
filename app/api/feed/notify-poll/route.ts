@@ -12,6 +12,7 @@ import {
   detectBetSettlement,
   evaluateRoundScore,
   evaluateWinningScore,
+  resolveBetRound,
   type RoundScoreBet,
   type TopFinishProbs,
   type TournamentProjection,
@@ -271,15 +272,26 @@ function subjectFor(bet: TrackedBet): string {
   return `${bet.playerName} top ${bet.cutoff}`;
 }
 
-/** Round-score settlement detection: evaluateRoundScore returns
- *  kind 'settled' once the player's chosen round is complete. */
+/** Round-score settlement detection. For bets with bet.round set, or
+ *  with placement.round captured at submit, this is straightforward —
+ *  check that round's status. For legacy bets where both are null,
+ *  we resolve via the tournament startDate + placedAt heuristic (the
+ *  same path BetDetail uses) so a bet placed during R1 still settles
+ *  against R1's score after the player moves on to R2. */
 function roundScoreSettlement(
   bet: RoundScoreBet,
   states: Record<string, PlayerRoundState>,
+  tournamentStartDate: number | null,
 ): { won: boolean } | null {
-  const ev = evaluateRoundScore(bet, states[bet.playerId]);
-  if (!ev || ev.kind !== "settled") return null;
-  return { won: ev.won };
+  const state = states[bet.playerId];
+  if (!state) return null;
+  const round = resolveBetRound(bet, state, tournamentStartDate);
+  if (round == null) return null;
+  const r = state.rounds?.[round];
+  if (!r || r.status !== "complete") return null;
+  const won =
+    bet.side === "under" ? r.strokes < bet.line : r.strokes > bet.line;
+  return { won };
 }
 
 export async function GET(req: Request) {
@@ -381,7 +393,11 @@ async function handle(req: Request) {
     // so they all flip to "won/lost" once the leaderboard's final.
     let settlement: { won: boolean } | null = null;
     if (bet.kind === "round-score") {
-      settlement = roundScoreSettlement(bet, playerRoundStates);
+      settlement = roundScoreSettlement(
+        bet,
+        playerRoundStates,
+        active.tournament.startDate ?? null,
+      );
     } else {
       settlement = detectBetSettlement(
         bet,

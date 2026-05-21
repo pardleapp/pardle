@@ -1,12 +1,22 @@
+"use client";
+
 /**
- * Player avatar — initials over a gradient circle, gradient picked
- * deterministically from the playerId so each player gets a stable
- * visual identity across the app.
+ * Player avatar — actual PGA Tour Cloudinary headshot when one exists
+ * for the playerId, falling back to initials over a deterministic
+ * gradient when the headshot 404s (legacy / DP World / amateur fields).
  *
  * Used inside the v4 theme as the "social-app" replacement for the
  * emoji prefix that the old feed rows used (🐦 / 💥 / 🎯). The score
  * chip carries the type signal; the avatar carries the person.
+ *
+ * Implementation: render the gradient + initials as the backdrop;
+ * layer an <img> on top via absolute positioning. If the image
+ * errors (404, no headshot for this player), hide it and the
+ * gradient shows through.
  */
+
+import { useState } from "react";
+import { pgaTourHeadshotUrlById } from "@/lib/data/pga-tour-ids";
 
 interface Props {
   playerId: string;
@@ -66,6 +76,10 @@ export default function PlayerAvatar({
       : state === "cold"
         ? "rgba(123, 178, 230, 0.55)"
         : null;
+  // Headshot — sized 2× the avatar dim for retina sharpness. Falls
+  // through to initials when the image fails to load.
+  const headshotUrl = pgaTourHeadshotUrlById(playerId, dim * 2);
+  const [imgFailed, setImgFailed] = useState(false);
   return (
     <span
       className={`avatar avatar-${size}${state ? ` avatar-${state}` : ""}`}
@@ -75,10 +89,29 @@ export default function PlayerAvatar({
         fontSize,
         background: `linear-gradient(135deg, ${from}, ${to})`,
         boxShadow: haloColor ? `0 0 0 2px ${haloColor}` : undefined,
+        position: "relative",
+        overflow: "hidden",
       }}
       aria-hidden="true"
     >
-      {initialsFor(playerName)}
+      <span style={{ position: "relative", zIndex: 1 }}>
+        {initialsFor(playerName)}
+      </span>
+      {!imgFailed && (
+        <img
+          src={headshotUrl}
+          alt=""
+          onError={() => setImgFailed(true)}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            zIndex: 2,
+          }}
+        />
+      )}
     </span>
   );
 }
