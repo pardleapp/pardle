@@ -12521,6 +12521,77 @@ body:has(.v4-theme) {
   color: var(--muted);
 }
 
+/* Player stats — DataGolf SG breakdown + advanced stat cards.
+   The base CSS uses `var(--bg, white)` on these card backgrounds
+   which, in light-mode user preference, falls through to actual
+   white inside the dark v4 theme (a CSS quirk). Explicit overrides
+   here keep the cards properly dark. */
+.v4-theme .ps-sg-card,
+.v4-theme .ps-round-card,
+.v4-theme .pcard-stat-box,
+.v4-theme .ps-sg-bucket {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+.v4-theme .ps-sg-bucket {
+  background: var(--bg-card-hi);
+}
+
+.v4-theme .ps-sg-headline-num,
+.v4-theme .ps-sg-bucket-num,
+.v4-theme .ps-round-total,
+.v4-theme .pcard-stat-num {
+  color: var(--text);
+}
+
+.v4-theme .ps-sg-headline-lbl,
+.v4-theme .ps-sg-bucket-lbl,
+.v4-theme .ps-sg-bucket-rank,
+.v4-theme .ps-round-head,
+.v4-theme .ps-round-total-lbl,
+.v4-theme .ps-round-empty,
+.v4-theme .ps-stat-rank,
+.v4-theme .pcard-stat-lbl {
+  color: var(--muted);
+}
+
+.v4-theme .ps-sg-headline {
+  border-bottom-color: var(--border);
+}
+
+.v4-theme .ps-sg-headline-rank {
+  color: var(--text);
+}
+
+.v4-theme .ps-round-breakdown li span {
+  color: var(--muted);
+}
+
+.v4-theme .ps-round-breakdown li strong {
+  color: var(--text);
+}
+
+/* Section titles inside the player page */
+.v4-theme .pcard-section-title,
+.v4-theme .pcard-scoring-label,
+.v4-theme .pcard-round-label {
+  color: var(--muted);
+}
+
+/* Scorecard cells (par / birdie / bogey / etc.) — keep their
+   semantic colors but tint borders for dark bg. */
+.v4-theme .pcard-cell-empty,
+.v4-theme .pcard-cell-par {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+.v4-theme .pcard-round-num,
+.v4-theme .pcard-round {
+  color: var(--text);
+}
+
 /* ── History page ────────────────────────────────────────────────── */
 .v4-theme .history-stats,
 .v4-theme .history-chart,
