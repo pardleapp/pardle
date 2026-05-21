@@ -303,7 +303,14 @@ function groupByTournamentWeek(
   return groups;
 }
 
-export default function HistoryClient() {
+export default function HistoryClient({
+  hideList = false,
+}: {
+  /** When true, suppress the chronological bet list at the bottom —
+   *  the /bets page sets this so the list doesn't duplicate the
+   *  BetTracker that's already rendered above. */
+  hideList?: boolean;
+} = {}) {
   const { user, loading: authLoading } = useAuth();
   const [bets, setBets] = useState<HistoryBet[] | null>(null);
 
@@ -464,7 +471,7 @@ export default function HistoryClient() {
         </div>
       )}
 
-      <div className="history-list">
+      {!hideList && <div className="history-list">
         {groups.map((g) => (
           <div key={g.label} className="history-group">
             <h3 className="history-section-title">{g.label}</h3>
@@ -525,7 +532,7 @@ export default function HistoryClient() {
             </ul>
           </div>
         ))}
-      </div>
+      </div>}
     </section>
   );
 }

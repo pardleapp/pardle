@@ -6,6 +6,7 @@
  */
 
 import { BRAND } from "@/lib/brand";
+import HistoryClient from "../history/HistoryClient";
 import AuthChip from "../live/auth/AuthChip";
 import MainNav from "../MainNav";
 import BetsClient from "./BetsClient";
@@ -29,6 +30,7 @@ export default function BetsPage() {
         </div>
       </header>
       <BetsClient />
+      <HistoryClient hideList />
     </main>
   );
 }
