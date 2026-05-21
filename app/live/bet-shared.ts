@@ -55,6 +55,15 @@ export interface RoundScorePlacement {
    *  PnL £ baseline to v_at_placement = stake (using this), and plots
    *  the Win % directly from the model's prob over time. */
   probAtPlacement: number;
+  /** Resolved round number at placement time. Captures the user's
+   *  intent for "current round" bets: if a round was in progress when
+   *  the bet was placed, the bet locks to THAT round; otherwise it
+   *  locks to the next round to start. Without this, render-time
+   *  resolveBetRound() drifts to whatever state.currentRound happens
+   *  to be later (so a bet placed during R1 drifts to R2 once R1
+   *  completes). Optional for back-compat with bets placed before
+   *  this field was introduced. */
+  round?: number;
 }
 
 export interface RoundScoreBet extends BetSettlementFields {
@@ -441,6 +450,7 @@ export function patchLegacyPlacement(
   return {
     ...b,
     placement: {
+      round,
       holesPlayed: r.holesPlayed,
       strokes: r.strokes,
       parPlayed: r.parPlayed,
@@ -451,13 +461,29 @@ export function patchLegacyPlacement(
   };
 }
 
+/**
+ * Resolve which round a "current round" bet (bet.round = null) should
+ * lock to at placement time, following the rule:
+ *   - if a round is in progress (or about to start) → that round
+ *   - else if the active round just completed → next round (clamped to 4)
+ */
+function roundAtPlacement(state: PlayerRoundState): number | null {
+  const cur = state.currentRound;
+  if (typeof cur !== "number") return null;
+  const snap = state.rounds?.[cur];
+  if (snap?.status === "complete") {
+    return Math.min(4, cur + 1);
+  }
+  return cur;
+}
+
 /** Build the placement snapshot stored on a new round-score bet. */
 export function snapshotForPlacement(
   bet: Pick<RoundScoreBet, "round" | "line" | "side" | "oddsTaken">,
   state: PlayerRoundState | undefined,
 ): RoundScorePlacement | undefined {
   if (!state) return undefined;
-  const round = bet.round ?? state.currentRound ?? null;
+  const round = bet.round ?? roundAtPlacement(state);
   if (round == null) return undefined;
   const r = state.rounds?.[round];
   if (!r) return undefined;
@@ -482,6 +508,7 @@ export function snapshotForPlacement(
     );
   }
   return {
+    round,
     holesPlayed: r.holesPlayed,
     strokes: r.strokes,
     parPlayed: r.parPlayed,
@@ -519,7 +546,12 @@ export function resolveBetRound(
   state: PlayerRoundState | undefined,
   tournamentStartDate?: number | null,
 ): number | null {
+  // Explicit round on the bet wins everything else.
   if (bet.round != null) return bet.round;
+  // Placement-time round (captured at submit) is the next preference —
+  // tells us which round was intended when "current round" was picked.
+  // Newer bets always have this; older bets fall through to date heuristics.
+  if (bet.placement?.round != null) return bet.placement.round;
   if (tournamentStartDate != null) {
     const diffDays =
       (bet.placedAt - tournamentStartDate) / (24 * 60 * 60 * 1000);
