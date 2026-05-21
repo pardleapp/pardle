@@ -6,6 +6,7 @@ import {
   getLeaderboard,
   getScorecards,
 } from "@/lib/golf-api/pgatour";
+import { bulkResolveEventIds } from "@/lib/feed/historical-cache";
 import { getPlayerReelRows } from "@/lib/feed/player-rows";
 import { getRecentFormByName } from "@/lib/feed/recent-form";
 import { getRecentHoles } from "@/lib/feed/recent-holes";
@@ -54,6 +55,16 @@ export default async function PlayerPage({ params }: PageProps) {
 
   const playerName = row?.displayName ?? "Player";
   const recentForm = getRecentFormByName(playerName);
+  // Resolve DataGolf event IDs for the recent-form rows so each
+  // becomes a clickable drill-down. Cached server-side; cheap.
+  const eventIdMap = recentForm
+    ? await bulkResolveEventIds(
+        recentForm.recent.map((r) => ({
+          tournament: r.tournament,
+          year: r.season,
+        })),
+      )
+    : {};
   const stats = scorecard
     ? derivePlayerStats(scorecard)
     : null;
@@ -99,7 +110,12 @@ export default async function PlayerPage({ params }: PageProps) {
         )}
       </section>
 
-      <PlayerRecentForm recent={recentForm?.recent ?? []} />
+      <PlayerRecentForm
+        recent={recentForm?.recent ?? []}
+        playerId={id}
+        playerName={playerName}
+        eventIdMap={eventIdMap}
+      />
 
       <PlayerHighlights best={reelRows.best} worst={reelRows.worst} />
 

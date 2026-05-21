@@ -498,3 +498,93 @@ export async function getFullLiveStats(
     proxFw: numOrNull(r.prox_fw),
   }));
 }
+
+// ──────────────────────────────────────────────────────────────────
+// Historical event data — paid DataGolf endpoints
+// ──────────────────────────────────────────────────────────────────
+
+export interface DGHistoricalEvent {
+  calendar_year: number;
+  date: string; // "YYYY-MM-DD"
+  event_id: number;
+  event_name: string;
+  sg_categories: string; // "yes" / "no"
+  traditional_stats: string;
+  tour: string;
+}
+
+/**
+ * List of every historical event DataGolf has on file for the tour.
+ * Used to resolve `tournament_name + year → event_id` when drilling
+ * from a player's recent-form list into the per-event detail page.
+ */
+export async function getHistoricalEventList(
+  tour: string = "pga",
+): Promise<DGHistoricalEvent[]> {
+  return await fetchJson<DGHistoricalEvent[]>(
+    `/historical-raw-data/event-list?tour=${encodeURIComponent(tour)}`,
+  );
+}
+
+export interface DGHistoricalRound {
+  birdies: number;
+  bogies: number;
+  course_name: string;
+  course_num: number;
+  course_par: number;
+  doubles_or_worse: number;
+  driving_acc: number | null;
+  driving_dist: number | null;
+  eagles_or_better: number;
+  gir: number | null;
+  great_shots: number;
+  pars: number;
+  poor_shots: number;
+  prox_fw: number | null;
+  prox_rgh: number | null;
+  score: number;
+  scrambling: number | null;
+  sg_app: number | null;
+  sg_arg: number | null;
+  sg_ott: number | null;
+  sg_putt: number | null;
+  sg_t2g: number | null;
+  sg_total: number | null;
+  start_hole: number;
+  teetime: string;
+}
+
+export interface DGHistoricalScoreRow {
+  dg_id: number;
+  fin_text: string;
+  player_name: string; // "Last, First"
+  round_1?: DGHistoricalRound;
+  round_2?: DGHistoricalRound;
+  round_3?: DGHistoricalRound;
+  round_4?: DGHistoricalRound;
+}
+
+export interface DGHistoricalRoundsPayload {
+  event_completed: string;
+  event_id: string | number;
+  event_name: string;
+  scores: DGHistoricalScoreRow[];
+}
+
+/**
+ * Full per-player per-round detail for one historical event. Powers
+ * the per-tournament drill-down page reachable from each player's
+ * recent-form list.
+ *
+ * Immutable: once an event has completed, the data won't change.
+ * Caller should layer a Redis cache (48h+ TTL) on top.
+ */
+export async function getHistoricalRounds(
+  eventId: number,
+  year: number,
+  tour: string = "pga",
+): Promise<DGHistoricalRoundsPayload> {
+  return await fetchJson<DGHistoricalRoundsPayload>(
+    `/historical-raw-data/rounds?tour=${encodeURIComponent(tour)}&event_id=${eventId}&year=${year}`,
+  );
+}

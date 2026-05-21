@@ -12592,6 +12592,191 @@ body:has(.v4-theme) {
   color: var(--text);
 }
 
+/* Clickable recent-form row */
+.v4-theme .pcard-form-row-link {
+  padding: 0;
+}
+
+.v4-theme .pcard-form-row-anchor {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+  transition: background 100ms;
+}
+
+.v4-theme .pcard-form-row-anchor:hover {
+  background: var(--bg-card-hi);
+}
+
+.v4-theme .pcard-form-row-anchor::after {
+  content: "→";
+  position: absolute;
+  right: 14px;
+  color: var(--text-faint);
+  pointer-events: none;
+  display: none;
+}
+
+.v4-theme .pcard-form-row-link:hover .pcard-form-tournament {
+  color: var(--green);
+}
+
+/* ── Per-tournament drill-down page (/live/player/[id]/t/...) ── */
+.v4-theme .ptourn-head {
+  background: var(--bg-card);
+  border: none;
+  border-radius: 16px;
+  padding: 20px 22px;
+  margin-bottom: 14px;
+}
+
+.v4-theme .ptourn-eyebrow {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+
+.v4-theme .ptourn-title {
+  margin: 0 0 16px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.v4-theme .ptourn-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.v4-theme .ptourn-summary-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-card-hi);
+}
+
+.v4-theme .ptourn-summary-num {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1;
+}
+
+.v4-theme .ptourn-summary-lbl {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.v4-theme .ptourn-meta {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.v4-theme .ptourn-section {
+  background: var(--bg-card);
+  border: none;
+  border-radius: 16px;
+  padding: 18px 22px;
+  margin-bottom: 14px;
+}
+
+.v4-theme .ptourn-section-title {
+  margin: 0 0 10px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.v4-theme .ptourn-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.v4-theme .ptourn-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 8px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.v4-theme .ptourn-table td {
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.v4-theme .ptourn-table tr:last-child td {
+  border-bottom: none;
+}
+
+.v4-theme .ptourn-table-emph {
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.v4-theme .ptourn-table-total td {
+  background: var(--bg-card-hi);
+  font-weight: 800;
+}
+
+.v4-theme .ptourn-table-good {
+  color: var(--green);
+}
+
+.v4-theme .ptourn-table-bad {
+  color: var(--red);
+}
+
+.v4-theme .ptourn-footnote {
+  margin: 16px 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+@media (max-width: 640px) {
+  .v4-theme .ptourn-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .v4-theme .ptourn-table {
+    font-size: 12px;
+  }
+  .v4-theme .ptourn-table th,
+  .v4-theme .ptourn-table td {
+    padding: 7px 4px;
+  }
+}
+
 /* ── History page ────────────────────────────────────────────────── */
 .v4-theme .history-stats,
 .v4-theme .history-chart,
