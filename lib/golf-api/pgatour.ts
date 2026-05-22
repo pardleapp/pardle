@@ -129,7 +129,18 @@ const TOURNAMENT_INACTIVE_STATES = new Set([
  *  longer than we want. */
 async function isTournamentConcluded(
   tournamentId: string,
+  startDate: number,
 ): Promise<boolean> {
+  // A four-round PGA Tour event can't be over until late Sunday at
+  // the earliest — even a Thursday-morning start with every R1
+  // finisher showing thru="F" is a between-rounds gap, not the end
+  // of the tournament. Require at least 80 hours since startDate
+  // before trusting the leaderboard's all-F signal as "concluded".
+  // 80h covers normal Thu→Sun finishes; weather-shortened events
+  // are rare enough that we'd rather over-include than over-exclude.
+  const MIN_ELAPSED_MS = 80 * 60 * 60 * 1000;
+  if (Date.now() - startDate < MIN_ELAPSED_MS) return false;
+
   const lb = await getCachedLeaderboard(tournamentId).catch(() => []);
   if (lb.length === 0) return false;
   return lb.every((r) => {
@@ -160,7 +171,7 @@ export async function getActiveTournament(): Promise<{
     .filter((t) => now >= t.startDate && now <= t.startDate + FIVE_DAYS)
     .sort((a, b) => a.startDate - b.startDate);
   for (const t of inWindow) {
-    const concluded = await isTournamentConcluded(t.id);
+    const concluded = await isTournamentConcluded(t.id, t.startDate);
     if (!concluded) {
       return { tournament: t, isLive: true };
     }
