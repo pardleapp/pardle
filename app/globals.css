@@ -13051,7 +13051,12 @@ body:has(.v4-theme) {
 
 /* ── Mobile density tweaks (≤480px) ──────────────────────────────── */
 @media (max-width: 480px) {
-  /* ── Mobile chrome compaction (everything above the feed) ────── */
+  /* ── Mobile chrome compaction + height rhythm ────────────────────
+     Two-tier height system to keep everything visually in sync:
+       Primary (32px):  nav tabs, auth chip, search input
+       Section toggle (28px): reel tabs, filter buttons
+       Inline chip (22px): putt-IQ chip, momentum chips, feed tags
+     All sections share 14px horizontal padding and 6px vertical gap. */
 
   /* Hide the Pardle wordmark — favicon + URL bar already identify
      the app. Recovers a full row of vertical space. */
@@ -13059,60 +13064,83 @@ body:has(.v4-theme) {
     display: none;
   }
   .v4-theme .brand.brand-split {
-    padding-top: 8px;
-    padding-bottom: 8px;
+    padding: 8px 14px;
     border-bottom-width: 1px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
 
-  /* Tournament header card: compact padding + smaller text. Stack
-     name + putt-IQ chip vertically so a long tournament name (e.g.
-     "THE CJ CUP Byron Nelson") doesn't get squeezed by the chip. */
+  /* Primary nav rail — 32px pills */
+  .v4-theme .hub-nav-tab {
+    min-height: 32px;
+    padding: 6px 14px;
+    font-size: 12.5px;
+  }
+  .v4-theme .auth-chip,
+  .v4-theme .auth-chip-btn {
+    min-height: 32px;
+    padding: 6px 12px;
+    font-size: 12.5px;
+  }
+
+  /* Tournament header card: stack name + putt-IQ chip vertically
+     so a long tournament name doesn't get squeezed by the chip. */
   .v4-theme .feed-header-row {
     flex-direction: column;
     align-items: flex-start;
     padding: 8px 14px;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     gap: 6px;
   }
   .v4-theme .feed-tournament-name {
     font-size: 15px;
     width: 100%;
   }
-  .v4-theme .puttiq-chip {
-    font-size: 11px;
-    padding: 4px 9px;
-  }
   .v4-theme .feed-status-card {
-    margin: 6px 12px;
+    margin: 6px 14px;
     padding: 18px 14px;
   }
   .v4-theme .feed-status-card .feed-tournament-name {
     font-size: 17px;
   }
 
-  /* PlayerSearch: full-width (so the user can type and read a long
-     query) but with a shorter input height — was the height that
-     was bulky, not the width. */
+  /* PlayerSearch — primary tier (32px) so it matches the nav rail
+     visually. Full-width input. */
   .v4-theme .psearch {
     padding: 4px 14px;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
   }
   .v4-theme .psearch-input {
     font-size: 12.5px;
-    padding: 5px 10px;
-    min-height: 30px;
+    padding: 6px 12px;
+    min-height: 32px;
   }
   .v4-theme .psearch-input::placeholder {
     font-size: 12.5px;
   }
 
+  /* Inline-chip tier (22px) — putt-IQ chip, momentum chips, feed tags */
+  .v4-theme .puttiq-chip {
+    font-size: 11px;
+    padding: 4px 10px;
+    min-height: 22px;
+  }
+  .v4-theme .momentum-chip {
+    padding: 3px 9px;
+    min-height: 22px;
+    font-size: 10.5px;
+  }
+  .v4-theme .feed-tag {
+    padding: 3px 9px;
+    min-height: 22px;
+    font-size: 10px;
+  }
+
   /* Momentum strip: collapse two rows (hot + cold) into a single
-     horizontal scroller. Both rows now lay out inline with a
+     horizontal scroller. Both rows lay out inline with a thin
      vertical divider between them. */
   .v4-theme .momentum-strip {
-    padding: 6px 14px;
-    margin-bottom: 4px;
+    padding: 4px 14px;
+    margin-bottom: 6px;
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -13130,12 +13158,11 @@ body:has(.v4-theme) {
     gap: 6px;
   }
   .v4-theme .momentum-row-label-text {
-    display: none; /* the emoji prefix is enough */
+    display: none;
   }
   .v4-theme .momentum-chips {
     padding-right: 0;
   }
-  /* Vertical pip between hot block and cold block. */
   .v4-theme .momentum-row-cold {
     position: relative;
     padding-left: 8px;
@@ -13150,26 +13177,30 @@ body:has(.v4-theme) {
     background: var(--border);
   }
 
-  /* Catch-me-up banner — tighter when it shows */
+  /* Catch-me-up banner */
   .v4-theme .catchup-banner {
-    padding: 6px 12px;
-    margin: 4px 12px;
+    padding: 6px 14px;
+    margin: 4px 14px;
     font-size: 12px;
   }
 
-  /* Reel group bar — tighter */
+  /* Section-toggle tier (28px) — reel tabs, filter buttons */
   .v4-theme .reel-group-bar {
-    padding: 4px 12px;
+    padding: 4px 14px;
   }
   .v4-theme .reel-group-tab {
     font-size: 12px;
-    padding: 5px 10px;
+    padding: 5px 12px;
+    min-height: 28px;
   }
-
-  /* Filter row — tighter */
   .v4-theme .feed-filter-row {
-    padding: 4px 12px;
-    margin-bottom: 4px;
+    padding: 4px 14px;
+    margin-bottom: 6px;
+  }
+  .v4-theme .feed-filter-btn {
+    min-height: 28px;
+    padding: 5px 12px;
+    font-size: 12px;
   }
 
   /* Feed row: tighter padding, smaller avatar, smaller chip + name */
