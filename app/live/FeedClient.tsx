@@ -191,6 +191,82 @@ function betKindLabel(bet: TrackedBet): string {
   return "bet";
 }
 
+interface BetImpact {
+  /** Bets where THIS player is the wagered player. */
+  direct: TrackedBet[];
+  /** Bets where this player is a competitor whose shots can move the
+   *  bet's probability (top of leaderboard for outright / top-finish /
+   *  winning-score). Round-score bets never produce indirect impact. */
+  indirect: TrackedBet[];
+}
+
+function parseLbPos(s: string): number | null {
+  if (!s) return null;
+  const m = s.match(/^T?(\d+)$/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Build a per-player impact map: for each tracked bet, work out which
+ * leaderboard players could materially move that bet's probability,
+ * and tag them as "direct" (it's the player you bet on) or "indirect"
+ * (it's a competitor whose result alters the bet's outcome).
+ *
+ * Heuristic by bet kind:
+ *   outright       → bet player (direct) + current top 10 (indirect)
+ *   top-finish N   → bet player (direct) + top (N+3) (indirect, cut bubble)
+ *   round-score    → just the bet player; competitors don't matter
+ *   winning-score  → top 6 contenders (all indirect — no bet player)
+ */
+function buildImpactMap(
+  bets: TrackedBet[],
+  leaderboard: CachedLeaderboardRow[],
+): Map<string, BetImpact> {
+  const out = new Map<string, BetImpact>();
+  if (bets.length === 0) return out;
+  const sortedLb = [...leaderboard].sort((a, b) => {
+    const pa = parseLbPos(a.position) ?? 999;
+    const pb = parseLbPos(b.position) ?? 999;
+    return pa - pb;
+  });
+  const topN = (n: number) => sortedLb.slice(0, n).map((r) => r.playerId);
+  const get = (pid: string): BetImpact => {
+    let cur = out.get(pid);
+    if (!cur) {
+      cur = { direct: [], indirect: [] };
+      out.set(pid, cur);
+    }
+    return cur;
+  };
+  const addDirect = (pid: string, b: TrackedBet) => {
+    get(pid).direct.push(b);
+  };
+  const addIndirect = (pid: string, b: TrackedBet) => {
+    get(pid).indirect.push(b);
+  };
+  for (const b of bets) {
+    if (b.kind === "outright") {
+      addDirect(b.playerId, b);
+      for (const pid of topN(10)) {
+        if (pid !== b.playerId) addIndirect(pid, b);
+      }
+    } else if (b.kind === "top-finish") {
+      addDirect(b.playerId, b);
+      const n = Math.min(b.cutoff + 3, 25);
+      for (const pid of topN(n)) {
+        if (pid !== b.playerId) addIndirect(pid, b);
+      }
+    } else if (b.kind === "round-score") {
+      addDirect(b.playerId, b);
+    } else if (b.kind === "winning-score") {
+      for (const pid of topN(6)) addIndirect(pid, b);
+    }
+  }
+  return out;
+}
+
 /**
  * Strip the leading player name from an engine-generated headline so
  * the v4 row can render the name in its own slot. Falls back to the
@@ -519,23 +595,15 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
   // ── Live feed ───────────────────────────────────────────────────
   const followSet = new Set(follows);
-  // Map playerId → bets the user has tracked on that player. Used
-  // for both the "Your bets" filter and the per-row "📌 affects your
-  // bet" chip. Winning-score bets (no player) are excluded.
-  const betsByPlayerId = new Map<string, TrackedBet[]>();
-  for (const b of trackedBets) {
-    if (b.kind === "winning-score") continue;
-    const pid = b.playerId;
-    if (!pid) continue;
-    const arr = betsByPlayerId.get(pid) ?? [];
-    arr.push(b);
-    betsByPlayerId.set(pid, arr);
-  }
+  // Per-player impact for each tracked bet — direct (your player) or
+  // indirect (a competitor whose result moves the bet's probability).
+  // Drives both the "Your bets" filter and the per-row chip.
+  const impactMap = buildImpactMap(trackedBets, data.leaderboard ?? []);
   const visibleRows =
     filterMode === "following"
       ? data.rows.filter((r) => followSet.has(r.event.playerId))
       : filterMode === "your-bets"
-        ? data.rows.filter((r) => betsByPlayerId.has(r.event.playerId))
+        ? data.rows.filter((r) => impactMap.has(r.event.playerId))
         : data.rows;
 
   // Only show the vote widget on the LATEST open putt poll in the
@@ -591,7 +659,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
       {/* Hide the filter bar entirely when there's neither follows
           nor tracked bets — nothing to filter to. */}
-      {(follows.length > 0 || betsByPlayerId.size > 0) && (
+      {(follows.length > 0 || trackedBets.length > 0) && (
         <div className="feed-filter-row">
           <button
             type="button"
@@ -609,13 +677,13 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
               ★ Following ({follows.length})
             </button>
           )}
-          {betsByPlayerId.size > 0 && (
+          {trackedBets.length > 0 && (
             <button
               type="button"
               className={`feed-filter-btn ${filterMode === "your-bets" ? "feed-filter-on" : ""}`}
               onClick={() => setFilterMode("your-bets")}
             >
-              📌 Your bets ({betsByPlayerId.size})
+              📌 Your bets ({trackedBets.length})
             </button>
           )}
         </div>
@@ -634,8 +702,8 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         </p>
       ) : filterMode === "your-bets" && visibleRows.length === 0 ? (
         <p className="feed-empty">
-          No shots from the players you&apos;ve bet on yet — they&apos;ll
-          show here as they happen.
+          No bet-relevant shots yet — your players (and close competitors
+          who could move the needle) will show here as they happen.
         </p>
       ) : (
         <ul className="feed-list">
@@ -700,25 +768,39 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                       // Priority: bet-relevance (your bet), odds shift,
                       // top-10 shift, context tags, community backing.
                       const chips: Array<JSX.Element> = [];
-                      // "📌 Your bet" chip — fires when the event's
-                      // player has at least one tracked bet. Highest
-                      // priority because it's the most personal signal:
-                      // this event is happening to your money.
-                      const myBets = betsByPlayerId.get(event.playerId);
-                      if (myBets && myBets.length > 0) {
+                      // Bet-relevance chip — direct beats indirect.
+                      // Direct: this event's player is one you bet on
+                      // (highest signal: it's happening to your money).
+                      // Indirect: this event's player is a competitor
+                      // whose result moves a tracked bet's probability
+                      // (e.g. the leader blowing up on Sunday lifts your
+                      // outright on the chaser).
+                      const impact = impactMap.get(event.playerId);
+                      if (impact && impact.direct.length > 0) {
+                        const direct = impact.direct;
                         const kindLabel =
-                          myBets.length === 1
-                            ? betKindLabel(myBets[0])
-                            : `${myBets.length} bets`;
-                        const firstBetId = myBets[0].id;
+                          direct.length === 1
+                            ? betKindLabel(direct[0])
+                            : `${direct.length} bets`;
                         chips.push(
                           <Link
                             key="your-bet"
-                            href={`/live/bet/${firstBetId}`}
+                            href={`/live/bet/${direct[0].id}`}
                             className="feed-tag feed-tag-your-bet"
                             title="An event involving a player you've bet on — tap to see the bet detail"
                           >
                             📌 Your {kindLabel}
+                          </Link>,
+                        );
+                      } else if (impact && impact.indirect.length > 0) {
+                        chips.push(
+                          <Link
+                            key="affects-bet"
+                            href={`/live/bet/${impact.indirect[0].id}`}
+                            className="feed-tag feed-tag-affects-bet"
+                            title="A competitor for one of your bets — their result moves the bet's probability"
+                          >
+                            📌 Affects your bet
                           </Link>,
                         );
                       }
