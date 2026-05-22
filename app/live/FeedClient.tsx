@@ -13,7 +13,6 @@ import {
 import CatchMeUp from "./CatchMeUp";
 import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
-import LeaderboardPanel from "./LeaderboardPanel";
 import { abbreviateName } from "@/lib/text/abbreviate";
 import PlayerAvatar from "./PlayerAvatar";
 import PlayerSearch from "./PlayerSearch";
@@ -225,7 +224,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   const [floaters, setFloaters] = useState<Floater[]>([]);
   const [filterMode, setFilterMode] = useState<"all" | "following">("all");
   const [follows, setFollowsState] = useState<string[]>([]);
-  const [view, setView] = useState<"feed" | "leaderboard">("feed");
   const [oddsFormat, setOddsFormat] =
     useState<OddsFormat>(DEFAULT_ODDS_FORMAT);
 
@@ -530,36 +528,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
       <CatchMeUp rows={data.rows ?? []} />
 
-      <nav className="feed-tabs" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === "feed"}
-          className={`feed-tab ${view === "feed" ? "feed-tab-on" : ""}`}
-          onClick={() => setView("feed")}
-        >
-          Live feed
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === "leaderboard"}
-          className={`feed-tab ${view === "leaderboard" ? "feed-tab-on" : ""}`}
-          onClick={() => setView("leaderboard")}
-        >
-          Leaderboard
-        </button>
-      </nav>
-
-      {view === "leaderboard" ? (
-        <LeaderboardPanel
-          rows={data.leaderboard ?? []}
-          mode="tab"
-          recentForm={data.recentForm}
-          handStatus={data.handStatus}
-        />
-      ) : (
-        <>
       <ReelGroup
         panes={[
           {
@@ -827,8 +795,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         Live PGA Tour scoring · auto-refreshes every 15s · usually within
         ~30s of the course
       </p>
-        </>
-      )}
 
       {/* Floating-emoji overlay — fixed so bursts rise over the whole feed */}
       <div className="feed-floater-layer" aria-hidden="true">
