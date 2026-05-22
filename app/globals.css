@@ -13062,8 +13062,19 @@ body:has(.v4-theme) {
     height: 32px;
     font-size: 11px;
   }
+  /* Stack name and chip vertically on mobile so long names like
+     "N. Petronzio" can't get clipped by a wide score chip
+     ("BOGEY · H18 · +1") sharing the same row. Both items left-
+     align under the body column; layout reads name → chip → body. */
+  .v4-theme .feed-row-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
   .v4-theme .feed-row-name {
     font-size: 14px;
+    overflow: visible;
+    white-space: normal;
   }
   .v4-theme .feed-row-score-num {
     font-size: 15px;
