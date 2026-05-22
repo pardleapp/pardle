@@ -14,6 +14,7 @@ import CatchMeUp from "./CatchMeUp";
 import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
 import { abbreviateName } from "@/lib/text/abbreviate";
+import { readBets, type TrackedBet } from "./bet-shared";
 import PlayerAvatar from "./PlayerAvatar";
 import PlayerSearch from "./PlayerSearch";
 import PuttPollWidget from "./PuttPollWidget";
@@ -182,6 +183,14 @@ function timeAgo(ts: number): string {
   return `${Math.floor(m / 60)}h ago`;
 }
 
+/** Short label for the bet kind, used on the "📌 Your …" chip. */
+function betKindLabel(bet: TrackedBet): string {
+  if (bet.kind === "outright") return "outright";
+  if (bet.kind === "top-finish") return `Top ${bet.cutoff}`;
+  if (bet.kind === "round-score") return "round bet";
+  return "bet";
+}
+
 /**
  * Strip the leading player name from an engine-generated headline so
  * the v4 row can render the name in its own slot. Falls back to the
@@ -222,8 +231,14 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     {},
   );
   const [floaters, setFloaters] = useState<Floater[]>([]);
-  const [filterMode, setFilterMode] = useState<"all" | "following">("all");
+  const [filterMode, setFilterMode] = useState<
+    "all" | "following" | "your-bets"
+  >("all");
   const [follows, setFollowsState] = useState<string[]>([]);
+  // Tracked bets loaded from localStorage on mount + whenever they
+  // change. Drives both the "Your bets" filter mode and the
+  // per-row "📌 affects your bet" chip on the live feed.
+  const [trackedBets, setTrackedBets] = useState<TrackedBet[]>([]);
   const [oddsFormat, setOddsFormat] =
     useState<OddsFormat>(DEFAULT_ODDS_FORMAT);
 
@@ -259,6 +274,20 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     return () => {
       window.removeEventListener("pardle-follows-changed", sync);
       window.removeEventListener("focus", sync);
+    };
+  }, []);
+
+  // Tracked bets — refresh on mount, on tab focus (might have edited
+  // bets on /bets in another tab), and on storage events. Drives
+  // the bet-aware chip + the Your-bets filter tab.
+  useEffect(() => {
+    const sync = () => setTrackedBets(readBets());
+    sync();
+    window.addEventListener("focus", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("focus", sync);
+      window.removeEventListener("storage", sync);
     };
   }, []);
 
@@ -490,10 +519,24 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
   // ── Live feed ───────────────────────────────────────────────────
   const followSet = new Set(follows);
+  // Map playerId → bets the user has tracked on that player. Used
+  // for both the "Your bets" filter and the per-row "📌 affects your
+  // bet" chip. Winning-score bets (no player) are excluded.
+  const betsByPlayerId = new Map<string, TrackedBet[]>();
+  for (const b of trackedBets) {
+    if (b.kind === "winning-score") continue;
+    const pid = b.playerId;
+    if (!pid) continue;
+    const arr = betsByPlayerId.get(pid) ?? [];
+    arr.push(b);
+    betsByPlayerId.set(pid, arr);
+  }
   const visibleRows =
     filterMode === "following"
       ? data.rows.filter((r) => followSet.has(r.event.playerId))
-      : data.rows;
+      : filterMode === "your-bets"
+        ? data.rows.filter((r) => betsByPlayerId.has(r.event.playerId))
+        : data.rows;
 
   // Only show the vote widget on the LATEST open putt poll in the
   // feed. Older open polls (their putt was struck minutes ago) and
@@ -546,10 +589,9 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         storageKey="homefeed"
       />
 
-      {/* Hide the filter bar entirely when there's no one to follow —
-          can't filter to "following" with an empty list, so the
-          toggle is dead weight above the feed. */}
-      {follows.length > 0 && (
+      {/* Hide the filter bar entirely when there's neither follows
+          nor tracked bets — nothing to filter to. */}
+      {(follows.length > 0 || betsByPlayerId.size > 0) && (
         <div className="feed-filter-row">
           <button
             type="button"
@@ -558,13 +600,24 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           >
             All shots
           </button>
-          <button
-            type="button"
-            className={`feed-filter-btn ${filterMode === "following" ? "feed-filter-on" : ""}`}
-            onClick={() => setFilterMode("following")}
-          >
-            ★ Following ({follows.length})
-          </button>
+          {follows.length > 0 && (
+            <button
+              type="button"
+              className={`feed-filter-btn ${filterMode === "following" ? "feed-filter-on" : ""}`}
+              onClick={() => setFilterMode("following")}
+            >
+              ★ Following ({follows.length})
+            </button>
+          )}
+          {betsByPlayerId.size > 0 && (
+            <button
+              type="button"
+              className={`feed-filter-btn ${filterMode === "your-bets" ? "feed-filter-on" : ""}`}
+              onClick={() => setFilterMode("your-bets")}
+            >
+              📌 Your bets ({betsByPlayerId.size})
+            </button>
+          )}
         </div>
       )}
 
@@ -578,6 +631,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           {follows.length === 0
             ? "You're not following anyone yet. Tap a player's name to open their card and follow them."
             : "No shots from the players you follow yet — they'll show here."}
+        </p>
+      ) : filterMode === "your-bets" && visibleRows.length === 0 ? (
+        <p className="feed-empty">
+          No shots from the players you&apos;ve bet on yet — they&apos;ll
+          show here as they happen.
         </p>
       ) : (
         <ul className="feed-list">
@@ -639,9 +697,31 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                         (data.communityTotalBettors ?? 0) >= 5;
                       // Build a single chip list, then cap at 2 — keeps
                       // mobile rows from wrapping to 3-4 chip lines.
-                      // Priority: odds shift, top-10 shift, context tags,
-                      // community backing (most "unique to Pardle" first).
+                      // Priority: bet-relevance (your bet), odds shift,
+                      // top-10 shift, context tags, community backing.
                       const chips: Array<JSX.Element> = [];
+                      // "📌 Your bet" chip — fires when the event's
+                      // player has at least one tracked bet. Highest
+                      // priority because it's the most personal signal:
+                      // this event is happening to your money.
+                      const myBets = betsByPlayerId.get(event.playerId);
+                      if (myBets && myBets.length > 0) {
+                        const kindLabel =
+                          myBets.length === 1
+                            ? betKindLabel(myBets[0])
+                            : `${myBets.length} bets`;
+                        const firstBetId = myBets[0].id;
+                        chips.push(
+                          <Link
+                            key="your-bet"
+                            href={`/live/bet/${firstBetId}`}
+                            className="feed-tag feed-tag-your-bet"
+                            title="An event involving a player you've bet on — tap to see the bet detail"
+                          >
+                            📌 Your {kindLabel}
+                          </Link>,
+                        );
+                      }
                       if (event.oddsBefore && event.oddsAfter) {
                         chips.push(
                           <span

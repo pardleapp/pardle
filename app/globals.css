@@ -11621,6 +11621,22 @@ body:has(.v4-theme) {
   color: var(--purple);
 }
 
+/* "📌 Your bet" chip — events involving a player you've tracked
+   bets on. Highest-priority chip, gets a distinctive amber colour
+   so it pops against the regular green/grey chip palette. Tap to
+   open the bet detail. */
+.v4-theme .feed-tag-your-bet {
+  background: var(--amber-soft);
+  color: var(--amber);
+  border: 1px solid rgba(255, 157, 46, 0.3);
+  text-decoration: none;
+  font-weight: 800;
+}
+
+.v4-theme .feed-tag-your-bet:hover {
+  background: rgba(255, 157, 46, 0.22);
+}
+
 .v4-theme .feed-meta {
   font-size: 11px;
   font-weight: 600;
