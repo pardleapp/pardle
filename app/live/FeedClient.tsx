@@ -705,6 +705,18 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                         );
                       }
                       for (const t of event.tags ?? []) {
+                        // Deprecated chip strings — old events in the
+                        // Redis-cached feed list still carry these in
+                        // their baked-in tags array. Filter them at
+                        // render time so they don't show until those
+                        // events naturally scroll off (~24h).
+                        if (
+                          /^\d+ of last \d+ in red$/.test(t) ||
+                          /^top \d+ in field today$/.test(t) ||
+                          /^among most /.test(t)
+                        ) {
+                          continue;
+                        }
                         chips.push(
                           <span key={`tag-${t}`} className="feed-tag">
                             {t}
