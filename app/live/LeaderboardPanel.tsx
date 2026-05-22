@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { CachedLeaderboardRow } from "@/lib/feed/store";
+import { abbreviateName } from "@/lib/text/abbreviate";
 import PlayerAvatar from "./PlayerAvatar";
 import RecentFormSparkline, {
   type RecentEvent,
@@ -75,7 +76,7 @@ export default function LeaderboardPanel({
                     {hand === "hot" ? "🔥" : "🥶"}
                   </span>
                 )}
-                {r.displayName}
+                {abbreviateName(r.displayName)}
               </Link>
               {form && (
                 <RecentFormSparkline

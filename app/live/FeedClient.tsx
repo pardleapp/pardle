@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type JSX } from "react";
 import type { Burst, CachedLeaderboardRow } from "@/lib/feed/store";
 import type { FeedRow } from "@/lib/feed/types";
 import {
@@ -14,6 +14,7 @@ import CatchMeUp from "./CatchMeUp";
 import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
 import LeaderboardPanel from "./LeaderboardPanel";
+import { abbreviateName } from "@/lib/text/abbreviate";
 import PlayerAvatar from "./PlayerAvatar";
 import PlayerSearch from "./PlayerSearch";
 import PuttPollWidget from "./PuttPollWidget";
@@ -638,7 +639,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                   >
                     <div className="feed-row-head">
                       <span className="feed-row-name">
-                        {event.playerName}
+                        {abbreviateName(event.playerName)}
                         {data.handStatus?.[event.playerId] && (
                           <HandBadge
                             status={data.handStatus[event.playerId]}
@@ -647,70 +648,89 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                       </span>
                       <ScoreChip event={event} />
                     </div>
-                    <p className="feed-row-action">
-                      {stripPlayerName(event.headline, event.playerName)}
-                    </p>
+                    {/* Action sentence only on events whose score chip
+                        can't carry the full identity — shots and polls.
+                        Score events (birdie/eagle/bogey/etc.) get the
+                        result label baked into the chip itself, so a
+                        duplicate "Birdies the 14th" line would be noise. */}
+                    {event.type !== "score" && (
+                      <p className="feed-row-action">
+                        {stripPlayerName(event.headline, event.playerName)}
+                      </p>
+                    )}
                     {(() => {
                       const backingPct =
                         data.communityBackingPct?.[event.playerId];
                       const showBacking =
                         typeof backingPct === "number" &&
                         (data.communityTotalBettors ?? 0) >= 5;
-                      const hasAny =
-                        event.tags?.length ||
-                        (event.oddsBefore && event.oddsAfter) ||
-                        (event.top10Before != null &&
-                          event.top10After != null) ||
-                        showBacking;
-                      if (!hasAny) return null;
-                      return (
-                        <p className="feed-tags">
-                          {event.tags?.map((t) => (
-                            <span key={t} className="feed-tag">
-                              {t}
-                            </span>
-                          ))}
-                          {event.oddsBefore && event.oddsAfter && (
-                            <span
-                              className={`feed-tag feed-tag-odds ${
-                                event.oddsAfter < event.oddsBefore
-                                  ? "feed-tag-odds-shorten"
-                                  : "feed-tag-odds-drift"
-                              }`}
-                              title="Win-market odds shift"
-                            >
-                              odds {formatOdds(event.oddsBefore, oddsFormat)} →{" "}
-                              {formatOdds(event.oddsAfter, oddsFormat)}
-                            </span>
-                          )}
-                          {event.top10Before != null &&
-                            event.top10After != null && (
-                              <span
-                                className={`feed-tag feed-tag-odds ${
-                                  event.top10After > event.top10Before
-                                    ? "feed-tag-odds-shorten"
-                                    : "feed-tag-odds-drift"
-                                }`}
-                                title="Top-10 finish probability shift"
-                              >
-                                top 10{" "}
-                                {Math.round(event.top10Before * 100)}% →{" "}
-                                {Math.round(event.top10After * 100)}%
-                              </span>
-                            )}
-                          {showBacking && (
-                            <span
-                              className="feed-tag feed-tag-community"
-                              title={`Backed by ${backingPct}% of Pardle bettors this week`}
-                            >
-                              {backingPct}% of Pardle backs him
-                            </span>
-                          )}
-                        </p>
-                      );
+                      // Build a single chip list, then cap at 2 — keeps
+                      // mobile rows from wrapping to 3-4 chip lines.
+                      // Priority: odds shift, top-10 shift, context tags,
+                      // community backing (most "unique to Pardle" first).
+                      const chips: Array<JSX.Element> = [];
+                      if (event.oddsBefore && event.oddsAfter) {
+                        chips.push(
+                          <span
+                            key="odds"
+                            className={`feed-tag feed-tag-odds ${
+                              event.oddsAfter < event.oddsBefore
+                                ? "feed-tag-odds-shorten"
+                                : "feed-tag-odds-drift"
+                            }`}
+                            title="Win-market odds shift"
+                          >
+                            odds {formatOdds(event.oddsBefore, oddsFormat)} →{" "}
+                            {formatOdds(event.oddsAfter, oddsFormat)}
+                          </span>,
+                        );
+                      }
+                      if (
+                        event.top10Before != null &&
+                        event.top10After != null
+                      ) {
+                        chips.push(
+                          <span
+                            key="top10"
+                            className={`feed-tag feed-tag-odds ${
+                              event.top10After > event.top10Before
+                                ? "feed-tag-odds-shorten"
+                                : "feed-tag-odds-drift"
+                            }`}
+                            title="Top-10 finish probability shift"
+                          >
+                            top 10 {Math.round(event.top10Before * 100)}% →{" "}
+                            {Math.round(event.top10After * 100)}%
+                          </span>,
+                        );
+                      }
+                      for (const t of event.tags ?? []) {
+                        chips.push(
+                          <span key={`tag-${t}`} className="feed-tag">
+                            {t}
+                          </span>,
+                        );
+                      }
+                      if (showBacking) {
+                        chips.push(
+                          <span
+                            key="backing"
+                            className="feed-tag feed-tag-community"
+                            title={`Backed by ${backingPct}% of Pardle bettors this week`}
+                          >
+                            {backingPct}% of Pardle backs him
+                          </span>,
+                        );
+                      }
+                      if (chips.length === 0) return null;
+                      // Cap at 2 visible chips. Extras are dropped on
+                      // mobile (the data is still surfaced on the bet
+                      // detail card for tracked bets).
+                      const visible = chips.slice(0, 2);
+                      return <p className="feed-tags">{visible}</p>;
                     })()}
                     <p className="feed-meta">
-                      R{event.round} · {timeAgo(event.ts)} · view card →
+                      R{event.round} · {timeAgo(event.ts)}
                     </p>
                   </Link>
                   {event.type === "putt-poll" &&
@@ -733,27 +753,36 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                   <div className="feed-actions">
                     <button
                       type="button"
-                      className={`feed-react ${mine === "up" ? "feed-react-on" : ""}`}
+                      className={`feed-react ${mine === "up" ? "feed-react-on" : ""} ${reactions.up === 0 && mine !== "up" ? "feed-react-zero" : ""}`}
                       onClick={() => sendReaction(event.id, "up")}
                       aria-label="Like"
                     >
-                      👍 {reactions.up > 0 ? reactions.up : ""}
+                      <IconThumbUp />
+                      {reactions.up > 0 && (
+                        <span className="feed-react-count">{reactions.up}</span>
+                      )}
                     </button>
                     <button
                       type="button"
-                      className={`feed-react ${mine === "down" ? "feed-react-on" : ""}`}
+                      className={`feed-react ${mine === "down" ? "feed-react-on" : ""} ${reactions.down === 0 && mine !== "down" ? "feed-react-zero" : ""}`}
                       onClick={() => sendReaction(event.id, "down")}
                       aria-label="Dislike"
                     >
-                      👎 {reactions.down > 0 ? reactions.down : ""}
+                      <IconThumbDown />
+                      {reactions.down > 0 && (
+                        <span className="feed-react-count">{reactions.down}</span>
+                      )}
                     </button>
                     <button
                       type="button"
-                      className={`feed-react ${isOpen ? "feed-react-on" : ""}`}
+                      className={`feed-react ${isOpen ? "feed-react-on" : ""} ${count === 0 && !isOpen ? "feed-react-zero" : ""}`}
                       onClick={() => setExpanded(isOpen ? null : event.id)}
                       aria-label="Comments"
                     >
-                      💬 {count > 0 ? count : ""}
+                      <IconComment />
+                      {count > 0 && (
+                        <span className="feed-react-count">{count}</span>
+                      )}
                     </button>
                     <FollowButton
                       playerId={event.playerId}
@@ -844,7 +873,9 @@ function MomentumStrip({
                 href={`/live/player/${r.playerId}`}
                 className="momentum-chip"
               >
-                <span className="momentum-chip-name">{r.displayName}</span>
+                <span className="momentum-chip-name">
+                  {abbreviateName(r.displayName)}
+                </span>
                 <span className="momentum-chip-sg">{fmt(r.sgTotal)}</span>
               </Link>
             ))}
@@ -864,7 +895,9 @@ function MomentumStrip({
                 href={`/live/player/${r.playerId}`}
                 className="momentum-chip momentum-chip-cold"
               >
-                <span className="momentum-chip-name">{r.displayName}</span>
+                <span className="momentum-chip-name">
+                  {abbreviateName(r.displayName)}
+                </span>
                 <span className="momentum-chip-sg">{fmt(r.sgTotal)}</span>
               </Link>
             ))}
@@ -875,16 +908,56 @@ function MomentumStrip({
   );
 }
 
+// ── Inline icons for reaction buttons ─────────────────────────────
+
+function IconThumbUp() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7 22V11" />
+      <path d="M5 11h2" />
+      <path d="M7 11h7l2-2 0-4a2 2 0 0 1 2 2v4l-1 2h4a2 2 0 0 1 2 2l-2 7a2 2 0 0 1-2 1H7" />
+    </svg>
+  );
+}
+
+function IconThumbDown() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M17 2v11" />
+      <path d="M19 13h-2" />
+      <path d="M17 13h-7l-2 2 0 4a2 2 0 0 0 2 2 2 2 0 0 0 2-2v-4l1-2H7a2 2 0 0 0-2-2L7 2a2 2 0 0 0 2-1h8" transform="translate(0,0)" />
+    </svg>
+  );
+}
+
+function IconComment() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
 // ── Score chip — score vs par + hole, hero-treatment in v4 rows ───
 
+const RESULT_LABEL: Record<string, string> = {
+  albatross: "ALBA",
+  eagle: "EAGLE",
+  birdie: "BIRDIE",
+  par: "PAR",
+  bogey: "BOGEY",
+  double: "DOUBLE",
+  "triple-plus": "BLOW-UP",
+};
+
 function ScoreChip({ event }: { event: FeedRow["event"] }) {
-  // Type-event signal: birdie = −1, eagle = −2, etc. Computed from
-  // (strokes - par) on score events; "ACE" on aces; just the hole
-  // on shot-only events with no score.
+  // Three pieces on score events: TYPE · H{hole} · {±n}. Carries the
+  // full event identity so the action sentence below can be dropped,
+  // saving a line per row.
   if (event.ace) {
     return (
       <span className="feed-row-score">
-        ACE
+        <span className="feed-row-score-label">ACE</span>
         {event.hole && (
           <span className="feed-row-score-hole">H{event.hole}</span>
         )}
@@ -897,17 +970,21 @@ function ScoreChip({ event }: { event: FeedRow["event"] }) {
     typeof event.par === "number"
   ) {
     const diff = event.strokes - event.par;
-    const sign = diff > 0 ? "+" : "";
+    const sign = diff > 0 ? "+" : diff < 0 ? "−" : "";
+    const value = diff === 0 ? "E" : `${sign}${Math.abs(diff)}`;
     const isBad = diff > 0;
+    const label = event.result ? RESULT_LABEL[event.result] : null;
     return (
       <span
         className={`feed-row-score${isBad ? " feed-row-score-bad" : ""}`}
       >
-        {sign}
-        {diff}
+        {label && (
+          <span className="feed-row-score-label">{label}</span>
+        )}
         {event.hole && (
           <span className="feed-row-score-hole">H{event.hole}</span>
         )}
+        <span className="feed-row-score-num">{value}</span>
       </span>
     );
   }

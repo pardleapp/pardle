@@ -11,6 +11,7 @@
  */
 
 import { tourPuttMakeRate } from "@/lib/feed/tour-baselines";
+import { abbreviateName } from "@/lib/text/abbreviate";
 
 export interface PuttPollServerState {
   counts: { yes: number; no: number };
@@ -71,7 +72,7 @@ function buildBaselineLine(args: {
     args.playerName
   ) {
     parts.push(
-      `${args.playerName} ${formatSg(args.playerPuttSg)} SG putting this week`,
+      `${abbreviateName(args.playerName)} ${formatSg(args.playerPuttSg)} SG putting this week`,
     );
   }
   if (parts.length === 0) return null;

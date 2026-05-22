@@ -76,7 +76,19 @@ export default function ReelGroup({
       setActive(storedTab);
     }
     const storedCollapsed = window.localStorage.getItem(collapsedKey);
-    if (storedCollapsed === "1") setCollapsed(true);
+    if (storedCollapsed != null) {
+      // Explicit user choice wins.
+      setCollapsed(storedCollapsed === "1");
+    } else if (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 480px)").matches
+    ) {
+      // No stored preference + small viewport → default to collapsed.
+      // Reels are below-the-fold-anyway on phones; collapsing buys back
+      // ~120px of vertical space for the live feed without losing access
+      // (the title bar stays tappable).
+      setCollapsed(true);
+    }
   }, [tabKey, collapsedKey, panes]);
 
   function pick(k: string) {

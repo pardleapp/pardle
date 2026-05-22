@@ -11515,17 +11515,27 @@ body:has(.v4-theme) {
 }
 
 .v4-theme .feed-row-score {
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--green);
-  display: flex;
+  display: inline-flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
+  letter-spacing: -0.01em;
 }
 
-.v4-theme .feed-row-score-bad {
+.v4-theme .feed-row-score-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: var(--green-soft);
+  color: var(--green);
+  line-height: 1;
+}
+
+.v4-theme .feed-row-score-bad .feed-row-score-label {
+  background: var(--red-soft);
   color: var(--red);
 }
 
@@ -11534,6 +11544,17 @@ body:has(.v4-theme) {
   font-weight: 700;
   color: var(--muted);
   letter-spacing: 0;
+}
+
+.v4-theme .feed-row-score-num {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+}
+
+.v4-theme .feed-row-score-bad .feed-row-score-num {
+  color: var(--red);
 }
 
 .v4-theme .feed-row-action {
@@ -11618,15 +11639,19 @@ body:has(.v4-theme) {
 }
 
 .v4-theme .feed-react {
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--muted);
   background: transparent;
   border: none;
-  padding: 4px 8px;
+  padding: 5px 8px;
   border-radius: 999px;
   cursor: pointer;
   transition: background 100ms, color 100ms;
+  font-variant-numeric: tabular-nums;
 }
 
 .v4-theme .feed-react:hover {
@@ -11637,6 +11662,10 @@ body:has(.v4-theme) {
 .v4-theme .feed-react-on {
   background: var(--green-soft);
   color: var(--green);
+}
+
+.v4-theme .feed-react-count {
+  line-height: 1;
 }
 
 /* Empty / footnote tweaks */
@@ -12981,4 +13010,68 @@ body:has(.v4-theme) {
   background: var(--bg-card);
   border: 1px solid var(--border);
   color: var(--text);
+}
+
+/* ── Mobile density tweaks (≤480px) ──────────────────────────────── */
+@media (max-width: 480px) {
+  /* Feed row: tighter padding, smaller avatar, smaller chip + name */
+  .v4-theme .feed-row {
+    grid-template-columns: 32px 1fr auto;
+    gap: 4px 10px;
+    padding: 10px 12px;
+  }
+  .v4-theme .feed-row .avatar.avatar-md {
+    width: 32px;
+    height: 32px;
+    font-size: 11px;
+  }
+  .v4-theme .feed-row-name {
+    font-size: 14px;
+  }
+  .v4-theme .feed-row-score-num {
+    font-size: 15px;
+  }
+  .v4-theme .feed-row-score-label {
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+  .v4-theme .feed-row-action {
+    font-size: 12.5px;
+  }
+  .v4-theme .feed-meta {
+    font-size: 10px;
+  }
+  /* Bet tracker rows */
+  .v4-theme .bets-row {
+    padding: 12px;
+  }
+  .v4-theme .bets-row-value strong {
+    font-size: 17px;
+  }
+  .v4-theme .bets-row-name {
+    font-size: 13px;
+  }
+  /* Page chrome — tighter h1 */
+  .v4-theme .brand h1 {
+    font-size: 18px;
+  }
+}
+
+/* Reaction buttons fade to icon-only when nobody's reacted yet.
+   Still tappable — just visually de-emphasised so a quiet row
+   doesn't shout three buttons at empty counts. */
+.v4-theme .feed-react-zero {
+  opacity: 0.4;
+  padding: 5px 6px;
+}
+
+.v4-theme .feed-react-zero:hover {
+  opacity: 1;
+}
+
+/* SVG icons inside the reaction buttons inherit the button color. */
+.v4-theme .feed-react svg {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
 }

@@ -35,6 +35,7 @@ import NotificationPrompt from "./notifications/NotificationPrompt";
 import RecentFormSparkline, {
   type RecentEvent,
 } from "./RecentFormSparkline";
+import { abbreviateName } from "@/lib/text/abbreviate";
 
 type BetKind = "outright" | "round-score" | "winning-score" | "top-finish";
 
@@ -96,7 +97,7 @@ function PlayerRowName({
             {hand === "hot" ? "🔥" : "🥶"}
           </span>
         )}
-        {children ?? bet.playerName}
+        {children ?? abbreviateName(bet.playerName)}
       </p>
       {form && (
         <RecentFormSparkline
@@ -649,7 +650,7 @@ function TopFinishRow({
             handStatus={handStatus}
           >
             <>
-              {bet.playerName}{" "}
+              {abbreviateName(bet.playerName)}{" "}
               <span className="bets-row-kind">Top {bet.cutoff}</span>
             </>
           </PlayerRowName>
@@ -916,7 +917,7 @@ function RoundScoreRow({
             handStatus={handStatus}
           >
             <>
-              {bet.playerName}{" "}
+              {abbreviateName(bet.playerName)}{" "}
               <span className="bets-row-kind">
                 {bet.side} {bet.line} · {roundLabel}
               </span>
