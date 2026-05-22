@@ -96,10 +96,12 @@ export default function ReelGroup({
     if (typeof window !== "undefined") {
       window.localStorage.setItem(tabKey, k);
       // Picking a tab while collapsed should also reveal the panel —
-      // otherwise the click feels like a no-op.
+      // otherwise the click feels like a no-op. Store explicit "0"
+      // (not remove) so the mount effect doesn't snap back to the
+      // mobile default on the next feed poll.
       if (collapsed) {
         setCollapsed(false);
-        window.localStorage.removeItem(collapsedKey);
+        window.localStorage.setItem(collapsedKey, "0");
       }
     }
   }
@@ -108,11 +110,12 @@ export default function ReelGroup({
     setCollapsed((prev) => {
       const next = !prev;
       if (typeof window !== "undefined") {
-        if (next) {
-          window.localStorage.setItem(collapsedKey, "1");
-        } else {
-          window.localStorage.removeItem(collapsedKey);
-        }
+        // Always write — never remove. The mount effect treats an
+        // absent key as "no preference" and falls back to the mobile
+        // default (collapsed = true). If we delete the key on expand,
+        // the very next feed poll re-runs the effect (panes is a dep),
+        // sees no stored value, and snaps the panel back to collapsed.
+        window.localStorage.setItem(collapsedKey, next ? "1" : "0");
       }
       return next;
     });

@@ -13051,6 +13051,118 @@ body:has(.v4-theme) {
 
 /* ── Mobile density tweaks (≤480px) ──────────────────────────────── */
 @media (max-width: 480px) {
+  /* ── Mobile chrome compaction (everything above the feed) ────── */
+
+  /* Hide the Pardle wordmark — favicon + URL bar already identify
+     the app. Recovers a full row of vertical space. */
+  .v4-theme .brand h1 {
+    display: none;
+  }
+  .v4-theme .brand.brand-split {
+    padding-top: 8px;
+    padding-bottom: 8px;
+    border-bottom-width: 1px;
+    margin-bottom: 8px;
+  }
+
+  /* Tournament header card: compact padding + smaller text. The
+     tournament name was the centrepiece of a tall card; here it's
+     just an identifier above the feed. */
+  .v4-theme .feed-header-row {
+    padding: 8px 14px;
+    margin-bottom: 4px;
+  }
+  .v4-theme .feed-tournament-name {
+    font-size: 15px;
+  }
+  .v4-theme .feed-status-card {
+    margin: 6px 12px;
+    padding: 18px 14px;
+  }
+  .v4-theme .feed-status-card .feed-tournament-name {
+    font-size: 17px;
+  }
+
+  /* PlayerSearch: narrower + smaller. Was full-width with a 50px
+     row height; now constrained so it doesn't dominate. */
+  .v4-theme .psearch {
+    padding: 4px 14px;
+    margin-bottom: 4px;
+    max-width: 70%;
+  }
+  .v4-theme .psearch-input {
+    font-size: 12.5px;
+    padding: 7px 10px;
+  }
+  .v4-theme .psearch-input::placeholder {
+    font-size: 12.5px;
+  }
+
+  /* Momentum strip: collapse two rows (hot + cold) into a single
+     horizontal scroller. Both rows now lay out inline with a
+     vertical divider between them. */
+  .v4-theme .momentum-strip {
+    padding: 6px 14px;
+    margin-bottom: 4px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    gap: 8px;
+    scrollbar-width: none;
+  }
+  .v4-theme .momentum-strip::-webkit-scrollbar {
+    display: none;
+  }
+  .v4-theme .momentum-row {
+    flex-direction: row;
+    overflow: visible;
+    flex-shrink: 0;
+    gap: 6px;
+  }
+  .v4-theme .momentum-row-label-text {
+    display: none; /* the emoji prefix is enough */
+  }
+  .v4-theme .momentum-chips {
+    padding-right: 0;
+  }
+  /* Vertical pip between hot block and cold block. */
+  .v4-theme .momentum-row-cold {
+    position: relative;
+    padding-left: 8px;
+  }
+  .v4-theme .momentum-row-cold::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 25%;
+    bottom: 25%;
+    width: 1px;
+    background: var(--border);
+  }
+
+  /* Catch-me-up banner — tighter when it shows */
+  .v4-theme .catchup-banner {
+    padding: 6px 12px;
+    margin: 4px 12px;
+    font-size: 12px;
+  }
+
+  /* Reel group bar — tighter */
+  .v4-theme .reel-group-bar {
+    padding: 4px 12px;
+  }
+  .v4-theme .reel-group-tab {
+    font-size: 12px;
+    padding: 5px 10px;
+  }
+
+  /* Filter row — tighter */
+  .v4-theme .feed-filter-row {
+    padding: 4px 12px;
+    margin-bottom: 4px;
+  }
+
   /* Feed row: tighter padding, smaller avatar, smaller chip + name */
   .v4-theme .feed-row {
     grid-template-columns: 32px 1fr auto;

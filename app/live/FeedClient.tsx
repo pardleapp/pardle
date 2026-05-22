@@ -578,22 +578,27 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         storageKey="homefeed"
       />
 
-      <div className="feed-filter-row">
-        <button
-          type="button"
-          className={`feed-filter-btn ${filterMode === "all" ? "feed-filter-on" : ""}`}
-          onClick={() => setFilterMode("all")}
-        >
-          All shots
-        </button>
-        <button
-          type="button"
-          className={`feed-filter-btn ${filterMode === "following" ? "feed-filter-on" : ""}`}
-          onClick={() => setFilterMode("following")}
-        >
-          ★ Following {follows.length > 0 ? `(${follows.length})` : ""}
-        </button>
-      </div>
+      {/* Hide the filter bar entirely when there's no one to follow —
+          can't filter to "following" with an empty list, so the
+          toggle is dead weight above the feed. */}
+      {follows.length > 0 && (
+        <div className="feed-filter-row">
+          <button
+            type="button"
+            className={`feed-filter-btn ${filterMode === "all" ? "feed-filter-on" : ""}`}
+            onClick={() => setFilterMode("all")}
+          >
+            All shots
+          </button>
+          <button
+            type="button"
+            className={`feed-filter-btn ${filterMode === "following" ? "feed-filter-on" : ""}`}
+            onClick={() => setFilterMode("following")}
+          >
+            ★ Following ({follows.length})
+          </button>
+        </div>
+      )}
 
       {data.rows.length === 0 ? (
         <p className="feed-empty">
