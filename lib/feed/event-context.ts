@@ -83,18 +83,18 @@ export function streakTag(inputs: StreakInputs): string | null {
   if (seq.length < 3) return null;
   const last = seq.slice(-Math.min(8, seq.length));
 
-  // Good-news streaks: at least 3 reds in the most-recent N holes.
-  // Try larger windows first so "5 of last 7" beats "3 of last 5".
-  for (const win of [8, 7, 6, 5, 4, 3]) {
-    if (last.length < win) continue;
-    const slice = last.slice(-win);
-    const reds = slice.filter((h) => isRed(h.result)).length;
-    if (reds >= 3 && reds * 2 >= win) {
-      // Only emit on a fresh red — feels wrong to flag a hot streak
-      // when the fresh event was a bogey or par.
-      if (!inputs.freshResult || !isRed(inputs.freshResult)) break;
-      if (reds === win) return `${win} birdies in a row`;
-      return `${reds} of last ${win} in red`;
+  // Good-news streaks: 3+ consecutive red holes ending on the fresh
+  // event. The "N of last M in red" partial-streak variant was cut
+  // because it reads as stats noise (requires mental math) — we keep
+  // only the cleaner "5 birdies in a row" narrative.
+  if (inputs.freshResult && isRed(inputs.freshResult)) {
+    let trailingReds = 0;
+    for (let i = seq.length - 1; i >= 0; i--) {
+      if (isRed(seq[i].result)) trailingReds++;
+      else break;
+    }
+    if (trailingReds >= 3) {
+      return `${trailingReds} birdies in a row`;
     }
   }
 
@@ -231,13 +231,14 @@ export function fieldRankTag(args: {
   if (args.strictlyMore === 0) {
     if (args.tiedWith === 0) return `most ${args.noun} in field today`;
     if (args.tiedWith <= 2) return `tied for most ${args.noun} in field`;
-    // 4+ players tied at the top — too noisy to claim "leading", but
-    // they're still top of the pack.
-    return `among most ${args.noun} in field`;
+    // 4+ players tied at the top — too vague to claim "leading", and
+    // "among most" reads as filler. Stay silent.
+    return null;
   }
   if (args.strictlyMore === 1) return `2nd-most ${args.noun} in field`;
   if (args.strictlyMore === 2) return `3rd-most ${args.noun} in field`;
-  if (args.strictlyMore <= 4) return `top 5 in field today`;
+  // Ranks 4-5 ("top 5 in field today") cut as too vague — the named
+  // 1st/2nd/3rd-most variants carry a story; this one doesn't.
   return null;
 }
 
