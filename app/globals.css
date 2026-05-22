@@ -11638,6 +11638,9 @@ body:has(.v4-theme) {
   margin-top: 4px;
 }
 
+/* Base styles — tuned for mobile compactness. Desktop gets a
+   beefed-up override below so reactions read as the core CTAs
+   they should be on bigger screens. */
 .v4-theme .feed-react {
   display: inline-flex;
   align-items: center;
@@ -11650,7 +11653,7 @@ body:has(.v4-theme) {
   padding: 5px 8px;
   border-radius: 999px;
   cursor: pointer;
-  transition: background 100ms, color 100ms;
+  transition: background 100ms, color 100ms, border-color 100ms;
   font-variant-numeric: tabular-nums;
 }
 
@@ -11666,6 +11669,40 @@ body:has(.v4-theme) {
 
 .v4-theme .feed-react-count {
   line-height: 1;
+}
+
+/* Desktop — make reactions prominent. They're social CTAs and the
+   product treats social interaction as a core pillar; on a 1200px+
+   viewport with the user sitting back, the mobile-tight version
+   reads as nearly invisible. Pill background + border + larger icon
+   restores visibility without crowding the row. */
+@media (min-width: 481px) {
+  .v4-theme .feed-react {
+    gap: 6px;
+    font-size: 12px;
+    padding: 7px 12px;
+    background: var(--bg-card-hi);
+    border: 1px solid var(--border);
+    min-height: 34px;
+  }
+  .v4-theme .feed-react:hover {
+    background: var(--bg-card);
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+  .v4-theme .feed-react-on {
+    border-color: rgba(0, 217, 110, 0.3);
+  }
+  .v4-theme .feed-react-on:hover {
+    background: rgba(0, 217, 110, 0.18);
+  }
+  .v4-theme .feed-react svg {
+    width: 17px;
+    height: 17px;
+  }
+  .v4-theme .feed-react-count {
+    font-weight: 800;
+  }
 }
 
 /* Empty / footnote tweaks */
@@ -13057,16 +13094,17 @@ body:has(.v4-theme) {
   }
 }
 
-/* Reaction buttons fade to icon-only when nobody's reacted yet.
-   Still tappable — just visually de-emphasised so a quiet row
-   doesn't shout three buttons at empty counts. */
+/* On mobile, zero-count reactions fade to keep quiet rows from
+   shouting three empty buttons. On desktop they stay full opacity —
+   the pill background already gives them visibility without crowding. */
 .v4-theme .feed-react-zero {
-  opacity: 0.4;
-  padding: 5px 6px;
+  opacity: 0.5;
 }
 
-.v4-theme .feed-react-zero:hover {
-  opacity: 1;
+@media (min-width: 481px) {
+  .v4-theme .feed-react-zero {
+    opacity: 1;
+  }
 }
 
 /* SVG icons inside the reaction buttons inherit the button color. */
