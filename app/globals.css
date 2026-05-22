@@ -13065,15 +13065,23 @@ body:has(.v4-theme) {
     margin-bottom: 8px;
   }
 
-  /* Tournament header card: compact padding + smaller text. The
-     tournament name was the centrepiece of a tall card; here it's
-     just an identifier above the feed. */
+  /* Tournament header card: compact padding + smaller text. Stack
+     name + putt-IQ chip vertically so a long tournament name (e.g.
+     "THE CJ CUP Byron Nelson") doesn't get squeezed by the chip. */
   .v4-theme .feed-header-row {
+    flex-direction: column;
+    align-items: flex-start;
     padding: 8px 14px;
     margin-bottom: 4px;
+    gap: 6px;
   }
   .v4-theme .feed-tournament-name {
     font-size: 15px;
+    width: 100%;
+  }
+  .v4-theme .puttiq-chip {
+    font-size: 11px;
+    padding: 4px 9px;
   }
   .v4-theme .feed-status-card {
     margin: 6px 12px;
@@ -13083,16 +13091,17 @@ body:has(.v4-theme) {
     font-size: 17px;
   }
 
-  /* PlayerSearch: narrower + smaller. Was full-width with a 50px
-     row height; now constrained so it doesn't dominate. */
+  /* PlayerSearch: full-width (so the user can type and read a long
+     query) but with a shorter input height — was the height that
+     was bulky, not the width. */
   .v4-theme .psearch {
     padding: 4px 14px;
     margin-bottom: 4px;
-    max-width: 70%;
   }
   .v4-theme .psearch-input {
     font-size: 12.5px;
-    padding: 7px 10px;
+    padding: 5px 10px;
+    min-height: 30px;
   }
   .v4-theme .psearch-input::placeholder {
     font-size: 12.5px;
