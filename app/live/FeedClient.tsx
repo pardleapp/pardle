@@ -1007,16 +1007,40 @@ const RESULT_LABEL: Record<string, string> = {
   "triple-plus": "BLOW-UP",
 };
 
+/** Normalise an orchestrator to-par string ("-3" / "E" / "+1") into
+ *  the display form we use elsewhere — Unicode minus, "E" for level. */
+function formatToPar(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  const s = raw.trim();
+  if (!s) return null;
+  if (s === "E" || s === "0") return "E";
+  if (s.startsWith("-")) return `−${s.slice(1)}`;
+  if (s.startsWith("+")) return s;
+  // Bare number with no sign — treat as plus for positives.
+  const n = Number(s);
+  if (Number.isFinite(n)) {
+    if (n === 0) return "E";
+    return n > 0 ? `+${n}` : `−${Math.abs(n)}`;
+  }
+  return s;
+}
+
 function ScoreChip({ event }: { event: FeedRow["event"] }) {
-  // Three pieces on score events: TYPE · H{hole} · {±n}. Carries the
-  // full event identity so the action sentence below can be dropped,
-  // saving a line per row.
+  // Score chip carries the full event identity so the action sentence
+  // below can be dropped. Pieces: TYPE · H{hole} · {overall to-par}.
+  // The per-hole ±N is implied by the TYPE label (BOGEY = +1, etc),
+  // so we surface the player's running tournament total instead —
+  // far more useful for a bettor parsing the leaderboard at a glance.
+  const totalDisplay = formatToPar(event.toPar);
   if (event.ace) {
     return (
       <span className="feed-row-score">
         <span className="feed-row-score-label">ACE</span>
         {event.hole && (
           <span className="feed-row-score-hole">H{event.hole}</span>
+        )}
+        {totalDisplay && (
+          <span className="feed-row-score-num">{totalDisplay}</span>
         )}
       </span>
     );
@@ -1027,10 +1051,13 @@ function ScoreChip({ event }: { event: FeedRow["event"] }) {
     typeof event.par === "number"
   ) {
     const diff = event.strokes - event.par;
-    const sign = diff > 0 ? "+" : diff < 0 ? "−" : "";
-    const value = diff === 0 ? "E" : `${sign}${Math.abs(diff)}`;
     const isBad = diff > 0;
     const label = event.result ? RESULT_LABEL[event.result] : null;
+    // Per-hole fallback when the orchestrator hasn't given us an
+    // overall total yet (rare — usually only mid-poll lag).
+    const fallback = diff === 0
+      ? "E"
+      : `${diff > 0 ? "+" : "−"}${Math.abs(diff)}`;
     return (
       <span
         className={`feed-row-score${isBad ? " feed-row-score-bad" : ""}`}
@@ -1041,7 +1068,9 @@ function ScoreChip({ event }: { event: FeedRow["event"] }) {
         {event.hole && (
           <span className="feed-row-score-hole">H{event.hole}</span>
         )}
-        <span className="feed-row-score-num">{value}</span>
+        <span className="feed-row-score-num">
+          {totalDisplay ?? fallback}
+        </span>
       </span>
     );
   }
@@ -1049,6 +1078,9 @@ function ScoreChip({ event }: { event: FeedRow["event"] }) {
     return (
       <span className="feed-row-score">
         <span className="feed-row-score-hole">H{event.hole}</span>
+        {totalDisplay && (
+          <span className="feed-row-score-num">{totalDisplay}</span>
+        )}
       </span>
     );
   }

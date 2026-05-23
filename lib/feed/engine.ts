@@ -127,6 +127,10 @@ export async function pollAndDiff(
   const nameById = new Map(
     leaderboard.map((r) => [r.playerId, r.displayName]),
   );
+  // Player → overall to-par display string ("-7" / "E" / "+3"). Baked
+  // onto score events so the feed row can show the player's running
+  // tournament total alongside the per-hole result.
+  const totalById = new Map(leaderboard.map((r) => [r.playerId, r.total]));
   const activeIds = leaderboard
     .filter((r) => !INACTIVE_STATES.has(r.playerState))
     .map((r) => r.playerId);
@@ -232,6 +236,7 @@ export async function pollAndDiff(
           result,
           ace,
           lowlight,
+          toPar: totalById.get(pid),
           headline: ace
             ? aceHeadline(playerName, h.holeNumber)
             : scoreHeadline(playerName, h.holeNumber, result),

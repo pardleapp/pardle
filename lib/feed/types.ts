@@ -50,9 +50,13 @@ export interface FeedEvent {
   /** Distance of the approach, in yards. */
   shotYards?: number;
 
-  // ── position / milestone events ──
+  // ── player overall context (set on score + position/milestone events) ──
   position?: string; // e.g. "1" | "T2"
-  toPar?: string; // overall total to par, display string
+  /** Player's tournament-overall to-par at the moment this event was
+   *  generated. Display string from the orchestrator leaderboard:
+   *  "-7" / "E" / "+3". Lets the feed row show running tournament
+   *  total next to the per-hole result. */
+  toPar?: string;
 
   /** Pre-rendered one-line headline for the feed row. */
   headline: string;
