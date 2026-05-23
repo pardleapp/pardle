@@ -11621,38 +11621,36 @@ body:has(.v4-theme) {
   color: var(--purple);
 }
 
-/* "📌 Your bet" chip — events involving a player you've tracked
-   bets on. Highest-priority chip, gets a distinctive amber colour
-   so it pops against the regular green/grey chip palette. Tap to
-   open the bet detail. */
-.v4-theme .feed-tag-your-bet {
-  background: var(--amber-soft);
-  color: var(--amber);
-  border: 1px solid rgba(255, 157, 46, 0.3);
+/* PnL impact chip — fires per-row only when this specific event
+   moved one of the user's tracked bets by a material £ amount.
+   Green for "lifts your bet"; red for "hurts your bet". Carries the
+   exact £ swing, so this is the loudest, most personal signal on
+   the feed and gets the most colour weight. Tap → bet detail. */
+.v4-theme .feed-tag-impact {
+  border: 1px solid transparent;
   text-decoration: none;
   font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
-.v4-theme .feed-tag-your-bet:hover {
-  background: rgba(255, 157, 46, 0.22);
+.v4-theme .feed-tag-impact-up {
+  background: rgba(0, 217, 110, 0.14);
+  color: var(--green, #00d96e);
+  border-color: rgba(0, 217, 110, 0.32);
 }
 
-/* "📌 Affects your bet" — softer amber variant for indirect impact:
-   the event's player isn't one you bet on, but they're a top-of-
-   leaderboard competitor whose result moves the bet's probability.
-   Lower-key than the direct chip so the row still reads "useful
-   context" without shouting "this is your money". */
-.v4-theme .feed-tag-affects-bet {
-  background: rgba(255, 157, 46, 0.08);
-  color: rgba(255, 157, 46, 0.78);
-  border: 1px solid rgba(255, 157, 46, 0.18);
-  text-decoration: none;
-  font-weight: 700;
+.v4-theme .feed-tag-impact-up:hover {
+  background: rgba(0, 217, 110, 0.22);
 }
 
-.v4-theme .feed-tag-affects-bet:hover {
-  background: rgba(255, 157, 46, 0.14);
-  color: var(--amber);
+.v4-theme .feed-tag-impact-down {
+  background: rgba(255, 76, 76, 0.12);
+  color: #ff6b6b;
+  border-color: rgba(255, 76, 76, 0.32);
+}
+
+.v4-theme .feed-tag-impact-down:hover {
+  background: rgba(255, 76, 76, 0.2);
 }
 
 .v4-theme .feed-meta {

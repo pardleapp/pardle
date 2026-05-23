@@ -15,6 +15,11 @@ import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
 import { abbreviateName } from "@/lib/text/abbreviate";
 import { readBets, type TrackedBet } from "./bet-shared";
+import {
+  betKindShortLabel,
+  formatImpactGbp,
+  headlineImpactForEvent,
+} from "./bet-impact";
 import PlayerAvatar from "./PlayerAvatar";
 import PlayerSearch from "./PlayerSearch";
 import PuttPollWidget from "./PuttPollWidget";
@@ -183,89 +188,6 @@ function timeAgo(ts: number): string {
   return `${Math.floor(m / 60)}h ago`;
 }
 
-/** Short label for the bet kind, used on the "📌 Your …" chip. */
-function betKindLabel(bet: TrackedBet): string {
-  if (bet.kind === "outright") return "outright";
-  if (bet.kind === "top-finish") return `Top ${bet.cutoff}`;
-  if (bet.kind === "round-score") return "round bet";
-  return "bet";
-}
-
-interface BetImpact {
-  /** Bets where THIS player is the wagered player. */
-  direct: TrackedBet[];
-  /** Bets where this player is a competitor whose shots can move the
-   *  bet's probability (top of leaderboard for outright / top-finish /
-   *  winning-score). Round-score bets never produce indirect impact. */
-  indirect: TrackedBet[];
-}
-
-function parseLbPos(s: string): number | null {
-  if (!s) return null;
-  const m = s.match(/^T?(\d+)$/);
-  if (!m) return null;
-  const n = Number(m[1]);
-  return Number.isFinite(n) ? n : null;
-}
-
-/**
- * Build a per-player impact map: for each tracked bet, work out which
- * leaderboard players could materially move that bet's probability,
- * and tag them as "direct" (it's the player you bet on) or "indirect"
- * (it's a competitor whose result alters the bet's outcome).
- *
- * Heuristic by bet kind:
- *   outright       → bet player (direct) + current top 10 (indirect)
- *   top-finish N   → bet player (direct) + top (N+3) (indirect, cut bubble)
- *   round-score    → just the bet player; competitors don't matter
- *   winning-score  → top 6 contenders (all indirect — no bet player)
- */
-function buildImpactMap(
-  bets: TrackedBet[],
-  leaderboard: CachedLeaderboardRow[],
-): Map<string, BetImpact> {
-  const out = new Map<string, BetImpact>();
-  if (bets.length === 0) return out;
-  const sortedLb = [...leaderboard].sort((a, b) => {
-    const pa = parseLbPos(a.position) ?? 999;
-    const pb = parseLbPos(b.position) ?? 999;
-    return pa - pb;
-  });
-  const topN = (n: number) => sortedLb.slice(0, n).map((r) => r.playerId);
-  const get = (pid: string): BetImpact => {
-    let cur = out.get(pid);
-    if (!cur) {
-      cur = { direct: [], indirect: [] };
-      out.set(pid, cur);
-    }
-    return cur;
-  };
-  const addDirect = (pid: string, b: TrackedBet) => {
-    get(pid).direct.push(b);
-  };
-  const addIndirect = (pid: string, b: TrackedBet) => {
-    get(pid).indirect.push(b);
-  };
-  for (const b of bets) {
-    if (b.kind === "outright") {
-      addDirect(b.playerId, b);
-      for (const pid of topN(10)) {
-        if (pid !== b.playerId) addIndirect(pid, b);
-      }
-    } else if (b.kind === "top-finish") {
-      addDirect(b.playerId, b);
-      const n = Math.min(b.cutoff + 3, 25);
-      for (const pid of topN(n)) {
-        if (pid !== b.playerId) addIndirect(pid, b);
-      }
-    } else if (b.kind === "round-score") {
-      addDirect(b.playerId, b);
-    } else if (b.kind === "winning-score") {
-      for (const pid of topN(6)) addIndirect(pid, b);
-    }
-  }
-  return out;
-}
 
 /**
  * Strip the leading player name from an engine-generated headline so
@@ -307,13 +229,12 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     {},
   );
   const [floaters, setFloaters] = useState<Floater[]>([]);
-  const [filterMode, setFilterMode] = useState<
-    "all" | "following" | "your-bets"
-  >("all");
+  const [filterMode, setFilterMode] = useState<"all" | "following">("all");
   const [follows, setFollowsState] = useState<string[]>([]);
   // Tracked bets loaded from localStorage on mount + whenever they
-  // change. Drives both the "Your bets" filter mode and the
-  // per-row "📌 affects your bet" chip on the live feed.
+  // change. Drives the per-row bet-impact chip — "🚀 +£42 your
+  // outright" / "💀 −£18 your outright" — that fires on events the
+  // engine confirms materially moved the bet's probability.
   const [trackedBets, setTrackedBets] = useState<TrackedBet[]>([]);
   const [oddsFormat, setOddsFormat] =
     useState<OddsFormat>(DEFAULT_ODDS_FORMAT);
@@ -595,16 +516,10 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
   // ── Live feed ───────────────────────────────────────────────────
   const followSet = new Set(follows);
-  // Per-player impact for each tracked bet — direct (your player) or
-  // indirect (a competitor whose result moves the bet's probability).
-  // Drives both the "Your bets" filter and the per-row chip.
-  const impactMap = buildImpactMap(trackedBets, data.leaderboard ?? []);
   const visibleRows =
     filterMode === "following"
       ? data.rows.filter((r) => followSet.has(r.event.playerId))
-      : filterMode === "your-bets"
-        ? data.rows.filter((r) => impactMap.has(r.event.playerId))
-        : data.rows;
+      : data.rows;
 
   // Only show the vote widget on the LATEST open putt poll in the
   // feed. Older open polls (their putt was struck minutes ago) and
@@ -657,9 +572,9 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         storageKey="homefeed"
       />
 
-      {/* Hide the filter bar entirely when there's neither follows
-          nor tracked bets — nothing to filter to. */}
-      {(follows.length > 0 || trackedBets.length > 0) && (
+      {/* Following toggle — bet relevance now surfaces inline as a
+          per-row £ impact chip rather than a whole separate feed. */}
+      {follows.length > 0 && (
         <div className="feed-filter-row">
           <button
             type="button"
@@ -668,24 +583,13 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           >
             All shots
           </button>
-          {follows.length > 0 && (
-            <button
-              type="button"
-              className={`feed-filter-btn ${filterMode === "following" ? "feed-filter-on" : ""}`}
-              onClick={() => setFilterMode("following")}
-            >
-              ★ Following ({follows.length})
-            </button>
-          )}
-          {trackedBets.length > 0 && (
-            <button
-              type="button"
-              className={`feed-filter-btn ${filterMode === "your-bets" ? "feed-filter-on" : ""}`}
-              onClick={() => setFilterMode("your-bets")}
-            >
-              📌 Your bets ({trackedBets.length})
-            </button>
-          )}
+          <button
+            type="button"
+            className={`feed-filter-btn ${filterMode === "following" ? "feed-filter-on" : ""}`}
+            onClick={() => setFilterMode("following")}
+          >
+            ★ Following ({follows.length})
+          </button>
         </div>
       )}
 
@@ -699,11 +603,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           {follows.length === 0
             ? "You're not following anyone yet. Tap a player's name to open their card and follow them."
             : "No shots from the players you follow yet — they'll show here."}
-        </p>
-      ) : filterMode === "your-bets" && visibleRows.length === 0 ? (
-        <p className="feed-empty">
-          No bet-relevant shots yet — your players (and close competitors
-          who could move the needle) will show here as they happen.
         </p>
       ) : (
         <ul className="feed-list">
@@ -768,39 +667,52 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                       // Priority: bet-relevance (your bet), odds shift,
                       // top-10 shift, context tags, community backing.
                       const chips: Array<JSX.Element> = [];
-                      // Bet-relevance chip — direct beats indirect.
-                      // Direct: this event's player is one you bet on
-                      // (highest signal: it's happening to your money).
-                      // Indirect: this event's player is a competitor
-                      // whose result moves a tracked bet's probability
-                      // (e.g. the leader blowing up on Sunday lifts your
-                      // outright on the chaser).
-                      const impact = impactMap.get(event.playerId);
-                      if (impact && impact.direct.length > 0) {
-                        const direct = impact.direct;
-                        const kindLabel =
-                          direct.length === 1
-                            ? betKindLabel(direct[0])
-                            : `${direct.length} bets`;
+                      // PnL impact chip — fires only when this event
+                      // materially moved one of the user's tracked
+                      // bets. Computed per row from the engine-baked
+                      // oddsBefore/After + top10Before/After deltas
+                      // (precise for outright + top-10) or a per-stroke
+                      // heuristic for round-score. Direct: event player
+                      // is the bet player; indirect: a top-of-leaderboard
+                      // competitor moved your guy's prob via market
+                      // redistribution. Chip carries the actual £ swing.
+                      const impact =
+                        trackedBets.length > 0
+                          ? headlineImpactForEvent(event, trackedBets, {
+                              currentOdds: data.currentOdds,
+                              leaderboard: data.leaderboard,
+                            })
+                          : null;
+                      if (impact) {
+                        const positive = impact.deltaValue >= 0;
+                        const indirect = impact.source === "indirect";
+                        const emoji = positive
+                          ? indirect
+                            ? "🎯"
+                            : "🚀"
+                          : "💀";
+                        const kindLabel = betKindShortLabel(impact.bet);
+                        const verb = indirect
+                          ? positive
+                            ? "lifts"
+                            : "hurts"
+                          : "on";
                         chips.push(
                           <Link
-                            key="your-bet"
-                            href={`/live/bet/${direct[0].id}`}
-                            className="feed-tag feed-tag-your-bet"
-                            title="An event involving a player you've bet on — tap to see the bet detail"
+                            key="impact"
+                            href={`/live/bet/${impact.bet.id}`}
+                            className={`feed-tag feed-tag-impact ${
+                              positive
+                                ? "feed-tag-impact-up"
+                                : "feed-tag-impact-down"
+                            }`}
+                            title={
+                              indirect
+                                ? `Competitor moved the market — estimated ${formatImpactGbp(impact.deltaValue)} on your ${kindLabel}`
+                                : `${formatImpactGbp(impact.deltaValue)} change to your ${kindLabel}`
+                            }
                           >
-                            📌 Your {kindLabel}
-                          </Link>,
-                        );
-                      } else if (impact && impact.indirect.length > 0) {
-                        chips.push(
-                          <Link
-                            key="affects-bet"
-                            href={`/live/bet/${impact.indirect[0].id}`}
-                            className="feed-tag feed-tag-affects-bet"
-                            title="A competitor for one of your bets — their result moves the bet's probability"
-                          >
-                            📌 Affects your bet
+                            {emoji} {formatImpactGbp(impact.deltaValue)} {verb} your {kindLabel}
                           </Link>,
                         );
                       }
