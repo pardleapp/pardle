@@ -89,26 +89,34 @@ export default async function PlayerStats({
                 <div className="ps-round-head">R{round}</div>
                 {row ? (
                   <>
-                    <div className="ps-round-total">
+                    <div className={`ps-round-total ${sgToneClass(row.sgTotal)}`}>
                       {formatSgValue(row.sgTotal)}
                       <span className="ps-round-total-lbl"> total</span>
                     </div>
                     <ul className="ps-round-breakdown">
                       <li>
                         <span>OTT</span>
-                        <strong>{formatSgValue(row.sgOtt)}</strong>
+                        <strong className={sgToneClass(row.sgOtt)}>
+                          {formatSgValue(row.sgOtt)}
+                        </strong>
                       </li>
                       <li>
                         <span>APP</span>
-                        <strong>{formatSgValue(row.sgApp)}</strong>
+                        <strong className={sgToneClass(row.sgApp)}>
+                          {formatSgValue(row.sgApp)}
+                        </strong>
                       </li>
                       <li>
                         <span>ARG</span>
-                        <strong>{formatSgValue(row.sgArg)}</strong>
+                        <strong className={sgToneClass(row.sgArg)}>
+                          {formatSgValue(row.sgArg)}
+                        </strong>
                       </li>
                       <li>
                         <span>PUTT</span>
-                        <strong>{formatSgValue(row.sgPutt)}</strong>
+                        <strong className={sgToneClass(row.sgPutt)}>
+                          {formatSgValue(row.sgPutt)}
+                        </strong>
                       </li>
                     </ul>
                   </>
@@ -199,11 +207,13 @@ function SgHeadline({
 }) {
   return (
     <div className="ps-sg-headline">
-      <div className="ps-sg-headline-num">{formatSgValue(value)}</div>
+      <div className={`ps-sg-headline-num ${sgToneClass(value)}`}>
+        {formatSgValue(value)}
+      </div>
       <div className="ps-sg-headline-meta">
         <span className="ps-sg-headline-lbl">{label}</span>
         {rank && (
-          <span className="ps-sg-headline-rank">
+          <span className={`ps-sg-headline-rank ${rankToneClass(rank)}`}>
             {ordinal(rank.rank)} of {rank.outOf}
           </span>
         )}
@@ -224,9 +234,13 @@ function SgBucket({
   return (
     <div className="ps-sg-bucket">
       <div className="ps-sg-bucket-lbl">{label}</div>
-      <div className="ps-sg-bucket-num">{formatSgValue(value)}</div>
+      <div className={`ps-sg-bucket-num ${sgToneClass(value)}`}>
+        {formatSgValue(value)}
+      </div>
       {rank && (
-        <div className="ps-sg-bucket-rank">{ordinal(rank.rank)}</div>
+        <div className={`ps-sg-bucket-rank ${rankToneClass(rank)}`}>
+          {ordinal(rank.rank)}
+        </div>
       )}
     </div>
   );
@@ -247,7 +261,7 @@ function MiscStat({
 }) {
   return (
     <div className="pcard-stat-box">
-      <span className="pcard-stat-num">
+      <span className={`pcard-stat-num ${rank ? rankToneClass(rank) : ""}`}>
         {value == null
           ? "—"
           : asPct
@@ -258,7 +272,9 @@ function MiscStat({
       </span>
       <span className="pcard-stat-lbl">{label}</span>
       {rank && (
-        <span className="ps-stat-rank">{ordinal(rank.rank)} in field</span>
+        <span className={`ps-stat-rank ${rankToneClass(rank)}`}>
+          {ordinal(rank.rank)} in field
+        </span>
       )}
     </div>
   );
@@ -268,6 +284,29 @@ function formatSgValue(v: number | null): string {
   if (v == null) return "—";
   if (v > 0) return `+${v.toFixed(2)}`;
   return v.toFixed(2);
+}
+
+/** Tone class for a strokes-gained value. Positive = elite green,
+ *  negative = red, zero / null = muted. Drives the bright SG palette. */
+function sgToneClass(v: number | null): string {
+  if (v == null) return "ps-tone-zero";
+  if (v > 0.05) return "ps-tone-up";
+  if (v < -0.05) return "ps-tone-down";
+  return "ps-tone-zero";
+}
+
+/** Tone class for a field rank. Top of field glows; bottom of field
+ *  reds out; middle stays muted. Tiers match a typical DataGolf grade
+ *  scale — top-3 is loud, top decile is green, bottom decile is red. */
+function rankToneClass(r: { rank: number; outOf: number } | null): string {
+  if (!r || r.outOf <= 0) return "ps-rank-mid";
+  if (r.rank <= 3) return "ps-rank-elite";
+  const pct = r.rank / r.outOf;
+  if (pct <= 0.1) return "ps-rank-top";
+  if (pct <= 0.33) return "ps-rank-good";
+  if (pct >= 0.9) return "ps-rank-poor";
+  if (pct >= 0.67) return "ps-rank-low";
+  return "ps-rank-mid";
 }
 
 function ordinal(n: number): string {

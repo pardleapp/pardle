@@ -12641,6 +12641,106 @@ body:has(.v4-theme) {
 .v4-theme .ps-round-total,
 .v4-theme .pcard-stat-num {
   color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* ── DataGolf-style SG tone palette ───────────────────────────────
+   Positive SG glows electric green; negative bleeds red; zero stays
+   muted. The .ps-tone-* classes are applied wherever an SG value is
+   rendered (headline, bucket, per-round breakdown). The headline
+   gets an extra text-shadow glow so the hero number reads from
+   across the room. Override sits *after* the base color rule above,
+   so cascade picks tone over plain --text. */
+.v4-theme .ps-tone-up {
+  color: var(--green);
+}
+
+.v4-theme .ps-tone-down {
+  color: var(--red);
+}
+
+.v4-theme .ps-tone-zero {
+  color: var(--text-faint);
+}
+
+.v4-theme .ps-sg-headline-num.ps-tone-up {
+  text-shadow: 0 0 18px var(--green-glow);
+}
+
+.v4-theme .ps-sg-headline-num.ps-tone-down {
+  text-shadow: 0 0 18px var(--red-glow);
+}
+
+/* ── Rank quartile palette ────────────────────────────────────────
+   Field rank gets quartile-colored so the eye picks out "1st of 147"
+   vs "113th of 147" without parsing the number. Elite (top 3) gets
+   a pill background + bold weight so the leaderboard winner-marker
+   reads as a badge. */
+.v4-theme .ps-rank-elite {
+  color: var(--green);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.v4-theme .ps-sg-headline-rank.ps-rank-elite,
+.v4-theme .ps-stat-rank.ps-rank-elite,
+.v4-theme .ps-sg-bucket-rank.ps-rank-elite {
+  background: var(--green-soft);
+  border: 1px solid rgba(0, 217, 110, 0.4);
+  padding: 2px 8px;
+  border-radius: 999px;
+  box-shadow: 0 0 12px var(--green-glow);
+}
+
+.v4-theme .ps-rank-top {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.v4-theme .ps-rank-good {
+  color: rgba(0, 217, 110, 0.78);
+  font-weight: 600;
+}
+
+.v4-theme .ps-rank-mid {
+  color: var(--muted);
+}
+
+.v4-theme .ps-rank-low {
+  color: rgba(255, 75, 107, 0.7);
+  font-weight: 600;
+}
+
+.v4-theme .ps-rank-poor {
+  color: var(--red);
+  font-weight: 700;
+}
+
+/* When the advanced-grid stat NUMBER is colored by rank (no sign
+   to lean on), drop its glow weight a touch — these aren't hero
+   numbers, just rank-signaled values. */
+.v4-theme .pcard-stat-num.ps-rank-elite,
+.v4-theme .pcard-stat-num.ps-rank-top {
+  color: var(--green);
+  text-shadow: 0 0 10px var(--green-glow);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+  border-radius: 0;
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+
+.v4-theme .pcard-stat-num.ps-rank-poor,
+.v4-theme .pcard-stat-num.ps-rank-low {
+  color: var(--red);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
 }
 
 .v4-theme .ps-sg-headline-lbl,
@@ -12668,6 +12768,22 @@ body:has(.v4-theme) {
 
 .v4-theme .ps-round-breakdown li strong {
   color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tone classes need an extra specificity bump inside the round
+   breakdown — the base "li strong" rule above is otherwise more
+   specific than ".ps-tone-up" alone and the green/red would lose. */
+.v4-theme .ps-round-breakdown li strong.ps-tone-up {
+  color: var(--green);
+}
+
+.v4-theme .ps-round-breakdown li strong.ps-tone-down {
+  color: var(--red);
+}
+
+.v4-theme .ps-round-breakdown li strong.ps-tone-zero {
+  color: var(--text-faint);
 }
 
 /* Section titles inside the player page */
