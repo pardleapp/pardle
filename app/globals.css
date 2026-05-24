@@ -13424,3 +13424,241 @@ body:has(.v4-theme) {
   height: 16px;
   vertical-align: middle;
 }
+
+/* ── Course map ─────────────────────────────────────────────────────
+   /course — live view of every active player at the hole they're
+   currently playing. Two rows of 9, each hole a card carrying a
+   stack of player chips. Distinctive on-glance read of the whole
+   tournament; the only Pardle screen that surfaces all 144 players
+   simultaneously without scrolling. */
+.course-map {
+  padding: 0 0 80px;
+}
+
+.course-map-header {
+  padding: 6px 4px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.course-map-tournament {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: -0.01em;
+}
+
+.course-map-summary {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.course-map-row {
+  margin-bottom: 14px;
+}
+
+.course-map-row-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0 0 6px 4px;
+}
+
+.course-map-grid {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 4px;
+}
+
+@media (max-width: 720px) {
+  .course-map-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.course-hole {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 4px 4px;
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.course-hole-empty {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.04);
+}
+
+.course-hole-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0 2px;
+}
+
+.course-hole-num {
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--text);
+  letter-spacing: 0.04em;
+}
+
+.course-hole-par {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-faint);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.course-hole-players {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.course-hole-empty-dot {
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  margin: auto;
+}
+
+.course-player {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  text-decoration: none;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  min-height: 22px;
+}
+
+.course-player:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.course-player-up {
+  border-left: 2px solid var(--green);
+}
+
+.course-player-down {
+  border-left: 2px solid var(--red);
+}
+
+.course-player-even {
+  border-left: 2px solid var(--text-faint);
+}
+
+.course-player-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.course-player-total {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.course-player-up .course-player-total {
+  color: var(--green);
+}
+
+.course-player-down .course-player-total {
+  color: var(--red);
+}
+
+/* On small screens hide the avatar inside the chip — the name+total
+   are enough at this density and the avatars overflow the card. */
+@media (max-width: 720px) {
+  .course-player .pa,
+  .course-player .player-avatar {
+    display: none;
+  }
+}
+
+.course-strip {
+  margin-top: 18px;
+}
+
+.course-strip-title {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0 0 6px 4px;
+}
+
+.course-strip-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.course-strip-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.course-strip-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.course-strip-chip-name {
+  font-variant-numeric: tabular-nums;
+}
+
+.course-strip-chip-total {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.course-strip-chip.course-player-up .course-strip-chip-total {
+  color: var(--green);
+}
+
+.course-strip-chip.course-player-down .course-strip-chip-total {
+  color: var(--red);
+}
+
+.course-strip-done .course-strip-chip {
+  opacity: 0.72;
+}

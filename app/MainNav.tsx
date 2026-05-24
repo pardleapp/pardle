@@ -9,12 +9,18 @@
 
 import Link from "next/link";
 
-export type MainNavTab = "live" | "bets" | "leaderboard" | "games";
+export type MainNavTab =
+  | "live"
+  | "bets"
+  | "leaderboard"
+  | "course"
+  | "games";
 
 const TABS: Array<{ key: MainNavTab; href: string; label: string }> = [
   { key: "live", href: "/", label: "Feed" },
   { key: "bets", href: "/bets", label: "Bets" },
   { key: "leaderboard", href: "/leaderboard", label: "Leaderboard" },
+  { key: "course", href: "/course", label: "Course" },
   { key: "games", href: "/games", label: "Games" },
 ];
 
