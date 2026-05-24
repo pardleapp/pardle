@@ -461,7 +461,23 @@ async function handle(req: Request) {
     })),
   );
 
-  return NextResponse.json({
+  // Edge-cache hint to Vercel's CDN. Per-visitor cache key (URL
+   // includes ?v=<authorKey>), so this doesn't leak one user's
+   // myVote / myPuttIq overlay to another. Trade-off:
+   //   - s-maxage=2: edge can serve cached responses for 2s after
+   //     the function ran — matches the orchestrator's effective
+   //     freshness rate (we poll the upstream once per ~25s anyway)
+   //   - stale-while-revalidate=4: 2-6s window the edge serves
+   //     stale + revalidates in background, so the user never waits
+   //   - max-age=0: browsers still fetch every poll cycle (the SWR
+   //     game is at the edge, not in the browser)
+   // Net: function instance executes ~once per 5-6s per visitor
+   // instead of every 3s. Same UX, ~50% fewer cold compute hits.
+   const headers = {
+     "Cache-Control":
+       "public, s-maxage=2, stale-while-revalidate=4, max-age=0",
+   };
+   return NextResponse.json({
     tournament: {
       id: tournament.id,
       name: tournament.name,
@@ -548,7 +564,7 @@ async function handle(req: Request) {
           playerSgBreakdown,
         }
       : {}),
-  });
+  }, { headers });
 }
 
 /** Compact wire shape for one putt poll the client renders. */

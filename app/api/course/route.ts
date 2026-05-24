@@ -73,16 +73,28 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({
-    tournament: {
-      id: tournamentId,
-      name: active.tournament.name,
-      currentRound,
-      isLive: active.isLive,
+  return NextResponse.json(
+    {
+      tournament: {
+        id: tournamentId,
+        name: active.tournament.name,
+        currentRound,
+        isLive: active.isLive,
+      },
+      holes,
+      players,
     },
-    holes,
-    players,
-  });
+    {
+      // Same edge-cache hint as /api/feed — response is the same for
+      // every visitor (no per-user overlays here) so the edge can
+      // dedupe aggressively. Course-map polls at 6s on the client;
+      // s-maxage=3 + swr=6 means most polls hit the edge cache.
+      headers: {
+        "Cache-Control":
+          "public, s-maxage=3, stale-while-revalidate=6, max-age=0",
+      },
+    },
+  );
 }
 
 function pickActiveRound(
