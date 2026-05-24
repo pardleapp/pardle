@@ -160,6 +160,8 @@ export async function POST(req: Request) {
       endsAt: (s.endsAt ?? null)?.toLowerCase() ?? null,
       toHoleFeet: s.toHoleFeet ?? null,
       status: null,
+      fromLie: null,
+      club: null,
     };
     const verdict = classifyShot(parsed, s.shotNum, null);
     if (!verdict) continue;

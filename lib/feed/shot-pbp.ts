@@ -26,6 +26,14 @@ export interface ParsedShot {
   toHoleFeet: number | null;
   /** True when this is a pre-shot/post-round status, not an actual stroke. */
   status: "waiting" | "complete" | null;
+  /** Lie this shot was played FROM, lowercased, when the orchestrator
+   *  prefixes the pbp with "From rough, …" / "From bunker, …". Null
+   *  when the prefix wasn't present. */
+  fromLie: string | null;
+  /** Club used, normalised to title-case ("Driver", "7-iron", "Wedge",
+   *  "Putter"), when the orchestrator prefixes the pbp with the club.
+   *  Null when not present. */
+  club: string | null;
 }
 
 /** Match "X yds to <lie>". Captures the yardage and the lie text. */
@@ -34,6 +42,17 @@ const SHOT_RE = /(\d+)\s*yds?\s+to\s+([a-z][a-z\s]*?)(?:,|$)/i;
 const TO_HOLE_YDS_RE = /(\d+)\s*yds?\s+to\s+hole\b/i;
 const TO_HOLE_FT_RE = /(\d+)\s*ft(?:\s+(\d+)\s*in\.?)?\s+to\s+hole\b/i;
 
+/** "From rough, …" / "From left bunker, …" lead-in giving the lie the
+ *  shot was played from. Strip when present, return the lie. */
+const FROM_LIE_RE = /^from\s+([a-z][a-z\s]*?)\s*,\s*/i;
+
+/** Club-name lead-in. Matches the orchestrator's most common formats:
+ *    "Driver, …"  "3-wood, …"  "7 iron, …"  "Wedge, …"  "Hybrid, …"
+ *  Conservative — only matches a known club word, not arbitrary text,
+ *  so we don't mistake "Right green" or "Tee shot" for a club. */
+const CLUB_RE =
+  /^((?:Driver|3-wood|5-wood|7-wood|Wood|[2-9][- ]?iron|[2-9]\s*iron|[2-9]-?hybrid|Hybrid|PW|GW|SW|LW|Wedge|Putter))\s*,\s*/i;
+
 function normaliseLie(s: string): string {
   const t = s.trim().toLowerCase();
   // Strip directional qualifiers ("right green" → "green") since the
@@ -41,37 +60,79 @@ function normaliseLie(s: string): string {
   return t.replace(/^(left|right|center|centre)\s+/, "");
 }
 
+/** Normalise a club name to a consistent display form. */
+function normaliseClub(s: string): string {
+  const t = s.trim();
+  // Lowercase except first letter — "Driver" / "3-iron" / "Wedge"
+  if (/^[2-9]/.test(t)) {
+    // Numeric prefix: keep digit, lower-case the rest, collapse "7 iron" → "7-iron"
+    return t.toLowerCase().replace(/\s+/g, "-");
+  }
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+}
+
 export function parsePlayByPlay(pbp: string | null): ParsedShot | null {
   if (!pbp) return null;
   const text = pbp.trim();
   if (text === "Round Complete") {
-    return { shotYards: null, endsAt: null, toHoleFeet: null, status: "complete" };
+    return {
+      shotYards: null,
+      endsAt: null,
+      toHoleFeet: null,
+      status: "complete",
+      fromLie: null,
+      club: null,
+    };
   }
   if (/waiting to tee off/i.test(text) || /^at tee$/i.test(text)) {
-    return { shotYards: null, endsAt: null, toHoleFeet: null, status: "waiting" };
+    return {
+      shotYards: null,
+      endsAt: null,
+      toHoleFeet: null,
+      status: "waiting",
+      fromLie: null,
+      club: null,
+    };
+  }
+
+  // Strip optional "From <lie>," and "[Club]," lead-ins so the main
+  // shot regex sees the canonical "Xyds to Y" body. Order matters —
+  // both can appear, but "From" always comes first when present.
+  let body = text;
+  let fromLie: string | null = null;
+  const fromMatch = FROM_LIE_RE.exec(body);
+  if (fromMatch) {
+    fromLie = normaliseLie(fromMatch[1]);
+    body = body.slice(fromMatch[0].length);
+  }
+  let club: string | null = null;
+  const clubMatch = CLUB_RE.exec(body);
+  if (clubMatch) {
+    club = normaliseClub(clubMatch[1]);
+    body = body.slice(clubMatch[0].length);
   }
 
   let shotYards: number | null = null;
   let endsAt: string | null = null;
-  const m1 = SHOT_RE.exec(text);
+  const m1 = SHOT_RE.exec(body);
   if (m1) {
     shotYards = Number(m1[1]);
     endsAt = normaliseLie(m1[2]);
   }
 
   let toHoleFeet: number | null = null;
-  const ft = TO_HOLE_FT_RE.exec(text);
+  const ft = TO_HOLE_FT_RE.exec(body);
   if (ft) {
     const f = Number(ft[1]);
     const i = ft[2] ? Number(ft[2]) : 0;
     toHoleFeet = f + i / 12;
   } else {
-    const yds = TO_HOLE_YDS_RE.exec(text);
+    const yds = TO_HOLE_YDS_RE.exec(body);
     if (yds) toHoleFeet = Number(yds[1]) * 3;
   }
 
   if (shotYards === null && toHoleFeet === null) return null;
-  return { shotYards, endsAt, toHoleFeet, status: null };
+  return { shotYards, endsAt, toHoleFeet, status: null, fromLie, club };
 }
 
 export type ShotKind = "drive" | "stuffed" | "penalty";
@@ -113,11 +174,14 @@ export function classifyShot(
 ): ShotVerdict | null {
   if (parsed.status !== null) return null;
 
-  // Penalty / water: emit regardless of shot number.
+  // Penalty / water: emit regardless of shot number. Add club + from-lie
+  // detail only when present — "tugs a 7-iron from the rough into the
+  // water" is far more evocative than "finds the water".
   if (parsed.endsAt && PENALTY_LIES.has(parsed.endsAt)) {
+    const verdict = buildPenaltyVerdict(parsed);
     return {
       kind: "penalty",
-      verdict: `finds the ${parsed.endsAt}`,
+      verdict,
       emoji: "💦",
       lowlight: true,
       highlight: false,
@@ -148,7 +212,10 @@ export function classifyShot(
   }
 
   // Stuffed approach: not a tee shot, ball ends on the green inside
-  // 5 ft. The shot before a near-certain birdie/eagle look.
+  // 5 ft. The shot before a near-certain birdie/eagle look. Enrich
+  // with club + approach distance + from-lie when the orchestrator
+  // gave them to us — "stiffs a 192-yard 7-iron from the rough to
+  // 4 ft" is the DataGolf-level copy we're aiming for.
   if (
     shotNumber >= 2 &&
     parsed.endsAt === "green" &&
@@ -156,14 +223,13 @@ export function classifyShot(
     parsed.toHoleFeet > 0 &&
     parsed.toHoleFeet <= STUFFED_PROXIMITY_FT
   ) {
-    // Format remaining nicely: <= 1 ft → "inches", else "X ft".
     const dist =
       parsed.toHoleFeet < 1
         ? `${Math.round(parsed.toHoleFeet * 12)} in`
         : `${Math.round(parsed.toHoleFeet)} ft`;
     return {
       kind: "stuffed",
-      verdict: `stiffs an approach to ${dist}`,
+      verdict: buildStuffedVerdict(parsed, dist),
       emoji: "🎯",
       lowlight: false,
       highlight: true,
@@ -171,4 +237,48 @@ export function classifyShot(
   }
 
   return null;
+}
+
+/**
+ * "stiffs a [192-yard ][7-iron ]approach[ from the rough] to 4 ft".
+ * Each enrichment slot turns on independently when the orchestrator
+ * gave us the data — falls back to the original short form when none
+ * of the slots fired.
+ */
+function buildStuffedVerdict(parsed: ParsedShot, dist: string): string {
+  const yardBit =
+    parsed.shotYards != null && parsed.shotYards > 0
+      ? `${parsed.shotYards}-yard `
+      : "";
+  const clubBit = parsed.club ? `${parsed.club} ` : "";
+  // Fairway is the default lie — no need to call it out. Tee/rough/
+  // bunker/etc. add real colour to the moment.
+  const fromBit =
+    parsed.fromLie && parsed.fromLie !== "fairway"
+      ? ` from the ${parsed.fromLie}`
+      : "";
+  const noun = clubBit ? "approach" : `${yardBit}approach`;
+  // When club is known we want "stiffs an 8-iron approach" not "stiffs
+  // a 192-yard 8-iron approach" — the yardage adds little next to a
+  // named club. Keep yardage as fallback when club is unknown.
+  const subject = clubBit ? `a ${clubBit}approach` : `${yardBit}${noun}` || "an approach";
+  return `stiffs ${subject.trim()}${fromBit} to ${dist}`;
+}
+
+/**
+ * "tugs a [7-iron ][from the rough ]into the water" / fallback "finds
+ * the water". Penalty verdicts get verb variety when club is known —
+ * a Driver into hazard reads differently than a wedge.
+ */
+function buildPenaltyVerdict(parsed: ParsedShot): string {
+  if (!parsed.endsAt) return "finds trouble";
+  const clubBit = parsed.club ? ` ${parsed.club}` : "";
+  const fromBit =
+    parsed.fromLie && parsed.fromLie !== "fairway"
+      ? ` from the ${parsed.fromLie}`
+      : "";
+  if (clubBit) {
+    return `pushes a${clubBit}${fromBit} into the ${parsed.endsAt}`;
+  }
+  return `finds the ${parsed.endsAt}`;
 }
