@@ -20,6 +20,8 @@ import {
   formatImpactGbp,
   headlineImpactForEvent,
 } from "./bet-impact";
+import NotificationPrompt from "./notifications/NotificationPrompt";
+import { useNotifications } from "./notifications/useNotifications";
 import PlayerAvatar from "./PlayerAvatar";
 import PlayerSearch from "./PlayerSearch";
 import PuttPollWidget from "./PuttPollWidget";
@@ -273,6 +275,16 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       window.removeEventListener("focus", sync);
     };
   }, []);
+
+  // Mirror followed-players to the server so the notify-poll cron can
+  // address birdie/eagle/blow-up + putt-poll-open events to this
+  // device. Cheap when push isn't enabled (the hook returns early).
+  // Debounced via the effect tick — multiple rapid follow toggles
+  // collapse to one POST per render frame.
+  const { syncFollows } = useNotifications();
+  useEffect(() => {
+    void syncFollows(follows);
+  }, [follows, syncFollows]);
 
   // Tracked bets — refresh on mount, on tab focus (might have edited
   // bets on /bets in another tab), and on storage events. Drives
@@ -882,6 +894,12 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           </span>
         ))}
       </div>
+
+      <NotificationPrompt
+        betCount={trackedBets.length}
+        followCount={follows.length}
+        follows={follows}
+      />
 
       {/* Burst reaction bar — sticky at the bottom */}
       <div className="feed-burst-bar">

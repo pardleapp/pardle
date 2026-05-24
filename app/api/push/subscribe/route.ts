@@ -23,6 +23,12 @@ export async function POST(req: Request) {
     endpoint?: string;
     keys?: { p256dh?: string; auth?: string };
     expirationTime?: unknown;
+    /** Optional list of playerIds the device is following at the moment
+     *  of subscription. Lets the cron address followed-player events
+     *  (birdie, eagle, blow-up, putt-poll open) without needing a join
+     *  to a separate follows table. The client refreshes this via the
+     *  follows-sync endpoint when the user follows/unfollows later. */
+    follows?: string[];
   };
   try {
     body = await req.json();
@@ -38,6 +44,11 @@ export async function POST(req: Request) {
   }
 
   const ua = req.headers.get("user-agent") ?? null;
+  const follows = Array.isArray(body.follows)
+    ? body.follows
+        .filter((v): v is string => typeof v === "string" && v.length > 0)
+        .slice(0, 200)
+    : [];
 
   const { error } = await supabase
     .from("push_subscriptions")
@@ -49,6 +60,7 @@ export async function POST(req: Request) {
         auth_key: authKey,
         user_agent: ua,
         last_seen_at: new Date().toISOString(),
+        follows,
       },
       { onConflict: "endpoint" },
     );

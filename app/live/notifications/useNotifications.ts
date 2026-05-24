@@ -69,7 +69,9 @@ export function useNotifications() {
     void refresh();
   }, [refresh]);
 
-  const enable = useCallback(async (): Promise<boolean> => {
+  const enable = useCallback(async (
+    options?: { follows?: string[] },
+  ): Promise<boolean> => {
     if (typeof window === "undefined") return false;
     if (!VAPID_PUBLIC_KEY) {
       console.error("NEXT_PUBLIC_VAPID_PUBLIC_KEY missing");
@@ -106,11 +108,18 @@ export function useNotifications() {
         });
       }
 
-      // Send it server-side.
+      // Send it server-side. Includes the caller's current follows
+      // list so the cron can address followed-player events right
+      // away — no chicken-and-egg "subscribed but server doesn't
+      // know who you follow yet" window.
+      const subPayload: Record<string, unknown> = { ...sub.toJSON() };
+      if (Array.isArray(options?.follows)) {
+        subPayload.follows = options.follows;
+      }
       const res = await fetch("/api/push/subscribe", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(sub.toJSON()),
+        body: JSON.stringify(subPayload),
       });
       if (!res.ok) {
         setState({
@@ -136,6 +145,30 @@ export function useNotifications() {
     }
   }, []);
 
+  /**
+   * Sync the device's followed-players list to the server. Cheap to
+   * call — no-op when push isn't enabled. Use from a `useEffect` that
+   * watches the local follows state so a follow/unfollow propagates
+   * to the cron within seconds.
+   */
+  const syncFollows = useCallback(async (follows: string[]): Promise<void> => {
+    if (typeof window === "undefined") return;
+    try {
+      const reg = await navigator.serviceWorker.getRegistration("/sw.js");
+      const sub = reg ? await reg.pushManager.getSubscription() : null;
+      if (!sub) return;
+      await fetch("/api/push/follows", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ endpoint: sub.endpoint, follows }),
+      });
+    } catch {
+      // Sync is best-effort — the next subscribe call will rewrite the
+      // list anyway, and the cron just won't address this device for
+      // the latest follows until then.
+    }
+  }, []);
+
   const disable = useCallback(async (): Promise<void> => {
     if (typeof window === "undefined") return;
     setState((s) => ({ ...s, loading: true }));
@@ -157,5 +190,5 @@ export function useNotifications() {
     }
   }, []);
 
-  return { state, enable, disable, refresh };
+  return { state, enable, disable, refresh, syncFollows };
 }

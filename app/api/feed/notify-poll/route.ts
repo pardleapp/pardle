@@ -7,6 +7,8 @@ import {
 import { ensurePlayerSkill } from "@/lib/feed/skill-cache";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { sendPush, type SubscriptionLike } from "@/lib/notifications/web-push";
+import { abbreviateName } from "@/lib/text/abbreviate";
+import type { FeedEvent } from "@/lib/feed/types";
 import {
   currentValueForBet,
   detectBetSettlement,
@@ -49,6 +51,10 @@ export const maxDuration = 60;
 const SWING_PP = 15;
 const SWING_VALUE_REL = 0.4;
 const COOLDOWN_MS = 30 * 60 * 1000;
+/** Don't push events older than this when the cron catches a backlog.
+ *  A birdie 8 minutes old is a confusing notification — the user
+ *  already saw it (or didn't care). */
+const EVENT_PUSH_MAX_AGE_MS = 5 * 60 * 1000;
 const ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || "https://pardle.app";
 
 const gbp = new Intl.NumberFormat("en-GB", {
@@ -452,14 +458,134 @@ async function handle(req: Request) {
     }
   }
 
+  // ── Followed-player events ────────────────────────────────────────
+  // Birdies, eagles, blow-ups, and putt-poll opens for any player a
+  // subscribed device follows. Reuses the same web-push pipeline as
+  // the bet branch above. Throttled per subscription via
+  // last_notified_event_ts so we never re-push the same event ID.
+  let followNotified = 0;
+  const eventCutoff = Date.now() - EVENT_PUSH_MAX_AGE_MS;
+  const pushWorthy = (bundle.events ?? [])
+    .filter((e) => e.ts >= eventCutoff && isPushWorthyEvent(e))
+    .sort((a, b) => a.ts - b.ts);
+
+  if (pushWorthy.length > 0) {
+    // Use the `gt` filter on array_length(follows, 1) — Supabase JS
+    // can't express that, so we order/limit broadly and skip empties.
+    const { data: followSubs } = await admin
+      .from("push_subscriptions")
+      .select(
+        "id, user_id, endpoint, p256dh, auth_key, follows, last_notified_event_ts",
+      );
+
+    for (const sub of (followSubs ?? []) as Array<
+      SubscriptionLike & {
+        follows: string[] | null;
+        last_notified_event_ts: number | null;
+      }
+    >) {
+      const follows = sub.follows ?? [];
+      if (follows.length === 0) continue;
+      const followSet = new Set(follows);
+      const lastTs = sub.last_notified_event_ts ?? 0;
+      const matched = pushWorthy.filter(
+        (e) => e.ts > lastTs && followSet.has(e.playerId),
+      );
+      if (matched.length === 0) continue;
+
+      let maxTsSent = lastTs;
+      let pruned = false;
+      for (const ev of matched) {
+        const payload = buildEventPayload(ev);
+        const res = await sendPush(sub, payload);
+        if (res.gone) {
+          await admin.from("push_subscriptions").delete().eq("id", sub.id);
+          gonePruned++;
+          pruned = true;
+          break;
+        }
+        if (res.ok) {
+          followNotified++;
+          if (ev.ts > maxTsSent) maxTsSent = ev.ts;
+        }
+      }
+      if (!pruned && maxTsSent > lastTs) {
+        await admin
+          .from("push_subscriptions")
+          .update({ last_notified_event_ts: maxTsSent } as never)
+          .eq("id", sub.id);
+      }
+    }
+  }
+
   return NextResponse.json({
     polled: true,
     tournament: tournamentId,
     bets: rows.length,
     evaluated,
     notified,
+    followNotified,
     gonePruned,
   });
+}
+
+/**
+ * Score events worth waking a phone for: birdies+ and disasters+.
+ * Plus any putt-poll-open event (interactive moment — vote before
+ * the putt drops). Pars and bogeys are deliberately filtered out.
+ */
+function isPushWorthyEvent(e: FeedEvent): boolean {
+  if (e.ace) return true;
+  if (e.type === "score") {
+    return (
+      e.result === "albatross" ||
+      e.result === "eagle" ||
+      e.result === "birdie" ||
+      e.result === "double" ||
+      e.result === "triple-plus"
+    );
+  }
+  if (e.type === "putt-poll" && e.pollId) return true;
+  return false;
+}
+
+/**
+ * Convert a feed event into a push payload. Title carries the
+ * abbreviated player name + the result emoji; body is the action
+ * sentence with player-name prefix stripped (the title already
+ * showed it). `tag` collapses repeat pings for the same player so
+ * a four-birdie hot streak stays as one notification at a time.
+ */
+function buildEventPayload(e: FeedEvent): {
+  title: string;
+  body: string;
+  url: string;
+  tag: string;
+} {
+  const short = abbreviateName(e.playerName);
+  if (e.type === "putt-poll") {
+    const dist =
+      typeof e.puttDistanceFt === "number"
+        ? `${e.puttDistanceFt}ft `
+        : "";
+    const forWhat = e.puttFor ?? "putt";
+    return {
+      title: `🎯 ${short}`,
+      body: `${dist}for ${forWhat} — call it before it drops`,
+      url: `${ORIGIN}/`,
+      tag: `poll-${e.pollId ?? e.id}`,
+    };
+  }
+  const stripped = e.headline.startsWith(e.playerName)
+    ? e.headline.slice(e.playerName.length).trim()
+    : e.headline;
+  const trailer = e.toPar ? ` · R${e.round} ${e.toPar}` : ` · R${e.round}`;
+  return {
+    title: `${e.emoji} ${short}`,
+    body: `${stripped}${trailer}`,
+    url: `${ORIGIN}/live/player/${e.playerId}`,
+    tag: `player-${e.playerId}`,
+  };
 }
 
 // ──────────────────────────────────────────────────────────────────
