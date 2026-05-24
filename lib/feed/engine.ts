@@ -60,6 +60,7 @@ import {
   buildContextTags,
   playedInOrderForRound,
 } from "./event-context";
+import { seasonFormTag } from "./season-form";
 
 /** Player states we don't poll scorecards for. */
 const INACTIVE_STATES = new Set([
@@ -468,7 +469,14 @@ export async function pollAndDiff(
       streak,
       fieldRank: rankForEvent(ev),
     });
-    if (tags.length > 0) ev.tags = tags;
+    // Season-form chip is the editorial layer: "Coming off T-3" /
+    // "3 top-10s in 5 starts" / "Bouncing back from MC". Sits behind
+    // the position/streak chips on priority since those describe
+    // *this* moment, but rounds out the row when only one immediate
+    // tag has fired.
+    const seasonTag = seasonFormTag(ev.playerName);
+    if (seasonTag && !tags.includes(seasonTag)) tags.push(seasonTag);
+    if (tags.length > 0) ev.tags = tags.slice(0, 3);
   }
 
   // Order events so the "most interesting" land last (= top of feed
