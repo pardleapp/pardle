@@ -45,6 +45,15 @@ function reactionsKey(e: string) {
 function reactedKey(e: string, who: string) {
   return `feed:reacted:${e}:${who}`;
 }
+/** Sorted set per event of (authorKey → ts) — the timestamp each
+ *  unique reacter most recently reacted. Drives the "going off" hot
+ *  chip: ZCOUNT(reactionTsKey, now-60s, +inf) = distinct reacters in
+ *  the last minute. Kept short-lived (1h TTL) since hotness only
+ *  matters in the moments after an event lands. */
+function reactionTsKey(e: string) {
+  return `feed:reactts:${e}`;
+}
+const REACTION_TS_TTL = 60 * 60;
 function commentsKey(e: string) {
   return `feed:comments:${e}`;
 }
@@ -272,7 +281,39 @@ export async function react(
     await redis.hincrby(key, dir, 1);
   }
   await redis.set(marker, want, { ex: REACTED_TTL });
+  // Record the reaction timestamp for hot-chip velocity tracking.
+  // Use authorKey as member so re-reactions (down→up flip) update
+  // the same entry rather than double-counting one person as two
+  // reacters.
+  const tsKey = reactionTsKey(eventId);
+  await redis.zadd(tsKey, { score: Date.now(), member: authorKey });
+  await redis.expire(tsKey, REACTION_TS_TTL);
   return getReactions(eventId);
+}
+
+/**
+ * Bulk-count distinct reacters per event in the last `windowMs`. Used
+ * at /api/feed render time to inject the 🔥 hot chip on events where
+ * the engagement velocity has crossed a threshold. ZCOUNT is O(log n)
+ * per key, pipelined across all event ids in one round-trip.
+ */
+export async function getReactionVelocityBulk(
+  eventIds: string[],
+  windowMs: number,
+): Promise<Record<string, number>> {
+  if (eventIds.length === 0) return {};
+  const since = Date.now() - windowMs;
+  const pipe = redis.pipeline();
+  for (const id of eventIds) {
+    pipe.zcount(reactionTsKey(id), since, "+inf");
+  }
+  const res = (await pipe.exec()) as unknown[];
+  const out: Record<string, number> = {};
+  for (let i = 0; i < eventIds.length; i++) {
+    const v = res[i];
+    out[eventIds[i]] = typeof v === "number" ? v : 0;
+  }
+  return out;
 }
 
 // ──────────────────────────────────────────────────────────────────

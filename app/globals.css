@@ -13425,6 +13425,28 @@ body:has(.v4-theme) {
   vertical-align: middle;
 }
 
+/* "🔥 going off" hot chip — fires when an event is getting reacted
+   to FAST. Distinct pulsing-amber so the eye picks out the row
+   where the action is. Outshines the routine context chips. */
+.v4-theme .feed-tag-hot {
+  background: var(--amber-soft);
+  color: var(--amber);
+  border: 1px solid rgba(255, 157, 46, 0.4);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  box-shadow: 0 0 12px var(--amber-glow);
+  animation: feed-tag-hot-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes feed-tag-hot-pulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(255, 157, 46, 0.32);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(255, 157, 46, 0.55);
+  }
+}
+
 /* ── Course map ─────────────────────────────────────────────────────
    /course — live view of every active player at the hole they're
    currently playing. Two rows of 9, each hole a card carrying a

@@ -7,6 +7,7 @@ import {
   getCommentCountsBulk,
   getFeedBundle,
   getReactionsBulk,
+  getReactionVelocityBulk,
   markSeenToday,
   pushWinningScoreSnapshot,
   touchPresence,
@@ -320,8 +321,29 @@ async function handle(req: Request) {
     return { ...event, top10Before: b, top10After: a };
   };
 
+  // Reaction-velocity hot chip — fires on events getting reactions
+  // FAST (≥3 distinct reacters in the last 60s). Computed here at
+  // render time rather than baked at event-creation: hotness is a
+  // moving target and the same event may go hot then cool off again,
+  // so it's never persisted on the event itself.
+  const HOT_WINDOW_MS = 60 * 1000;
+  const HOT_THRESHOLD = 3;
+  const velocities = await getReactionVelocityBulk(ids, HOT_WINDOW_MS);
+  const attachHotChip = (event: FeedRow["event"]): FeedRow["event"] => {
+    const v = velocities[event.id] ?? 0;
+    if (v < HOT_THRESHOLD) return event;
+    const tags = event.tags ? [...event.tags] : [];
+    if (tags.some((t) => t.startsWith("🔥 going off"))) return event;
+    // Hot chip leads — it's the strongest "look at me" signal. Other
+    // chips slide back behind it but the cap stays at 3 visible.
+    return {
+      ...event,
+      tags: [`🔥 going off · ${v}`, ...tags].slice(0, 3),
+    };
+  };
+
   const toRow = (event: FeedRow["event"]): FeedRow => ({
-    event: attachTop10Shift(attachOdds(event)),
+    event: attachHotChip(attachTop10Shift(attachOdds(event))),
     reactions: reactions[event.id] ?? { up: 0, down: 0 },
     commentCount: commentCounts[event.id] ?? 0,
   });

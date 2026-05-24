@@ -776,8 +776,16 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                         ) {
                           continue;
                         }
+                        // "🔥 going off" hot chip gets a distinct
+                        // pulsing-orange treatment so the "look at me"
+                        // signal lands at a glance vs the muted green
+                        // of routine context chips.
+                        const isHot = t.startsWith("🔥 going off");
                         chips.push(
-                          <span key={`tag-${t}`} className="feed-tag">
+                          <span
+                            key={`tag-${t}`}
+                            className={`feed-tag${isHot ? " feed-tag-hot" : ""}`}
+                          >
                             {t}
                           </span>,
                         );
