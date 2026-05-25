@@ -1,0 +1,59 @@
+name: Refresh season-rounds.json
+
+# Re-builds lib/data/season-rounds.json from DataGolf every Tuesday
+# (after Monday's tournaments have finished settling) and commits
+# the result back to main if anything changed. Vercel auto-deploys
+# on the new commit, so the richer season-form chips stay current
+# with no human in the loop.
+#
+# Also runs on manual trigger from the Actions tab — useful when
+# we ship a code change to the chip-picker and want fresh data
+# without waiting for Tuesday.
+
+on:
+  schedule:
+    # 06:00 UTC every Tuesday = 07:00 UK / 02:00 ET. After the
+    # last weekend-rolling event has settled but before US morning
+    # traffic.
+    - cron: "0 6 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build season-rounds
+        env:
+          DATAGOLF_API_KEY: ${{ secrets.DATAGOLF_API_KEY }}
+        run: node scripts/build-season-rounds.mjs
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet lib/data/season-rounds.json; then
+            echo "No changes — skipping commit."
+            exit 0
+          fi
+          git config user.name "pardle-bot"
+          git config user.email "bot@pardle.app"
+          git add lib/data/season-rounds.json
+          PLAYERS=$(node -e "const d=require('./lib/data/season-rounds.json'); console.log(Object.keys(d).length)")
+          ROUNDS=$(node -e "const d=require('./lib/data/season-rounds.json'); let n=0; for (const v of Object.values(d)) n+=v.rounds.length; console.log(n)")
+          git commit -m "chore(data): refresh season-rounds.json (${PLAYERS} players · ${ROUNDS} rounds)"
+          git push
