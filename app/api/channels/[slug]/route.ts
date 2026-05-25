@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { getActiveTournament } from "@/lib/golf-api/pgatour";
+import { getUserStats } from "@/lib/feed/putt-iq";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +30,9 @@ export async function GET(
 
   const { data: channel, error } = await supabase
     .from("channels")
-    .select("id, slug, name, owner_id, bio, is_public, invite_code, created_at")
+    .select(
+      "id, slug, name, owner_id, bio, is_public, invite_code, owner_author_key, created_at",
+    )
     .eq("slug", slug.toLowerCase())
     .maybeSingle();
   if (error) {
@@ -73,6 +77,40 @@ export async function GET(
   // Hide invite code from non-owners.
   const showInviteCode = viewer?.isOwner === true;
 
+  // Putt-IQ credibility chip: owner's accuracy/streak as a public-
+  // facing trust signal. Only fires once the owner has cast at least
+  // one putt-poll vote AND has linked their cookie via the
+  // author-key endpoint. Falls back silently when either is missing.
+  let ownerPuttIq: {
+    total: number;
+    correct: number;
+    accuracy: number;
+    currentStreak: number;
+    tournamentRank: number | null;
+    tournamentTotal: number;
+    tournamentCorrect: number;
+  } | null = null;
+  const ownerAuthorKey = (channel as { owner_author_key?: string | null })
+    .owner_author_key;
+  if (ownerAuthorKey) {
+    const active = await getActiveTournament().catch(() => null);
+    const stats = await getUserStats(
+      ownerAuthorKey,
+      active?.tournament.id,
+    ).catch(() => null);
+    if (stats && stats.total > 0) {
+      ownerPuttIq = {
+        total: stats.total,
+        correct: stats.correct,
+        accuracy: stats.total > 0 ? stats.correct / stats.total : 0,
+        currentStreak: stats.currentStreak,
+        tournamentRank: stats.tournamentRank ?? null,
+        tournamentTotal: stats.tournament?.total ?? 0,
+        tournamentCorrect: stats.tournament?.correct ?? 0,
+      };
+    }
+  }
+
   return NextResponse.json({
     channel: {
       id: channel.id,
@@ -83,6 +121,7 @@ export async function GET(
       isPublic: channel.is_public,
       inviteCode: showInviteCode ? channel.invite_code : undefined,
       createdAt: channel.created_at,
+      ownerPuttIq,
     },
     followerCount: followerCount ?? 0,
     viewer,

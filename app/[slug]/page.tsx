@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { BRAND } from "@/lib/brand";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { isReservedSlug } from "@/lib/channels/reserved-slugs";
+import { getActiveTournament } from "@/lib/golf-api/pgatour";
+import { getUserStats } from "@/lib/feed/putt-iq";
 import TipsterPageClient from "./TipsterPageClient";
 
 interface PageProps {
@@ -19,7 +21,9 @@ async function fetchChannel(slug: string) {
 
   const { data: channel } = await supabase
     .from("channels")
-    .select("id, slug, name, owner_id, bio, is_public, invite_code, created_at")
+    .select(
+      "id, slug, name, owner_id, bio, is_public, invite_code, owner_author_key, created_at",
+    )
     .eq("slug", slug.toLowerCase())
     .maybeSingle();
   if (!channel) return null;
@@ -49,6 +53,40 @@ async function fetchChannel(slug: string) {
     };
   }
 
+  // Owner credibility chip: fetch their accumulated Putt-IQ stats
+  // keyed by the cookie authorKey they linked on a prior page load.
+  // Skips silently when the link isn't there yet or the owner hasn't
+  // voted on a single poll.
+  const ownerAuthorKey =
+    (channel as { owner_author_key?: string | null }).owner_author_key ?? null;
+  let ownerPuttIq: {
+    total: number;
+    correct: number;
+    accuracy: number;
+    currentStreak: number;
+    tournamentRank: number | null;
+    tournamentTotal: number;
+    tournamentCorrect: number;
+  } | null = null;
+  if (ownerAuthorKey) {
+    const active = await getActiveTournament().catch(() => null);
+    const stats = await getUserStats(
+      ownerAuthorKey,
+      active?.tournament.id,
+    ).catch(() => null);
+    if (stats && stats.total > 0) {
+      ownerPuttIq = {
+        total: stats.total,
+        correct: stats.correct,
+        accuracy: stats.total > 0 ? stats.correct / stats.total : 0,
+        currentStreak: stats.currentStreak,
+        tournamentRank: stats.tournamentRank ?? null,
+        tournamentTotal: stats.tournament?.total ?? 0,
+        tournamentCorrect: stats.tournament?.correct ?? 0,
+      };
+    }
+  }
+
   return {
     id: channel.id as string,
     slug: channel.slug as string,
@@ -60,6 +98,7 @@ async function fetchChannel(slug: string) {
       ? (channel.invite_code as string)
       : undefined,
     followerCount: followerCount ?? 0,
+    ownerPuttIq,
     viewer,
   };
 }

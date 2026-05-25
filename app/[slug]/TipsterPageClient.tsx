@@ -5,6 +5,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/app/live/auth/useAuth";
 import FeedClient from "@/app/live/FeedClient";
 
+interface OwnerPuttIq {
+  total: number;
+  correct: number;
+  accuracy: number;
+  currentStreak: number;
+  tournamentRank: number | null;
+  tournamentTotal: number;
+  tournamentCorrect: number;
+}
+
 interface ChannelView {
   id: string;
   slug: string;
@@ -14,12 +24,18 @@ interface ChannelView {
   isPublic: boolean;
   inviteCode?: string;
   followerCount: number;
+  /** Owner's putt-prediction accuracy / streak as a credibility chip.
+   *  Null when the owner hasn't linked their authorKey or hasn't
+   *  voted on a single poll yet. */
+  ownerPuttIq: OwnerPuttIq | null;
   viewer: {
     isOwner: boolean;
     isFollower: boolean;
     notifyOnNewTip: boolean;
   } | null;
 }
+
+const AUTHOR_KEY_STORAGE = "pardle_feed_author";
 
 interface Tip {
   id: string;
@@ -103,6 +119,25 @@ export default function TipsterPageClient({
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
 
   const isMember = channel.viewer?.isOwner || channel.viewer?.isFollower;
+
+  // Owner-only: sync the visitor's cookie-based authorKey to the
+  // channel row so the channel page can surface PuttIQ stats as a
+  // credibility chip. No-op when the viewer isn't the owner. Fires
+  // once on mount and any time the cookie changes between renders.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!channel.viewer?.isOwner) return;
+    const authorKey = window.localStorage.getItem(AUTHOR_KEY_STORAGE);
+    if (!authorKey || authorKey.length < 8) return;
+    // Skip if the server already has this key — saves the round-trip.
+    // (We can't read owner_author_key here, so we cheap-out and just
+    // POST once per page load — the endpoint is idempotent.)
+    void fetch(`/api/channels/${channel.slug}/author-key`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ authorKey }),
+    });
+  }, [channel.slug, channel.viewer?.isOwner]);
 
   const reload = useCallback(async () => {
     if (!isMember) {
@@ -289,6 +324,7 @@ export default function TipsterPageClient({
             {channel.followerCount === 1 ? "follower" : "followers"} ·{" "}
             {channel.isPublic ? "Public" : "Invite only"}
           </p>
+          <OwnerPuttIqChip stats={channel.ownerPuttIq} />
         </div>
         <div className="tipster-header-actions">
           {authLoading ? null : !user ? (
@@ -485,5 +521,39 @@ export default function TipsterPageClient({
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * "Putt IQ: 12/18 · 67% · 🔥 4 · #3" — the tipster's putt-prediction
+ * credibility chip. Sits under the bio next to follower count.
+ * Renders nothing when the owner hasn't voted on a poll yet OR when
+ * the owner-authorKey link hasn't been established (see the sync
+ * effect above).
+ */
+function OwnerPuttIqChip({ stats }: { stats: OwnerPuttIq | null }) {
+  if (!stats || stats.total === 0) return null;
+  const acc = Math.round(stats.accuracy * 100);
+  const useTournament =
+    stats.tournamentTotal > 0 ? stats.tournamentTotal : null;
+  const num = useTournament
+    ? `${stats.tournamentCorrect}/${stats.tournamentTotal}`
+    : `${stats.correct}/${stats.total}`;
+  return (
+    <div className="tipster-puttiq" aria-label="Putt prediction accuracy">
+      <span className="tipster-puttiq-label">Putt IQ</span>
+      <span className="tipster-puttiq-num">{num}</span>
+      <span className="tipster-puttiq-acc">{acc}%</span>
+      {stats.currentStreak >= 2 && (
+        <span className="tipster-puttiq-streak" title={`${stats.currentStreak} correct in a row`}>
+          🔥 {stats.currentStreak}
+        </span>
+      )}
+      {typeof stats.tournamentRank === "number" && (
+        <span className="tipster-puttiq-rank" title="Tournament rank">
+          #{stats.tournamentRank}
+        </span>
+      )}
+    </div>
   );
 }

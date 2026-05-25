@@ -10408,6 +10408,52 @@ html, body {
   text-transform: uppercase;
 }
 
+/* Tipster putt-IQ credibility chip — sits below the follower-count
+   line. The whole row's a single pill split into label + figures so
+   the tipster's prediction accuracy reads at a glance alongside any
+   bet PnL. Mirrors the header PuttIqChip styling from the live feed
+   but flat / non-clickable here. */
+.tipster-puttiq {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 6px 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 999px;
+  background: rgba(0, 217, 110, 0.08);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.tipster-puttiq-label {
+  color: var(--green, #00d96e);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+}
+
+.tipster-puttiq-num {
+  color: var(--text);
+}
+
+.tipster-puttiq-acc {
+  color: var(--green, #00d96e);
+}
+
+.tipster-puttiq-streak {
+  color: var(--amber, #ff9d2e);
+}
+
+.tipster-puttiq-rank {
+  color: var(--muted);
+  border-left: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  padding-left: 8px;
+}
+
 .tipster-header-actions {
   flex-shrink: 0;
 }
