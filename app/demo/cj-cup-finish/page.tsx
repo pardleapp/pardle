@@ -36,10 +36,10 @@ interface DemoEvent {
 }
 
 const BET = {
-  stake: 25,
-  oddsTaken: 9.0,
-  oddsLabel: "+800",
-  payout: 25 * 9.0,
+  stake: 100,
+  oddsTaken: 50.0,
+  oddsLabel: "+4900",
+  payout: 100 * 50.0,
 };
 
 const PLAYER_ID = "51766";
@@ -57,7 +57,7 @@ const EVENTS: DemoEvent[] = [
     strokes: 3,
     scoreToParAfter: "−26",
     tags: ["1-shot lead"],
-    deltaValue: 2.2,
+    deltaValue: 50,
     deltaPct: 1.0,
     minsAgo: 240,
   },
@@ -68,8 +68,8 @@ const EVENTS: DemoEvent[] = [
     strokes: 3,
     scoreToParAfter: "−27",
     tags: ["3-shot lead", "5th birdie of round"],
-    deltaValue: 4.3,
-    deltaPct: 1.9,
+    deltaValue: 100,
+    deltaPct: 2.0,
     minsAgo: 105,
   },
   {
@@ -79,8 +79,8 @@ const EVENTS: DemoEvent[] = [
     strokes: 3,
     scoreToParAfter: "−29",
     tags: ["5-shot lead", "Eagle on 12"],
-    deltaValue: 27.0,
-    deltaPct: 12.0,
+    deltaValue: 750,
+    deltaPct: 15.0,
     minsAgo: 88,
   },
   {
@@ -90,8 +90,8 @@ const EVENTS: DemoEvent[] = [
     strokes: 3,
     scoreToParAfter: "−30",
     tags: ["6-shot lead"],
-    deltaValue: 6.8,
-    deltaPct: 3.0,
+    deltaValue: 200,
+    deltaPct: 4.0,
     minsAgo: 70,
   },
   {
@@ -102,8 +102,8 @@ const EVENTS: DemoEvent[] = [
     scoreToParAfter: "−31",
     action: "Drains a 44 ft 8 in. putt for birdie",
     tags: ["7-shot lead", "Longest putt of week"],
-    deltaValue: 11.2,
-    deltaPct: 5.0,
+    deltaValue: 350,
+    deltaPct: 7.0,
     minsAgo: 55,
   },
   {
@@ -112,9 +112,9 @@ const EVENTS: DemoEvent[] = [
     par: 4,
     strokes: 3,
     scoreToParAfter: "−30",
-    tags: ["Field cannot catch", "Cruise control"],
-    deltaValue: 9.0,
-    deltaPct: 4.0,
+    tags: ["Field cannot catch"],
+    deltaValue: 150,
+    deltaPct: 3.0,
     minsAgo: 25,
   },
   {
@@ -123,9 +123,9 @@ const EVENTS: DemoEvent[] = [
     par: 4,
     strokes: 3,
     scoreToParAfter: "−30",
-    tags: ["WINNER"],
-    deltaValue: 27.5,
-    deltaPct: 12.2,
+    tags: ["WINNER · £5,000 paid"],
+    deltaValue: 100,
+    deltaPct: 2.0,
     minsAgo: 5,
   },
 ];
