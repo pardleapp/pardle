@@ -104,7 +104,7 @@ export default async function OpengraphImage() {
               letterSpacing: -0.5,
             }}
           >
-            Eagle on 12 · 44-foot birdie on 15 · 7-shot win
+            Eagle on 12 · 44-foot birdie on 15 · Wins by 3
           </div>
         </div>
 

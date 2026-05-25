@@ -22,22 +22,22 @@ interface Beat {
 }
 
 const BEATS: Beat[] = [
-  { t: 1200, hole: 6, result: "birdie", par: 4, scoreToParAfter: "−26", tag: "1-shot lead", delta: 50 },
-  { t: 2600, hole: 11, result: "birdie", par: 4, scoreToParAfter: "−27", tag: "3-shot lead", delta: 100 },
-  { t: 4000, hole: 12, result: "eagle", par: 5, scoreToParAfter: "−29", tag: "Eagle on 12", delta: 750, hero: true },
-  { t: 6000, hole: 14, result: "birdie", par: 4, scoreToParAfter: "−30", tag: "6-shot lead", delta: 200 },
+  { t: 1200, hole: 6, result: "birdie", par: 4, scoreToParAfter: "−23", tag: "Extends the lead", delta: 50 },
+  { t: 2600, hole: 11, result: "birdie", par: 4, scoreToParAfter: "−24", tag: "Pulling away", delta: 100 },
+  { t: 4000, hole: 12, result: "eagle", par: 5, scoreToParAfter: "−26", tag: "Eagle on 12", delta: 750, hero: true },
+  { t: 6000, hole: 14, result: "birdie", par: 4, scoreToParAfter: "−27", tag: "Field can't catch him", delta: 200 },
   {
     t: 7600,
     hole: 15,
     result: "birdie",
     par: 4,
-    scoreToParAfter: "−31",
+    scoreToParAfter: "−28",
     action: "Drains a 44 ft 8 in. putt for birdie",
     tag: "Longest putt of week",
     delta: 350,
     hero: true,
   },
-  { t: 9400, hole: 17, result: "birdie", par: 4, scoreToParAfter: "−30", tag: "Cruise control", delta: 150 },
+  { t: 9400, hole: 17, result: "birdie", par: 4, scoreToParAfter: "−29", tag: "Cruise control", delta: 150 },
   { t: 10800, hole: 18, result: "birdie", par: 4, scoreToParAfter: "−30", tag: "WINNER · £5,000 paid", delta: 100, hero: true },
 ];
 
