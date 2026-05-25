@@ -110,6 +110,25 @@ function newEventId(ts: number): string {
   return `${ts}-${eventCounter.toString(36)}`;
 }
 
+/** Parse the orchestrator's to-par display string ("-3" / "E" / "+5")
+ *  into a signed number. Returns null when the string isn't parseable. */
+function parseTotalToParNum(s: string | undefined | null): number | null {
+  if (!s) return null;
+  const t = s.trim();
+  if (!t) return null;
+  if (t === "E" || t === "0") return 0;
+  // Handles both "-3" and "+5"; Number("+5") === 5.
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Inverse of parseTotalToParNum — "-3" / "E" / "+5". */
+function formatToParNum(n: number): string {
+  if (n === 0) return "E";
+  if (n > 0) return `+${n}`;
+  return String(n);
+}
+
 export interface PollResult {
   newEvents: FeedEvent[];
   /** True when this was the first poll (snapshot seeded, no events). */
@@ -451,17 +470,89 @@ export async function pollAndDiff(
     return { count: myCount, strictlyMore, tiedWith };
   }
 
+  // Pre-compute the per-player+round play-order with strokes/par detail
+  // so each event can have its tags + toPar baked AS OF that event's
+  // hole, not as of the final scorecard state. Without this, multiple
+  // birdies detected in a single poll cycle all read "Nth birdie of
+  // the round" with the same N (the final count) and the same
+  // tournament-total to-par.
+  interface PlayedEntry {
+    holeNumber: number;
+    result: ScoreResult;
+    strokes: number;
+    par: number;
+  }
+  const orderByKey = new Map<string, PlayedEntry[]>();
+  const buildOrderFor = (pid: string, round: number): PlayedEntry[] => {
+    const sc = scorecards[pid];
+    if (!sc) return [];
+    const holes = sc.rounds[round];
+    if (!holes) return [];
+    const holesScored: Record<number, string> = {};
+    const pars: Record<number, number> = {};
+    for (const h of holes) {
+      holesScored[h.holeNumber] = h.score;
+      pars[h.holeNumber] = h.par;
+    }
+    const order = playedInOrderForRound(
+      holesScored,
+      pars,
+      thruByPid.get(pid),
+    );
+    return order
+      .map((h) => {
+        const strokes = Number(holesScored[h.holeNumber]);
+        const par = pars[h.holeNumber];
+        if (!Number.isFinite(strokes) || !par) return null;
+        return { ...h, strokes, par };
+      })
+      .filter((x): x is PlayedEntry => x !== null);
+  };
+
   for (const ev of events) {
     const freshPos = positionByPid.get(ev.playerId);
     const prevPos = prev.positions[ev.playerId];
     let streak: ReturnType<typeof streakInputsFor> = null;
-    if (ev.type === "score" && ev.round != null) {
-      streak = streakInputsFor(
-        scorecards[ev.playerId],
-        ev.round,
-        thruByPid.get(ev.playerId),
-        ev.result ?? null,
-      );
+    if (ev.type === "score" && ev.round != null && ev.hole != null) {
+      const key = `${ev.playerId}:${ev.round}`;
+      let order = orderByKey.get(key);
+      if (!order) {
+        order = buildOrderFor(ev.playerId, ev.round);
+        orderByKey.set(key, order);
+      }
+      const idx = order.findIndex((h) => h.holeNumber === ev.hole);
+      if (idx >= 0) {
+        // Streak input only sees holes played up to and including this
+        // event's hole — so withinRoundTag emits "3rd birdie" for the
+        // 3rd, "4th" for the 4th, even when both landed in the same poll.
+        streak = {
+          playedInOrder: order.slice(0, idx + 1),
+          freshResult: ev.result ?? null,
+        };
+        // Adjust the baked toPar to subtract the score contributions of
+        // any later-in-play-order holes that also landed this poll cycle.
+        // (totalById is the current cumulative; later strokes-vs-par
+        // would still be "in" that number, so we unwind them.)
+        const currentTotalStr = totalById.get(ev.playerId);
+        const currentTotal = parseTotalToParNum(currentTotalStr);
+        if (currentTotal != null) {
+          let laterDiff = 0;
+          for (let i = idx + 1; i < order.length; i++) {
+            laterDiff += order[i].strokes - order[i].par;
+          }
+          ev.toPar = formatToParNum(currentTotal - laterDiff);
+        }
+      } else {
+        // Fallback when the hole isn't yet visible in the scorecard
+        // (defensive — shouldn't happen because the event was created
+        // from the same diff that updated the snapshot).
+        streak = streakInputsFor(
+          scorecards[ev.playerId],
+          ev.round,
+          thruByPid.get(ev.playerId),
+          ev.result ?? null,
+        );
+      }
     }
     const tags = buildContextTags({
       prevPosition: prevPos,
