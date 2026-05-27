@@ -191,9 +191,14 @@ export async function PATCH(
     patch.is_public = body.isPublic;
   }
   if (regenerate) {
-    // Postgres-side: substr(md5(random()::text), 1, 10) — 10 char hex.
-    patch.invite_code = Array.from({ length: 10 }, () =>
-      Math.floor(Math.random() * 16).toString(16),
+    // 16 hex chars = 64 bits of crypto-strong entropy. Was 10 chars
+    // of Math.random() — 40 bits of non-cryptographic PRNG output,
+    // which a determined attacker could brute force or predict to
+    // join private tipster channels.
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+    patch.invite_code = Array.from(bytes, (b) =>
+      b.toString(16).padStart(2, "0"),
     ).join("");
   }
   if (Object.keys(patch).length === 0) {

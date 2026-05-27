@@ -51,6 +51,15 @@ export async function POST(req: Request) {
     );
   }
 
+  // Crypto-strong invite code, overriding the Postgres column's
+  // default of substr(md5(random()::text), 1, 10) which uses a
+  // non-cryptographic PRNG. 16 hex chars = 64 bits.
+  const inviteBytes = new Uint8Array(8);
+  crypto.getRandomValues(inviteBytes);
+  const inviteCode = Array.from(inviteBytes, (b) =>
+    b.toString(16).padStart(2, "0"),
+  ).join("");
+
   // Insert the channel. RLS enforces owner_id = auth.uid() via the
   // "channels: owner inserts own" policy.
   const { data: created, error: insertErr } = await supabase
@@ -61,6 +70,7 @@ export async function POST(req: Request) {
       owner_id: user.id,
       bio: body.bio?.trim() ? body.bio.trim() : null,
       is_public: !!body.isPublic,
+      invite_code: inviteCode,
     })
     .select("id, slug, name, owner_id, bio, is_public, invite_code, created_at")
     .single();

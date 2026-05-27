@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
+import { Redis } from "@upstash/redis";
 import { getSupabaseServer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+const redis = Redis.fromEnv();
+/** One chat message per user per channel per N seconds. Matches the
+ *  feed-comment rate limit so a single follower can't flood a
+ *  tipster's chat during a live moment. */
+const CHAT_RATE_SECONDS = 4;
 
 /**
  * GET /api/channels/[slug]/messages
@@ -61,6 +68,22 @@ export async function POST(
     .maybeSingle();
   if (!channel) {
     return NextResponse.json({ error: "not-found" }, { status: 404 });
+  }
+
+  // Per-user-per-channel chat rate limit. Mirrors feed/comment.
+  const rateOk = await redis.set(
+    `chan:chat-rate:${user.id}:${channel.id}`,
+    "1",
+    { nx: true, ex: CHAT_RATE_SECONDS },
+  );
+  if (rateOk !== "OK") {
+    return NextResponse.json(
+      {
+        error: "slow-down",
+        reason: "You're posting too fast — give it a few seconds.",
+      },
+      { status: 429 },
+    );
   }
 
   const { data: inserted, error: insertErr } = await supabase

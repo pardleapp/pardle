@@ -3,6 +3,88 @@ import { getSupabaseServer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+/** Reasonable bounds for the per-bet numbers we persist. Stake is
+ *  capped well above what a friends-launch user could realistically
+ *  type but well below "obvious garbage". Odds and line ranges are
+ *  picked to be inclusive of every real market we surface. */
+const MAX_STAKE = 100_000;
+const MAX_ODDS = 1_000;
+const MAX_LINE = 400; // covers winning-score totals + per-round lines
+const VALID_KINDS = new Set([
+  "outright",
+  "round-score",
+  "winning-score",
+  "top-finish",
+]);
+const VALID_SIDES = new Set(["under", "over"]);
+const VALID_TOP_CUTOFFS = new Set([5, 10, 20]);
+const PLAYER_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+
+function isPositiveNumberInRange(
+  v: unknown,
+  min: number,
+  max: number,
+): v is number {
+  return typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+}
+
+function isOptString(v: unknown, max = 200): v is string | undefined {
+  return v === undefined || (typeof v === "string" && v.length <= max);
+}
+
+/** Validate every field we'll persist. Returns null on success or a
+ *  short reason string for the 400 response. Errs on the strict side
+ *  — a real client whose validation matches ours will never hit this
+ *  branch; an attacker hand-rolling the JSON will. */
+function validateBet(bet: Record<string, unknown>): string | null {
+  const { id, kind, placedAt, stake, oddsTaken, oddsTakenLabel } = bet;
+  if (typeof id !== "string" || !ID_RE.test(id)) return "bad-id";
+  if (typeof kind !== "string" || !VALID_KINDS.has(kind)) return "bad-kind";
+  if (
+    typeof placedAt !== "number" ||
+    !Number.isFinite(placedAt) ||
+    placedAt < 0 ||
+    placedAt > Date.now() + 60_000
+  ) {
+    return "bad-placedAt";
+  }
+  if (!isPositiveNumberInRange(stake, 0.01, MAX_STAKE)) return "bad-stake";
+  if (!isPositiveNumberInRange(oddsTaken, 1, MAX_ODDS)) return "bad-oddsTaken";
+  if (!isOptString(oddsTakenLabel, 32)) return "bad-oddsTakenLabel";
+
+  if (kind === "outright" || kind === "round-score" || kind === "top-finish") {
+    const playerId = bet.playerId;
+    if (typeof playerId !== "string" || !PLAYER_ID_RE.test(playerId)) {
+      return "bad-playerId";
+    }
+    if (!isOptString(bet.playerName, 80)) return "bad-playerName";
+  }
+  if (kind === "round-score") {
+    if (
+      bet.round !== null &&
+      !(typeof bet.round === "number" && Number.isInteger(bet.round) && bet.round >= 1 && bet.round <= 4)
+    ) {
+      return "bad-round";
+    }
+    if (typeof bet.side !== "string" || !VALID_SIDES.has(bet.side)) return "bad-side";
+    if (!isPositiveNumberInRange(bet.line, 50, 130)) return "bad-line";
+  }
+  if (kind === "winning-score") {
+    if (typeof bet.side !== "string" || !VALID_SIDES.has(bet.side)) return "bad-side";
+    if (!isPositiveNumberInRange(bet.line, 200, MAX_LINE)) return "bad-line";
+  }
+  if (kind === "top-finish") {
+    if (
+      typeof bet.cutoff !== "number" ||
+      !VALID_TOP_CUTOFFS.has(bet.cutoff)
+    ) {
+      return "bad-cutoff";
+    }
+  }
+  return null;
+}
+
 /**
  * GET /api/bets — list the signed-in user's bets (active only).
  */
@@ -64,30 +146,39 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "bad-json" }, { status: 400 });
   }
-  const id = bet.id;
-  const kind = bet.kind;
-  const placedAt = bet.placedAt;
-  if (
-    typeof id !== "string" ||
-    typeof kind !== "string" ||
-    typeof placedAt !== "number" ||
-    !["outright", "round-score", "winning-score", "top-finish"].includes(kind)
-  ) {
-    return NextResponse.json({ error: "invalid-bet" }, { status: 400 });
+
+  // Per-kind field validation. The bets table stores `data` as JSONB
+  // and is read back verbatim in many places (community-backing chip,
+  // Sharp Score, share view, PnL chart) — so a malformed POST flows
+  // into the rest of the product. Reject anything that doesn't match
+  // a realistic bet shape.
+  const validationError = validateBet(bet);
+  if (validationError) {
+    return NextResponse.json(
+      { error: "invalid-bet", reason: validationError },
+      { status: 400 },
+    );
   }
-  // Cookie authorKey used for Sharp Score attribution. Stored on
-  // the row (not embedded in the JSON blob) so the settle path can
-  // look it up via a column index instead of parsing every bet.
+  const id = bet.id as string;
+  const kind = bet.kind as string;
+  const placedAt = bet.placedAt as number;
+
+  // Strip authorKey out of the JSON blob before persisting — the
+  // dedicated bets.author_key column carries the attribution. The
+  // public /share/bet view returns row.data verbatim and we don't
+  // want the visitor's cookie identity travelling with shared bets.
   const authorKey =
     typeof bet.authorKey === "string" && bet.authorKey.length > 0
       ? bet.authorKey
       : null;
+  const { authorKey: _stripped, ...betWithoutAuthor } = bet;
+  void _stripped;
   const { error } = await supabase.from("bets").upsert(
     {
       id,
       user_id: user.id,
       kind,
-      data: bet,
+      data: betWithoutAuthor,
       placed_at: new Date(placedAt).toISOString(),
       author_key: authorKey,
     } as never,

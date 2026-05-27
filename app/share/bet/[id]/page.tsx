@@ -35,8 +35,17 @@ async function loadShare(id: string): Promise<{
     .maybeSingle();
   const row = res.data as BetRow | null;
   if (!row) return null;
+  // Strip authorKey before exposing to anonymous visitors — the bet
+  // author's cookie identity travelled with the JSON blob for bets
+  // placed before we added the dedicated author_key column, and we
+  // don't want it leaking on every share link. Defence-in-depth:
+  // the POST handler now also strips it on the way in, so this is
+  // for the legacy rows.
+  const data = row.data as Record<string, unknown>;
+  const { authorKey: _stripped, ...safeData } = data;
+  void _stripped;
   const bet = {
-    ...(row.data as object),
+    ...safeData,
     id: row.id,
     kind: row.kind,
     placedAt: new Date(row.placed_at).getTime(),
