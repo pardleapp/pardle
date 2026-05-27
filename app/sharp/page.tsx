@@ -72,9 +72,9 @@ export default async function SharpLeaderboardPage() {
                 resolves.
               </li>
               <li>
-                <strong>Track bets</strong> on the bet tracker — settled
-                outright, top-finish and round-score bets all credit
-                your score.
+                <strong>Log bets you&apos;ve placed</strong> on the bet
+                tracker — settled outright, top-finish and round-score
+                bets all credit your score.
               </li>
               <li>
                 Hit {SHARP_MIN_CALLS} settled calls to qualify for the
@@ -87,7 +87,7 @@ export default async function SharpLeaderboardPage() {
                 Open the live feed →
               </Link>
               <Link href="/bets" className="sharp-empty-cta-quiet">
-                Track a bet
+                Log a bet you&apos;ve placed
               </Link>
             </div>
           </div>

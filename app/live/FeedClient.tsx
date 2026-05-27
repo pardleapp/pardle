@@ -1478,7 +1478,7 @@ function SharpScoreOnboard() {
         </li>
         <li>
           <span className="sharp-onboard-step-num">2</span>
-          Track a bet — settles credit your score too
+          Log a bet you&apos;ve placed — settles credit your score too
         </li>
         <li>
           <span className="sharp-onboard-step-num">3</span>
