@@ -424,24 +424,25 @@ async function handle(req: Request) {
   }));
   // Fallback: between events, bundle.leaderboard is empty so the
   // bet-form player search would have nothing to match against.
-  // Pull the last-completed tournament's leaderboard so users can
-  // still add a bet on any current PGA Tour player. Cheap when the
-  // schedule is cached; only fires the orchestrator hit when both
-  // leaderboard caches are cold.
+  // Priority order:
+  //   1. THIS WEEK'S upcoming tournament's field (132+ committed
+  //      players, available from leaderboardV2 days before tee-off).
+  //      This is what a user adding a bet actually wants — bets are
+  //      placed on the upcoming event, not last week's.
+  //   2. Last completed event's field (covers the no-event-this-week
+  //      case + any edge case where the upcoming field isn't live yet).
   if (
     playerIndex.length === 0 &&
     !tournamentIdOverride &&
     !preferLastCompleted
   ) {
     try {
-      const { completed } = await import("@/lib/golf-api/pgatour").then(
-        (m) => m.getSchedule(),
-      );
-      const mostRecent = completed
-        .filter((t) => t.startDate <= Date.now())
-        .sort((a, b) => b.startDate - a.startDate)[0];
-      if (mostRecent) {
-        const fresh = await getLeaderboard(mostRecent.id);
+      // Try the upcoming (or just-completed-but-not-yet-stale) tournament
+      // first. tournament here is whatever getActiveTournament resolved
+      // to (live=false in this branch since playerIndex would be filled
+      // when live).
+      if (tournament) {
+        const fresh = await getLeaderboard(tournament.id);
         playerIndex = fresh.map((r) => ({
           playerId: r.playerId,
           displayName: r.displayName,
@@ -450,6 +451,29 @@ async function handle(req: Request) {
           thru: r.thru,
           playerState: r.playerState,
         }));
+      }
+      // Final fallback: most recently completed tournament's
+      // leaderboard, when even the upcoming one's field isn't
+      // published yet (rare — usually orchestrator has the commits a
+      // week+ before tee-off).
+      if (playerIndex.length === 0) {
+        const { completed } = await import("@/lib/golf-api/pgatour").then(
+          (m) => m.getSchedule(),
+        );
+        const mostRecent = completed
+          .filter((t) => t.startDate <= Date.now())
+          .sort((a, b) => b.startDate - a.startDate)[0];
+        if (mostRecent) {
+          const fresh = await getLeaderboard(mostRecent.id);
+          playerIndex = fresh.map((r) => ({
+            playerId: r.playerId,
+            displayName: r.displayName,
+            position: r.position,
+            total: r.total,
+            thru: r.thru,
+            playerState: r.playerState,
+          }));
+        }
       }
     } catch (err) {
       console.error("[feed] playerIndex fallback fetch failed", err);
