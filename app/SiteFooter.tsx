@@ -33,6 +33,12 @@ export default function SiteFooter() {
         (US).
       </p>
       <div className="site-footer-links">
+        <Link href="/sharp" className="site-footer-link">
+          Sharp Score
+        </Link>
+        <Link href="/leaderboard/polls" className="site-footer-link">
+          Putt-IQ
+        </Link>
         <Link href="/privacy" className="site-footer-link">
           Privacy
         </Link>

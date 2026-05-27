@@ -14,6 +14,7 @@ export type MainNavTab =
   | "bets"
   | "leaderboard"
   | "course"
+  | "sharp"
   | "games"
   /** Page is not itself one of the nav tabs (e.g. tipster channel,
    *  bet detail) but still wants the nav visible so visitors can
@@ -25,6 +26,7 @@ const TABS: Array<{ key: MainNavTab; href: string; label: string }> = [
   { key: "bets", href: "/bets", label: "Bets" },
   { key: "leaderboard", href: "/leaderboard", label: "Leaderboard" },
   { key: "course", href: "/course", label: "Course" },
+  { key: "sharp", href: "/sharp", label: "Sharp" },
   { key: "games", href: "/games", label: "Games" },
 ];
 

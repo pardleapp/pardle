@@ -91,6 +91,13 @@ export default function AuthChip() {
               Your bets
             </Link>
             <Link
+              href="/sharp"
+              className="auth-chip-menu-item"
+              onClick={() => setMenuOpen(false)}
+            >
+              Sharp Score
+            </Link>
+            <Link
               href="/tipster"
               className="auth-chip-menu-item"
               onClick={() => setMenuOpen(false)}
