@@ -15523,3 +15523,98 @@ body:has(.v4-theme) {
 .course-strip-done .course-strip-chip {
   opacity: 0.72;
 }
+
+/* ── 404 / error pages ────────────────────────────────────────────
+   Shared shell used by app/not-found.tsx and app/error.tsx. Lives
+   inside the standard v4-theme container so the brand header above
+   reads the same on either surface. */
+
+.error-shell {
+  padding: 40px 16px 60px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.error-eyebrow {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+
+.error-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--text);
+  line-height: 1.25;
+  max-width: 380px;
+}
+
+.error-body {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 360px;
+  line-height: 1.5;
+}
+
+.error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.error-cta {
+  display: inline-block;
+  padding: 11px 22px;
+  border-radius: 999px;
+  background: var(--green);
+  color: #0a0a0b;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  min-height: 44px;
+  transition: filter 0.12s;
+}
+
+.error-cta:hover {
+  filter: brightness(1.08);
+}
+
+.error-cta-quiet {
+  display: inline-flex;
+  align-items: center;
+  padding: 11px 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  min-height: 44px;
+  transition: background-color 0.12s;
+}
+
+.error-cta-quiet:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.error-digest {
+  margin: 14px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  opacity: 0.6;
+}
