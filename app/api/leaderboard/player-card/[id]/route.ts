@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   getActiveTournament,
+  getSchedule,
   getScorecards,
   getLeaderboard,
   type PGAScorecard,
@@ -70,11 +71,27 @@ export async function GET(
     return NextResponse.json({ error: "missing-id" }, { status: 400 });
   }
 
+  // Mirror /api/feed?prefer=last-completed: resolve the live event
+  // when one's underway, otherwise fall back to the most recently
+  // completed one so the /leaderboard tab keeps working Mon-Wed
+  // and during the period between schedule events.
   const active = await getActiveTournament().catch(() => null);
-  if (!active) {
+  let tournamentId: string | null =
+    active?.isLive ? active.tournament.id : null;
+  if (!tournamentId) {
+    try {
+      const { completed } = await getSchedule();
+      const mostRecent = completed
+        .filter((t) => t.startDate <= Date.now())
+        .sort((a, b) => b.startDate - a.startDate)[0];
+      if (mostRecent) tournamentId = mostRecent.id;
+    } catch {
+      // fall through to 404 below
+    }
+  }
+  if (!tournamentId) {
     return NextResponse.json({ error: "no-tournament" }, { status: 404 });
   }
-  const tournamentId = active.tournament.id;
 
   const [leaderboard, scorecards] = await Promise.all([
     getLeaderboard(tournamentId).catch(() => []),
