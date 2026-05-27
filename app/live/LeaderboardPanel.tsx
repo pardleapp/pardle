@@ -85,8 +85,10 @@ export default function LeaderboardPanel({
                   mode="compact"
                 />
               )}
-              <span className="lb-total">{r.total}</span>
-              <span className="lb-thru">{r.thru}</span>
+              <span className="lb-score">
+                <span className="lb-total">{r.total}</span>
+                <span className="lb-thru">{r.thru}</span>
+              </span>
             </li>
           );
         })}

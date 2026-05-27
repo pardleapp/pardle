@@ -6158,22 +6158,31 @@ footer {
   padding: 0 0 4px;
 }
 
+/* Five-column grid clusters total + thru into a single right-edge
+   block (.lb-score) so the score reads as one chunk instead of two
+   columns separated by a gap. Vertical padding tightened so rows
+   feel like a list, not a series of cards. */
 .lb-row {
   display: grid;
-  grid-template-columns: 38px 32px 1fr auto auto auto;
+  grid-template-columns: 28px 32px 1fr auto auto;
   align-items: center;
-  gap: 8px;
-  padding: 7px 14px;
+  gap: 10px;
+  padding: 4px 14px;
   font-size: 14px;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  border-top: 1px solid var(--border);
 }
 
-/* On mobile the sparkline can collide with the name in narrow viewports
-   — collapse to 5 columns and hide the sparkline column. The hot/cold
-   badge inside .lb-name still shows the momentum signal. */
+/* First row has no top divider — the section header above is enough. */
+.lb-row:first-child {
+  border-top: none;
+}
+
+/* Mobile: hide the sparkline; 4-col grid (pos, avatar, name, score). */
 @media (max-width: 480px) {
   .lb-row {
-    grid-template-columns: 38px 32px 1fr auto auto;
+    grid-template-columns: 28px 32px 1fr auto;
+    gap: 8px;
+    padding: 5px 12px;
   }
   .lb-row .recent-form {
     display: none;
@@ -6184,6 +6193,7 @@ footer {
   font-weight: 800;
   color: var(--muted);
   font-size: 12.5px;
+  text-align: right;
 }
 
 .lb-name {
@@ -6199,18 +6209,26 @@ footer {
   text-decoration: underline;
 }
 
+.lb-score {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.1;
+  min-width: 42px;
+}
+
 .lb-total {
   font-weight: 900;
   color: var(--green);
-  min-width: 30px;
-  text-align: right;
+  font-size: 15px;
 }
 
 .lb-thru {
-  font-size: 12px;
+  font-size: 10.5px;
   color: var(--muted);
-  min-width: 28px;
-  text-align: right;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 1px;
 }
 
 /* ── Poll / predictions panel ──────────────────────────────────── */
@@ -14108,10 +14126,8 @@ body:has(.v4-theme) {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
   opacity: 0.7;
 }
 
@@ -14131,14 +14147,22 @@ body:has(.v4-theme) {
   height: 14px;
 }
 
+.v4-theme .lb-skeleton-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  margin-left: auto;
+}
+
 .v4-theme .lb-skeleton-total {
-  width: 40px;
-  height: 14px;
+  width: 36px;
+  height: 13px;
 }
 
 .v4-theme .lb-skeleton-thru {
-  width: 30px;
-  height: 12px;
+  width: 22px;
+  height: 9px;
 }
 
 /* ── /players index page ──────────────────────────────────────────

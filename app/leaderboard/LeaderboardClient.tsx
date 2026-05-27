@@ -189,8 +189,10 @@ function LeaderboardSkeleton() {
             <div className="skeleton-line lb-skeleton-pos" />
             <div className="skeleton-avatar lb-skeleton-avatar" />
             <div className="skeleton-line lb-skeleton-name" />
-            <div className="skeleton-line lb-skeleton-total" />
-            <div className="skeleton-line lb-skeleton-thru" />
+            <div className="lb-skeleton-score">
+              <div className="skeleton-line lb-skeleton-total" />
+              <div className="skeleton-line lb-skeleton-thru" />
+            </div>
           </li>
         ))}
       </ul>
