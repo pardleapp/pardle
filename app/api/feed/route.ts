@@ -414,7 +414,7 @@ async function handle(req: Request) {
 
   // Slim shape for the player-search dropdown — just enough to match
   // by name and render a result row with position + total.
-  const playerIndex = leaderboard.map((r) => ({
+  let playerIndex = leaderboard.map((r) => ({
     playerId: r.playerId,
     displayName: r.displayName,
     position: r.position,
@@ -422,6 +422,39 @@ async function handle(req: Request) {
     thru: r.thru,
     playerState: r.playerState,
   }));
+  // Fallback: between events, bundle.leaderboard is empty so the
+  // bet-form player search would have nothing to match against.
+  // Pull the last-completed tournament's leaderboard so users can
+  // still add a bet on any current PGA Tour player. Cheap when the
+  // schedule is cached; only fires the orchestrator hit when both
+  // leaderboard caches are cold.
+  if (
+    playerIndex.length === 0 &&
+    !tournamentIdOverride &&
+    !preferLastCompleted
+  ) {
+    try {
+      const { completed } = await import("@/lib/golf-api/pgatour").then(
+        (m) => m.getSchedule(),
+      );
+      const mostRecent = completed
+        .filter((t) => t.startDate <= Date.now())
+        .sort((a, b) => b.startDate - a.startDate)[0];
+      if (mostRecent) {
+        const fresh = await getLeaderboard(mostRecent.id);
+        playerIndex = fresh.map((r) => ({
+          playerId: r.playerId,
+          displayName: r.displayName,
+          position: r.position,
+          total: r.total,
+          thru: r.thru,
+          playerState: r.playerState,
+        }));
+      }
+    } catch (err) {
+      console.error("[feed] playerIndex fallback fetch failed", err);
+    }
+  }
 
   // Field hole-by-hole stats — aggregate of (strokes − par) across
   // every player who's completed each hole this tournament. Powers
