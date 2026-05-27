@@ -165,8 +165,8 @@ export default async function PlayerTournamentPage({
           <p className="subtitle">Tournament not available</p>
         </header>
         <p className="feed-empty">
-          DataGolf doesn&apos;t have historical data for this event yet, or
-          the fetch failed. Try again in a few minutes.
+          Historical data for this event isn&apos;t available yet. Try
+          again in a few minutes.
         </p>
       </main>
     );
@@ -190,7 +190,7 @@ export default async function PlayerTournamentPage({
         </header>
         <p className="feed-empty">
           {name
-            ? `Couldn't find "${name}" in this event's DataGolf record.`
+            ? `Couldn't find "${name}" in this event's record.`
             : "No player name provided in URL."}
         </p>
       </main>
@@ -377,7 +377,7 @@ export default async function PlayerTournamentPage({
       </section>
 
       <p className="ptourn-footnote">
-        Source: DataGolf historical event archive
+        Historical PGA Tour event archive
       </p>
     </main>
   );

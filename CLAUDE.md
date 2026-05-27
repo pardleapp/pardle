@@ -61,6 +61,7 @@ The user (Tom) is **non-technical** — does not write code, doesn't know TypeSc
 - **No emojis in code or commits** unless the user explicitly asks. (Game share cards are a separate thing — those use emojis by design.)
 - **Same-day puzzle determinism.** Today's puzzle must be the same for every user worldwide on the same UTC date. Never random; always derived from `daysSinceEpoch % puzzleCount`.
 - **Never mention feed latency, refresh cadence, or "how fast" the feed is in user-facing copy.** No "sub-15s", no "refreshes every 3s", no "within X seconds of the course", no "near real-time" with a number attached. A professional product doesn't advertise its delay budget — exposing seconds to users invites them to find a tournament moment that arrived "too slowly" and lose trust. The speed pillar in this file is for internal prioritisation only. User-facing copy says "Live" / "Live shot-by-shot" / "Real-time" and nothing more specific. Comments and internal docs are fine.
+- **Never name third-party data sources in user-facing copy.** No "Polymarket odds", "DataGolf record", "PGA Tour orchestrator", "DraftKings", "FanDuel" anywhere a customer can see them — not in chart placeholders, empty states, footnotes, error messages, tooltips, or share cards. Use generic, customer-friendly language instead: "odds", "historical record", "PGA Tour event archive", "the bookmaker", etc. Pardle is the product; data partners are an implementation detail. Comments / commit messages / CLAUDE.md / dashboards: fine.
 
 ## What NOT to do (until validation gate passes)
 
