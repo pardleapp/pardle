@@ -49,6 +49,10 @@ import {
   type PuttIqStats,
 } from "@/lib/feed/putt-iq";
 import { getRecentFormBulk, type RecentForm } from "@/lib/feed/recent-form";
+import {
+  getSharpScore,
+  type SharpScoreStats,
+} from "@/lib/feed/sharp-score";
 
 export const dynamic = "force-dynamic";
 
@@ -275,6 +279,7 @@ async function handle(req: Request) {
     puttPollBulk,
     puttPollMyVotes,
     myPuttIq,
+    mySharp,
   ] = await Promise.all([
     getReactionsBulk(ids),
     getCommentCountsBulk(ids),
@@ -301,6 +306,14 @@ async function handle(req: Request) {
     visitorId
       ? getUserStats(visitorId, tournament.id)
       : Promise.resolve(null as PuttIqStats | null),
+    // Caller's Sharp Score — accuracy across every prediction
+    // category (putt-polls + bet outcomes). Drives the home-feed
+    // credibility chip that's the user's own slice of the /sharp
+    // leaderboard. Returns the empty-stats shape when authorKey is
+    // missing so the client always sees consistent fields.
+    visitorId
+      ? getSharpScore(visitorId)
+      : Promise.resolve(null as SharpScoreStats | null),
   ]);
 
   // Pull odds buffers for the union of players in this response. We
@@ -673,6 +686,11 @@ async function handle(req: Request) {
      *  tournament rank. Drives the header chip + recap toasts. Null
      *  when no visitorId is supplied. */
     myPuttIq,
+    /** Caller's Sharp Score — accuracy across every prediction
+     *  category (putt-polls + bet outcomes). Drives the credibility
+     *  chip in the feed header. Null when no visitorId is supplied;
+     *  empty-stats shape (total: 0) when the visitor has no calls. */
+    mySharp,
     /** Hot/cold-hand status keyed by playerId. Sparse — only contains
      *  the top 5 by sg_total today (🔥) and bottom 5 (🥶), magnitude
      *  floors applied. Renders as a small emoji prefix next to player

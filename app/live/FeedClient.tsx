@@ -144,6 +144,17 @@ interface FeedResponse {
     tournament?: { total: number; correct: number };
     tournamentRank?: number | null;
   } | null;
+  /** Caller's Sharp Score across every prediction category. Null
+   *  when no visitorId; empty (total: 0) when nothing's been
+   *  recorded yet. */
+  mySharp?: {
+    total: number;
+    correct: number;
+    accuracy: number;
+    qualified: boolean;
+    currentStreak: number;
+    rank: number | null;
+  } | null;
   /** Hot/cold hand status keyed by playerId — sparse (only the top 5
    *  / bottom 5 by today's sg_total who clear the magnitude floor). */
   handStatus?: Record<string, "hot" | "cold">;
@@ -679,7 +690,10 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           />
           {data.tournament.name}
         </h2>
-        <PuttIqChip stats={data.myPuttIq ?? null} />
+        <div className="feed-header-chips">
+          <SharpScoreChip stats={data.mySharp ?? null} />
+          <PuttIqChip stats={data.myPuttIq ?? null} />
+        </div>
       </div>
 
       <PlayerSearch players={data.playerIndex ?? []} />
@@ -1395,6 +1409,40 @@ function HandBadge({ status }: { status: "hot" | "cold" }) {
     >
       {status === "hot" ? "🔥" : "🥶"}
     </span>
+  );
+}
+
+// ── Sharp Score chip ────────────────────────────────────────────────
+
+function SharpScoreChip({
+  stats,
+}: {
+  stats: FeedResponse["mySharp"] | null;
+}) {
+  // Don't render anything until the visitor has at least one call —
+  // a chip that says "0 calls" is pure noise on a cold visitor's
+  // first page load.
+  if (!stats || stats.total === 0) return null;
+  const acc = stats.qualified
+    ? Math.round(stats.accuracy * 100)
+    : null;
+  return (
+    <Link
+      href="/sharp"
+      className="sharp-chip"
+      title="Your accuracy across every prediction on Pardle"
+    >
+      <span className="sharp-chip-label">Sharp</span>
+      {acc != null ? (
+        <span className="sharp-chip-acc">{acc}%</span>
+      ) : (
+        <span className="sharp-chip-new">New caller</span>
+      )}
+      <span className="sharp-chip-calls">{stats.total} calls</span>
+      {stats.qualified && stats.rank != null && (
+        <span className="sharp-chip-rank">#{stats.rank}</span>
+      )}
+    </Link>
   );
 }
 

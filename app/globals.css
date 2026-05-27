@@ -5561,6 +5561,14 @@ footer {
   margin-bottom: 14px;
 }
 
+.feed-header-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .psearch {
   position: relative;
   margin-bottom: 14px;
@@ -8987,6 +8995,80 @@ footer {
   .puttiq-chip-rank {
     background: #cdec9a;
     color: #2f5a13;
+  }
+}
+
+/* ── Sharp Score chip in the feed header ─────────────────────── */
+/* Amber-toned to read distinctly from the green Putt-IQ chip but
+   still feel like a sibling — both surface the user's own
+   credibility, so they're paired in the header chips row. */
+.sharp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 157, 46, 0.45);
+  border-radius: 999px;
+  background: rgba(255, 157, 46, 0.1);
+  text-decoration: none;
+  color: #b4660a;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: background 120ms, border-color 120ms;
+}
+
+.sharp-chip:hover {
+  background: rgba(255, 157, 46, 0.18);
+  border-color: rgba(255, 157, 46, 0.65);
+}
+
+.sharp-chip-label {
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  opacity: 0.85;
+}
+
+.sharp-chip-acc {
+  font-weight: 900;
+  font-size: 13.5px;
+  color: #b4660a;
+}
+
+.sharp-chip-new {
+  font-weight: 700;
+  font-size: 11.5px;
+  opacity: 0.8;
+}
+
+.sharp-chip-calls {
+  font-size: 10.5px;
+  opacity: 0.75;
+}
+
+.sharp-chip-rank {
+  background: #b4660a;
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+@media (prefers-color-scheme: dark) {
+  .sharp-chip {
+    color: #ffb55a;
+    background: rgba(255, 157, 46, 0.16);
+    border-color: rgba(255, 157, 46, 0.55);
+  }
+  .sharp-chip-acc {
+    color: #ffb55a;
+  }
+  .sharp-chip-rank {
+    background: #ffb55a;
+    color: #1a0f02;
   }
 }
 
