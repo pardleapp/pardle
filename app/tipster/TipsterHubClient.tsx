@@ -38,14 +38,21 @@ export default function TipsterHubClient() {
   }, [user, authLoading]);
 
   if (authLoading || !loaded) {
-    return <p className="feed-empty">Loading…</p>;
+    return (
+      <div className="tipster-hub-skeleton" aria-busy="true">
+        <div className="skeleton-line tipster-hub-skel-title" />
+        <div className="skeleton-block tipster-hub-skel-card" />
+        <div className="skeleton-line tipster-hub-skel-title" />
+        <div className="skeleton-block tipster-hub-skel-card" />
+      </div>
+    );
   }
   if (!user) {
     return (
       <div className="tipster-create-gate">
         <p>
-          Sign in to follow tipsters or start your own page. Tap the auth
-          chip in the top right of the live feed.
+          Sign in to follow tipsters or start your own page. Tap{" "}
+          <strong>Sign in</strong> in the top right of this page.
         </p>
       </div>
     );

@@ -33,7 +33,11 @@ export default function CreateTipsterForm() {
   );
 
   if (authLoading) {
-    return <p className="feed-empty">Loading…</p>;
+    return (
+      <div className="tipster-hub-skeleton" aria-busy="true">
+        <div className="skeleton-block tipster-hub-skel-card" />
+      </div>
+    );
   }
   if (!user) {
     return (

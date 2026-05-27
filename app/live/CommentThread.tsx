@@ -120,7 +120,14 @@ export default function CommentThread({
   return (
     <div className="feed-thread">
       {comments === null ? (
-        <p className="feed-thread-loading">Loading comments…</p>
+        <ul className="feed-thread-list" aria-busy="true">
+          {[0, 1].map((i) => (
+            <li key={i} className="feed-comment feed-comment-skeleton">
+              <span className="skeleton-line feed-comment-skel-author" />
+              <span className="skeleton-line feed-comment-skel-text" />
+            </li>
+          ))}
+        </ul>
       ) : comments.length === 0 ? (
         <p className="feed-thread-loading">
           No comments yet — say something.
