@@ -13416,13 +13416,15 @@ body:has(.v4-theme) {
   /* Nav row layout: full-width brand-nav, AuthChip pinned on the
      right, tabs scroll horizontally to fit any number of entries
      without spilling off the phone. Native-feeling iOS pattern —
-     the right-edge fade mask hints there's more if you swipe. */
-  .v4-theme .brand-nav {
+     the right-edge fade mask hints there's more if you swipe.
+     Selectors target the brand-nav pattern itself (not the v4
+     theme) so the games hub page gets the same behavior. */
+  .brand-nav {
     width: 100%;
     flex: 1 1 100%;
     gap: 6px;
   }
-  .v4-theme .brand-nav .hub-nav-tabs {
+  .brand-nav .hub-nav-tabs {
     flex: 1 1 0;
     min-width: 0;
     overflow-x: auto;
@@ -13442,8 +13444,11 @@ body:has(.v4-theme) {
       transparent 100%
     );
   }
-  .v4-theme .brand-nav .hub-nav-tabs::-webkit-scrollbar {
+  .brand-nav .hub-nav-tabs::-webkit-scrollbar {
     display: none;
+  }
+  .brand-nav .hub-nav-tab {
+    flex-shrink: 0;
   }
   .v4-theme .auth-chip,
   .v4-theme .auth-chip-btn {
