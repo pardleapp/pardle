@@ -6161,32 +6161,84 @@ footer {
 /* Five-column grid clusters total + thru into a single right-edge
    block (.lb-score) so the score reads as one chunk instead of two
    columns separated by a gap. Vertical padding tightened so rows
-   feel like a list, not a series of cards. */
+   feel like a list, not a series of cards. Sixth column reserved
+   for the expand chevron on the tab-mode (clickable) leaderboard. */
 .lb-row {
   display: grid;
-  grid-template-columns: 28px 32px 1fr auto auto;
+  grid-template-columns: 28px 32px 1fr auto auto auto;
   align-items: center;
   gap: 10px;
   padding: 4px 14px;
   font-size: 14px;
   border-top: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
 }
 
-/* First row has no top divider — the section header above is enough. */
-.lb-row:first-child {
+/* Tab-mode rows are buttons; strip the default styling. */
+.lb-row-button {
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--border);
+  font-family: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  transition: background-color 0.12s;
+}
+
+.lb-row-button:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  .lb-row-button:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+.lb-row-wrap:first-child .lb-row,
+.lb-row-wrap:first-child .lb-row-button {
   border-top: none;
 }
 
-/* Mobile: hide the sparkline; 4-col grid (pos, avatar, name, score). */
+.lb-row-open .lb-row-button {
+  background: rgba(0, 217, 110, 0.05);
+}
+
+/* Hide the chevron column when the row is rendered without a chevron
+   (non-tab mode collapses to 5 cols). */
+.lb-row:not(.lb-row-button) {
+  grid-template-columns: 28px 32px 1fr auto auto;
+}
+
+/* Mobile: hide the sparkline; collapse to fewer cols. */
 @media (max-width: 480px) {
   .lb-row {
-    grid-template-columns: 28px 32px 1fr auto;
+    grid-template-columns: 28px 32px 1fr auto auto;
     gap: 8px;
     padding: 5px 12px;
+  }
+  .lb-row:not(.lb-row-button) {
+    grid-template-columns: 28px 32px 1fr auto;
   }
   .lb-row .recent-form {
     display: none;
   }
+}
+
+.lb-chev {
+  font-size: 14px;
+  color: var(--muted);
+  transition: transform 0.18s;
+  width: 12px;
+  text-align: center;
+}
+
+.lb-chev-open {
+  transform: rotate(-180deg);
+  color: var(--green);
 }
 
 .lb-pos {
@@ -6229,6 +6281,195 @@ footer {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   margin-top: 1px;
+}
+
+/* ── Inline scorecard panel (expanded row) ─────────────────────── */
+
+.lb-card-panel {
+  padding: 12px 14px 14px;
+  background: rgba(0, 217, 110, 0.04);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: lb-card-open 0.18s ease-out;
+}
+
+@keyframes lb-card-open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.lb-card-panel-loading {
+  min-height: 96px;
+  background: rgba(0, 217, 110, 0.03);
+}
+
+.lb-card-panel-empty {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.lb-round-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.lb-round-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 4px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+}
+
+.lb-round-chip-num {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lb-round-chip-topar {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.lb-round-chip-under .lb-round-chip-topar {
+  color: var(--green);
+}
+
+.lb-round-chip-over .lb-round-chip-topar {
+  color: #ff6b6b;
+}
+
+.lb-round-chip-empty .lb-round-chip-topar {
+  color: var(--muted);
+}
+
+.lb-round-chip-focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 1px rgba(0, 217, 110, 0.4) inset;
+}
+
+.lb-card-holes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lb-card-holes-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lb-card-row {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 3px;
+}
+
+.pcell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+}
+
+.pcell-empty {
+  opacity: 0.3;
+}
+
+.pcell-birdie {
+  background: rgba(0, 217, 110, 0.22);
+  color: var(--green);
+  border-color: rgba(0, 217, 110, 0.45);
+}
+
+.pcell-eagle {
+  background: rgba(0, 217, 110, 0.45);
+  color: #fff;
+  border-color: var(--green);
+}
+
+.pcell-bogey {
+  background: rgba(255, 157, 46, 0.2);
+  color: #ff9d2e;
+  border-color: rgba(255, 157, 46, 0.45);
+}
+
+.pcell-double {
+  background: rgba(255, 71, 71, 0.22);
+  color: #ff6b6b;
+  border-color: rgba(255, 71, 71, 0.5);
+}
+
+.lb-card-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lb-card-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  min-width: 56px;
+}
+
+.lb-card-stat-num {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.lb-card-stat-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.lb-card-profile {
+  align-self: flex-end;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--green);
+  text-decoration: none;
+}
+
+.lb-card-profile:hover {
+  text-decoration: underline;
 }
 
 /* ── Poll / predictions panel ──────────────────────────────────── */

@@ -1,0 +1,153 @@
+import { NextResponse } from "next/server";
+import {
+  getActiveTournament,
+  getScorecards,
+  getLeaderboard,
+  type PGAScorecard,
+} from "@/lib/golf-api/pgatour";
+import { derivePlayerStats } from "@/lib/feed/scorecard-stats";
+
+/**
+ * GET /api/leaderboard/player-card/[id]
+ *
+ * Lazy-fetched payload powering the inline scorecard panel that
+ * expands when a leaderboard row is clicked. Returns just the
+ * round-by-round summary + the current/last round's 18 holes —
+ * enough to render a compact tournament view without the weight
+ * of the full /live/player/[id] page.
+ *
+ * Edge-cached for 20s so a popular player whose row gets opened
+ * by every viewer doesn't hammer the orchestrator. Stale-while-
+ * revalidate keeps the panel snappy on subsequent expands.
+ */
+export const dynamic = "force-dynamic";
+export const revalidate = 20;
+
+interface PanelRound {
+  round: number;
+  strokes: number | null;
+  toPar: number | null;
+  holesPlayed: number;
+  birdies: number;
+  eagles: number;
+  bogeys: number;
+  doubles: number;
+}
+
+interface PanelHole {
+  hole: number;
+  par: number;
+  score: number | null;
+}
+
+export interface PlayerCardResponse {
+  playerId: string;
+  playerName: string;
+  position: string;
+  total: string;
+  thru: string;
+  /** Round to surface in the 18-hole strip — current live round when
+   *  one's underway, otherwise the most recent completed round. */
+  focusRound: number | null;
+  focusHoles: PanelHole[];
+  rounds: PanelRound[];
+  totals: {
+    birdies: number;
+    eagles: number;
+    bogeys: number;
+    doubles: number;
+    bestRound: number | null;
+    scoringAvg: number | null;
+  };
+}
+
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  if (!id) {
+    return NextResponse.json({ error: "missing-id" }, { status: 400 });
+  }
+
+  const active = await getActiveTournament().catch(() => null);
+  if (!active) {
+    return NextResponse.json({ error: "no-tournament" }, { status: 404 });
+  }
+  const tournamentId = active.tournament.id;
+
+  const [leaderboard, scorecards] = await Promise.all([
+    getLeaderboard(tournamentId).catch(() => []),
+    getScorecards(tournamentId, [id]).catch(
+      () => ({}) as Record<string, PGAScorecard>,
+    ),
+  ]);
+  const row = leaderboard.find((r) => r.playerId === id);
+  const scorecard = scorecards[id];
+  if (!row || !scorecard) {
+    return NextResponse.json({ error: "not-found" }, { status: 404 });
+  }
+
+  const stats = derivePlayerStats(scorecard);
+
+  // Pick the round to show in the 18-hole strip: prefer the live
+  // round (some holes played but not all 18), else the latest
+  // completed round, else R1 if nothing's started.
+  let focusRound: number | null = null;
+  for (const rs of stats.rounds) {
+    if (rs.holesPlayed > 0 && rs.holesPlayed < 18) {
+      focusRound = rs.round;
+      break;
+    }
+  }
+  if (focusRound == null) {
+    const completed = stats.rounds.filter((r) => r.holesPlayed === 18);
+    if (completed.length > 0) {
+      focusRound = completed[completed.length - 1].round;
+    } else if (stats.rounds.length > 0) {
+      focusRound = stats.rounds[0].round;
+    }
+  }
+
+  const focusHoles: PanelHole[] =
+    focusRound != null
+      ? (scorecard.rounds[focusRound] ?? []).map((h) => ({
+          hole: h.holeNumber,
+          par: h.par,
+          score:
+            h.score === "" || h.score === "-" || !Number.isFinite(Number(h.score))
+              ? null
+              : Number(h.score),
+        }))
+      : [];
+
+  const body: PlayerCardResponse = {
+    playerId: row.playerId,
+    playerName: row.displayName,
+    position: row.position,
+    total: row.total,
+    thru: row.thru,
+    focusRound,
+    focusHoles,
+    rounds: stats.rounds.map((r) => ({
+      round: r.round,
+      strokes: r.strokes,
+      toPar: r.toPar,
+      holesPlayed: r.holesPlayed,
+      birdies: r.birdies,
+      eagles: r.eagles,
+      bogeys: r.bogeys,
+      doubles: r.doubles,
+    })),
+    totals: {
+      birdies: stats.totalBirdies,
+      eagles: stats.totalEagles,
+      bogeys: stats.totalBogeys,
+      doubles: stats.totalDoubles,
+      bestRound: stats.bestRound,
+      scoringAvg: stats.scoringAvg,
+    },
+  };
+
+  return NextResponse.json(body);
+}
