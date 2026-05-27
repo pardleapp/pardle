@@ -343,6 +343,9 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
   const authorKey = useRef<string>("");
   const seenBursts = useRef<Set<string>>(new Set());
+  // Event IDs we've already auto-celebrated this session — prevents
+  // re-spawning floaters every poll cycle for the same eagle.
+  const celebratedEvents = useRef<Set<string>>(new Set());
   // Median /api/feed duration across recent fetches (ms). Drives the
   // honest "usually ~2.1s" hint on the skeleton. Hydrated from
   // localStorage on mount + updated after each successful load.
@@ -473,6 +476,38 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
             spawnFloater(b.emoji);
           }
         }
+      }
+
+      // Auto-celebrate genuinely big shots — eagles, aces, blow-ups,
+      // and long putts (≥30 ft) spawn the matching emoji floater so
+      // the screen reacts to the moment without anyone needing to
+      // tap. Same dedup pattern as bursts above. Only events from
+      // the last ~30s trigger — avoids a confetti rain when an
+      // hour-old eagle scrolls in for the first time.
+      const NEW_EVENT_CUTOFF_MS = 30_000;
+      const now = Date.now();
+      for (const row of json.rows ?? []) {
+        const ev = row.event;
+        if (celebratedEvents.current.has(ev.id)) continue;
+        celebratedEvents.current.add(ev.id);
+        if (now - ev.ts > NEW_EVENT_CUTOFF_MS) continue;
+        let emoji: string | null = null;
+        if (ev.ace) emoji = "🎯";
+        else if (ev.result === "albatross") emoji = "🤯";
+        else if (ev.result === "eagle") emoji = "🦅";
+        else if (ev.result === "triple-plus") emoji = "💥";
+        else if (
+          ev.type === "score" &&
+          typeof ev.proximityInches === "number" &&
+          ev.proximityInches >= 360 &&
+          (ev.result === "birdie" || ev.result === "par")
+        ) {
+          // Long-distance hole-out / drained putt — proximity is "to
+          // hole" so ≥30ft (360 in) putts holed are the signature
+          // moments we want to celebrate.
+          emoji = "🐦";
+        }
+        if (emoji) spawnFloater(emoji);
       }
     } catch {
       setError(true);
