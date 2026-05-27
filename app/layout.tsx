@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { Inter } from "next/font/google";
 import { BRAND } from "@/lib/brand";
+import SiteFooter from "./SiteFooter";
 
 // Inter variable: covers all weights we use (400/600/700/800/900) in
 // one woff2 file. Display-swap so the page paints with the system
@@ -61,6 +62,7 @@ export default function RootLayout({
     <html lang="en" className={inter.variable}>
       <body>
         {children}
+        <SiteFooter />
         <Analytics />
       </body>
     </html>

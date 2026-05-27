@@ -15631,3 +15631,110 @@ body:has(.v4-theme) {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   opacity: 0.6;
 }
+
+/* ── Legal pages (/privacy, /terms) ───────────────────────────── */
+
+.legal-page {
+  max-width: 720px;
+  margin: 20px auto 80px;
+  padding: 0 4px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.legal-title {
+  margin: 0 0 6px;
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.legal-updated {
+  margin: 0 0 26px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.legal-page p,
+.legal-page ul {
+  font-size: 14.5px;
+  margin: 0 0 16px;
+  color: var(--text);
+}
+
+.legal-page ul {
+  padding-left: 22px;
+}
+
+.legal-page li {
+  margin-bottom: 6px;
+}
+
+.legal-page h3 {
+  margin: 28px 0 10px;
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--green);
+  letter-spacing: 0.01em;
+}
+
+.legal-page a {
+  color: var(--green);
+  text-decoration: underline;
+}
+
+.legal-page a:hover {
+  text-decoration: none;
+}
+
+.legal-page code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.legal-page strong {
+  color: var(--text);
+  font-weight: 800;
+}
+
+/* ── Site footer (responsible-gambling + legal links) ────────── */
+
+.site-footer {
+  margin: 40px auto 24px;
+  padding: 16px 16px 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.site-footer-disclaimer {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin: 0;
+  max-width: 560px;
+  line-height: 1.55;
+}
+
+.site-footer-links {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.site-footer-link {
+  font-size: 11.5px;
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.site-footer-link:hover {
+  color: var(--text);
+}
