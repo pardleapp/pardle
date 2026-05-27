@@ -702,8 +702,18 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                         (data.communityTotalBettors ?? 0) >= 5;
                       // Build a single chip list, then cap at 2 — keeps
                       // mobile rows from wrapping to 3-4 chip lines.
-                      // Priority: bet-relevance (your bet), odds shift,
-                      // top-10 shift, context tags, community backing.
+                      // Priority order (top wins the 2 visible slots):
+                      //   1. PnL impact (your money is moving)
+                      //   2. 🔥 hot chip (community attention is here)
+                      //   3. odds shift
+                      //   4. top-10 shift
+                      //   5. context tags
+                      //   6. community backing
+                      // The hot chip is pulled out of event.tags to
+                      // jump it to slot 2 — otherwise impact + odds
+                      // shifts push it off the visible cap and waste
+                      // the pulsing-amber "look at me" treatment on
+                      // a row no-one can see it on.
                       const chips: Array<JSX.Element> = [];
                       // PnL impact chip — fires only when this event
                       // materially moved one of the user's tracked
@@ -754,6 +764,23 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                           </Link>,
                         );
                       }
+                      // Hot chip jumps the queue before odds/top-10/
+                      // context tags. Found by scanning event.tags for
+                      // the "🔥 going off" prefix the cron injects at
+                      // render time.
+                      const hotTag = (event.tags ?? []).find((t) =>
+                        t.startsWith("🔥 going off"),
+                      );
+                      if (hotTag) {
+                        chips.push(
+                          <span
+                            key="hot"
+                            className="feed-tag feed-tag-hot"
+                          >
+                            {hotTag}
+                          </span>,
+                        );
+                      }
                       if (event.oddsBefore && event.oddsAfter) {
                         chips.push(
                           <span
@@ -802,16 +829,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                         ) {
                           continue;
                         }
-                        // "🔥 going off" hot chip gets a distinct
-                        // pulsing-orange treatment so the "look at me"
-                        // signal lands at a glance vs the muted green
-                        // of routine context chips.
-                        const isHot = t.startsWith("🔥 going off");
+                        // Hot chip was already pushed above with its
+                        // own priority slot — skip the dup here.
+                        if (t.startsWith("🔥 going off")) continue;
                         chips.push(
-                          <span
-                            key={`tag-${t}`}
-                            className={`feed-tag${isHot ? " feed-tag-hot" : ""}`}
-                          >
+                          <span key={`tag-${t}`} className="feed-tag">
                             {t}
                           </span>,
                         );

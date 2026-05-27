@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BRAND } from "@/lib/brand";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { isReservedSlug } from "@/lib/channels/reserved-slugs";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
 import { getUserStats } from "@/lib/feed/putt-iq";
+import AuthChip from "../live/auth/AuthChip";
+import MainNav from "../MainNav";
 import TipsterPageClient from "./TipsterPageClient";
 
 interface PageProps {
@@ -133,16 +134,13 @@ export default async function TipsterPage({
   if (!channel) notFound();
 
   return (
-    <main className="container container-wide">
+    <main className="container container-wide v4-theme">
       <header className="brand brand-split">
-        <h1>
-          <Link href="/" className="tipster-back">
-            {BRAND.name}
-          </Link>
-        </h1>
-        <Link href="/" className="hub-nav-tab">
-          Live feed
-        </Link>
+        <h1>{BRAND.name}</h1>
+        <div className="brand-nav">
+          <MainNav active="none" />
+          <AuthChip />
+        </div>
       </header>
       <TipsterPageClient
         channel={channel}
