@@ -13268,6 +13268,40 @@ body:has(.v4-theme) {
     min-height: 32px;
     padding: 6px 14px;
     font-size: 12.5px;
+    flex-shrink: 0;
+  }
+
+  /* Nav row layout: full-width brand-nav, AuthChip pinned on the
+     right, tabs scroll horizontally to fit any number of entries
+     without spilling off the phone. Native-feeling iOS pattern —
+     the right-edge fade mask hints there's more if you swipe. */
+  .v4-theme .brand-nav {
+    width: 100%;
+    flex: 1 1 100%;
+    gap: 6px;
+  }
+  .v4-theme .brand-nav .hub-nav-tabs {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+    mask-image: linear-gradient(
+      to right,
+      black 0%,
+      black 88%,
+      transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      black 0%,
+      black 88%,
+      transparent 100%
+    );
+  }
+  .v4-theme .brand-nav .hub-nav-tabs::-webkit-scrollbar {
+    display: none;
   }
   .v4-theme .auth-chip,
   .v4-theme .auth-chip-btn {
