@@ -113,6 +113,25 @@ export default function OffWeekLanding({ tournament }: Props) {
         </Link>
       )}
 
+      <Link href="/sharp" className="offweek-sharp">
+        <div className="offweek-sharp-head">
+          <span className="offweek-sharp-pill">⚡ Sharp Score</span>
+          <span className="offweek-sharp-arrow" aria-hidden="true">→</span>
+        </div>
+        <p className="offweek-sharp-title">
+          How sharp are you?
+        </p>
+        <p className="offweek-sharp-blurb">
+          Every putt-poll vote and tracked bet builds your accuracy
+          record. The chip sits next to your name across Pardle — so
+          when you call it right, everyone sees.
+        </p>
+        <p className="offweek-sharp-foot">
+          Top callers ranked on the leaderboard. See where you&apos;d
+          stack up →
+        </p>
+      </Link>
+
       <div className="offweek-cards">
         <Link href="/leaderboard" className="offweek-card">
           <span className="offweek-card-icon" aria-hidden="true">

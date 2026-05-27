@@ -15356,6 +15356,104 @@ body:has(.v4-theme) {
   line-height: 1;
 }
 
+/* Sharp Score promo on the off-week landing. Mirrors the home-feed
+   SharpScoreOnboard card pitch but condensed since OffWeekLanding
+   already has its own header copy and a card grid below it. */
+.v4-theme .offweek-sharp {
+  display: block;
+  padding: 16px 16px 14px;
+  margin: 0 0 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 157, 46, 0.45);
+  background:
+    radial-gradient(
+      circle at 0% 0%,
+      rgba(255, 157, 46, 0.18) 0%,
+      rgba(255, 157, 46, 0.04) 60%,
+      transparent 100%
+    ),
+    rgba(255, 255, 255, 0.02);
+  text-decoration: none;
+  color: var(--text);
+  position: relative;
+  overflow: hidden;
+  transition: border-color 120ms, transform 80ms;
+}
+
+.v4-theme .offweek-sharp::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  right: -10%;
+  width: 50%;
+  height: 180%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 157, 46, 0.18) 0%,
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+.v4-theme .offweek-sharp:hover {
+  border-color: rgba(255, 157, 46, 0.65);
+}
+
+.v4-theme .offweek-sharp:active {
+  transform: scale(0.99);
+}
+
+.v4-theme .offweek-sharp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.v4-theme .offweek-sharp-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 157, 46, 0.18);
+  border: 1px solid rgba(255, 157, 46, 0.45);
+  color: #ffb55a;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.v4-theme .offweek-sharp-arrow {
+  font-size: 20px;
+  color: #ffb55a;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.v4-theme .offweek-sharp-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.v4-theme .offweek-sharp-blurb {
+  margin: 0 0 10px;
+  font-size: 13.5px;
+  color: var(--text);
+  opacity: 0.92;
+  line-height: 1.5;
+}
+
+.v4-theme .offweek-sharp-foot {
+  margin: 0;
+  font-size: 12px;
+  color: #ffb55a;
+  font-weight: 700;
+}
+
 .v4-theme .offweek-cards {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
