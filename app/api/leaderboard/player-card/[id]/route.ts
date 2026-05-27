@@ -47,10 +47,13 @@ export interface PlayerCardResponse {
   position: string;
   total: string;
   thru: string;
-  /** Round to surface in the 18-hole strip — current live round when
-   *  one's underway, otherwise the most recent completed round. */
+  /** Round to default-surface in the 18-hole strip — current live
+   *  round when one's underway, otherwise the most recent completed
+   *  round. The client may swap which round it renders. */
   focusRound: number | null;
-  focusHoles: PanelHole[];
+  /** Per-round 18-hole strips. Empty rounds (not started, missed
+   *  cut) simply absent. Client picks which round to render. */
+  holesByRound: Record<number, PanelHole[]>;
   rounds: PanelRound[];
   totals: {
     birdies: number;
@@ -126,17 +129,19 @@ export async function GET(
     }
   }
 
-  const focusHoles: PanelHole[] =
-    focusRound != null
-      ? (scorecard.rounds[focusRound] ?? []).map((h) => ({
-          hole: h.holeNumber,
-          par: h.par,
-          score:
-            h.score === "" || h.score === "-" || !Number.isFinite(Number(h.score))
-              ? null
-              : Number(h.score),
-        }))
-      : [];
+  const holesByRound: Record<number, PanelHole[]> = {};
+  for (const rs of stats.rounds) {
+    const raw = scorecard.rounds[rs.round] ?? [];
+    if (raw.length === 0) continue;
+    holesByRound[rs.round] = raw.map((h) => ({
+      hole: h.holeNumber,
+      par: h.par,
+      score:
+        h.score === "" || h.score === "-" || !Number.isFinite(Number(h.score))
+          ? null
+          : Number(h.score),
+    }));
+  }
 
   const body: PlayerCardResponse = {
     playerId: row.playerId,
@@ -145,7 +150,7 @@ export async function GET(
     total: row.total,
     thru: row.thru,
     focusRound,
-    focusHoles,
+    holesByRound,
     rounds: stats.rounds.map((r) => ({
       round: r.round,
       strokes: r.strokes,

@@ -54,6 +54,7 @@ export default function PlayerCardPanel({ playerId }: Props) {
     () => cache.get(playerId) ?? null,
   );
   const [error, setError] = useState(false);
+  const [selectedRound, setSelectedRound] = useState<number | null>(null);
 
   useEffect(() => {
     if (data) return;
@@ -79,6 +80,14 @@ export default function PlayerCardPanel({ playerId }: Props) {
     };
   }, [playerId, data]);
 
+  // Default-select the focusRound when data arrives; user picks
+  // override afterwards.
+  useEffect(() => {
+    if (data && selectedRound == null && data.focusRound != null) {
+      setSelectedRound(data.focusRound);
+    }
+  }, [data, selectedRound]);
+
   if (error) {
     return (
       <div className="lb-card-panel lb-card-panel-empty">
@@ -90,8 +99,11 @@ export default function PlayerCardPanel({ playerId }: Props) {
     return <div className="lb-card-panel lb-card-panel-loading" aria-busy="true" />;
   }
 
-  const front = data.focusHoles.slice(0, 9);
-  const back = data.focusHoles.slice(9, 18);
+  const displayRound = selectedRound ?? data.focusRound;
+  const displayHoles =
+    displayRound != null ? data.holesByRound[displayRound] ?? [] : [];
+  const front = displayHoles.slice(0, 9);
+  const back = displayHoles.slice(9, 18);
   const frontPar = front.reduce((a, h) => a + h.par, 0);
   const backPar = back.reduce((a, h) => a + h.par, 0);
   const frontStrokes = front.reduce((a, h) => a + (h.score ?? 0), 0);
@@ -103,27 +115,33 @@ export default function PlayerCardPanel({ playerId }: Props) {
 
   return (
     <div className="lb-card-panel">
-      <div className="lb-round-row">
+      <div className="lb-round-row" role="tablist">
         {[1, 2, 3, 4].map((roundNum) => {
           const rs = data.rounds.find((r) => r.round === roundNum);
           const toPar = rs?.toPar ?? null;
-          const isFocus = data.focusRound === roundNum;
+          const isSelected = displayRound === roundNum;
+          const hasData = !!data.holesByRound[roundNum];
           return (
-            <div
+            <button
+              type="button"
               key={roundNum}
-              className={`${roundChipClass(toPar)} ${isFocus ? "lb-round-chip-focus" : ""}`}
+              role="tab"
+              aria-selected={isSelected}
+              disabled={!hasData}
+              onClick={() => hasData && setSelectedRound(roundNum)}
+              className={`${roundChipClass(toPar)} ${isSelected ? "lb-round-chip-focus" : ""} ${!hasData ? "lb-round-chip-disabled" : ""}`}
             >
               <span className="lb-round-chip-num">R{roundNum}</span>
               <span className="lb-round-chip-topar">{fmtToPar(toPar)}</span>
-            </div>
+            </button>
           );
         })}
       </div>
 
-      {data.focusRound != null && data.focusHoles.length > 0 && (
+      {displayRound != null && displayHoles.length > 0 && (
         <div className="lb-card-holes">
           <div className="lb-card-holes-head">
-            <span>R{data.focusRound} · front</span>
+            <span>R{displayRound} · front</span>
             <span>{frontTo == null ? "—" : fmtToPar(frontTo)}</span>
           </div>
           <div className="lb-card-row">

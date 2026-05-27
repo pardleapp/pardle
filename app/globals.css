@@ -6332,6 +6332,22 @@ footer {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.12s, border-color 0.12s, transform 0.08s;
+}
+
+.lb-round-chip:hover:not(.lb-round-chip-disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.lb-round-chip:active:not(.lb-round-chip-disabled) {
+  transform: scale(0.97);
+}
+
+.lb-round-chip-disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
 }
 
 .lb-round-chip-num {
