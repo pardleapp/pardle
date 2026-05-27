@@ -722,6 +722,15 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         </Link>
       )}
 
+      {/* Sharp Score onboarding card — shown once for visitors with
+          zero settled calls. The chip in the header is for already-
+          engaged users; this card is the discovery hook for everyone
+          else. Self-dismisses the moment the visitor records their
+          first call (data.mySharp.total goes 0 → 1+). */}
+      {(data.mySharp?.total ?? 0) === 0 && (
+        <SharpScoreOnboard />
+      )}
+
       <MomentumStrip momentum={data.fieldMomentum} />
 
       <CatchMeUp rows={data.rows ?? []} />
@@ -1409,6 +1418,46 @@ function HandBadge({ status }: { status: "hot" | "cold" }) {
     >
       {status === "hot" ? "🔥" : "🥶"}
     </span>
+  );
+}
+
+// ── Sharp Score onboarding card ─────────────────────────────────────
+
+function SharpScoreOnboard() {
+  return (
+    <section className="sharp-onboard" aria-label="Build your Sharp Score">
+      <div className="sharp-onboard-head">
+        <span className="sharp-onboard-pill">⚡ Sharp Score</span>
+        <h3 className="sharp-onboard-title">
+          How sharp are you?
+        </h3>
+      </div>
+      <p className="sharp-onboard-blurb">
+        Every putt-poll vote and tracked bet builds your accuracy
+        record. The chip sits next to your name across Pardle —
+        so when you call it right, everyone sees.
+      </p>
+      <ul className="sharp-onboard-steps">
+        <li>
+          <span className="sharp-onboard-step-num">1</span>
+          Vote &apos;in&apos; or &apos;out&apos; when a putt poll
+          drops in the feed
+        </li>
+        <li>
+          <span className="sharp-onboard-step-num">2</span>
+          Track a bet — settles credit your score too
+        </li>
+        <li>
+          <span className="sharp-onboard-step-num">3</span>
+          Hit 10 calls and your accuracy unlocks publicly
+        </li>
+      </ul>
+      <div className="sharp-onboard-ctas">
+        <Link href="/sharp" className="sharp-onboard-cta">
+          See the leaderboard →
+        </Link>
+      </div>
+    </section>
   );
 }
 
