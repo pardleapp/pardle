@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BRAND } from "@/lib/brand";
 import {
@@ -31,6 +32,52 @@ const SEASON_DATA = seasonRoundsRaw as Record<string, SeasonRoundsEntry>;
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+/** Resolve the player's display name from the live or last-completed
+ *  leaderboard so the share-card title actually carries the name when
+ *  someone links to this page from WhatsApp or Twitter. Falls back to
+ *  a generic title if the player can't be found. */
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  let playerName: string | null = null;
+  try {
+    const active = await getActiveTournament();
+    if (active) {
+      const lb = await getLeaderboard(active.tournament.id);
+      playerName = lb.find((r) => r.playerId === id)?.displayName ?? null;
+    }
+    if (!playerName) {
+      const fallback = await resolveNameFromLast(id);
+      if (fallback) playerName = fallback.name;
+    }
+  } catch {
+    // Best-effort — fall back to generic title.
+  }
+  if (!playerName) {
+    return {
+      title: `Player — ${BRAND.name}`,
+      description: "Tournament scorecard, season form, recent shots.",
+    };
+  }
+  const title = `${playerName} — ${BRAND.name}`;
+  const description = `Tournament scorecard, season form and recent shots for ${playerName}.`;
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "profile",
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+    },
+  };
 }
 
 /** Map a result to the scorecard cell class. */
