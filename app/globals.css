@@ -9048,6 +9048,133 @@ footer {
   opacity: 0.75;
 }
 
+.sharp-chip-progress {
+  font-size: 11px;
+  font-weight: 800;
+  opacity: 0.9;
+}
+
+/* Cold state — visitor has zero calls. Brighter border + a subtle
+   pulse so first-time visitors actually notice the chip and tap
+   into /sharp. Without this the chip was invisible to the audience
+   that most needed to discover it. */
+.sharp-chip-cold {
+  border-color: rgba(255, 157, 46, 0.7);
+  background: rgba(255, 157, 46, 0.16);
+  animation: sharp-chip-cold-pulse 2.8s ease-in-out infinite;
+}
+
+.sharp-chip-cold .sharp-chip-cta {
+  font-weight: 900;
+  font-size: 12px;
+  color: #b4660a;
+}
+
+@media (prefers-color-scheme: dark) {
+  .sharp-chip-cold .sharp-chip-cta {
+    color: #ffb55a;
+  }
+}
+
+@keyframes sharp-chip-cold-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 157, 46, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 157, 46, 0.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sharp-chip-cold {
+    animation: none;
+  }
+}
+
+/* /sharp empty-state explainer — the page a cold visitor lands on
+   when they tap the chip on the home feed. Replaces the previous
+   one-line "no qualified callers yet" copy with a how-to so the
+   trip-out doesn't feel like a dead end. */
+.sharp-empty {
+  margin: 18px auto 0;
+  max-width: 540px;
+  padding: 22px 22px 26px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sharp-empty-title {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text);
+  text-align: center;
+}
+
+.sharp-empty-steps {
+  margin: 0 0 18px;
+  padding: 0 0 0 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.sharp-empty-steps li {
+  padding-left: 4px;
+}
+
+.sharp-empty-steps strong {
+  color: #ffb55a;
+  font-weight: 800;
+}
+
+.sharp-empty-ctas {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.sharp-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--green);
+  color: #0a0d12;
+  font-weight: 800;
+  font-size: 13.5px;
+  text-decoration: none;
+  min-height: 40px;
+  transition: filter 0.12s;
+}
+
+.sharp-empty-cta:hover {
+  filter: brightness(1.08);
+}
+
+.sharp-empty-cta-quiet {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 13.5px;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  min-height: 40px;
+}
+
+.sharp-empty-cta-quiet:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .sharp-chip-rank {
   background: #b4660a;
   color: #fff;

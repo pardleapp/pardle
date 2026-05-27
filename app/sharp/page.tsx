@@ -61,10 +61,36 @@ export default async function SharpLeaderboardPage() {
         </div>
 
         {qualified.length === 0 ? (
-          <p className="feed-empty" style={{ padding: 32 }}>
-            No qualified callers yet. Vote on a few putt-polls during
-            the next tournament to start building your record.
-          </p>
+          <div className="sharp-empty">
+            <h3 className="sharp-empty-title">
+              How to build your Sharp Score
+            </h3>
+            <ol className="sharp-empty-steps">
+              <li>
+                <strong>Vote on putt-polls</strong> during live rounds —
+                each call counts toward your record once the putt
+                resolves.
+              </li>
+              <li>
+                <strong>Track bets</strong> on the bet tracker — settled
+                outright, top-finish and round-score bets all credit
+                your score.
+              </li>
+              <li>
+                Hit {SHARP_MIN_CALLS} settled calls to qualify for the
+                leaderboard. Your accuracy chip lights up green when
+                you&apos;re above the field average.
+              </li>
+            </ol>
+            <div className="sharp-empty-ctas">
+              <Link href="/" className="sharp-empty-cta">
+                Open the live feed →
+              </Link>
+              <Link href="/bets" className="sharp-empty-cta-quiet">
+                Track a bet
+              </Link>
+            </div>
+          </div>
         ) : (
           <ol className="sharp-list">
             {qualified.map((r, i) => (

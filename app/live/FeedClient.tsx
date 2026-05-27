@@ -1419,13 +1419,30 @@ function SharpScoreChip({
 }: {
   stats: FeedResponse["mySharp"] | null;
 }) {
-  // Don't render anything until the visitor has at least one call —
-  // a chip that says "0 calls" is pure noise on a cold visitor's
-  // first page load.
-  if (!stats || stats.total === 0) return null;
-  const acc = stats.qualified
-    ? Math.round(stats.accuracy * 100)
+  // Three visual states — the cold state is the discovery loop for
+  // brand-new visitors so we render even when total === 0:
+  //   0 calls   → "Start a Sharp Score →"  (engagement hook)
+  //   1–9 calls → "Sharp · 4/10 to qualify"  (progress bar style)
+  //   ≥10 calls → "Sharp · 67% · 23 calls · #4"  (full stats)
+  const total = stats?.total ?? 0;
+  const qualified = !!stats?.qualified;
+  const acc = qualified
+    ? Math.round((stats?.accuracy ?? 0) * 100)
     : null;
+
+  if (total === 0) {
+    return (
+      <Link
+        href="/sharp"
+        className="sharp-chip sharp-chip-cold"
+        title="Build a credibility score from your putt-poll votes and bet outcomes"
+      >
+        <span className="sharp-chip-label">Sharp Score</span>
+        <span className="sharp-chip-cta">Start →</span>
+      </Link>
+    );
+  }
+
   return (
     <Link
       href="/sharp"
@@ -1436,10 +1453,12 @@ function SharpScoreChip({
       {acc != null ? (
         <span className="sharp-chip-acc">{acc}%</span>
       ) : (
-        <span className="sharp-chip-new">New caller</span>
+        <span className="sharp-chip-progress">{total}/10 to qualify</span>
       )}
-      <span className="sharp-chip-calls">{stats.total} calls</span>
-      {stats.qualified && stats.rank != null && (
+      {acc != null && (
+        <span className="sharp-chip-calls">{total} calls</span>
+      )}
+      {qualified && stats?.rank != null && (
         <span className="sharp-chip-rank">#{stats.rank}</span>
       )}
     </Link>
