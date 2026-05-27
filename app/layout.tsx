@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { Inter } from "next/font/google";
 import { BRAND } from "@/lib/brand";
 import SiteFooter from "./SiteFooter";
+import { ToastProvider } from "./live/Toast";
 
 // Inter variable: covers all weights we use (400/600/700/800/900) in
 // one woff2 file. Display-swap so the page paints with the system
@@ -61,8 +62,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body>
-        {children}
-        <SiteFooter />
+        <ToastProvider>
+          {children}
+          <SiteFooter />
+        </ToastProvider>
         <Analytics />
       </body>
     </html>

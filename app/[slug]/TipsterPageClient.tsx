@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/app/live/auth/useAuth";
+import { useToast } from "@/app/live/Toast";
 import FeedClient from "@/app/live/FeedClient";
 
 interface OwnerPuttIq {
@@ -115,6 +116,7 @@ export default function TipsterPageClient({
   isFresh: boolean;
 }) {
   const { user, loading: authLoading } = useAuth();
+  const toast = useToast();
   const [channel, setChannel] = useState<ChannelView>(initialChannel);
   // Default to "feed" so when followers land during live play they
   // see the action immediately. Tips + Chat are one tap away.
@@ -222,17 +224,19 @@ export default function TipsterPageClient({
         }
       } else {
         const j = (await res.json()) as { reason?: string; error?: string };
-        alert(j.reason ?? j.error ?? "Couldn't follow");
+        toast.error(j.reason ?? j.error ?? "Couldn't follow");
       }
     } catch {
-      alert("Network error");
+      toast.error("Network error — try again in a moment");
     } finally {
       setFollowBusy(false);
     }
   }
 
   async function unfollow() {
-    if (followBusy || !confirm(`Unfollow @${channel.slug}?`)) return;
+    if (followBusy) return;
+    const ok = await toast.confirm(`Unfollow @${channel.slug}?`, "Unfollow");
+    if (!ok) return;
     setFollowBusy(true);
     try {
       await fetch(`/api/channels/${channel.slug}/unfollow`, {
@@ -260,14 +264,14 @@ export default function TipsterPageClient({
       );
       if (!res.ok) {
         const j = (await res.json()) as { reason?: string };
-        alert(j.reason ?? "Couldn't track that tip");
+        toast.error(j.reason ?? "Couldn't track that tip");
       } else {
         // Success feedback handled by the button label flip.
         setTimeout(() => setTrackingId(null), 1200);
         return;
       }
     } catch {
-      alert("Network error");
+      toast.error("Network error — try again in a moment");
     }
     setTrackingId(null);
   }
@@ -300,7 +304,7 @@ export default function TipsterPageClient({
       if (!res.ok) {
         setMessages((m) => m.filter((x) => x.id !== optimisticId));
         const j = (await res.json()) as { reason?: string };
-        alert(j.reason ?? "Couldn't send");
+        toast.error(j.reason ?? "Couldn't send");
       } else {
         // Real row lands on next reload tick (≤5s). Replace optimistic
         // with the server message id so the dedup is correct.

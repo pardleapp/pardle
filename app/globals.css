@@ -16227,3 +16227,171 @@ body:has(.v4-theme) {
 .site-footer-link:hover {
   color: var(--text);
 }
+
+/* ── Toast system ────────────────────────────────────────────────
+   Bottom-anchored stack of dismissable + confirm toasts. Replaces
+   the native window.alert / window.confirm flows that used to fire
+   from bet tracker, bet detail, and tipster pages. */
+
+.toast-stack {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #1a1d23;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  animation: toast-in 0.18s ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-success {
+  border-color: rgba(0, 217, 110, 0.45);
+}
+
+.toast-success::before {
+  content: "✓";
+  color: var(--green);
+  font-weight: 900;
+  font-size: 16px;
+}
+
+.toast-error {
+  border-color: rgba(255, 71, 71, 0.5);
+  background: rgba(255, 71, 71, 0.06);
+}
+
+.toast-error::before {
+  content: "!";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ff6b6b;
+  color: #1a0808;
+  font-size: 12px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.toast-info::before {
+  content: "i";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 900;
+  font-style: italic;
+  flex-shrink: 0;
+}
+
+.toast-message {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.toast-close {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  min-width: 28px;
+  min-height: 28px;
+}
+
+.toast-close:hover {
+  color: var(--text);
+}
+
+.toast-confirm {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 16px;
+}
+
+.toast-confirm::before {
+  display: none;
+}
+
+.toast-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.toast-btn {
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+  border: none;
+  min-height: 40px;
+  transition: filter 0.12s, background-color 0.12s;
+}
+
+.toast-btn-cancel {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.toast-btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.toast-btn-confirm {
+  background: var(--green);
+  color: #0a0d12;
+}
+
+.toast-btn-confirm:hover {
+  filter: brightness(1.08);
+}
+
+.toast-btn-confirm:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}

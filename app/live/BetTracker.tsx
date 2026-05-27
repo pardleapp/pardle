@@ -31,6 +31,7 @@ import {
   type WinningScoreBet,
 } from "./bet-shared";
 import { useAuth } from "./auth/useAuth";
+import { useToast } from "./Toast";
 import NotificationPrompt from "./notifications/NotificationPrompt";
 import RecentFormSparkline, {
   type RecentEvent,
@@ -139,6 +140,7 @@ export default function BetTracker({
   oddsFormat,
   onPickOddsFormat,
 }: Props) {
+  const toast = useToast();
   const [bets, setBets] = useState<TrackedBet[]>([]);
   const [open, setOpen] = useState(false);
   const [presetKind, setPresetKind] = useState<BetKind | null>(null);
@@ -411,12 +413,12 @@ export default function BetTracker({
                 body: JSON.stringify({ bets: local }),
               });
               if (!res.ok) {
-                alert(`Sync failed: HTTP ${res.status}`);
+                toast.error(`Sync failed (HTTP ${res.status})`);
                 return;
               }
               const j = (await res.json()) as { migrated?: number };
-              alert(
-                `Synced ${j.migrated ?? 0} bet${j.migrated === 1 ? "" : "s"} to server. Reloading…`,
+              toast.success(
+                `Synced ${j.migrated ?? 0} bet${j.migrated === 1 ? "" : "s"} to server`,
               );
               // Re-pull from server so the freshly-synced bets pick up
               // any settlement state notify-poll has already written.
@@ -439,7 +441,9 @@ export default function BetTracker({
                 writeBets(merged);
               }
             } catch (err) {
-              alert(`Sync error: ${err instanceof Error ? err.message : err}`);
+              toast.error(
+                `Sync error: ${err instanceof Error ? err.message : "unknown"}`,
+              );
             }
           }}
         >

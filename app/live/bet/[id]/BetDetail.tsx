@@ -35,6 +35,7 @@ import {
 } from "../../bet-shared";
 import BetChartFull from "./BetChartFull";
 import { computeBetInsight } from "@/lib/feed/bet-insights";
+import { useToast } from "@/app/live/Toast";
 
 const REFRESH_MS = 6_000;
 
@@ -118,6 +119,7 @@ function buildShareText(
 }
 
 export default function BetDetail({ betId }: { betId: string }) {
+  const toast = useToast();
   const [bet, setBet] = useState<TrackedBet | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [data, setData] = useState<FeedResponse | null>(null);
@@ -330,7 +332,7 @@ export default function BetDetail({ betId }: { betId: string }) {
       if (!res.ok) {
         if (res.status === 401) {
           setShareStatus("err");
-          alert("Sign in first so we can attach the shared bet to you.");
+          toast.error("Sign in first so we can attach the shared bet to you.");
           return;
         }
         setShareStatus("err");
@@ -364,13 +366,18 @@ export default function BetDetail({ betId }: { betId: string }) {
     }
   }
 
-  function removeThis() {
+  async function removeThis() {
     if (!bet) return;
-    if (!confirm("Remove this bet from your tracker?")) return;
+    const ok = await toast.confirm(
+      "Remove this bet from your tracker?",
+      "Remove",
+    );
+    if (!ok) return;
     const remaining = readBets().filter((b) => b.id !== bet.id);
     writeBets(remaining);
-    // Go back home.
-    window.location.href = "/live";
+    // Soft-nav so the user lands cleanly on the bets page rather than
+    // reloading through the /live redirect.
+    window.location.href = "/bets";
   }
 
   if (!hydrated) return null;
