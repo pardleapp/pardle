@@ -2038,6 +2038,20 @@ body {
   line-height: 1;
 }
 
+/* Hide the giant 56px Pardle wordmark on mobile inside the /games
+   header — every other top-nav surface hides its h1 on mobile so the
+   chrome reads consistently. /games is the one outlier that wasn't
+   inside .v4-theme; rather than wrap the whole hub in v4-theme (which
+   would re-skin the game tiles), drop a parallel mobile rule. */
+@media (max-width: 480px) {
+  .hub-header .hub-wordmark {
+    display: none;
+  }
+  .hub-header-split {
+    margin-bottom: 18px;
+  }
+}
+
 .hub-subtitle {
   font-size: 17px;
   color: var(--muted);
@@ -7345,6 +7359,15 @@ footer {
   transition: background-color 0.15s;
 }
 
+/* Mirror the leaderboard mobile rule — sparkline collides with the
+   value + profit cluster on narrow viewports. Hide on phones; the
+   hot/cold avatar badge still carries the momentum signal. */
+@media (max-width: 480px) {
+  .bets-row .recent-form {
+    display: none;
+  }
+}
+
 .bets-row:hover {
   background: rgba(0, 0, 0, 0.04);
 }
@@ -8552,6 +8575,14 @@ footer {
   gap: 5px;
   margin: 3px 0 0;
   padding: 0;
+}
+
+/* Mobile: cap visible chips at 2 (max ~2 lines) so cramped rows
+   don't grow tall on small screens. Desktop sees everything. */
+@media (max-width: 480px) {
+  .feed-tags .feed-tag:nth-child(n + 3) {
+    display: none;
+  }
 }
 
 .feed-tag {
@@ -10242,8 +10273,26 @@ footer {
   border-color: var(--text);
 }
 
+/* Loading-state chip is a fixed-width shimmer block so the header
+   doesn't reflow once auth resolves and "Sign in" / display-name
+   replaces the placeholder. Was a bare "…" character which caused a
+   visible CLS in the top-right corner of every page load. */
 .auth-chip-loading {
-  opacity: 0.6;
+  width: 64px;
+  min-width: 64px;
+  padding: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 200px 100%;
+  background-repeat: no-repeat;
+  background-color: rgba(255, 255, 255, 0.04);
+  animation: pardle-skeleton-shimmer 1.4s ease-in-out infinite;
+  color: transparent;
+  border-color: var(--border);
 }
 
 .auth-chip-wrap {
@@ -14518,8 +14567,12 @@ body:has(.v4-theme) {
     flex-shrink: 0;
     gap: 6px;
   }
+  /* Mobile: keep the short label visible (just "Hot" / "Cold") so
+     the row's meaning is legible. Was hidden entirely which left
+     an emoji-only carousel that newer visitors didn't parse. */
   .v4-theme .momentum-row-label-text {
-    display: none;
+    display: inline-flex;
+    font-size: 9.5px;
   }
   .v4-theme .momentum-chips {
     padding-right: 0;
@@ -15812,9 +15865,15 @@ body:has(.v4-theme) {
   gap: 4px;
 }
 
+/* Mobile: keep the 9-across grid (front 9 + back 9 each fit one
+   row of nine compact tiles) instead of collapsing to 3 columns
+   which cost 2-3 screens of scroll. Tiles shrink + flatten on
+   small viewports — players inside become a single avatar stack
+   when more than 1 player is on a hole. */
 @media (max-width: 720px) {
   .course-map-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    gap: 2px;
   }
 }
 
@@ -15827,6 +15886,15 @@ body:has(.v4-theme) {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+@media (max-width: 720px) {
+  .course-hole {
+    min-height: 56px;
+    padding: 4px 2px 3px;
+    border-radius: 6px;
+    gap: 2px;
+  }
 }
 
 .course-hole-empty {
@@ -15924,6 +15992,18 @@ body:has(.v4-theme) {
   text-transform: uppercase;
 }
 
+@media (max-width: 720px) {
+  .course-hole-num {
+    font-size: 10px;
+  }
+  .course-hole-par {
+    display: none;
+  }
+  .course-hole-head {
+    padding: 0;
+  }
+}
+
 .course-hole-players {
   display: flex;
   flex-direction: column;
@@ -15954,6 +16034,46 @@ body:has(.v4-theme) {
   color: var(--text);
   overflow: hidden;
   min-height: 22px;
+}
+
+/* Mobile compaction: the 9-across grid means each tile is ~36px
+   wide on a 360px viewport. Player chips collapse to a single
+   coloured dot — semantic colour preserved via the border-left
+   classes, no text. Tap-through still works because the link
+   wraps the dot. */
+@media (max-width: 720px) {
+  .course-player {
+    min-height: 8px;
+    padding: 0;
+    gap: 0;
+    background: transparent;
+    border-radius: 999px;
+    width: 6px;
+    height: 6px;
+    align-self: center;
+    flex-shrink: 0;
+  }
+  .course-player-up {
+    background: var(--green);
+    border-left: none;
+  }
+  .course-player-down {
+    background: var(--red);
+    border-left: none;
+  }
+  .course-player-even {
+    background: var(--text-faint);
+    border-left: none;
+  }
+  .course-player-name {
+    display: none;
+  }
+  .course-hole-players {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 3px;
+  }
 }
 
 .course-player:hover {

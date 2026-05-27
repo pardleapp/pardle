@@ -1002,11 +1002,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                         );
                       }
                       if (chips.length === 0) return null;
-                      // Cap at 2 visible chips. Extras are dropped on
-                      // mobile (the data is still surfaced on the bet
-                      // detail card for tracked bets).
-                      const visible = chips.slice(0, 2);
-                      return <p className="feed-tags">{visible}</p>;
+                      // Render all chips and let CSS wrap them; the
+                      // feed-tags container uses flex-wrap with a
+                      // mobile-only line-clamp so phones still get 2
+                      // visible while tablet+ shows everything.
+                      return <p className="feed-tags">{chips}</p>;
                     })()}
                     <p className="feed-meta">
                       R{event.round} · {timeAgo(event.ts)}
