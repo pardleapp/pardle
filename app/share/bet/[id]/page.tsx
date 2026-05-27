@@ -1,9 +1,10 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { BRAND } from "@/lib/brand";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import type { TrackedBet } from "@/app/live/bet-shared";
+import AuthChip from "@/app/live/auth/AuthChip";
+import MainNav from "@/app/MainNav";
 import SharedBetView from "./SharedBetView";
 
 interface PageProps {
@@ -108,14 +109,15 @@ export default async function SharedBetPage({ params }: PageProps) {
   if (!share) notFound();
 
   return (
-    <main className="container container-wide">
-      <header className="brand">
-        <Link className="brand-back" href="/" aria-label="Go to Pardle">
-          ←
-        </Link>
+    <main className="container container-wide v4-theme">
+      <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
-        <p className="subtitle">{share.ownerName}&apos;s bet</p>
+        <div className="brand-nav">
+          <MainNav active="none" />
+          <AuthChip />
+        </div>
       </header>
+      <p className="lb-page-tournament">{share.ownerName}&apos;s bet</p>
       <SharedBetView bet={share.bet} ownerName={share.ownerName} />
     </main>
   );

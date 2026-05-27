@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import FeedClient from "@/app/live/FeedClient";
+import AuthChip from "@/app/live/auth/AuthChip";
+import MainNav from "@/app/MainNav";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -30,14 +31,13 @@ export const dynamic = "force-dynamic";
 export default async function ReplayPage({ params }: PageProps) {
   const { id } = await params;
   return (
-    <main className="container container-wide">
+    <main className="container container-wide v4-theme">
       <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
         <div className="brand-nav">
           <span className="replay-badge">REPLAY · {id}</span>
-          <Link href="/" className="hub-nav-tab">
-            ← Live feed
-          </Link>
+          <MainNav active="none" />
+          <AuthChip />
         </div>
       </header>
       <FeedClient forcedTournamentId={id} />

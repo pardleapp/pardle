@@ -9,9 +9,10 @@
  * inline and persisted to Redis via /api/leaderboard/polls/name.
  */
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BRAND } from "@/lib/brand";
+import AuthChip from "../../live/auth/AuthChip";
+import MainNav from "../../MainNav";
 
 const AUTHOR_KEY_STORAGE = "pardle_feed_author";
 
@@ -99,27 +100,39 @@ export default function PollsLeaderboardPage() {
   }
 
   return (
-    <main
-      className="v4-theme"
-      style={{ maxWidth: 720, margin: "0 auto", padding: "24px 16px 60px" }}
-    >
-      <header className="brand">
-        <Link className="brand-back" href="/" aria-label="Back to feed">
-          ←
-        </Link>
+    <main className="container container-wide v4-theme">
+      <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
-        <p className="subtitle">
-          Putt-call leaderboard
-          {data?.tournament ? ` · ${data.tournament.name}` : ""}
-        </p>
+        <div className="brand-nav">
+          <MainNav active="leaderboard" />
+          <AuthChip />
+        </div>
       </header>
+      <p className="lb-page-tournament">
+        Putt-call leaderboard
+        {data?.tournament ? ` · ${data.tournament.name}` : ""}
+      </p>
 
       {error && !data && (
         <p className="feed-empty">
           Couldn&apos;t load the leaderboard. It&apos;ll retry automatically.
         </p>
       )}
-      {!data && !error && <p className="feed-empty">Loading…</p>}
+      {!data && !error && (
+        <ul className="lb-skeleton-list" aria-label="Loading leaderboard">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <li key={i} className="lb-skeleton-row">
+              <div className="skeleton-line lb-skeleton-pos" />
+              <div className="skeleton-avatar lb-skeleton-avatar" />
+              <div className="skeleton-line lb-skeleton-name" />
+              <div className="lb-skeleton-score">
+                <div className="skeleton-line lb-skeleton-total" />
+                <div className="skeleton-line lb-skeleton-thru" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {data && (
         <>

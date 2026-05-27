@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { BRAND } from "@/lib/brand";
+import AuthChip from "../../live/auth/AuthChip";
+import MainNav from "../../MainNav";
 import CreateTipsterForm from "./CreateTipsterForm";
 
 export const metadata: Metadata = {
@@ -13,14 +14,16 @@ export const dynamic = "force-dynamic";
 
 export default function NewTipsterPage() {
   return (
-    <main className="container">
+    <main className="container container-wide v4-theme">
       <header className="brand brand-split">
-        <h1>Become a tipster</h1>
-        <Link href="/" className="hub-nav-tab">
-          ← back
-        </Link>
+        <h1>{BRAND.name}</h1>
+        <div className="brand-nav">
+          <MainNav active="none" />
+          <AuthChip />
+        </div>
       </header>
       <section className="tipster-create">
+        <h2 className="tipster-create-title">Become a tipster</h2>
         <p className="tipster-create-intro">
           Your page is where you post bets to your followers in real time.
           They get a push when you drop a tip, can one-click track it into
