@@ -395,7 +395,7 @@ export default function BetDetail({ betId }: { betId: string }) {
     );
   }
   if (!data) {
-    return <p className="feed-empty">Loading…</p>;
+    return <BetDetailSkeleton />;
   }
 
   const settled = detectBetSettlement(
@@ -871,5 +871,28 @@ function InsightCard({
       <p className="bd-insight-headline">{insight.headline}</p>
       {insight.hint && <p className="bd-insight-hint">{insight.hint}</p>}
     </div>
+  );
+}
+
+// ── Loading skeleton ───────────────────────────────────────────────
+// Mirrors the real surface's shape — PnL hero on top, name strip,
+// chart frame — so the cold-load → painted transition doesn't
+// snap visibly. Was plain "Loading…" text inside a feed-empty box.
+
+function BetDetailSkeleton() {
+  return (
+    <section className="bd-wrap" aria-busy="true">
+      <div className="bd-head bd-head-hero">
+        <div className="skeleton-line bd-skeleton-amt" />
+        <div className="skeleton-line bd-skeleton-sub" />
+      </div>
+      <div className="skeleton-block bd-skeleton-name" />
+      <div className="skeleton-block bd-skeleton-chart" />
+      <div className="bd-skeleton-stats">
+        <div className="skeleton-line bd-skeleton-stat" />
+        <div className="skeleton-line bd-skeleton-stat" />
+        <div className="skeleton-line bd-skeleton-stat" />
+      </div>
+    </section>
   );
 }

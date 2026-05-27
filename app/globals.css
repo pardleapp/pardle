@@ -9007,11 +9007,17 @@ footer {
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  border: 1px solid rgba(255, 157, 46, 0.45);
+  border: 1px solid rgba(255, 157, 46, 0.55);
   border-radius: 999px;
-  background: rgba(255, 157, 46, 0.1);
+  background: rgba(255, 157, 46, 0.16);
   text-decoration: none;
-  color: #b4660a;
+  /* Bright amber against the dark v4 surface — was #b4660a which
+     contrast-fails (~2.7:1) against dark backgrounds. v4-theme is
+     the only context this chip ever renders inside, so make the
+     bright value the base instead of relying on a prefers-color-
+     scheme media query that doesn't fire when the OS is in light
+     mode but our surface is dark. */
+  color: #ffb55a;
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -9034,7 +9040,7 @@ footer {
 .sharp-chip-acc {
   font-weight: 900;
   font-size: 13.5px;
-  color: #b4660a;
+  color: #ffb55a;
 }
 
 .sharp-chip-new {
@@ -9067,13 +9073,7 @@ footer {
 .sharp-chip-cold .sharp-chip-cta {
   font-weight: 900;
   font-size: 12px;
-  color: #b4660a;
-}
-
-@media (prefers-color-scheme: dark) {
-  .sharp-chip-cold .sharp-chip-cta {
-    color: #ffb55a;
-  }
+  color: #ffb55a;
 }
 
 @keyframes sharp-chip-cold-pulse {
@@ -9314,27 +9314,12 @@ footer {
 }
 
 .sharp-chip-rank {
-  background: #b4660a;
-  color: #fff;
+  background: #ffb55a;
+  color: #1a0f02;
   padding: 1px 6px;
   border-radius: 999px;
   font-size: 10px;
   font-weight: 800;
-}
-
-@media (prefers-color-scheme: dark) {
-  .sharp-chip {
-    color: #ffb55a;
-    background: rgba(255, 157, 46, 0.16);
-    border-color: rgba(255, 157, 46, 0.55);
-  }
-  .sharp-chip-acc {
-    color: #ffb55a;
-  }
-  .sharp-chip-rank {
-    background: #ffb55a;
-    color: #1a0f02;
-  }
 }
 
 /* ── Putt-call leaderboard page ──────────────────────────────────── */
@@ -9966,13 +9951,16 @@ footer {
    comfortably tappable (≥40px is the iOS HIG minimum). */
 @media (max-width: 480px) {
   .feed-burst-bar {
-    gap: 4px;
-    padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+    gap: 2px;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
   }
   .feed-burst-btn {
-    width: 40px;
-    height: 40px;
-    font-size: 21px;
+    /* Apple HIG 44px minimum tap target — was 40px which mis-taps
+       on the dominant social CTA. Gap + padding shrunk so six
+       buttons still fit a 360px viewport. */
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
   }
 }
 
@@ -12734,6 +12722,7 @@ body:has(.v4-theme) {
 .v4-theme .feed-react {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   font-size: 11px;
   font-weight: 700;
@@ -12741,6 +12730,12 @@ body:has(.v4-theme) {
   background: transparent;
   border: none;
   padding: 5px 8px;
+  /* 44px touch target on mobile per Apple HIG / project's own ≥44px
+     rule. Reactions are the social-pillar CTAs so they get full
+     hit-area on every viewport; desktop override below pads further
+     for the bigger pill treatment. */
+  min-height: 44px;
+  min-width: 44px;
   border-radius: 999px;
   cursor: pointer;
   transition: background 100ms, color 100ms, border-color 100ms;
@@ -14722,7 +14717,8 @@ body:has(.v4-theme) {
 .v4-theme .skeleton-line,
 .v4-theme .skeleton-avatar,
 .v4-theme .skeleton-score,
-.v4-theme .skeleton-body {
+.v4-theme .skeleton-body,
+.v4-theme .skeleton-block {
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0.04) 0%,
@@ -14734,6 +14730,54 @@ body:has(.v4-theme) {
   background-color: rgba(255, 255, 255, 0.04);
   animation: pardle-skeleton-shimmer 1.4s ease-in-out infinite;
   border-radius: 6px;
+}
+
+/* Larger flat blocks for non-text skeletons (chart frame, image
+   placeholder, name strip). Larger border-radius reads as a panel
+   rather than a text line. */
+.v4-theme .skeleton-block {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+/* Bet-detail skeleton sizings — match the real surface's shape so
+   the cold-load → painted transition doesn't snap. The hero amount
+   placeholder is intentionally chunky (matches the bd-hero-amt
+   font-size). */
+.v4-theme .bd-skeleton-amt {
+  width: 60%;
+  max-width: 220px;
+  height: 36px;
+  border-radius: 8px;
+}
+
+.v4-theme .bd-skeleton-sub {
+  width: 40%;
+  max-width: 160px;
+  height: 14px;
+}
+
+.v4-theme .bd-skeleton-name {
+  height: 32px;
+  width: 100%;
+}
+
+.v4-theme .bd-skeleton-chart {
+  height: 280px;
+  width: 100%;
+}
+
+.v4-theme .bd-skeleton-stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.v4-theme .bd-skeleton-stat {
+  flex: 1 1 90px;
+  height: 50px;
+  min-width: 90px;
+  border-radius: 10px;
 }
 
 .v4-theme .skeleton-line {

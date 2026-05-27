@@ -14,6 +14,8 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
+import AuthChip from "./live/auth/AuthChip";
+import MainNav from "./MainNav";
 
 export default function ErrorBoundary({
   error,
@@ -34,6 +36,10 @@ export default function ErrorBoundary({
             {BRAND.name}
           </Link>
         </h1>
+        <div className="brand-nav">
+          <MainNav active="none" />
+          <AuthChip />
+        </div>
       </header>
       <section className="error-shell">
         <p className="error-eyebrow">Something went wrong</p>

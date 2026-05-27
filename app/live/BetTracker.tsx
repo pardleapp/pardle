@@ -512,9 +512,9 @@ export default function BetTracker({
         <div className="bets-empty-state">
           <h3 className="bets-empty-title">Track your first bet</h3>
           <p className="bets-empty-blurb">
-            Add a bet from your book (DraftKings, FanDuel, Polymarket,
-            or anywhere) — Pardle shows you the fair value live, with
-            a £ swing on every shot that moves the needle.
+            Add a bet from your bookmaker — Pardle shows you the fair
+            value live, with a £ swing on every shot that moves the
+            needle.
           </p>
           <div className="bets-empty-grid">
             <button

@@ -16,7 +16,7 @@ const inter = Inter({
 });
 
 const description =
-  "Track your golf bets live, see fair value tick every minute, and watch the tournament alongside other bettors.";
+  "Track your golf bets live, see the fair value move with every shot, and watch the tournament alongside other bettors.";
 const ogTitle = `${BRAND.name} — Live bet tracker + tournament feed`;
 
 export const metadata: Metadata = {

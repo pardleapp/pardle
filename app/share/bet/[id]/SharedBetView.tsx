@@ -122,7 +122,19 @@ export default function SharedBetView({ bet, ownerName }: Props) {
     );
   }
   if (!data) {
-    return <p className="feed-empty">Loading…</p>;
+    // Critical: this is the viral-share landing page. Plain "Loading"
+    // text used to paint here for ~1-2s before snapping to the rich
+    // hero + chart — a cold visitor's first impression of Pardle.
+    return (
+      <section className="bd-wrap" aria-busy="true">
+        <div className="bd-head bd-head-hero">
+          <div className="skeleton-line bd-skeleton-amt" />
+          <div className="skeleton-line bd-skeleton-sub" />
+        </div>
+        <div className="skeleton-block bd-skeleton-name" />
+        <div className="skeleton-block bd-skeleton-chart" />
+      </section>
+    );
   }
 
   const nowValue = currentValueForBet(

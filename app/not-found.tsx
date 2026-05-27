@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { BRAND } from "@/lib/brand";
+import AuthChip from "./live/auth/AuthChip";
+import MainNav from "./MainNav";
 
 export const metadata: Metadata = {
   title: `Page not found — ${BRAND.name}`,
@@ -15,6 +17,10 @@ export default function NotFound() {
             {BRAND.name}
           </Link>
         </h1>
+        <div className="brand-nav">
+          <MainNav active="none" />
+          <AuthChip />
+        </div>
       </header>
       <section className="error-shell">
         <p className="error-eyebrow">404</p>
