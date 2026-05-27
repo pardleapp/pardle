@@ -12,6 +12,7 @@ import {
 } from "@/lib/odds-format";
 import CatchMeUp from "./CatchMeUp";
 import CommentThread from "./CommentThread";
+import FeedSkeleton from "./FeedSkeleton";
 import FollowButton, { getFollows } from "./FollowButton";
 import HeroIntro from "./HeroIntro";
 import OffWeekLanding from "./OffWeekLanding";
@@ -35,6 +36,19 @@ import ReelGroup from "./ReelGroup";
 const REFRESH_MS = 3_000;
 const REFRESH_MS_HIDDEN = 30_000;
 const AUTHOR_KEY_STORAGE = "pardle_feed_author";
+/** Cache the last successful /api/feed response so repeat visits show
+ *  data instantly + revalidate in the background. ~1h freshness — if
+ *  older the user gets a normal skeleton, since stale tournament state
+ *  could confuse (e.g. yesterday's "live" data appearing on a new
+ *  tournament's tee day). Versioned so we can invalidate on payload
+ *  shape changes. */
+const FEED_CACHE_STORAGE = "pardle_feed_cache_v1";
+const FEED_CACHE_TTL_MS = 60 * 60 * 1000;
+/** Rolling log of recent fetch durations (ms). Drives the honest
+ *  "usually ~2.1s" hint on the skeleton — gives the user a calibrated
+ *  expectation instead of an open-ended wait. */
+const FEED_LOAD_TIMES_STORAGE = "pardle_feed_load_times_v1";
+const FEED_LOAD_TIMES_KEEP = 8;
 const BURST_EMOJIS = ["🔥", "😱", "⛳", "👏", "💀", "🐐"];
 const FLOATER_LIFETIME_MS = 2600;
 
@@ -175,6 +189,74 @@ function getAuthorKey(): string {
   return k;
 }
 
+interface CachedFeedEnvelope {
+  ts: number;
+  data: FeedResponse;
+}
+
+function readCachedFeed(): FeedResponse | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(FEED_CACHE_STORAGE);
+    if (!raw) return null;
+    const env = JSON.parse(raw) as CachedFeedEnvelope;
+    if (!env?.ts || !env.data) return null;
+    if (Date.now() - env.ts > FEED_CACHE_TTL_MS) return null;
+    return env.data;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedFeed(data: FeedResponse): void {
+  if (typeof window === "undefined") return;
+  try {
+    const env: CachedFeedEnvelope = { ts: Date.now(), data };
+    window.localStorage.setItem(FEED_CACHE_STORAGE, JSON.stringify(env));
+  } catch {
+    // localStorage full / disabled — silent. Cache miss next time is fine.
+  }
+}
+
+function readLoadTimes(): number[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(FEED_LOAD_TIMES_STORAGE);
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as unknown;
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((n): n is number => typeof n === "number" && n > 0);
+  } catch {
+    return [];
+  }
+}
+
+function recordLoadTime(ms: number): number[] {
+  if (typeof window === "undefined") return [];
+  const arr = readLoadTimes();
+  arr.push(ms);
+  const trimmed = arr.slice(-FEED_LOAD_TIMES_KEEP);
+  try {
+    window.localStorage.setItem(
+      FEED_LOAD_TIMES_STORAGE,
+      JSON.stringify(trimmed),
+    );
+  } catch {
+    // silent
+  }
+  return trimmed;
+}
+
+function medianMs(times: number[]): number | null {
+  if (times.length === 0) return null;
+  const sorted = [...times].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  return sorted[mid];
+}
+
 /**
  * Coarse "time ago" label. The orchestrator's score data lags real
  * play by a couple of minutes, so the `ts` we capture at detection is
@@ -261,9 +343,20 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
   const authorKey = useRef<string>("");
   const seenBursts = useRef<Set<string>>(new Set());
+  // Median /api/feed duration across recent fetches (ms). Drives the
+  // honest "usually ~2.1s" hint on the skeleton. Hydrated from
+  // localStorage on mount + updated after each successful load.
+  const [medianLoadMs, setMedianLoadMs] = useState<number | null>(null);
 
   useEffect(() => {
     authorKey.current = getAuthorKey();
+    // Cached-first display: show last successful response immediately
+    // so repeat visits feel instant. Background fetch (kicked off by
+    // the load() polling effect below) replaces with fresh data
+    // within the typical 1-3s, no visual interruption.
+    const cached = readCachedFeed();
+    if (cached) setData(cached);
+    setMedianLoadMs(medianMs(readLoadTimes()));
   }, []);
 
   // Track followed players — re-read whenever a FollowButton fires the event.
@@ -313,6 +406,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   }, []);
 
   const load = useCallback(async () => {
+    const startedAt = performance.now();
     try {
       const tParam = forcedTournamentId
         ? `&tournamentId=${encodeURIComponent(forcedTournamentId)}`
@@ -331,6 +425,16 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       }
       setData(json);
       setError(false);
+      // Cache for instant repeat-visit display. Skipped for past-
+      // tournament replays so we don't poison the home cache.
+      if (!forcedTournamentId) {
+        writeCachedFeed(json);
+      }
+      // Record this fetch's duration so the skeleton's "usually ~X.Xs"
+      // hint stays calibrated to the user's actual experience.
+      const duration = performance.now() - startedAt;
+      const updated = recordLoadTime(duration);
+      setMedianLoadMs(medianMs(updated));
 
       // Once the server has a recorded vote for a poll, drop the
       // optimistic overlay so closed-poll outcomes (made/missed)
@@ -492,11 +596,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     );
   }
   if (!data) {
-    return (
-      <section className="feed-wrap v4-theme">
-        <p className="feed-empty">Loading the feed…</p>
-      </section>
-    );
+    return <FeedSkeleton hintMs={medianLoadMs} />;
   }
   if (!data.tournament) {
     return <OffWeekLanding tournament={null} />;
