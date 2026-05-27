@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type JSX } from "react";
 import type { Burst, CachedLeaderboardRow } from "@/lib/feed/store";
 import type { FeedRow } from "@/lib/feed/types";
@@ -308,9 +307,25 @@ interface FeedClientProps {
   forcedTournamentId?: string;
 }
 
+const FIRST_BET_DISMISSED_KEY = "pardle_first_bet_dismissed_v1";
+
 export default function FeedClient({ forcedTournamentId }: FeedClientProps = {}) {
-  const router = useRouter();
   const [data, setData] = useState<FeedResponse | null>(null);
+  const [firstBetDismissed, setFirstBetDismissed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setFirstBetDismissed(
+      !!window.localStorage.getItem(FIRST_BET_DISMISSED_KEY),
+    );
+  }, []);
+
+  const dismissFirstBet = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(FIRST_BET_DISMISSED_KEY, "1");
+    }
+    setFirstBetDismissed(true);
+  }, []);
   const [error, setError] = useState(false);
   const [myReactions, setMyReactions] = useState<
     Record<string, "up" | "down">
@@ -703,33 +718,49 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           Without this, a cold visitor sees PnL chips ("🚀 +£42")
           on other players' rows but has no signal those chips
           would personalise to their stake. */}
-      {trackedBets.length === 0 && (
-        <Link href="/bets" className="feed-first-bet-cta">
-          <span className="feed-first-bet-cta-icon" aria-hidden="true">
-            📌
-          </span>
-          <span className="feed-first-bet-cta-body">
-            <span className="feed-first-bet-cta-title">
-              Track your first bet
-            </span>
-            <span className="feed-first-bet-cta-blurb">
-              See the £ swing on every shot, live
-            </span>
-          </span>
-          <span className="feed-first-bet-cta-arrow" aria-hidden="true">
-            →
-          </span>
-        </Link>
-      )}
-
-      {/* Sharp Score onboarding card — shown once for visitors with
-          zero settled calls. The chip in the header is for already-
-          engaged users; this card is the discovery hook for everyone
-          else. Self-dismisses the moment the visitor records their
-          first call (data.mySharp.total goes 0 → 1+). */}
-      {(data.mySharp?.total ?? 0) === 0 && (
+      {/* Onboarding cards — show only ONE at a time so a brand-new
+          visitor doesn't see three large promo blocks stacked above
+          the feed. Priority order:
+            1. Zero bets → first-bet CTA (most direct value prop)
+            2. Has bets, zero Sharp calls → Sharp Score onboard
+                (the identity / credibility layer kicks in once the
+                user is already invested in tracking)
+            3. Has calls → nothing (header chip handles their state)
+          First-bet CTA is permanently dismissable via the × so
+          returning visitors who deliberately don't track bets don't
+          get re-nagged forever. */}
+      {trackedBets.length === 0 ? (
+        !firstBetDismissed && (
+          <div className="feed-first-bet-cta-wrap">
+            <Link href="/bets" className="feed-first-bet-cta">
+              <span className="feed-first-bet-cta-icon" aria-hidden="true">
+                📌
+              </span>
+              <span className="feed-first-bet-cta-body">
+                <span className="feed-first-bet-cta-title">
+                  Track your first bet
+                </span>
+                <span className="feed-first-bet-cta-blurb">
+                  See the swing on every shot, live
+                </span>
+              </span>
+              <span className="feed-first-bet-cta-arrow" aria-hidden="true">
+                →
+              </span>
+            </Link>
+            <button
+              type="button"
+              className="feed-first-bet-cta-dismiss"
+              onClick={dismissFirstBet}
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        )
+      ) : (data.mySharp?.total ?? 0) === 0 ? (
         <SharpScoreOnboard />
-      )}
+      ) : null}
 
       <MomentumStrip momentum={data.fieldMomentum} />
 
@@ -809,31 +840,33 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                     size="md"
                     state={data.handStatus?.[event.playerId] ?? null}
                   />
-                  <Link
-                    href={`/live/player/${event.playerId}`}
-                    className="feed-body feed-body-link"
-                  >
-                    <div className="feed-row-head">
-                      <span className="feed-row-name">
-                        {abbreviateName(event.playerName)}
-                        {data.handStatus?.[event.playerId] && (
-                          <HandBadge
-                            status={data.handStatus[event.playerId]}
-                          />
-                        )}
-                      </span>
-                      <ScoreChip event={event} />
-                    </div>
-                    {/* Action sentence only on events whose score chip
-                        can't carry the full identity — shots and polls.
-                        Score events (birdie/eagle/bogey/etc.) get the
-                        result label baked into the chip itself, so a
-                        duplicate "Birdies the 14th" line would be noise. */}
-                    {event.type !== "score" && (
-                      <p className="feed-row-action">
-                        {stripPlayerName(event.headline, event.playerName)}
-                      </p>
-                    )}
+                  <div className="feed-body">
+                    <Link
+                      href={`/live/player/${event.playerId}`}
+                      className="feed-body-link"
+                    >
+                      <div className="feed-row-head">
+                        <span className="feed-row-name">
+                          {abbreviateName(event.playerName)}
+                          {data.handStatus?.[event.playerId] && (
+                            <HandBadge
+                              status={data.handStatus[event.playerId]}
+                            />
+                          )}
+                        </span>
+                        <ScoreChip event={event} />
+                      </div>
+                      {/* Action sentence only on events whose score chip
+                          can't carry the full identity — shots and polls.
+                          Score events (birdie/eagle/bogey/etc.) get the
+                          result label baked into the chip itself, so a
+                          duplicate "Birdies the 14th" line would be noise. */}
+                      {event.type !== "score" && (
+                        <p className="feed-row-action">
+                          {stripPlayerName(event.headline, event.playerName)}
+                        </p>
+                      )}
+                    </Link>
                     {(() => {
                       const backingPct =
                         data.communityBackingPct?.[event.playerId];
@@ -885,22 +918,14 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                             ? "lifts"
                             : "hurts"
                           : "on";
-                        // Rendered as a button (not a Link) because the
-                        // surrounding feed row is wrapped in an anchor to
-                        // /live/player/X — HTML forbids nested <a>. The
-                        // button intercepts the tap, stops propagation
-                        // so the outer link doesn't fire, then router-
-                        // pushes the bet detail.
+                        // Now a real Link — the feed-tags paragraph is
+                        // a sibling of the player Link, not nested
+                        // inside it, so anchors are valid here.
                         const betHref = `/live/bet/${impact.bet.id}`;
                         chips.push(
-                          <button
-                            type="button"
+                          <Link
                             key="impact"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              router.push(betHref);
-                            }}
+                            href={betHref}
                             className={`feed-tag feed-tag-impact ${
                               positive
                                 ? "feed-tag-impact-up"
@@ -913,7 +938,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                             }
                           >
                             {emoji} {formatImpactGbp(impact.deltaValue)} {verb} your {kindLabel}
-                          </button>,
+                          </Link>,
                         );
                       }
                       // Hot chip jumps the queue before odds/top-10/
@@ -1008,10 +1033,15 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                       // visible while tablet+ shows everything.
                       return <p className="feed-tags">{chips}</p>;
                     })()}
-                    <p className="feed-meta">
-                      R{event.round} · {timeAgo(event.ts)}
-                    </p>
-                  </Link>
+                    <Link
+                      href={`/live/player/${event.playerId}`}
+                      className="feed-body-link feed-meta-link"
+                    >
+                      <p className="feed-meta">
+                        R{event.round} · {timeAgo(event.ts)}
+                      </p>
+                    </Link>
+                  </div>
                   {event.type === "putt-poll" &&
                     event.pollId &&
                     // Latest open poll → render widget for live voting.

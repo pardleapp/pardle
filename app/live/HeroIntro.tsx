@@ -38,7 +38,7 @@ export default function HeroIntro() {
           The live tracker for golf bettors
         </p>
         <p className="hero-intro-blurb">
-          Live shot-by-shot · £ swing on every bet · react with other bettors
+          Live shot-by-shot · see the swing on every bet · react with other bettors
         </p>
       </div>
       <button
