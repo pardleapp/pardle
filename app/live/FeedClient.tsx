@@ -1097,8 +1097,13 @@ function FeedWarmingUp({
           <ul className="feed-warming-list">
             {onCourseTop.map((p) => (
               <li key={p.playerId} className="feed-warming-row">
+                <PlayerAvatar
+                  playerId={p.playerId}
+                  playerName={p.displayName}
+                  size="sm"
+                />
                 <span className="feed-warming-row-name">
-                  {p.displayName}
+                  {abbreviateName(p.displayName)}
                 </span>
                 <span className="feed-warming-row-meta">
                   thru {p.thru} · {p.total}
@@ -1114,8 +1119,13 @@ function FeedWarmingUp({
           <ul className="feed-warming-list">
             {yetToTeeTop.map((p) => (
               <li key={p.playerId} className="feed-warming-row">
+                <PlayerAvatar
+                  playerId={p.playerId}
+                  playerName={p.displayName}
+                  size="sm"
+                />
                 <span className="feed-warming-row-name">
-                  {p.displayName}
+                  {abbreviateName(p.displayName)}
                 </span>
                 <span className="feed-warming-row-meta">{p.position}</span>
               </li>
