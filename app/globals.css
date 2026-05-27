@@ -10375,6 +10375,43 @@ footer {
   cursor: pointer;
 }
 
+/* v4-theme override — the base styles use var(--surface) for bg
+   which v4 doesn't redefine, leaving the prompt with a white card
+   bg while var(--text) flips to light. Net effect: white-on-white,
+   title invisible. Force the dark v4 surface + bright text inside
+   the v4 container. */
+.v4-theme .notif-prompt {
+  background: var(--bg-card);
+  border-color: var(--border-strong);
+}
+
+.v4-theme .notif-prompt-title {
+  color: var(--text);
+}
+
+.v4-theme .notif-prompt-blurb {
+  color: var(--muted);
+}
+
+.v4-theme .notif-prompt-dismiss {
+  border-color: var(--border-strong);
+  color: var(--muted);
+}
+
+.v4-theme .notif-prompt-dismiss:hover {
+  color: var(--text);
+  background: var(--bg-card-hi);
+}
+
+.v4-theme .notif-prompt-enable {
+  background: var(--green);
+  color: #0a0d12;
+}
+
+.v4-theme .notif-prompt-enable:hover {
+  filter: brightness(1.08);
+}
+
 .notif-prompt-enable[disabled] {
   opacity: 0.6;
   cursor: progress;
