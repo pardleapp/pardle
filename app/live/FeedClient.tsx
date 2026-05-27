@@ -13,6 +13,7 @@ import {
 import CatchMeUp from "./CatchMeUp";
 import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
+import HeroIntro from "./HeroIntro";
 import { abbreviateName } from "@/lib/text/abbreviate";
 import { readBets, type TrackedBet } from "./bet-shared";
 import {
@@ -548,6 +549,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
   return (
     <section className="feed-wrap v4-theme">
+      <HeroIntro />
       <div className="feed-header-row">
         <h2 className="feed-tournament-name">
           <span
@@ -561,6 +563,30 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       </div>
 
       <PlayerSearch players={data.playerIndex ?? []} />
+
+      {/* First-bet CTA — self-dismisses the moment the user adds
+          their first tracked bet (trackedBets.length goes 0 → 1).
+          Without this, a cold visitor sees PnL chips ("🚀 +£42")
+          on other players' rows but has no signal those chips
+          would personalise to their stake. */}
+      {trackedBets.length === 0 && (
+        <Link href="/bets" className="feed-first-bet-cta">
+          <span className="feed-first-bet-cta-icon" aria-hidden="true">
+            📌
+          </span>
+          <span className="feed-first-bet-cta-body">
+            <span className="feed-first-bet-cta-title">
+              Track your first bet
+            </span>
+            <span className="feed-first-bet-cta-blurb">
+              See the £ swing on every shot, live
+            </span>
+          </span>
+          <span className="feed-first-bet-cta-arrow" aria-hidden="true">
+            →
+          </span>
+        </Link>
+      )}
 
       <MomentumStrip momentum={data.fieldMomentum} />
 
@@ -886,8 +912,8 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       )}
 
       <p className="feed-footnote">
-        Live PGA Tour scoring · auto-refreshes every 15s · usually within
-        ~30s of the course
+        Live PGA Tour scoring · refreshes every 3s · usually within
+        15s of the course
       </p>
 
       {/* Floating-emoji overlay — fixed so bursts rise over the whole feed */}
