@@ -59,9 +59,16 @@ export default function LeaderboardClient() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/feed?v=${authorKey.current}`, {
-        cache: "no-store",
-      });
+      // prefer=last-completed tells /api/feed to fall back to the most
+      // recently concluded tournament when nothing's currently live —
+      // so the leaderboard tab stays useful Mon-Wed between events
+      // instead of reading "this week's tournament hasn't started".
+      const res = await fetch(
+        `/api/feed?v=${authorKey.current}&prefer=last-completed`,
+        {
+          cache: "no-store",
+        },
+      );
       if (!res.ok) throw new Error(String(res.status));
       const json = (await res.json()) as LbResponse;
       setData(json);
@@ -120,7 +127,7 @@ export default function LeaderboardClient() {
   return (
     <section className="v4-theme lb-page">
       <p className="lb-page-tournament">
-        {data.tournament.isLive ? "Live · " : ""}
+        {data.tournament.isLive ? "Live · " : "Final · "}
         {data.tournament.name}
       </p>
       <LeaderboardPanel

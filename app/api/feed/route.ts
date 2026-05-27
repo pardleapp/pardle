@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
-import { getActiveTournament } from "@/lib/golf-api/pgatour";
+import {
+  getActiveTournament,
+  getLeaderboard,
+} from "@/lib/golf-api/pgatour";
 import { pollAndDiff } from "@/lib/feed/engine";
 import {
   acquirePollLock,
+  cacheLeaderboard,
   computeFieldStats,
   getCommentCountsBulk,
   getFeedBundle,
@@ -91,6 +95,14 @@ async function handle(req: Request) {
   // page does, and it opts in with ?include=charts. This drops the
   // /api/feed payload from ~150 KB to ~20 KB per poll.
   const includeChartData = url.searchParams.get("include") === "charts";
+  // Leaderboard fallback: when no tournament is currently live, the
+  // /leaderboard page wants the most recent completed event's data
+  // (otherwise the page reads "this week's tournament hasn't started"
+  // for the entire Mon–Wed gap). Callers opt in with `?prefer=
+  // last-completed`. Home feed doesn't pass it — it wants to render
+  // the off-week landing in that state.
+  const preferLastCompleted =
+    url.searchParams.get("prefer") === "last-completed";
 
   let tournament: { id: string; name: string; startDate: number } | null;
   let isLive: boolean;
@@ -128,6 +140,27 @@ async function handle(req: Request) {
     }
     tournament = active.tournament;
     isLive = active.isLive;
+
+    // Caller asked for the last completed event when nothing's live
+    // (the /leaderboard tab uses this so it stays useful Mon-Wed).
+    // Only redirects when isLive === false so live-week data is
+    // untouched the moment shots start landing.
+    if (preferLastCompleted && !isLive) {
+      const { completed } = await import("@/lib/golf-api/pgatour").then(
+        (m) => m.getSchedule(),
+      );
+      const mostRecent = completed
+        .filter((t) => t.startDate <= Date.now())
+        .sort((a, b) => b.startDate - a.startDate)[0];
+      if (mostRecent) {
+        tournament = mostRecent;
+        // isLive stays false — the response truthfully labels this
+        // as historical so the client renders 'Final · X' instead
+        // of 'Live · X'. The polling-gate below ALSO skips when
+        // we resolved via preferLastCompleted, so we don't fire
+        // pollAndDiff against a finished tournament.
+      }
+    }
   }
 
   let watching = 0;
@@ -157,6 +190,33 @@ async function handle(req: Request) {
   // which event ids ended up visible). Drops the request count to
   // Upstash from ~10/request down to 2/request.
   const bundle = await getFeedBundle(tournament.id);
+  // Backfill leaderboard from the orchestrator when we resolved
+  // last-completed and the cached rows have already expired (the
+  // cache has a 5-minute TTL, so any tournament > 5 min stale needs
+  // a fresh fetch). Without this, the /leaderboard tab between
+  // events shows the empty state because the bundle is hollow.
+  if (
+    preferLastCompleted &&
+    !isLive &&
+    bundle.leaderboard.length === 0
+  ) {
+    try {
+      const fresh = await getLeaderboard(tournament.id);
+      bundle.leaderboard = fresh.map((r) => ({
+        playerId: r.playerId,
+        displayName: r.displayName,
+        position: r.position,
+        total: r.total,
+        thru: r.thru,
+        playerState: r.playerState,
+      }));
+      if (bundle.leaderboard.length > 0) {
+        await cacheLeaderboard(tournament.id, bundle.leaderboard);
+      }
+    } catch (err) {
+      console.error("[feed] last-completed leaderboard fetch failed", err);
+    }
+  }
   const allEvents = bundle.events;
   const feedEvents = allEvents.slice(0, 80);
   const reelSource = allEvents.slice(0, 400);

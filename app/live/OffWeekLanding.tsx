@@ -126,20 +126,6 @@ export default function OffWeekLanding({ tournament }: Props) {
           </div>
         </Link>
 
-        <Link href="/pros" className="offweek-card">
-          <span className="offweek-card-icon" aria-hidden="true">
-            🎯
-          </span>
-          <div className="offweek-card-body">
-            <span className="offweek-card-title">
-              Today&apos;s Pros puzzle
-            </span>
-            <span className="offweek-card-blurb">
-              6 guesses to name the mystery pro
-            </span>
-          </div>
-        </Link>
-
         <Link href="/tipster" className="offweek-card">
           <span className="offweek-card-icon" aria-hidden="true">
             📌
