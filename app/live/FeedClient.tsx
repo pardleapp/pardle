@@ -808,10 +808,13 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       {data.rows.length === 0 ? (
         <FeedWarmingUp leaderboard={data.leaderboard} />
       ) : filterMode === "following" && visibleRows.length === 0 ? (
+        // The Following filter is only mounted when follows.length > 0
+        // (see the feed-filter-row condition above) — so we can
+        // assume the user does follow someone but no recent shots
+        // matched. The 'no one followed yet' branch was dead code.
         <p className="feed-empty">
-          {follows.length === 0
-            ? "You're not following anyone yet. Tap a player's name to open their card and follow them."
-            : "No shots from the players you follow yet — they'll show here."}
+          No shots from the players you follow yet — tap the ★ on
+          any player&apos;s row to follow them.
         </p>
       ) : (
         <ul className="feed-list">

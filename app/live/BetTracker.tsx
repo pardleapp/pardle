@@ -363,7 +363,7 @@ export default function BetTracker({
     <section className="bets">
       <div className="bets-head">
         <h3 className="bets-title">
-          💷 My bets{bets.length > 0 ? ` · ${bets.length}` : ""}
+          My bets{bets.length > 0 ? ` · ${bets.length}` : ""}
         </h3>
         <div className="bets-head-actions">
           <div

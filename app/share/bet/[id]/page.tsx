@@ -117,7 +117,7 @@ export default async function SharedBetPage({ params }: PageProps) {
           <AuthChip />
         </div>
       </header>
-      <p className="lb-page-tournament">{share.ownerName}&apos;s bet</p>
+      <p className="share-bet-subtitle">{share.ownerName}&apos;s bet</p>
       <SharedBetView bet={share.bet} ownerName={share.ownerName} />
     </main>
   );

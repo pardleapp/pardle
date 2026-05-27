@@ -8746,6 +8746,18 @@ footer {
   min-height: 40px;
 }
 
+/* ── Shared bet subtitle ─────────────────────────────────────── */
+/* Was borrowing .lb-page-tournament from the leaderboard surface;
+   semantic mismatch. Own class so future styling on either side
+   can diverge cleanly. */
+.share-bet-subtitle {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
 .feed-tag {
   display: inline-block;
   padding: 2px 7px;
