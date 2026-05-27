@@ -115,6 +115,22 @@ export default function PlayerCardPanel({ playerId }: Props) {
 
   return (
     <div className="lb-card-panel">
+      {(data.trajectory.length >= 2 || data.communityBackingPct != null) && (
+        <div className="lb-card-context">
+          {data.trajectory.length >= 2 && (
+            <RankSparkline samples={data.trajectory} />
+          )}
+          {data.communityBackingPct != null && (
+            <span
+              className="lb-card-chip lb-card-chip-backing"
+              title="Share of Pardle bettors who placed an outright or top-finish bet on this player this week"
+            >
+              <strong>{data.communityBackingPct}%</strong> of bettors back him
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="lb-round-row" role="tablist">
         {[1, 2, 3, 4].map((roundNum) => {
           const rs = data.rounds.find((r) => r.round === roundNum);
@@ -216,6 +232,66 @@ export default function PlayerCardPanel({ playerId }: Props) {
       >
         View full profile →
       </Link>
+    </div>
+  );
+}
+
+/**
+ * Compact rank trajectory. Inverts the Y axis (smaller rank = higher
+ * on the chart) so climbing the leaderboard reads as moving up.
+ * Caller has already gated on >=2 samples so the polyline is always
+ * meaningful.
+ */
+function RankSparkline({ samples }: { samples: { ts: number; pos: number }[] }) {
+  const W = 110;
+  const H = 28;
+  const PAD = 2;
+  const positions = samples.map((s) => s.pos);
+  const minPos = Math.min(...positions);
+  const maxPos = Math.max(...positions);
+  const span = Math.max(1, maxPos - minPos);
+  const xs = samples.map((_, i) => (samples.length === 1 ? W / 2 : PAD + (i / (samples.length - 1)) * (W - PAD * 2)));
+  const ys = positions.map(
+    (p) => PAD + ((p - minPos) / span) * (H - PAD * 2),
+  );
+  const points = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(" ");
+  const first = samples[0].pos;
+  const last = samples[samples.length - 1].pos;
+  const delta = last - first; // positive = dropped down the leaderboard
+  const trendClass =
+    delta < 0
+      ? "lb-trajectory-up"
+      : delta > 0
+      ? "lb-trajectory-down"
+      : "lb-trajectory-flat";
+  const arrow = delta < 0 ? "↑" : delta > 0 ? "↓" : "→";
+  const deltaText =
+    delta === 0
+      ? "holding"
+      : delta < 0
+      ? `up ${-delta}`
+      : `down ${delta}`;
+  return (
+    <div className={`lb-trajectory ${trendClass}`}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        className="lb-trajectory-svg"
+        aria-hidden="true"
+      >
+        <polyline
+          points={points}
+          fill="none"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r="2.5" />
+      </svg>
+      <span className="lb-trajectory-label">
+        <span className="lb-trajectory-arrow">{arrow}</span>
+        {deltaText}
+      </span>
     </div>
   );
 }

@@ -7,6 +7,8 @@ import {
   type PGAScorecard,
 } from "@/lib/golf-api/pgatour";
 import { derivePlayerStats } from "@/lib/feed/scorecard-stats";
+import { getPositionTrajectory } from "@/lib/feed/position-trajectory";
+import { computeCommunityBacking } from "@/lib/feed/community-backing";
 
 /**
  * GET /api/leaderboard/player-card/[id]
@@ -63,6 +65,14 @@ export interface PlayerCardResponse {
     bestRound: number | null;
     scoringAvg: number | null;
   };
+  /** Recent rank samples, oldest-first. Empty array if the
+   *  tournament is finished (no further sampling) or the player
+   *  hasn't been sampled yet. */
+  trajectory: { ts: number; pos: number }[];
+  /** Integer % of distinct Pardle bettors who placed an outright
+   *  or top-finish bet on this player in the tournament window.
+   *  Null when the population is too small to be meaningful. */
+  communityBackingPct: number | null;
 }
 
 export async function GET(
@@ -96,11 +106,27 @@ export async function GET(
     return NextResponse.json({ error: "no-tournament" }, { status: 404 });
   }
 
-  const [leaderboard, scorecards] = await Promise.all([
+  // Tournament start date — needed for the community-backing window
+  // which spans (start - 2d) to (start + 7d). Pulled from the same
+  // schedule lookup as the fallback above.
+  let tournamentStart: number | null = null;
+  try {
+    const { upcoming, completed } = await getSchedule();
+    const meta = [...upcoming, ...completed].find((t) => t.id === tournamentId);
+    if (meta) tournamentStart = meta.startDate;
+  } catch {
+    // backing chip will skip — non-fatal
+  }
+
+  const [leaderboard, scorecards, trajectory, backing] = await Promise.all([
     getLeaderboard(tournamentId).catch(() => []),
     getScorecards(tournamentId, [id]).catch(
       () => ({}) as Record<string, PGAScorecard>,
     ),
+    getPositionTrajectory(tournamentId, id).catch(() => []),
+    tournamentStart != null
+      ? computeCommunityBacking(tournamentStart).catch(() => null)
+      : Promise.resolve(null),
   ]);
   const row = leaderboard.find((r) => r.playerId === id);
   const scorecard = scorecards[id];
@@ -169,6 +195,8 @@ export async function GET(
       bestRound: stats.bestRound,
       scoringAvg: stats.scoringAvg,
     },
+    trajectory,
+    communityBackingPct: backing?.byPlayer[id] ?? null,
   };
 
   return NextResponse.json(body);

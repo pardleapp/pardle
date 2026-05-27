@@ -61,6 +61,7 @@ import {
   playedInOrderForRound,
 } from "./event-context";
 import { seasonFormTag } from "./season-form";
+import { samplePositions } from "./position-trajectory";
 
 /** Player states we don't poll scorecards for. */
 const INACTIVE_STATES = new Set([
@@ -168,6 +169,19 @@ export async function pollAndDiff(
       playerState: r.playerState,
     })),
   );
+
+  // Sample every active player's current rank into the trajectory
+  // store — feeds the rank sparkline in the inline scorecard panel.
+  // Throttled per-player to one sample every 5 min, so this no-ops
+  // when pollAndDiff runs more frequently than that.
+  await samplePositions(
+    tournamentId,
+    leaderboard
+      .filter((r) => !INACTIVE_STATES.has(r.playerState))
+      .map((r) => ({ playerId: r.playerId, position: r.position })),
+  ).catch((err) => {
+    console.error("[engine] samplePositions failed", err);
+  });
 
   const scorecards = await getScorecards(tournamentId, activeIds);
 
