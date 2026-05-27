@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  computeFieldStats,
   getCachedLeaderboard,
   getCachedTournamentPars,
+  getSnapshot,
 } from "@/lib/feed/store";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
 
@@ -36,9 +38,10 @@ export async function GET() {
   }
   const tournamentId = active.tournament.id;
 
-  const [leaderboard, parsByRoundHole] = await Promise.all([
+  const [leaderboard, parsByRoundHole, snapshot] = await Promise.all([
     getCachedLeaderboard(tournamentId),
     getCachedTournamentPars(tournamentId),
+    getSnapshot(tournamentId),
   ]);
 
   // Derive the round being played from whichever round has the most
@@ -47,10 +50,30 @@ export async function GET() {
   const currentRound = pickActiveRound(parsByRoundHole) ?? 1;
   const parsForRound = parsByRoundHole[currentRound] ?? {};
 
-  const holes = Array.from({ length: 18 }, (_, i) => ({
-    number: i + 1,
-    par: parsForRound[i + 1] ?? null,
-  }));
+  // Field-difficulty per hole this round — drives the heatmap on the
+  // course-map UI. Mean (strokes − par) across every player who's
+  // completed the hole so far. Negative = playing easy (birdies),
+  // positive = playing hard (bogeys+). Sparse: only holes with at
+  // least one completion get a stat. Cheap — same maths the engine
+  // already runs for bet projections.
+  const fieldStats = computeFieldStats(snapshot, parsByRoundHole);
+  const roundStats = fieldStats[currentRound] ?? {};
+
+  const holes = Array.from({ length: 18 }, (_, i) => {
+    const num = i + 1;
+    const stat = roundStats[num];
+    return {
+      number: num,
+      par: parsForRound[num] ?? null,
+      /** Field mean strokes-vs-par for this hole today. null when no
+       *  completions yet. Powers the heatmap color on the UI. */
+      fieldMean: stat?.mean ?? null,
+      /** How many players have completed this hole today. Small
+       *  samples (< 8) get a softer color so we don't claim
+       *  certainty from 2 players. */
+      fieldCount: stat?.count ?? 0,
+    };
+  });
 
   const players = leaderboard.map((r) => {
     const status = playerStatus(r.playerState);

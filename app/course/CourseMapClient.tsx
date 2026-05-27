@@ -25,6 +25,11 @@ const REFRESH_MS_HIDDEN = 30_000;
 interface Hole {
   number: number;
   par: number | null;
+  /** Field mean strokes-vs-par today. Negative = easy, positive = hard. */
+  fieldMean?: number | null;
+  /** Players who've completed this hole today. Drives the
+   *  certainty/opacity of the heatmap colour. */
+  fieldCount?: number;
 }
 
 interface CoursePlayer {
@@ -263,6 +268,26 @@ function CourseRow({
   );
 }
 
+function difficultyTone(
+  fieldMean: number | null | undefined,
+  fieldCount: number | undefined,
+): "easy" | "easyish" | "neutral" | "hardish" | "hard" | "none" {
+  // Need at least a handful of completions before we colour the hole
+  // — 2 players going either way isn't enough to call a hole easy.
+  if (fieldMean == null || (fieldCount ?? 0) < 6) return "none";
+  if (fieldMean <= -0.15) return "easy";
+  if (fieldMean <= -0.05) return "easyish";
+  if (fieldMean >= 0.25) return "hard";
+  if (fieldMean >= 0.1) return "hardish";
+  return "neutral";
+}
+
+function difficultyLabel(fieldMean: number | null | undefined): string | null {
+  if (fieldMean == null) return null;
+  const r = Math.round(fieldMean * 100) / 100;
+  return `${r >= 0 ? "+" : ""}${r.toFixed(2)}`;
+}
+
 function HoleCard({
   hole,
   players,
@@ -270,9 +295,16 @@ function HoleCard({
   hole: Hole;
   players: CoursePlayer[];
 }) {
+  const tone = difficultyTone(hole.fieldMean, hole.fieldCount);
+  const diffLabel = difficultyLabel(hole.fieldMean);
   return (
     <div
-      className={`course-hole${players.length === 0 ? " course-hole-empty" : ""}`}
+      className={`course-hole course-hole-diff-${tone}${players.length === 0 ? " course-hole-empty" : ""}`}
+      title={
+        diffLabel
+          ? `Field avg ${diffLabel} vs par this round (${hole.fieldCount ?? 0} players)`
+          : undefined
+      }
     >
       <div className="course-hole-head">
         <span className="course-hole-num">H{hole.number}</span>
@@ -304,6 +336,9 @@ function HoleCard({
           ))
         )}
       </div>
+      {diffLabel && tone !== "neutral" && tone !== "none" && (
+        <span className="course-hole-diff">{diffLabel}</span>
+      )}
     </div>
   );
 }

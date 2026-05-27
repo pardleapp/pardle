@@ -14699,6 +14699,74 @@ body:has(.v4-theme) {
   border-color: rgba(255, 255, 255, 0.04);
 }
 
+/* Heatmap tint — each hole gets a subtle background colour
+   reflecting the field's avg strokes-vs-par this round. Green when
+   the field is playing it easy (birdies), red when it's playing
+   hard (bogeys+). Neutral and unknown holes keep the default bg. */
+.course-hole-diff-easy {
+  background: linear-gradient(
+    160deg,
+    rgba(0, 217, 110, 0.16) 0%,
+    rgba(0, 217, 110, 0.04) 100%
+  );
+  border-color: rgba(0, 217, 110, 0.32);
+}
+
+.course-hole-diff-easyish {
+  background: linear-gradient(
+    160deg,
+    rgba(0, 217, 110, 0.08) 0%,
+    rgba(0, 217, 110, 0.02) 100%
+  );
+  border-color: rgba(0, 217, 110, 0.18);
+}
+
+.course-hole-diff-hardish {
+  background: linear-gradient(
+    160deg,
+    rgba(255, 76, 76, 0.08) 0%,
+    rgba(255, 76, 76, 0.02) 100%
+  );
+  border-color: rgba(255, 76, 76, 0.18);
+}
+
+.course-hole-diff-hard {
+  background: linear-gradient(
+    160deg,
+    rgba(255, 76, 76, 0.16) 0%,
+    rgba(255, 76, 76, 0.04) 100%
+  );
+  border-color: rgba(255, 76, 76, 0.32);
+}
+
+/* Field-mean numeric label tucked into the corner of toughest /
+   easiest holes — readable at a glance, doesn't compete with player
+   chips. */
+.course-hole-diff {
+  position: absolute;
+  bottom: 3px;
+  right: 6px;
+  font-size: 9px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  opacity: 0.7;
+}
+
+.course-hole-diff-easy .course-hole-diff,
+.course-hole-diff-easyish .course-hole-diff {
+  color: var(--green, #00d96e);
+}
+
+.course-hole-diff-hard .course-hole-diff,
+.course-hole-diff-hardish .course-hole-diff {
+  color: var(--red, #ff4b6b);
+}
+
+.course-hole {
+  position: relative;
+}
+
 .course-hole-head {
   display: flex;
   justify-content: space-between;
