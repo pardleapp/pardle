@@ -9532,6 +9532,42 @@ footer {
   color: var(--muted);
 }
 
+/* Benefits list above the email input — tells the visitor what
+   signing in actually unlocks. Without this the modal reads as
+   pure friction ('give me your email and you'll get… some kind
+   of access?'). */
+.auth-modal-benefits {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-modal-benefits li {
+  position: relative;
+  padding-left: 22px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.auth-modal-benefits li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--green, #00d96e);
+  font-weight: 900;
+  font-size: 14px;
+}
+
+.auth-modal-benefits li strong {
+  color: var(--text);
+  font-weight: 800;
+}
+
 .auth-modal-form {
   display: flex;
   flex-direction: column;

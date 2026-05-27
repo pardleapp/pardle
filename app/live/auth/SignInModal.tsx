@@ -56,7 +56,9 @@ export default function SignInModal({ open, onClose }: Props) {
         >
           ✕
         </button>
-        <h2 className="auth-modal-title">Sign in to Pardle</h2>
+        <h2 className="auth-modal-title">
+          Save your bets across devices
+        </h2>
         {status === "sent" ? (
           <div className="auth-modal-sent">
             <p>
@@ -73,6 +75,24 @@ export default function SignInModal({ open, onClose }: Props) {
           </div>
         ) : (
           <form onSubmit={submit} className="auth-modal-form">
+            <ul className="auth-modal-benefits">
+              <li>
+                <strong>Save your bets across devices</strong> — phone, laptop,
+                same view
+              </li>
+              <li>
+                <strong>Push when your bets move</strong> — big swings + final
+                settlement
+              </li>
+              <li>
+                <strong>Post tips on your own channel</strong> — share picks
+                with followers
+              </li>
+              <li>
+                <strong>Climb the Putt-IQ leaderboard</strong> — accuracy
+                ranked by tournament
+              </li>
+            </ul>
             <label className="auth-modal-label">
               <span>Email</span>
               <input
