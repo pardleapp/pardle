@@ -912,8 +912,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       )}
 
       <p className="feed-footnote">
-        Live PGA Tour scoring · refreshes every 3s · usually within
-        15s of the course
+        Live PGA Tour scoring
       </p>
 
       {/* Floating-emoji overlay — fixed so bursts rise over the whole feed */}

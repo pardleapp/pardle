@@ -60,6 +60,7 @@ The user (Tom) is **non-technical** — does not write code, doesn't know TypeSc
 - **No comments explaining what code does.** Only comment when the *why* is non-obvious (workarounds, hidden constraints, surprising behavior).
 - **No emojis in code or commits** unless the user explicitly asks. (Game share cards are a separate thing — those use emojis by design.)
 - **Same-day puzzle determinism.** Today's puzzle must be the same for every user worldwide on the same UTC date. Never random; always derived from `daysSinceEpoch % puzzleCount`.
+- **Never mention feed latency, refresh cadence, or "how fast" the feed is in user-facing copy.** No "sub-15s", no "refreshes every 3s", no "within X seconds of the course", no "near real-time" with a number attached. A professional product doesn't advertise its delay budget — exposing seconds to users invites them to find a tournament moment that arrived "too slowly" and lose trust. The speed pillar in this file is for internal prioritisation only. User-facing copy says "Live" / "Live shot-by-shot" / "Real-time" and nothing more specific. Comments and internal docs are fine.
 
 ## What NOT to do (until validation gate passes)
 
