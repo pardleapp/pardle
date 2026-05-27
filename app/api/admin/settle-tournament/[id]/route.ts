@@ -46,12 +46,15 @@ export async function POST(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
+  // Fail closed when the secret isn't configured — this route mutates
+  // bet settle state across every user.
   const expected = process.env.CRON_SECRET;
-  if (expected) {
-    const auth = req.headers.get("authorization") ?? "";
-    if (auth !== `Bearer ${expected}`) {
-      return NextResponse.json({ error: "unauthorised" }, { status: 401 });
-    }
+  if (!expected) {
+    return NextResponse.json({ error: "cron-disabled" }, { status: 503 });
+  }
+  const auth = req.headers.get("authorization") ?? "";
+  if (auth !== `Bearer ${expected}`) {
+    return NextResponse.json({ error: "unauthorised" }, { status: 401 });
   }
 
   const { id: tournamentId } = await ctx.params;

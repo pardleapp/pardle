@@ -28,12 +28,14 @@ function normalizeName(name: string): string {
 }
 
 export async function GET(req: Request) {
+  // Fail closed when the secret isn't configured.
   const expected = process.env.CRON_SECRET;
-  if (expected) {
-    const auth = req.headers.get("authorization") ?? "";
-    if (auth !== `Bearer ${expected}`) {
-      return NextResponse.json({ error: "unauthorised" }, { status: 401 });
-    }
+  if (!expected) {
+    return NextResponse.json({ error: "cron-disabled" }, { status: 503 });
+  }
+  const auth = req.headers.get("authorization") ?? "";
+  if (auth !== `Bearer ${expected}`) {
+    return NextResponse.json({ error: "unauthorised" }, { status: 401 });
   }
 
   const active = await getActiveTournament().catch(() => null);

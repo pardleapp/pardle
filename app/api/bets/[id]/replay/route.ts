@@ -17,7 +17,9 @@ export const dynamic = "force-dynamic";
  * which is the common state for anything more than a few days old.
  *
  * Strategy:
- *   1. Look up the bet (RLS gates to the owner)
+ *   1. Look up the bet (requires auth + explicit user_id check;
+ *      we don't trust RLS alone since the bets-read policy union
+ *      also matches public/channel-shared rows)
  *   2. Infer which tournament it belonged to by matching the bet's
  *      placed_at against the schedule's completed list (window of
  *      start..start+5days)
@@ -47,10 +49,22 @@ export async function GET(
 ) {
   const { id } = await ctx.params;
   const supabase = await getSupabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "unauthorised" }, { status: 401 });
+  }
+  // Defence in depth: bets-read RLS now OR's three independent
+  // SELECT policies (own / public / channel follower), so a bare
+  // .eq("id", id) without a user_id filter could return another
+  // user's bet via the public/channel paths. The replay endpoint
+  // is owner-only.
   const { data: betRow, error } = await supabase
     .from("bets")
     .select("id, kind, data, placed_at, settled_at, settled_won")
     .eq("id", id)
+    .eq("user_id", user.id)
     .maybeSingle();
   if (error) {
     return NextResponse.json(

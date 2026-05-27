@@ -30,6 +30,22 @@ function normalizeName(name: string): string {
 }
 
 export async function GET(req: Request) {
+  // Gate the model internals behind CRON_SECRET — leaks our entire
+  // top-finish probability table (per-player mean / variance / SG)
+  // and is also a free DOS amplifier since it triggers the full
+  // feed pipeline. Fail-closed when the secret isn't configured.
+  const expected = process.env.CRON_SECRET;
+  if (!expected) {
+    return NextResponse.json(
+      { error: "debug-disabled" },
+      { status: 503 },
+    );
+  }
+  const auth = req.headers.get("authorization") ?? "";
+  if (auth !== `Bearer ${expected}`) {
+    return NextResponse.json({ error: "unauthorised" }, { status: 401 });
+  }
+
   const url = new URL(req.url);
   const query = (url.searchParams.get("name") ?? "").toLowerCase();
   if (!query) {
