@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BRAND } from "@/lib/brand";
 import {
@@ -17,7 +16,9 @@ import { getRecentHoles } from "@/lib/feed/recent-holes";
 import { derivePlayerStats } from "@/lib/feed/scorecard-stats";
 import type { SeasonRoundsEntry } from "@/lib/feed/season-rounds";
 import { resultFor } from "@/lib/feed/types";
+import AuthChip from "../../auth/AuthChip";
 import FollowButton from "../../FollowButton";
+import MainNav from "../../../MainNav";
 import PlayerHighlights from "../../PlayerHighlights";
 import PlayerRecentForm from "../../PlayerRecentForm";
 import PlayerSeasonView from "../../PlayerSeasonView";
@@ -151,14 +152,12 @@ export default async function PlayerPage({ params }: PageProps) {
 
   return (
     <main className="container container-wide v4-theme">
-      <header className="brand">
-        <Link className="brand-back" href="/" aria-label="Back to feed">
-          ←
-        </Link>
+      <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
-        <p className="subtitle">
-          {hasLiveData ? "Live · player" : "Player profile"}
-        </p>
+        <div className="brand-nav">
+          <MainNav active="none" />
+          <AuthChip />
+        </div>
       </header>
 
       <section className="pcard-head">
