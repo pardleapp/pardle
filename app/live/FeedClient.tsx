@@ -628,6 +628,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   return (
     <section className="feed-wrap v4-theme">
       <HeroIntro />
+      <NotificationPrompt
+        betCount={trackedBets.length}
+        followCount={follows.length}
+        follows={follows}
+      />
       <div className="feed-header-row">
         <h2 className="feed-tournament-name">
           <span
@@ -1027,12 +1032,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           </span>
         ))}
       </div>
-
-      <NotificationPrompt
-        betCount={trackedBets.length}
-        followCount={follows.length}
-        follows={follows}
-      />
 
       {/* Burst reaction bar — sticky at the bottom */}
       <div className="feed-burst-bar">
