@@ -13866,6 +13866,55 @@ body:has(.v4-theme) {
   text-align: center;
 }
 
+/* Leaderboard skeleton — ghost rows mirroring LeaderboardPanel's
+   "tab" mode row layout: pos · avatar · name · total · thru. Same
+   shimmer animation as the feed skeleton for visual consistency. */
+.v4-theme .lb-skeleton-list {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.v4-theme .lb-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  opacity: 0.7;
+}
+
+.v4-theme .lb-skeleton-pos {
+  width: 22px;
+  height: 14px;
+}
+
+.v4-theme .lb-skeleton-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.v4-theme .lb-skeleton-name {
+  flex: 1;
+  height: 14px;
+}
+
+.v4-theme .lb-skeleton-total {
+  width: 40px;
+  height: 14px;
+}
+
+.v4-theme .lb-skeleton-thru {
+  width: 30px;
+  height: 12px;
+}
+
 /* ── /players index page ──────────────────────────────────────────
    Searchable list of every PGA Tour player we have data on. Tabbed
    sort controls + filter input above the row list. Each row links

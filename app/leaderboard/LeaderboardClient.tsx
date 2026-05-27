@@ -7,8 +7,11 @@
  * data the live feed and bets pages use, then renders LeaderboardPanel
  * in "tab" mode (one row per player, full visible list).
  *
- * Lives at /leaderboard so it can be a peer to the Live feed / Bets /
- * Games tabs in MainNav rather than a sub-toggle inside /live.
+ * Cached-first + skeleton loading pattern shared with FeedClient:
+ *   - Last response written to localStorage; next visit shows it
+ *     instantly while a fresh fetch runs in the background.
+ *   - First-time visit sees a ghost leaderboard skeleton instead of
+ *     the old plain "Loading…" text.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -18,6 +21,8 @@ import LeaderboardPanel from "../live/LeaderboardPanel";
 const REFRESH_MS = 6_000;
 const REFRESH_MS_HIDDEN = 30_000;
 const AUTHOR_KEY_STORAGE = "pardle_feed_author";
+const CACHE_STORAGE = "pardle_lb_cache_v1";
+const CACHE_TTL_MS = 60 * 60 * 1000;
 
 interface LbResponse {
   tournament: { id: string; name: string; isLive: boolean } | null;
@@ -38,6 +43,11 @@ interface LbResponse {
   >;
 }
 
+interface CacheEnvelope {
+  ts: number;
+  data: LbResponse;
+}
+
 function getAuthorKey(): string {
   if (typeof window === "undefined") return "";
   let k = window.localStorage.getItem(AUTHOR_KEY_STORAGE);
@@ -48,6 +58,30 @@ function getAuthorKey(): string {
   return k;
 }
 
+function readCache(): LbResponse | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(CACHE_STORAGE);
+    if (!raw) return null;
+    const env = JSON.parse(raw) as CacheEnvelope;
+    if (!env?.ts || !env.data) return null;
+    if (Date.now() - env.ts > CACHE_TTL_MS) return null;
+    return env.data;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(data: LbResponse): void {
+  if (typeof window === "undefined") return;
+  try {
+    const env: CacheEnvelope = { ts: Date.now(), data };
+    window.localStorage.setItem(CACHE_STORAGE, JSON.stringify(env));
+  } catch {
+    // localStorage full / disabled — silent.
+  }
+}
+
 export default function LeaderboardClient() {
   const [data, setData] = useState<LbResponse | null>(null);
   const [error, setError] = useState(false);
@@ -55,14 +89,14 @@ export default function LeaderboardClient() {
 
   useEffect(() => {
     authorKey.current = getAuthorKey();
+    // Cached-first: show last response instantly while the live
+    // fetch runs in the background.
+    const cached = readCache();
+    if (cached) setData(cached);
   }, []);
 
   const load = useCallback(async () => {
     try {
-      // prefer=last-completed tells /api/feed to fall back to the most
-      // recently concluded tournament when nothing's currently live —
-      // so the leaderboard tab stays useful Mon-Wed between events
-      // instead of reading "this week's tournament hasn't started".
       const res = await fetch(
         `/api/feed?v=${authorKey.current}&prefer=last-completed`,
         {
@@ -73,6 +107,7 @@ export default function LeaderboardClient() {
       const json = (await res.json()) as LbResponse;
       setData(json);
       setError(false);
+      writeCache(json);
     } catch {
       setError(true);
     }
@@ -106,11 +141,7 @@ export default function LeaderboardClient() {
     );
   }
   if (!data) {
-    return (
-      <section className="v4-theme" style={{ padding: 14 }}>
-        <p className="feed-empty">Loading…</p>
-      </section>
-    );
+    return <LeaderboardSkeleton />;
   }
   if (!data.tournament || !data.leaderboard?.length) {
     return (
@@ -136,6 +167,33 @@ export default function LeaderboardClient() {
         recentForm={data.recentForm}
         handStatus={data.handStatus}
       />
+    </section>
+  );
+}
+
+/**
+ * Ghost leaderboard rows shown during the first cold load when no
+ * cached data exists. Shimmer reuses the same animation as the
+ * feed skeleton so the perceived-load language stays consistent.
+ */
+function LeaderboardSkeleton() {
+  return (
+    <section className="v4-theme lb-page" aria-busy="true">
+      <div className="skeleton-line skeleton-line-title" />
+      <ul
+        className="lb-skeleton-list"
+        aria-label="Loading leaderboard"
+      >
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+          <li key={i} className="lb-skeleton-row">
+            <div className="skeleton-line lb-skeleton-pos" />
+            <div className="skeleton-avatar lb-skeleton-avatar" />
+            <div className="skeleton-line lb-skeleton-name" />
+            <div className="skeleton-line lb-skeleton-total" />
+            <div className="skeleton-line lb-skeleton-thru" />
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

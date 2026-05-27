@@ -69,12 +69,44 @@ export default function CourseMapClient() {
       const json = (await res.json()) as CourseResponse;
       setData(json);
       setError(false);
+      try {
+        window.localStorage.setItem(
+          "pardle_course_cache_v1",
+          JSON.stringify({ ts: Date.now(), data: json }),
+        );
+      } catch {
+        // silent
+      }
     } catch {
       setError(true);
     }
   }, []);
 
   useEffect(() => {
+    // Cached-first: show last response instantly while the live fetch
+    // runs in the background.
+    if (typeof window !== "undefined") {
+      try {
+        const cacheRaw = window.localStorage.getItem(
+          "pardle_course_cache_v1",
+        );
+        if (cacheRaw) {
+          const env = JSON.parse(cacheRaw) as {
+            ts: number;
+            data: CourseResponse;
+          };
+          if (
+            env?.ts &&
+            env.data &&
+            Date.now() - env.ts < 60 * 60 * 1000
+          ) {
+            setData(env.data);
+          }
+        }
+      } catch {
+        // silent
+      }
+    }
     load();
     let timer: ReturnType<typeof setInterval> | null = null;
     const isHidden = () =>
@@ -103,8 +135,17 @@ export default function CourseMapClient() {
   }
   if (!data) {
     return (
-      <section className="v4-theme" style={{ padding: 14 }}>
-        <p className="feed-empty">Loading the course…</p>
+      <section className="v4-theme course-map" aria-busy="true">
+        <div className="skeleton-line skeleton-line-title" />
+        <div className="course-map-grid" style={{ marginTop: 14 }}>
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} className="course-hole">
+              <div className="skeleton-line lb-skeleton-total" />
+              <div className="skeleton-line lb-skeleton-name" style={{ marginTop: 8 }} />
+              <div className="skeleton-line lb-skeleton-name" style={{ marginTop: 4, width: "70%" }} />
+            </div>
+          ))}
+        </div>
       </section>
     );
   }

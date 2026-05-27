@@ -77,6 +77,22 @@ export default function BetsClient() {
     if (raw === "american" || raw === "fractional" || raw === "decimal") {
       setOddsFormat(raw);
     }
+    // Cached-first: show last response instantly while the live fetch
+    // runs in the background.
+    try {
+      const cacheRaw = window.localStorage.getItem("pardle_bets_cache_v1");
+      if (cacheRaw) {
+        const env = JSON.parse(cacheRaw) as {
+          ts: number;
+          data: BetsResponse;
+        };
+        if (env?.ts && env.data && Date.now() - env.ts < 60 * 60 * 1000) {
+          setData(env.data);
+        }
+      }
+    } catch {
+      // silent
+    }
   }, []);
 
   const pickOddsFormat = useCallback((fmt: OddsFormat) => {
@@ -95,6 +111,14 @@ export default function BetsClient() {
       const json = (await res.json()) as BetsResponse;
       setData(json);
       setError(false);
+      try {
+        window.localStorage.setItem(
+          "pardle_bets_cache_v1",
+          JSON.stringify({ ts: Date.now(), data: json }),
+        );
+      } catch {
+        // silent
+      }
     } catch {
       setError(true);
     }
@@ -129,8 +153,18 @@ export default function BetsClient() {
   }
   if (!data) {
     return (
-      <section className="v4-theme" style={{ padding: 14 }}>
-        <p className="feed-empty">Loading your bets…</p>
+      <section className="v4-theme bets-page" aria-busy="true">
+        <div className="skeleton-line skeleton-line-title" />
+        <ul className="lb-skeleton-list" aria-label="Loading bets">
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="lb-skeleton-row">
+              <div className="skeleton-avatar lb-skeleton-avatar" />
+              <div className="skeleton-line lb-skeleton-name" />
+              <div className="skeleton-line lb-skeleton-total" />
+              <div className="skeleton-line lb-skeleton-thru" />
+            </li>
+          ))}
+        </ul>
       </section>
     );
   }
