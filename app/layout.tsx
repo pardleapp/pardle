@@ -35,12 +35,21 @@ export const metadata: Metadata = {
     title: ogTitle,
     description,
   },
+  // PWA meta — iOS Safari respects these for "Add to Home Screen":
+  // app launches standalone (no browser chrome) with a dark status
+  // bar that matches our v4 background. Manifest itself is served
+  // by app/manifest.ts.
+  appleWebApp: {
+    capable: true,
+    title: BRAND.name,
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#7BAE3F",
+  themeColor: "#0a0d12",
 };
 
 export default function RootLayout({
