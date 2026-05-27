@@ -126,6 +126,18 @@ export default function OffWeekLanding({ tournament }: Props) {
           </div>
         </Link>
 
+        <Link href="/players" className="offweek-card">
+          <span className="offweek-card-icon" aria-hidden="true">
+            🏌️
+          </span>
+          <div className="offweek-card-body">
+            <span className="offweek-card-title">Player statistics</span>
+            <span className="offweek-card-blurb">
+              Season form, SG breakdowns, every round of every event
+            </span>
+          </div>
+        </Link>
+
         <Link href="/tipster" className="offweek-card">
           <span className="offweek-card-icon" aria-hidden="true">
             📌

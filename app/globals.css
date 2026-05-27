@@ -13471,6 +13471,387 @@ body:has(.v4-theme) {
   vertical-align: middle;
 }
 
+/* ── /players index page ──────────────────────────────────────────
+   Searchable list of every PGA Tour player we have data on. Tabbed
+   sort controls + filter input above the row list. Each row links
+   to /players/[id] for the per-player drill-down. */
+.v4-theme .players-page {
+  padding: 4px 0 80px;
+}
+
+.v4-theme .players-page-head {
+  padding: 0 4px 14px;
+}
+
+.v4-theme .players-page-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.v4-theme .players-page-sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.v4-theme .players-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.v4-theme .players-search {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.v4-theme .players-search::placeholder {
+  color: var(--text-faint);
+}
+
+.v4-theme .players-search:focus {
+  outline: none;
+  border-color: var(--green, #00d96e);
+}
+
+.v4-theme .players-sort {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.v4-theme .players-sort-btn {
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.v4-theme .players-sort-btn-on {
+  background: var(--green, #00d96e);
+  color: var(--bg-card);
+  border-color: var(--green, #00d96e);
+}
+
+.v4-theme .players-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.v4-theme .players-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.v4-theme .players-row:hover {
+  background: var(--bg-card-hi);
+  border-color: var(--border-strong);
+}
+
+.v4-theme .players-row-name {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.v4-theme .players-row-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.v4-theme .players-row-sg {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.v4-theme .players-row-sg-up {
+  color: var(--green, #00d96e);
+}
+
+.v4-theme .players-row-sg-down {
+  color: var(--red, #ff4b6b);
+}
+
+.v4-theme .players-row-meta {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+/* ── /players/[id] drill-down ─────────────────────────────────────
+   Per-player season view: summary stats grid + recent form list +
+   per-round table. Built from season-rounds.json — no live API hits. */
+.v4-theme .player-season {
+  padding: 0 0 80px;
+}
+
+.v4-theme .player-season-back {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-decoration: none;
+  letter-spacing: 0.04em;
+}
+
+.v4-theme .player-season-back:hover {
+  color: var(--text);
+}
+
+.v4-theme .player-season-name {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.v4-theme .player-season-sub {
+  margin: 4px 0 18px;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.v4-theme .player-season-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+@media (max-width: 480px) {
+  .v4-theme .player-season-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.v4-theme .player-season-stat {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 12px;
+  text-align: center;
+}
+
+.v4-theme .player-season-stat-num {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.v4-theme .player-season-stat-up {
+  color: var(--green, #00d96e);
+}
+
+.v4-theme .player-season-stat-down {
+  color: var(--red, #ff4b6b);
+}
+
+.v4-theme .player-season-stat-lbl {
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.v4-theme .player-season-section {
+  margin: 22px 0 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.v4-theme .player-season-form {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.v4-theme .player-season-form-row {
+  display: grid;
+  grid-template-columns: 56px 1fr 56px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.v4-theme .player-season-form-missed {
+  opacity: 0.55;
+}
+
+.v4-theme .player-season-form-finish {
+  font-weight: 900;
+  color: var(--green, #00d96e);
+  font-variant-numeric: tabular-nums;
+}
+
+.v4-theme .player-season-form-missed .player-season-form-finish {
+  color: var(--muted);
+}
+
+.v4-theme .player-season-form-tournament {
+  color: var(--text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v4-theme .player-season-form-season {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: right;
+  font-weight: 700;
+}
+
+.v4-theme .player-season-rounds {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.v4-theme .player-season-round {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.v4-theme .player-season-round-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.v4-theme .player-season-round-date {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  width: 56px;
+}
+
+.v4-theme .player-season-round-tournament {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v4-theme .player-season-round-tag {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-faint);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.v4-theme .player-season-round-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.v4-theme .player-season-round-score {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.v4-theme .player-season-round-score-up {
+  color: var(--green, #00d96e);
+}
+
+.v4-theme .player-season-round-score-down {
+  color: var(--red, #ff4b6b);
+}
+
+.v4-theme .player-season-round-chip {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.v4-theme .player-season-round-sg {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
 /* OffWeekLanding — shown when no tournament is live (no schedule
    match OR pre-tee-off). Replaces the previous one-line dead-end
    with a useful destination Mon-Wed of any week. Four navigable
@@ -13523,8 +13904,9 @@ body:has(.v4-theme) {
 .v4-theme .offweek-next-blurb {
   margin: 0;
   font-size: 13px;
-  font-weight: 500;
-  color: var(--text-soft, #c5cad3);
+  font-weight: 600;
+  color: var(--text);
+  opacity: 0.88;
   line-height: 1.5;
 }
 
