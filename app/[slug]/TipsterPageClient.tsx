@@ -15,6 +15,15 @@ interface OwnerPuttIq {
   tournamentCorrect: number;
 }
 
+interface OwnerSharp {
+  total: number;
+  correct: number;
+  accuracy: number;
+  qualified: boolean;
+  currentStreak: number;
+  rank: number | null;
+}
+
 interface ChannelView {
   id: string;
   slug: string;
@@ -24,10 +33,12 @@ interface ChannelView {
   isPublic: boolean;
   inviteCode?: string;
   followerCount: number;
-  /** Owner's putt-prediction accuracy / streak as a credibility chip.
-   *  Null when the owner hasn't linked their authorKey or hasn't
-   *  voted on a single poll yet. */
+  /** Owner's putt-prediction accuracy / streak — putt-specific. */
   ownerPuttIq: OwnerPuttIq | null;
+  /** Owner's overall accuracy across every prediction they've made
+   *  (putt-polls, bet outcomes, pre-round picks). The lead credibility
+   *  signal — what gets them followed. */
+  ownerSharp: OwnerSharp | null;
   viewer: {
     isOwner: boolean;
     isFollower: boolean;
@@ -324,6 +335,7 @@ export default function TipsterPageClient({
             {channel.followerCount === 1 ? "follower" : "followers"} ·{" "}
             {channel.isPublic ? "Public" : "Invite only"}
           </p>
+          <OwnerSharpChip sharp={channel.ownerSharp} />
           <OwnerPuttIqChip stats={channel.ownerPuttIq} />
         </div>
         <div className="tipster-header-actions">
@@ -552,6 +564,50 @@ function OwnerPuttIqChip({ stats }: { stats: OwnerPuttIq | null }) {
       {typeof stats.tournamentRank === "number" && (
         <span className="tipster-puttiq-rank" title="Tournament rank">
           #{stats.tournamentRank}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Sharp Score chip — the broader credibility metric across every
+ * prediction (putts, bets, picks). Lead chip on the tipster page
+ * because it's the "should I follow this person?" signal. Shows
+ * "New caller" until the owner crosses the cold-start threshold.
+ */
+function OwnerSharpChip({ sharp }: { sharp: OwnerSharp | null }) {
+  if (!sharp || sharp.total === 0) return null;
+  const acc = Math.round(sharp.accuracy * 100);
+  return (
+    <div
+      className="tipster-sharp"
+      aria-label="Sharp Score — overall prediction accuracy"
+    >
+      <span className="tipster-sharp-label">Sharp Score</span>
+      {sharp.qualified ? (
+        <>
+          <span className="tipster-sharp-acc">{acc}%</span>
+          <span className="tipster-sharp-num">
+            {sharp.correct}/{sharp.total} calls
+          </span>
+          {sharp.currentStreak >= 3 && (
+            <span
+              className="tipster-sharp-streak"
+              title={`${sharp.currentStreak} correct in a row`}
+            >
+              🔥 {sharp.currentStreak}
+            </span>
+          )}
+          {typeof sharp.rank === "number" && sharp.rank <= 100 && (
+            <span className="tipster-sharp-rank" title="Sharp Score rank">
+              #{sharp.rank}
+            </span>
+          )}
+        </>
+      ) : (
+        <span className="tipster-sharp-new">
+          New caller · {sharp.total} call{sharp.total === 1 ? "" : "s"}
         </span>
       )}
     </div>

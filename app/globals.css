@@ -10573,6 +10573,172 @@ html, body {
   padding-left: 8px;
 }
 
+/* Sharp Score chip — broader credibility metric across every
+   prediction. Sits ABOVE the Putt-IQ chip on the tipster page
+   because it's the lead 'should I follow this person' signal. */
+.tipster-sharp {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  margin-right: 8px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 157, 46, 0.32);
+  border-radius: 999px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 157, 46, 0.16) 0%,
+    rgba(255, 157, 46, 0.04) 100%
+  );
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 16px rgba(255, 157, 46, 0.12);
+}
+
+.tipster-sharp-label {
+  color: var(--amber, #ff9d2e);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.tipster-sharp-acc {
+  color: var(--amber, #ff9d2e);
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.tipster-sharp-num {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tipster-sharp-streak {
+  color: var(--amber, #ff9d2e);
+}
+
+.tipster-sharp-rank {
+  color: var(--muted);
+  border-left: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  padding-left: 8px;
+}
+
+.tipster-sharp-new {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* /sharp leaderboard page — accuracy-ranked list of every qualified
+   caller this season. Same v4 row-card pattern as /players. */
+.v4-theme .sharp-page {
+  padding: 0 0 80px;
+}
+
+.v4-theme .sharp-page-head {
+  padding: 4px 4px 14px;
+}
+
+.v4-theme .sharp-page-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.v4-theme .sharp-page-blurb {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  opacity: 0.85;
+  line-height: 1.5;
+  max-width: 640px;
+}
+
+.v4-theme .sharp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.v4-theme .sharp-row {
+  display: grid;
+  grid-template-columns: 40px 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.v4-theme .sharp-row-rank {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.v4-theme .sharp-row:first-child .sharp-row-rank {
+  color: var(--amber, #ff9d2e);
+}
+
+.v4-theme .sharp-row-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v4-theme .sharp-row-acc {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--amber, #ff9d2e);
+  letter-spacing: -0.01em;
+}
+
+.v4-theme .sharp-row-calls {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.v4-theme .sharp-row-streak {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--amber, #ff9d2e);
+}
+
+.v4-theme .sharp-page-footnote {
+  margin: 22px 0 0;
+  font-size: 12px;
+  text-align: center;
+}
+
+.v4-theme .sharp-page-link {
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.v4-theme .sharp-page-link:hover {
+  color: var(--amber, #ff9d2e);
+}
+
 .tipster-header-actions {
   flex-shrink: 0;
 }

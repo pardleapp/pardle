@@ -169,6 +169,20 @@ export async function settlePollStats(args: {
   pipe.expire(lbKey, TOURNAMENT_TTL);
   await pipe.exec();
 
+  // Mirror each call into the generalised Sharp Score ledger so
+  // putt-poll accuracy contributes to the user's overall credibility
+  // chip alongside bet outcomes + future prediction categories.
+  const { recordCall } = await import("./sharp-score");
+  for (const [author, vote] of entries) {
+    const correct =
+      (vote === "yes" && args.made) || (vote === "no" && !args.made);
+    await recordCall({
+      authorKey: author,
+      category: "putt-poll",
+      correct,
+    });
+  }
+
   // Reconcile longestStreak per user — read current values, bump
   // longest where current exceeded it. Cheap enough at typical scale
   // (a poll settles with maybe a few dozen voters).

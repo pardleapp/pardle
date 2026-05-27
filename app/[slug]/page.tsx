@@ -5,6 +5,7 @@ import { getSupabaseServer } from "@/lib/supabase/server";
 import { isReservedSlug } from "@/lib/channels/reserved-slugs";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
 import { getUserStats } from "@/lib/feed/putt-iq";
+import { getSharpScore } from "@/lib/feed/sharp-score";
 import AuthChip from "../live/auth/AuthChip";
 import MainNav from "../MainNav";
 import TipsterPageClient from "./TipsterPageClient";
@@ -69,6 +70,14 @@ async function fetchChannel(slug: string) {
     tournamentTotal: number;
     tournamentCorrect: number;
   } | null = null;
+  let ownerSharp: {
+    total: number;
+    correct: number;
+    accuracy: number;
+    qualified: boolean;
+    currentStreak: number;
+    rank: number | null;
+  } | null = null;
   if (ownerAuthorKey) {
     const active = await getActiveTournament().catch(() => null);
     const stats = await getUserStats(
@@ -86,6 +95,21 @@ async function fetchChannel(slug: string) {
         tournamentCorrect: stats.tournament?.correct ?? 0,
       };
     }
+    // Sharp Score is the broader credibility metric — accuracy
+    // across every prediction the owner has made, not just putts.
+    // Surfaces as the lead chip; Putt-IQ stays as the per-tournament
+    // detail below.
+    const sharp = await getSharpScore(ownerAuthorKey).catch(() => null);
+    if (sharp && sharp.total > 0) {
+      ownerSharp = {
+        total: sharp.total,
+        correct: sharp.correct,
+        accuracy: sharp.accuracy,
+        qualified: sharp.qualified,
+        currentStreak: sharp.currentStreak,
+        rank: sharp.rank,
+      };
+    }
   }
 
   return {
@@ -100,6 +124,7 @@ async function fetchChannel(slug: string) {
       : undefined,
     followerCount: followerCount ?? 0,
     ownerPuttIq,
+    ownerSharp,
     viewer,
   };
 }
