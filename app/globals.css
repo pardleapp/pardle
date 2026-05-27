@@ -12043,6 +12043,89 @@ body:has(.v4-theme) {
   border-top: 1px solid var(--border);
 }
 
+/* Empty-state when the user has no bets — explains the 4 bet
+   types with tappable example tiles that pre-fill the AddBetForm.
+   First-bet friction was the highest in the audit; this turns
+   "stare at form" into "tap the kind you understand". */
+.v4-theme .bets-empty-state {
+  margin: 8px 14px 18px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(
+    160deg,
+    rgba(0, 217, 110, 0.05) 0%,
+    rgba(0, 217, 110, 0.01) 100%
+  );
+}
+
+.v4-theme .bets-empty-title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.v4-theme .bets-empty-blurb {
+  margin: 0 0 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  opacity: 0.85;
+  line-height: 1.5;
+}
+
+.v4-theme .bets-empty-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.v4-theme .bets-empty-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+  font-family: inherit;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.v4-theme .bets-empty-tile:hover,
+.v4-theme .bets-empty-tile:focus-visible {
+  background: var(--bg-card-hi);
+  border-color: var(--green, #00d96e);
+  transform: translateY(-1px);
+}
+
+.v4-theme .bets-empty-tile-emoji {
+  font-size: 22px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.v4-theme .bets-empty-tile-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.v4-theme .bets-empty-tile-blurb {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0;
+  line-height: 1.35;
+}
+
 .v4-theme .bets-empty {
   margin: 8px 14px;
   padding: 16px;

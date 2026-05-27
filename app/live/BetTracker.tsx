@@ -141,6 +141,7 @@ export default function BetTracker({
 }: Props) {
   const [bets, setBets] = useState<TrackedBet[]>([]);
   const [open, setOpen] = useState(false);
+  const [presetKind, setPresetKind] = useState<BetKind | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const { user } = useAuth();
 
@@ -494,19 +495,86 @@ export default function BetTracker({
           recentForm={recentForm}
           handStatus={handStatus}
           oddsFormat={oddsFormat}
+          initialKind={presetKind ?? "outright"}
           onAdd={(b) => {
             addBet(b);
             setOpen(false);
+            setPresetKind(null);
           }}
-          onCancel={() => setOpen(false)}
+          onCancel={() => {
+            setOpen(false);
+            setPresetKind(null);
+          }}
         />
       )}
 
       {bets.length === 0 && !open && (
-        <p className="bets-empty">
-          Log a bet — outright winner, round score under/over — to see it valued
-          live as the round unfolds. Tap a bet to see the full PnL chart.
-        </p>
+        <div className="bets-empty-state">
+          <h3 className="bets-empty-title">Track your first bet</h3>
+          <p className="bets-empty-blurb">
+            Add a bet from your book (DraftKings, FanDuel, Polymarket,
+            or anywhere) — Pardle shows you the fair value live, with
+            a £ swing on every shot that moves the needle.
+          </p>
+          <div className="bets-empty-grid">
+            <button
+              type="button"
+              className="bets-empty-tile"
+              onClick={() => {
+                setPresetKind("outright");
+                setOpen(true);
+              }}
+            >
+              <span className="bets-empty-tile-emoji">🏆</span>
+              <span className="bets-empty-tile-title">Outright</span>
+              <span className="bets-empty-tile-blurb">
+                Pick the winner
+              </span>
+            </button>
+            <button
+              type="button"
+              className="bets-empty-tile"
+              onClick={() => {
+                setPresetKind("top-finish");
+                setOpen(true);
+              }}
+            >
+              <span className="bets-empty-tile-emoji">📈</span>
+              <span className="bets-empty-tile-title">Top 5 / 10 / 20</span>
+              <span className="bets-empty-tile-blurb">
+                Player finishes in the top N
+              </span>
+            </button>
+            <button
+              type="button"
+              className="bets-empty-tile"
+              onClick={() => {
+                setPresetKind("round-score");
+                setOpen(true);
+              }}
+            >
+              <span className="bets-empty-tile-emoji">⛳</span>
+              <span className="bets-empty-tile-title">Round score</span>
+              <span className="bets-empty-tile-blurb">
+                Under / over a player&apos;s round total
+              </span>
+            </button>
+            <button
+              type="button"
+              className="bets-empty-tile"
+              onClick={() => {
+                setPresetKind("winning-score");
+                setOpen(true);
+              }}
+            >
+              <span className="bets-empty-tile-emoji">🎯</span>
+              <span className="bets-empty-tile-title">Winning score</span>
+              <span className="bets-empty-tile-blurb">
+                Total strokes of the eventual winner
+              </span>
+            </button>
+          </div>
+        </div>
       )}
 
       <NotificationPrompt betCount={bets.length} />
@@ -960,6 +1028,7 @@ function AddBetForm({
   recentForm,
   handStatus,
   oddsFormat,
+  initialKind = "outright",
   onAdd,
   onCancel,
 }: {
@@ -969,10 +1038,11 @@ function AddBetForm({
   recentForm: Record<string, RecentFormEntry> | undefined;
   handStatus: Record<string, "hot" | "cold"> | undefined;
   oddsFormat: OddsFormat;
+  initialKind?: BetKind;
   onAdd: (b: TrackedBet) => void;
   onCancel: () => void;
 }) {
-  const [kind, setKind] = useState<BetKind>("outright");
+  const [kind, setKind] = useState<BetKind>(initialKind);
   const [playerQ, setPlayerQ] = useState("");
   const [pickedPlayer, setPickedPlayer] = useState<{
     id: string;
