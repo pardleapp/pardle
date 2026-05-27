@@ -2725,6 +2725,13 @@ body {
   line-height: 1;
 }
 
+/* When a page header has a back-arrow, shove the wordmark right so
+   the arrow doesn't overlap it. Without this the absolute-positioned
+   arrow lands on top of the first letters of "Pardle". */
+.brand:has(.brand-back) > h1 {
+  padding-left: 44px;
+}
+
 .brand-back:hover {
   color: var(--text);
   border-color: var(--green);

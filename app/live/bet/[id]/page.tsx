@@ -1,5 +1,6 @@
-import Link from "next/link";
 import { BRAND } from "@/lib/brand";
+import AuthChip from "../../auth/AuthChip";
+import MainNav from "../../../MainNav";
 import BetDetail from "./BetDetail";
 
 interface PageProps {
@@ -12,12 +13,12 @@ export default async function BetDetailPage({ params }: PageProps) {
   const { id } = await params;
   return (
     <main className="container container-wide v4-theme">
-      <header className="brand">
-        <Link className="brand-back" href="/bets" aria-label="Back to bets">
-          ←
-        </Link>
+      <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
-        <p className="subtitle">Live · my bet</p>
+        <div className="brand-nav">
+          <MainNav active="bets" />
+          <AuthChip />
+        </div>
       </header>
 
       <BetDetail betId={id} />
