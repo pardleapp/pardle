@@ -7456,6 +7456,66 @@ footer {
   background: rgba(0, 0, 0, 0.02);
 }
 
+/* Hero header variant — PnL leads, bet identity secondary. Applied
+   via the second class on .bd-head when we want the money to land
+   first. Replaces the old corner-PnL layout that buried the live
+   value of bigger stakes. */
+.bd-head-hero {
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 18px 16px;
+  background: linear-gradient(
+    160deg,
+    rgba(0, 217, 110, 0.06) 0%,
+    rgba(0, 217, 110, 0.01) 100%
+  );
+}
+
+.bd-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bd-hero-amt {
+  font-size: 44px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.bd-hero.bets-profit-up .bd-hero-amt {
+  color: var(--green, #00d96e);
+  text-shadow: 0 0 24px rgba(0, 217, 110, 0.35);
+}
+
+.bd-hero.bets-profit-down .bd-hero-amt {
+  color: var(--red, #ff4b6b);
+}
+
+.bd-hero-meta {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.bd-id {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bd-head-hero .bd-name {
+  margin: 0;
+}
+
+.bd-head-hero .bd-overline {
+  margin: 0;
+}
+
 .bd-overline {
   margin: 0;
   font-size: 11px;

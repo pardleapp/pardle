@@ -468,8 +468,39 @@ export default function BetDetail({ betId }: { betId: string }) {
 
   return (
     <section className="bd-wrap">
-      <header className="bd-head">
-        <div>
+      <header className="bd-head bd-head-hero">
+        <div className={`bd-hero ${profitClass}`}>
+          <span className="bd-hero-amt">
+            {profit == null
+              ? "—"
+              : `${profit >= 0 ? "+" : "−"}${gbp.format(Math.abs(profit))}`}
+          </span>
+          <span className="bd-hero-meta">
+            {nowValue == null
+              ? "Settling soon"
+              : `Now worth ${gbp.format(nowValue)}`}
+            {profitPct != null && (
+              <>
+                {" · "}
+                <span className={profitClass}>
+                  {profitPct > 0 ? "+" : ""}
+                  {profitPct.toFixed(1)}%
+                </span>
+              </>
+            )}
+          </span>
+        </div>
+
+        <div className="bd-id">
+          <h2 className="bd-name">
+            {bet.kind === "winning-score" ? (
+              <span>Tournament total</span>
+            ) : (
+              <Link href={`/live/player/${bet.playerId}`}>
+                {bet.playerName}
+              </Link>
+            )}
+          </h2>
           <p className="bd-overline">
             {bet.kind === "outright"
               ? "Outright winner"
@@ -481,35 +512,16 @@ export default function BetDetail({ betId }: { betId: string }) {
                   bet.round != null ? ` · R${bet.round}` : ""
                 }`}
           </p>
-          <h2 className="bd-name">
-            {bet.kind === "winning-score" ? (
-              <span>Tournament total</span>
-            ) : (
-              <Link href={`/live/player/${bet.playerId}`}>
-                {bet.playerName}
-              </Link>
-            )}
-          </h2>
           <p className="bd-sub">
             @ {formatOdds(bet.oddsTaken, oddsFormat)} · stake{" "}
             {gbp.format(bet.stake)} · placed{" "}
-            {new Date(bet.placedAt).toLocaleString()}
+            {new Date(bet.placedAt).toLocaleString("en-GB", {
+              day: "numeric",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           </p>
-        </div>
-        <div className="bd-pnl">
-          <span className={`bd-pnl-pct ${profitClass}`}>
-            {profitPct == null
-              ? "—"
-              : `${profitPct > 0 ? "+" : ""}${profitPct.toFixed(1)}%`}
-          </span>
-          <span className={`bd-pnl-amt ${profitClass}`}>
-            {profit == null
-              ? "—"
-              : `${profit >= 0 ? "+" : ""}${gbp.format(profit)}`}
-          </span>
-          <span className="bd-pnl-value">
-            Now worth {nowValue == null ? "—" : gbp.format(nowValue)}
-          </span>
         </div>
       </header>
 
