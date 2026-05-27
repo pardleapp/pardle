@@ -5754,7 +5754,11 @@ footer {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #d23b3b;
+  /* Brand electric-green instead of TV-news red — red conflicts
+     with the bet-loss colour (var(--red) #ff4b6b) when a row
+     shows both '-£18' and a live pulse next to each other. */
+  background: var(--green, #00d96e);
+  box-shadow: 0 0 0 0 rgba(0, 217, 110, 0.6);
   animation: feed-pulse 1.6s ease-in-out infinite;
 }
 
@@ -8594,6 +8598,154 @@ footer {
   }
 }
 
+/* ── Leaderboard off-week ────────────────────────────────────── */
+
+.lb-offweek {
+  padding: 40px 16px 60px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.lb-offweek-eyebrow {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.lb-offweek-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--text);
+  line-height: 1.25;
+  max-width: 380px;
+}
+
+.lb-offweek-blurb {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 360px;
+  line-height: 1.5;
+}
+
+.lb-offweek-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.lb-offweek-cta {
+  display: inline-flex;
+  align-items: center;
+  padding: 11px 22px;
+  border-radius: 999px;
+  background: var(--green);
+  color: #0a0a0b;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+  min-height: 44px;
+}
+
+.lb-offweek-cta:hover {
+  filter: brightness(1.08);
+}
+
+.lb-offweek-cta-quiet {
+  display: inline-flex;
+  align-items: center;
+  padding: 11px 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  min-height: 44px;
+}
+
+.lb-offweek-cta-quiet:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Player page empty state ─────────────────────────────────── */
+
+.player-empty {
+  margin: 24px auto 40px;
+  padding: 28px 20px;
+  max-width: 440px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.player-empty-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.player-empty-blurb {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.player-empty-ctas {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.player-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--green);
+  color: #0a0a0b;
+  font-weight: 800;
+  font-size: 13.5px;
+  text-decoration: none;
+  min-height: 40px;
+}
+
+.player-empty-cta-quiet {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 13.5px;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  min-height: 40px;
+}
+
 .feed-tag {
   display: inline-block;
   padding: 2px 7px;
@@ -10937,8 +11089,9 @@ html, body {
   margin-right: 8px;
   vertical-align: middle;
   border-radius: 50%;
-  background: #d23b3b;
-  box-shadow: 0 0 0 0 rgba(210, 59, 59, 0.6);
+  /* Brand electric-green — see comment on .feed-live-pulse above. */
+  background: var(--green, #00d96e);
+  box-shadow: 0 0 0 0 rgba(0, 217, 110, 0.6);
   animation: feed-pulse 1.6s ease-in-out infinite;
   flex-shrink: 0;
 }

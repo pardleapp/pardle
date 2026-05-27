@@ -334,9 +334,24 @@ export default async function PlayerPage({ params }: PageProps) {
       )}
 
       {!hasLiveData && !seasonEntry && (
-        <p className="feed-empty" style={{ padding: 14 }}>
-          No season data on file for {playerName} yet.
-        </p>
+        <section className="player-empty">
+          <h3 className="player-empty-title">
+            No season data on file for {playerName} yet.
+          </h3>
+          <p className="player-empty-blurb">
+            We&apos;ll start tracking the moment they tee it up in a
+            PGA Tour event. In the meantime, see who&apos;s playing now
+            or browse the last leaderboard.
+          </p>
+          <div className="player-empty-ctas">
+            <a href="/" className="player-empty-cta">
+              Open the live feed →
+            </a>
+            <a href="/leaderboard" className="player-empty-cta-quiet">
+              Last leaderboard
+            </a>
+          </div>
+        </section>
       )}
     </main>
   );

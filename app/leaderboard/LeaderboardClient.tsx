@@ -14,6 +14,7 @@
  *     the old plain "Loading…" text.
  */
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CachedLeaderboardRow } from "@/lib/feed/store";
 import LeaderboardPanel from "../live/LeaderboardPanel";
@@ -145,12 +146,30 @@ export default function LeaderboardClient() {
   }
   if (!data.tournament || !data.leaderboard?.length) {
     return (
-      <section className="v4-theme" style={{ padding: 14 }}>
-        <p className="feed-empty">
-          {data.tournament
-            ? `${data.tournament.name} hasn't teed off yet.`
-            : "No tournament on the schedule right now."}
-        </p>
+      <section className="v4-theme lb-page">
+        <div className="lb-offweek">
+          <p className="lb-offweek-eyebrow">No live event</p>
+          <h2 className="lb-offweek-title">
+            {data.tournament
+              ? `${data.tournament.name} hasn't teed off yet`
+              : "The PGA Tour is dark this week"}
+          </h2>
+          <p className="lb-offweek-blurb">
+            Live leaderboard fires up the moment the first group hits
+            the course. In the meantime, here&apos;s where to land.
+          </p>
+          <div className="lb-offweek-ctas">
+            <Link href="/" className="lb-offweek-cta">
+              See the feed home →
+            </Link>
+            <Link href="/players" className="lb-offweek-cta-quiet">
+              Player statistics
+            </Link>
+            <Link href="/sharp" className="lb-offweek-cta-quiet">
+              Sharp Score
+            </Link>
+          </div>
+        </div>
       </section>
     );
   }
