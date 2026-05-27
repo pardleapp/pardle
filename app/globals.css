@@ -13528,6 +13528,86 @@ body:has(.v4-theme) {
   vertical-align: middle;
 }
 
+/* ── Feed warming-up state ────────────────────────────────────────
+   Shown when a tournament is live but no shots have processed yet
+   (the first 15-30 min after the first groups tee off). Replaces
+   the previous one-line "Feed is warming up" dead-end with a
+   useful snapshot of who's on the course right now + who's about
+   to tee. So the launch-day visitor lands on something to read,
+   not a blank screen. */
+.v4-theme .feed-warming {
+  padding: 18px 14px 22px;
+  border: 1px solid var(--border);
+  background: linear-gradient(
+    160deg,
+    rgba(0, 217, 110, 0.06) 0%,
+    rgba(0, 217, 110, 0.01) 100%
+  );
+  border-radius: 14px;
+  margin-top: 4px;
+}
+
+.v4-theme .feed-warming-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.v4-theme .feed-warming-blurb {
+  margin: 0 0 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.v4-theme .feed-warming-section {
+  margin-top: 12px;
+}
+
+.v4-theme .feed-warming-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--green, #00d96e);
+  margin-bottom: 6px;
+}
+
+.v4-theme .feed-warming-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.v4-theme .feed-warming-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.v4-theme .feed-warming-row-name {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.v4-theme .feed-warming-row-meta {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
 /* ── Feed skeleton (loading state) ───────────────────────────────
    Shown while the first /api/feed response is in flight. Ghost
    rows immediately give the page structure so the page doesn't

@@ -715,10 +715,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       )}
 
       {data.rows.length === 0 ? (
-        <p className="feed-empty">
-          Feed is warming up — first scores will appear here within a
-          minute or two of the groups going out.
-        </p>
+        <FeedWarmingUp leaderboard={data.leaderboard} />
       ) : filterMode === "following" && visibleRows.length === 0 ? (
         <p className="feed-empty">
           {follows.length === 0
@@ -1049,6 +1046,93 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       </div>
     </section>
   );
+}
+
+// ── Feed warming-up state (live tournament, no shots yet) ─────────
+
+function FeedWarmingUp({
+  leaderboard,
+}: {
+  leaderboard: CachedLeaderboardRow[];
+}) {
+  // "Currently mid-round" — has a positive numeric thru (with or
+  // without the back-tee asterisk) but hasn't finished. These are
+  // the players whose next shot lands in the feed first.
+  const onCourse: CachedLeaderboardRow[] = [];
+  const yetToTee: CachedLeaderboardRow[] = [];
+  for (const r of leaderboard) {
+    const t = (r.thru ?? "").trim();
+    if (!t || t === "-") {
+      yetToTee.push(r);
+      continue;
+    }
+    if (t === "F" || t === "F*") continue;
+    const m = /^(\d+)\*?$/.exec(t);
+    if (m) {
+      const n = Number(m[1]);
+      if (n > 0 && n < 18) onCourse.push(r);
+    }
+  }
+  // Top 5 of each by position so the leader-board context is clearest.
+  const byPos = (a: CachedLeaderboardRow, b: CachedLeaderboardRow) => {
+    const pa = parsePosNum(a.position);
+    const pb = parsePosNum(b.position);
+    return (pa ?? 999) - (pb ?? 999);
+  };
+  const onCourseTop = onCourse.sort(byPos).slice(0, 5);
+  const yetToTeeTop = yetToTee.sort(byPos).slice(0, 5);
+
+  return (
+    <section className="feed-warming">
+      <p className="feed-warming-title">
+        Tournament is live · first shots landing soon
+      </p>
+      <p className="feed-warming-blurb">
+        Every birdie, eagle, blow-up, and crowd-call putt arrives here
+        as it happens. While we wait —
+      </p>
+      {onCourseTop.length > 0 && (
+        <div className="feed-warming-section">
+          <div className="feed-warming-label">On course now</div>
+          <ul className="feed-warming-list">
+            {onCourseTop.map((p) => (
+              <li key={p.playerId} className="feed-warming-row">
+                <span className="feed-warming-row-name">
+                  {p.displayName}
+                </span>
+                <span className="feed-warming-row-meta">
+                  thru {p.thru} · {p.total}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {yetToTeeTop.length > 0 && (
+        <div className="feed-warming-section">
+          <div className="feed-warming-label">Yet to tee off</div>
+          <ul className="feed-warming-list">
+            {yetToTeeTop.map((p) => (
+              <li key={p.playerId} className="feed-warming-row">
+                <span className="feed-warming-row-name">
+                  {p.displayName}
+                </span>
+                <span className="feed-warming-row-meta">{p.position}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function parsePosNum(p: string): number | null {
+  if (!p) return null;
+  const m = /^T?(\d+)$/.exec(p);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
 }
 
 // ── Hottest-in-field strip ─────────────────────────────────────────
