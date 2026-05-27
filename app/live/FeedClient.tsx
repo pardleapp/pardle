@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type JSX } from "react";
 import type { Burst, CachedLeaderboardRow } from "@/lib/feed/store";
 import type { FeedRow } from "@/lib/feed/types";
@@ -297,6 +298,7 @@ interface FeedClientProps {
 }
 
 export default function FeedClient({ forcedTournamentId }: FeedClientProps = {}) {
+  const router = useRouter();
   const [data, setData] = useState<FeedResponse | null>(null);
   const [error, setError] = useState(false);
   const [myReactions, setMyReactions] = useState<
@@ -860,10 +862,22 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                             ? "lifts"
                             : "hurts"
                           : "on";
+                        // Rendered as a button (not a Link) because the
+                        // surrounding feed row is wrapped in an anchor to
+                        // /live/player/X — HTML forbids nested <a>. The
+                        // button intercepts the tap, stops propagation
+                        // so the outer link doesn't fire, then router-
+                        // pushes the bet detail.
+                        const betHref = `/live/bet/${impact.bet.id}`;
                         chips.push(
-                          <Link
+                          <button
+                            type="button"
                             key="impact"
-                            href={`/live/bet/${impact.bet.id}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              router.push(betHref);
+                            }}
                             className={`feed-tag feed-tag-impact ${
                               positive
                                 ? "feed-tag-impact-up"
@@ -876,7 +890,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                             }
                           >
                             {emoji} {formatImpactGbp(impact.deltaValue)} {verb} your {kindLabel}
-                          </Link>,
+                          </button>,
                         );
                       }
                       // Hot chip jumps the queue before odds/top-10/

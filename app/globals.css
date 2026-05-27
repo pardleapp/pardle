@@ -12329,6 +12329,12 @@ body:has(.v4-theme) {
   text-decoration: none;
   font-weight: 800;
   letter-spacing: 0.01em;
+  /* Rendered as a <button> so the outer feed-row link doesn't nest
+     anchors — strip the native button chrome that would otherwise
+     clash with the chip-pill styling. */
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
 }
 
 .v4-theme .feed-tag-impact-up {
