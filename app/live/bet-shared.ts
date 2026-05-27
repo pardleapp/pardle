@@ -628,32 +628,86 @@ export interface PlayerForSettlement {
   playerState?: string;
 }
 
+const INACTIVE_LEADERBOARD_STATES = new Set([
+  "CUT",
+  "WD",
+  "MC",
+  "DQ",
+  "DNS",
+]);
+
+/**
+ * Has the tournament concluded according to the leaderboard alone?
+ * Every active player must show thru="F" (or the orchestrator's "—"
+ * placeholder for inactive states that slipped through the filter).
+ *
+ * Synchronous-safe mirror of pgatour.ts's isTournamentConcluded, but
+ * without the 80h-since-start time gate — that gate is a server-side
+ * safety net against between-rounds gaps and isn't reachable from the
+ * notify-poll caller. The bet-row's last_notified_at + the cron's
+ * own polling cadence give equivalent debouncing here.
+ */
+function isLeaderboardFinal(players: PlayerForSettlement[]): boolean {
+  if (players.length === 0) return false;
+  for (const p of players) {
+    if (p.playerState && INACTIVE_LEADERBOARD_STATES.has(p.playerState)) continue;
+    if (p.thru !== "F" && p.thru !== "—") return false;
+  }
+  return true;
+}
+
 /**
  * Detect a settled tournament from the live leaderboard. Returns the
- * sole winner's playerId, or null if the tournament is still live or
- * tied at the top (e.g. unresolved playoff). Once a player sits at
- * position "1" with thru "F" and all four rounds in, the outright
- * winner market has effectively settled.
+ * winner's playerId. Handles both the common (sole winner) and the
+ * less-common (playoff / shared 1st) cases.
+ *
+ * The leaderboard is considered settled when:
+ *   - The bet's player has played all 18 holes of R4, AND
+ *   - Every other active player on the leaderboard is also thru "F".
+ *
+ * If multiple players share position 1 (post-playoff orchestrator
+ * lag, or a genuinely tied final) we return the first listed leader.
+ * Downstream callers settle outright/top-finish/winning-score by
+ * checking the bet against the leaderboard's actual position(s), so
+ * a tie-at-1 still correctly settles a backer of any tied player as
+ * "won" (industry standard dead-heat behaviour). The previous
+ * `leaders.length !== 1` short-circuit meant tied finishes left
+ * every bet permanently unsettled until manual intervention.
  *
  * We use this on the client to short-circuit outright bet valuation
  * once the tournament's done — otherwise we keep multiplying the
  * stake by the last cached market price, which can leave a winning
- * ticket showing ~0% (Polymarket's pre-settlement longshot price).
+ * ticket showing ~0% (the pre-settlement longshot price).
  */
 export function findOutrightWinner(
   players: PlayerForSettlement[],
   playerRoundStates: Record<string, PlayerRoundState>,
 ): string | null {
+  // Orchestrator labels ties as "T1" and a sole leader as "1".
+  // Match both — the sole-vs-tied logic branches below.
   const leaders = players.filter(
-    (p) => p.position === "1" && p.thru === "F",
+    (p) => (p.position === "1" || p.position === "T1") && p.thru === "F",
   );
-  if (leaders.length !== 1) return null;
-  const winner = leaders[0];
-  const state = playerRoundStates[winner.playerId];
-  if (!state) return null;
-  if (state.currentRound !== 4) return null;
-  if (state.holesRemaining !== 0) return null;
-  return winner.playerId;
+  if (leaders.length === 0) return null;
+
+  // Sole-winner fast path: R4 finished for the leader, no tie.
+  if (leaders.length === 1 && leaders[0].position === "1") {
+    const winner = leaders[0];
+    const state = playerRoundStates[winner.playerId];
+    if (!state) return null;
+    if (state.currentRound !== 4) return null;
+    if (state.holesRemaining !== 0) return null;
+    return winner.playerId;
+  }
+
+  // Tied at position 1: only settle once every other active player
+  // on the leaderboard has also finished. Otherwise we'd flip a
+  // playoff bet as settled the second R4 ended, before the playoff
+  // resolved. Once the board is genuinely final, return the first
+  // leader — downstream settlement reads the actual position string,
+  // so any backer of a co-winner still settles as won.
+  if (!isLeaderboardFinal(players)) return null;
+  return leaders[0].playerId;
 }
 
 /** Strip the optional "T" prefix and parse to int. "T10" → 10, "1" →
@@ -730,7 +784,14 @@ export function detectBetSettlement(
   if (bet.kind === "outright") {
     const winner = findOutrightWinner(players, playerRoundStates);
     if (!winner) return null;
-    return { won: bet.playerId === winner };
+    // Co-winners share the title — any player sitting at position
+    // "1" or "T1" at the moment findOutrightWinner returned a value
+    // is a winning backer. Industry dead-heat rules pay each at full
+    // odds for our binary won/lost classification.
+    const row = players.find((p) => p.playerId === bet.playerId);
+    const isCoWinner =
+      !!row && (row.position === "1" || row.position === "T1");
+    return { won: isCoWinner };
   }
   if (bet.kind === "top-finish") {
     return topFinishSettlement(bet, players, playerRoundStates);
