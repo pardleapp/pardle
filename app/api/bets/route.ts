@@ -75,6 +75,13 @@ export async function POST(req: Request) {
   ) {
     return NextResponse.json({ error: "invalid-bet" }, { status: 400 });
   }
+  // Cookie authorKey used for Sharp Score attribution. Stored on
+  // the row (not embedded in the JSON blob) so the settle path can
+  // look it up via a column index instead of parsing every bet.
+  const authorKey =
+    typeof bet.authorKey === "string" && bet.authorKey.length > 0
+      ? bet.authorKey
+      : null;
   const { error } = await supabase.from("bets").upsert(
     {
       id,
@@ -82,7 +89,8 @@ export async function POST(req: Request) {
       kind,
       data: bet,
       placed_at: new Date(placedAt).toISOString(),
-    },
+      author_key: authorKey,
+    } as never,
     { onConflict: "id" },
   );
   if (error) {

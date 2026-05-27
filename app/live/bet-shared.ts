@@ -276,10 +276,15 @@ export async function persistBet(bet: TrackedBet): Promise<void> {
   const existing = readBets().filter((b) => b.id !== bet.id);
   writeBets([...existing, bet]);
   try {
+    // Attach the visitor's cookie authorKey so the settle path can
+    // route the settled outcome back to their Sharp Score ledger.
+    // Same identity used by comments/reactions/putt-poll votes.
+    const authorKey =
+      window.localStorage.getItem("pardle_feed_author") ?? "";
     await fetch("/api/bets", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(bet),
+      body: JSON.stringify({ ...bet, authorKey }),
     });
   } catch {
     // Anonymous users get a 401 here — that's fine, localStorage

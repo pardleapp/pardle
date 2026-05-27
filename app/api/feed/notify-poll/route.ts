@@ -24,6 +24,7 @@ import {
   type WinningScoreBet,
 } from "@/app/live/bet-shared";
 import { getHotTopFinish } from "@/lib/feed/top-finish-cache";
+import { recordCall, type SharpCategory } from "@/lib/feed/sharp-score";
 
 /**
  * GET /api/feed/notify-poll
@@ -69,6 +70,10 @@ interface BetRow {
   kind: string;
   data: Record<string, unknown>;
   placed_at: string;
+  /** Cookie identity captured at bet placement so the settle path can
+   *  credit/debit the right Sharp Score ledger. Null for legacy bets
+   *  placed before migration 0007 — those won't contribute. */
+  author_key: string | null;
   last_notified_prob: number | null;
   last_notified_value: number | null;
   last_notified_at: string | null;
@@ -77,6 +82,14 @@ interface BetRow {
   notif_crossed_50_down: boolean;
   notif_crossed_80: boolean;
   notif_crossed_20: boolean;
+}
+
+function sharpCategoryFor(kind: string): SharpCategory | null {
+  if (kind === "outright") return "bet-outright";
+  if (kind === "top-finish") return "bet-top-finish";
+  if (kind === "round-score") return "bet-round-score";
+  if (kind === "winning-score") return "bet-winning-score";
+  return null;
 }
 
 interface PushDecision {
@@ -356,7 +369,7 @@ async function handle(req: Request) {
   const { data: rowsRaw, error } = await admin
     .from("bets")
     .select(
-      "id, user_id, kind, data, placed_at, last_notified_prob, last_notified_value, last_notified_at, notif_mode, notif_crossed_50_up, notif_crossed_50_down, notif_crossed_80, notif_crossed_20",
+      "id, user_id, kind, data, placed_at, author_key, last_notified_prob, last_notified_value, last_notified_at, notif_mode, notif_crossed_50_up, notif_crossed_50_down, notif_crossed_80, notif_crossed_20",
     )
     .is("removed_at", null)
     .is("settled_at", null)
@@ -455,6 +468,28 @@ async function handle(req: Request) {
         }
       }
       await admin.from("bets").update(decision.patch as never).eq("id", row.id);
+
+      // Sharp Score credit on settlement. Only fires on the settle
+      // decision (recognisable by settled_at being set in the patch),
+      // and only when we know the visitor's cookie identity — legacy
+      // bets placed before migration 0007 land with author_key=null
+      // and silently skip the ledger write.
+      if (
+        decision.patch.settled_at != null &&
+        typeof decision.patch.settled_won === "boolean" &&
+        row.author_key
+      ) {
+        const category = sharpCategoryFor(row.kind);
+        if (category) {
+          await recordCall({
+            authorKey: row.author_key,
+            category,
+            correct: decision.patch.settled_won,
+          }).catch((err) => {
+            console.error("[notify-poll] sharp-score record failed", err);
+          });
+        }
+      }
     }
   }
 
