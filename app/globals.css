@@ -13471,6 +13471,180 @@ body:has(.v4-theme) {
   vertical-align: middle;
 }
 
+/* OffWeekLanding — shown when no tournament is live (no schedule
+   match OR pre-tee-off). Replaces the previous one-line dead-end
+   with a useful destination Mon-Wed of any week. Four navigable
+   cards + a contextual bet-tracker callback. */
+.v4-theme .offweek-wrap {
+  padding: 4px 0 80px;
+}
+
+.v4-theme .offweek-next {
+  padding: 18px 18px 16px;
+  border: 1px solid var(--border);
+  background: linear-gradient(
+    160deg,
+    rgba(0, 217, 110, 0.06) 0%,
+    rgba(0, 217, 110, 0.01) 100%
+  );
+  border-radius: 14px;
+  margin-bottom: 14px;
+}
+
+.v4-theme .offweek-next-tag {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--green, #00d96e);
+  margin-bottom: 6px;
+}
+
+.v4-theme .offweek-next-name {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.v4-theme .offweek-next-meta {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.v4-theme .offweek-next-meta strong {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.v4-theme .offweek-next-blurb {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-soft, #c5cad3);
+  line-height: 1.5;
+}
+
+.v4-theme .offweek-bets-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin: 0 0 14px;
+  border: 1px solid rgba(255, 157, 46, 0.32);
+  background: rgba(255, 157, 46, 0.06);
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--text);
+  transition: background 120ms ease;
+}
+
+.v4-theme .offweek-bets-strip:hover {
+  background: rgba(255, 157, 46, 0.12);
+}
+
+.v4-theme .offweek-bets-strip-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.v4-theme .offweek-bets-strip-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.v4-theme .offweek-bets-strip-blurb {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--amber, #ff9d2e);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.v4-theme .offweek-bets-strip-arrow {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--amber, #ff9d2e);
+  line-height: 1;
+}
+
+.v4-theme .offweek-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 480px) {
+  .v4-theme .offweek-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.v4-theme .offweek-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--text);
+  transition: background 120ms ease, transform 120ms ease, border-color 120ms ease;
+}
+
+.v4-theme .offweek-card:hover {
+  background: var(--bg-card-hi);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.v4-theme .offweek-card-icon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.v4-theme .offweek-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.v4-theme .offweek-card-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.v4-theme .offweek-card-blurb {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+
+.v4-theme .offweek-footnote {
+  margin: 14px 0 0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  text-align: center;
+}
+
 /* HeroIntro — one-line value-prop strip shown above the tournament
    header for cold visitors. Dismissed permanently via localStorage
    on first tap. Amber accent so it reads as "orientation copy", not

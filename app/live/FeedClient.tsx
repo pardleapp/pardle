@@ -14,6 +14,7 @@ import CatchMeUp from "./CatchMeUp";
 import CommentThread from "./CommentThread";
 import FollowButton, { getFollows } from "./FollowButton";
 import HeroIntro from "./HeroIntro";
+import OffWeekLanding from "./OffWeekLanding";
 import { abbreviateName } from "@/lib/text/abbreviate";
 import { readBets, type TrackedBet } from "./bet-shared";
 import {
@@ -498,33 +499,10 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     );
   }
   if (!data.tournament) {
-    return (
-      <section className="feed-wrap v4-theme">
-        <p className="feed-empty">
-          No tournament on the schedule right now. Check back on a tour week.
-        </p>
-      </section>
-    );
+    return <OffWeekLanding tournament={null} />;
   }
   if (!data.tournament.isLive) {
-    const days = Math.max(
-      0,
-      Math.ceil((data.tournament.startDate - Date.now()) / 86_400_000),
-    );
-    // Show the countdown AND the bet tracker — users want to see
-    // their bets (especially recently-settled ones from the last
-    // tournament) regardless of whether the next event is live yet.
-    return (
-      <section className="feed-wrap v4-theme">
-        <section className="feed-status-card">
-          <h2 className="feed-tournament-name">{data.tournament.name}</h2>
-          <p className="feed-empty">
-            Tees off in {days} day{days === 1 ? "" : "s"}. The live feed
-            fires up when the first group hits the course.
-          </p>
-        </section>
-      </section>
-    );
+    return <OffWeekLanding tournament={data.tournament} />;
   }
 
   // ── Live feed ───────────────────────────────────────────────────
