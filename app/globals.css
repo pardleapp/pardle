@@ -13995,9 +13995,46 @@ body:has(.v4-theme) {
   }
   .v4-theme .feed-row > .feed-actions {
     grid-area: actions;
-    justify-self: start;
+    justify-self: stretch;
     margin-top: 2px;
     margin-left: -4px; /* unindent so first button aligns with body */
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  /* Primary context tag rides the right side of the actions row on
+     mobile — uses the empty space to the right of the four 44 px
+     reactions to carry the event's flavour ("First eagle of the
+     season", "5 birdies in a row"). Hidden on desktop where the
+     same tag still shows in the body's chip list above the meta. */
+  .feed-actions-tag {
+    margin-left: auto;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 60%;
+    line-height: 1.2;
+  }
+  /* On mobile, suppress the same chip in the body's tags row —
+     it now lives next to the reactions instead. Other tags in
+     the body row still show. */
+  .feed-tag-primary {
+    display: none;
+  }
+}
+
+/* Desktop keeps tags in the body chip list (where they currently
+   live) and hides the actions-row mirror. */
+@media (min-width: 541px) {
+  .feed-actions-tag {
+    display: none;
   }
 }
 

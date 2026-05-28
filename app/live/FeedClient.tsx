@@ -995,6 +995,19 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
             const mine = myReactions[event.id];
             const isOpen = expanded === event.id;
             const count = commentCounts[event.id] ?? commentCount;
+            // First context tag that isn't already shown in a
+            // dedicated slot (hot, deprecated chip strings). Gets a
+            // mobile-only mirror in the actions row so the empty
+            // space to the right of the reactions carries the
+            // event's flavour ("First eagle of the season", "5
+            // birdies in a row", etc.) instead of being dead.
+            const primaryContextTag = (event.tags ?? []).find((t) => {
+              if (/^\d+ of last \d+ in red$/.test(t)) return false;
+              if (/^top \d+ in field today$/.test(t)) return false;
+              if (/^among most /.test(t)) return false;
+              if (t.startsWith("🔥 going off")) return false;
+              return true;
+            });
             return (
               <li
                 key={event.id}
@@ -1191,8 +1204,18 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                         // Hot chip was already pushed above with its
                         // own priority slot — skip the dup here.
                         if (t.startsWith("🔥 going off")) continue;
+                        // First context tag also gets a slot inside
+                        // the actions row on mobile (see CSS), so
+                        // mark it for hiding on phones to avoid
+                        // duplication.
+                        const isPrimary = t === primaryContextTag;
                         chips.push(
-                          <span key={`tag-${t}`} className="feed-tag">
+                          <span
+                            key={`tag-${t}`}
+                            className={`feed-tag${
+                              isPrimary ? " feed-tag-primary" : ""
+                            }`}
+                          >
                             {t}
                           </span>,
                         );
@@ -1280,6 +1303,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                       playerName={event.playerName}
                       variant="icon"
                     />
+                    {primaryContextTag && (
+                      <span className="feed-actions-tag">
+                        {primaryContextTag}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {isOpen && (
