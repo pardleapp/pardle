@@ -735,6 +735,31 @@ function rankOf(position: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** True when two players' `thru` values indicate they're at the
+ *  same point in the round — same starting nine, same holes
+ *  completed, both ≤ 2 holes in. Used to constrain the marquee
+ *  head-to-head to pairings/tee-mates so the poll doesn't ask a
+ *  user to call Player A (thru 8) vs Player B (thru 0). */
+function sameTeePoint(a: string | null, b: string | null): boolean {
+  const norm = (t: string | null): { holes: number; back: boolean } | null => {
+    if (!t) return null;
+    const s = t.trim();
+    if (s === "" || s === "-" || s === "—") return { holes: 0, back: false };
+    if (s === "F" || s === "F*") return null; // round done — never a "tee" point
+    const m = /^(\d+)(\*?)$/.exec(s);
+    if (!m) return null;
+    const n = Number(m[1]);
+    if (!Number.isFinite(n) || n < 0) return null;
+    return { holes: n, back: m[2] === "*" };
+  };
+  const aa = norm(a);
+  const bb = norm(b);
+  if (!aa || !bb) return false;
+  if (aa.back !== bb.back) return false;
+  if (aa.holes !== bb.holes) return false;
+  return aa.holes <= 2;
+}
+
 /** Parse `thru` field ("9", "9*", "F", "-", "") into a count of
  *  holes completed this round. F → 18, blank/- → 0. */
 function parseThruHoles(thru: string | null | undefined): number {
@@ -869,13 +894,16 @@ async function maybeOpenPredictionPolls(
   }
 
   // ── Marquee head-to-head (R1/R2) ───────────────────────────────
-  // The R3/R4 trigger above keys off leaderboard position, which is
-  // noise in early rounds. For R1/R2, fall back to the two best
-  // active players by DataGolf pre-tournament SG so the user gets a
-  // meaningful 2-player call from the first tee.
+  // Pick the best PAIRING by DataGolf pre-tournament SG, where
+  // "pairing" means two players who are at the same point in their
+  // round right now (same starting nine, same thru count, both ≤ 2
+  // holes in). Without this guard we'd happily match a Scheffler
+  // who's already thru 8 against a Rahm at thru 0 — one of them
+  // would be 4 holes ahead before the poll even opened.
   if (maxRound === 1 || maxRound === 2) {
     const skill = await getCachedPlayerSkill(tournamentId).catch(() => null);
     if (skill) {
+      // Sort all active players with a known skill by skill desc.
       const skilled = active
         .map((r) => ({ row: r, sg: skill[r.playerId] }))
         .filter(
@@ -883,30 +911,42 @@ async function maybeOpenPredictionPolls(
             typeof x.sg === "number" && Number.isFinite(x.sg),
         )
         .sort((a, b) => b.sg - a.sg);
-      if (skilled.length >= 2) {
-        const a = skilled[0].row;
-        const b = skilled[1].row;
-        if (a.playerId !== b.playerId) {
-          await openPredictionPoll({
-            type: "head-to-head",
-            tournamentId,
-            dedupKey: `h2h:marquee:r${maxRound}`,
-            question: `Who shoots lower in R${maxRound}?`,
-            options: [
-              { key: a.playerId, label: a.displayName, playerId: a.playerId },
-              { key: b.playerId, label: b.displayName, playerId: b.playerId },
-              { key: "tie", label: "Tied" },
-            ],
-            closesAt: Date.now() + 10 * HOUR,
-            settle: {
-              round: maxRound,
-              playerA: { id: a.playerId, name: a.displayName },
-              playerB: { id: b.playerId, name: b.displayName },
-            },
-          }).catch((err) => {
-            console.error("[engine] open marquee h2h failed", err);
-          });
+      // Find the strongest skill-sum pair sharing a tee point. Cap
+      // the search at the top 16 so a long field doesn't push us
+      // toward N² work on every tick.
+      const candidates = skilled.slice(0, 16);
+      let bestPair: { a: typeof candidates[number]; b: typeof candidates[number] } | null = null;
+      for (let i = 0; i < candidates.length; i++) {
+        for (let j = i + 1; j < candidates.length; j++) {
+          if (sameTeePoint(candidates[i].row.thru, candidates[j].row.thru)) {
+            bestPair = { a: candidates[i], b: candidates[j] };
+            i = candidates.length; // break outer
+            break;
+          }
         }
+      }
+      if (bestPair && bestPair.a.row.playerId !== bestPair.b.row.playerId) {
+        const a = bestPair.a.row;
+        const b = bestPair.b.row;
+        await openPredictionPoll({
+          type: "head-to-head",
+          tournamentId,
+          dedupKey: `h2h:marquee:r${maxRound}`,
+          question: `Who shoots lower in R${maxRound}?`,
+          options: [
+            { key: a.playerId, label: a.displayName, playerId: a.playerId },
+            { key: b.playerId, label: b.displayName, playerId: b.playerId },
+            { key: "tie", label: "Tied" },
+          ],
+          closesAt: Date.now() + 10 * HOUR,
+          settle: {
+            round: maxRound,
+            playerA: { id: a.playerId, name: a.displayName },
+            playerB: { id: b.playerId, name: b.displayName },
+          },
+        }).catch((err) => {
+          console.error("[engine] open marquee h2h failed", err);
+        });
       }
     }
   }

@@ -9110,6 +9110,82 @@ footer {
   margin: 0 0 14px;
 }
 
+/* Single-card deck — one poll visible, navigation below. */
+.predpoll-deck {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.predpoll-deck-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 4px;
+}
+
+.predpoll-deck-nav-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+}
+
+.predpoll-deck-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.predpoll-deck-nav-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.predpoll-deck-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.predpoll-deck-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: background-color 0.15s, transform 0.15s;
+}
+
+.predpoll-deck-dot:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.predpoll-deck-dot-voted {
+  background: rgba(0, 217, 110, 0.5);
+}
+
+.predpoll-deck-dot-on {
+  background: #ffffff;
+  transform: scale(1.25);
+}
+
+.predpoll-deck-dot-voted.predpoll-deck-dot-on {
+  background: #00d96e;
+}
+
 .predpoll {
   padding: 16px 18px 14px;
   border-radius: 14px;

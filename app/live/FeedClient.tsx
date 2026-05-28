@@ -13,7 +13,7 @@ import {
 import dynamic from "next/dynamic";
 import CatchMeUp from "./CatchMeUp";
 import FeedSkeleton from "./FeedSkeleton";
-import PredictionPollCard from "./PredictionPollCard";
+import PredictionPollDeck from "./PredictionPollDeck";
 import type {
   PredictionPoll,
   PredictionPollCounts,
@@ -922,24 +922,17 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         <SharpScoreOnboard />
       ) : null}
 
-      {/* Open prediction polls — head-to-head + hold-the-lead.
-          Rendered above the momentum strip so they catch the eye
-          when the user lands on the feed. The cards are sized big
-          enough to read like real moments, not background chips. */}
+      {/* Open prediction polls — head-to-head, marquee h2h, round
+          O/U, hold-the-lead. Shown one at a time as a deck: vote,
+          see community %, auto-advance to the next unvoted call.
+          Keeps the feed viewport from being eaten when several
+          calls are live at once. */}
       {data.predictionPolls && data.predictionPolls.length > 0 && (
-        <div className="predpoll-stack">
-          {data.predictionPolls.map(({ poll, counts, myVote }) => (
-            <PredictionPollCard
-              key={poll.id}
-              poll={poll}
-              counts={
-                myPredictionVotes[poll.id]?.counts ?? counts
-              }
-              myVote={myPredictionVotes[poll.id]?.myVote ?? myVote}
-              onVote={(opt) => sendPredictionVote(poll.id, opt)}
-            />
-          ))}
-        </div>
+        <PredictionPollDeck
+          polls={data.predictionPolls}
+          myVotes={myPredictionVotes}
+          onVote={sendPredictionVote}
+        />
       )}
 
       <MomentumStrip momentum={data.fieldMomentum} />
