@@ -39,30 +39,21 @@ function buildQuery(bbox) {
 out geom;`;
 }
 
-/** Bounding box covering every coordinate in the dataset. */
-function computeBbox(features) {
-  let minLng = Infinity;
-  let minLat = Infinity;
-  let maxLng = -Infinity;
-  let maxLat = -Infinity;
-  const walk = (geom) => {
-    if (!geom) return;
-    if (Array.isArray(geom) && geom.length > 0 && typeof geom[0] === "number") {
-      const [lng, lat] = geom;
-      if (lng < minLng) minLng = lng;
-      if (lng > maxLng) maxLng = lng;
-      if (lat < minLat) minLat = lat;
-      if (lat > maxLat) maxLat = lat;
-      return;
-    }
-    if (Array.isArray(geom)) geom.forEach(walk);
-  };
-  for (const f of features) walk(f.coords);
-  if (!Number.isFinite(minLng)) return null;
-  // Pad bbox by ~3% so polygons don't sit flush against the SVG edge.
+/** Pad a manifest bbox by ~3% on each side so polygons don't sit
+ *  flush against the SVG edge. */
+function padManifestBbox(bbox) {
+  const [minLng, minLat, maxLng, maxLat] = bbox;
   const padLng = (maxLng - minLng) * 0.03;
   const padLat = (maxLat - minLat) * 0.03;
   return [minLng - padLng, minLat - padLat, maxLng + padLng, maxLat + padLat];
+}
+
+/** True when a point lies inside a bbox (inclusive). */
+function pointInBbox(pt, bbox) {
+  const [minLng, minLat, maxLng, maxLat] = bbox;
+  return (
+    pt[0] >= minLng && pt[0] <= maxLng && pt[1] >= minLat && pt[1] <= maxLat
+  );
 }
 
 /** A "way" from Overpass becomes one of our normalised features. */
@@ -224,20 +215,34 @@ async function extractCourse(slug, meta) {
   const ways = data.elements.filter((e) => e.type === "way");
   console.log(`[${slug}]   ${ways.length} ways returned`);
 
-  const features = [];
+  const allFeatures = [];
   for (const w of ways) {
     const f = normaliseWay(w);
-    if (f) features.push(f);
+    if (f) allFeatures.push(f);
   }
-  console.log(`[${slug}]   ${features.length} features normalised`);
+
+  // Filter to features whose centroid sits inside the manifest's
+  // course bbox. Overpass returns any way that *intersects* the
+  // bbox, which means rivers extending miles beyond the course
+  // would otherwise blow out the rendered viewport. Course
+  // features stay; out-of-area rivers and rough are dropped.
+  const features = allFeatures.filter((f) => {
+    const c = centroid(f.coords);
+    return c ? pointInBbox(c, meta.bbox) : false;
+  });
+  console.log(
+    `[${slug}]   ${features.length} features inside course bbox (of ${allFeatures.length})`,
+  );
 
   // Best-effort hole-number assignment for ways missing ref=N.
   assignHoleNumbers(features);
   const tagged = features.filter((f) => f.holeNum != null).length;
   console.log(`[${slug}]   ${tagged} features tagged with hole numbers`);
 
-  const bbox = computeBbox(features);
-  if (!bbox) throw new Error(`No geometry extracted for ${slug}`);
+  // Use the manifest bbox as the canonical viewport — the data
+  // doesn't dictate what the viewer sees. Padded by 3% so
+  // polygons don't sit flush against the edge.
+  const bbox = padManifestBbox(meta.bbox);
 
   // Group features by kind for cleaner consumption client-side.
   const grouped = {
