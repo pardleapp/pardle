@@ -6,6 +6,7 @@ import {
   getSnapshot,
 } from "@/lib/feed/store";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
+import { lookupCourseForTournament } from "@/lib/data/courses/registry";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -96,6 +97,11 @@ export async function GET() {
     };
   });
 
+  // Match the active tournament against the per-course geometry
+  // registry so the client knows whether to enable the visual
+  // course-map view (vs falling back to the abstract grid).
+  const courseRegistry = lookupCourseForTournament(active.tournament.name);
+
   return NextResponse.json(
     {
       tournament: {
@@ -104,6 +110,11 @@ export async function GET() {
         currentRound,
         isLive: active.isLive,
       },
+      /** Slug of the course geometry JSON to load via
+       *  /api/course/geo/[id]. Null when we don't have geometry
+       *  extracted for this tournament's venue. */
+      courseId: courseRegistry?.id ?? null,
+      courseName: courseRegistry?.name ?? null,
       holes,
       players,
     },

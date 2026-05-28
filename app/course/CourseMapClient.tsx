@@ -15,12 +15,31 @@
  */
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
 import { abbreviateName } from "@/lib/text/abbreviate";
+import type { CourseGeo } from "@/lib/data/courses/types";
+import type { CourseMapPlayer } from "../live/course/CourseMapSvg";
 import PlayerAvatar from "../live/PlayerAvatar";
+
+// Lazy-load the SVG renderer so the geometry chunk only ships
+// when the visitor actually opens the map view. The grid view
+// pulls nothing extra.
+const CourseMapSvg = dynamic(
+  () => import("../live/course/CourseMapSvg"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="skeleton-block cmap-skeleton" aria-busy="true" />
+    ),
+  },
+);
 
 const REFRESH_MS = 6_000;
 const REFRESH_MS_HIDDEN = 30_000;
+const VIEW_STORAGE_KEY = "pardle_course_view_v1";
+
+type CourseView = "map" | "grid";
 
 interface Hole {
   number: number;
@@ -49,6 +68,11 @@ interface CourseResponse {
     currentRound: number;
     isLive: boolean;
   } | null;
+  /** Slug of the matched course geometry, or null when this venue
+   *  doesn't have extracted OSM data yet. Drives the Map/Grid
+   *  toggle availability. */
+  courseId?: string | null;
+  courseName?: string | null;
   holes: Hole[];
   players: CoursePlayer[];
 }
@@ -66,6 +90,56 @@ function toneFromTotal(total: string): "up" | "down" | "even" {
 export default function CourseMapClient() {
   const [data, setData] = useState<CourseResponse | null>(null);
   const [error, setError] = useState(false);
+  const [view, setView] = useState<CourseView>("map");
+  /** Loaded course geometry — fetched lazily when the map view
+   *  becomes active for a tournament we have geometry for. */
+  const [geo, setGeo] = useState<CourseGeo | null>(null);
+  const [geoLoading, setGeoLoading] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(VIEW_STORAGE_KEY);
+    if (saved === "map" || saved === "grid") setView(saved);
+  }, []);
+
+  const setViewPersist = useCallback((v: CourseView) => {
+    setView(v);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, v);
+    }
+  }, []);
+
+  // Fetch the per-course geometry on demand when (a) a course id
+  // is available and (b) we don't already have it. The JSON is
+  // edge-cached for an hour, so this fires once per visit.
+  useEffect(() => {
+    const courseId = data?.courseId;
+    if (!courseId) {
+      setGeo(null);
+      return;
+    }
+    if (geo && geo.id === courseId) return;
+    let cancelled = false;
+    setGeoLoading(true);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/course/geo/${encodeURIComponent(courseId)}`,
+          { cache: "force-cache" },
+        );
+        if (!res.ok) throw new Error(String(res.status));
+        const json = (await res.json()) as CourseGeo;
+        if (!cancelled) setGeo(json);
+      } catch {
+        if (!cancelled) setGeo(null);
+      } finally {
+        if (!cancelled) setGeoLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [data?.courseId, geo]);
 
   const load = useCallback(async () => {
     try {
@@ -205,6 +279,19 @@ export default function CourseMapClient() {
   const front = data.holes.slice(0, 9);
   const back = data.holes.slice(9, 18);
 
+  const hasGeo = !!data.courseId;
+  const effectiveView: CourseView = hasGeo ? view : "grid";
+  const mapPlayers: CourseMapPlayer[] = data.players
+    .filter((p) => p.status === "active" && p.currentHole != null)
+    .map((p) => ({
+      playerId: p.playerId,
+      displayName: p.displayName,
+      currentHole: p.currentHole,
+      toPar: parseTotal(p.total),
+      position: p.position,
+      thru: p.thru,
+    }));
+
   return (
     <section className="course-map">
       <div className="course-map-header">
@@ -220,10 +307,45 @@ export default function CourseMapClient() {
           {countActive(data.players)} on course · {finished.length} done ·{" "}
           {notStarted.length} yet to tee
         </p>
+        {hasGeo && (
+          <div className="course-view-toggle" role="tablist" aria-label="View">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={effectiveView === "map"}
+              className={`course-view-tab ${effectiveView === "map" ? "course-view-tab-on" : ""}`}
+              onClick={() => setViewPersist("map")}
+            >
+              Map
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={effectiveView === "grid"}
+              className={`course-view-tab ${effectiveView === "grid" ? "course-view-tab-on" : ""}`}
+              onClick={() => setViewPersist("grid")}
+            >
+              Grid
+            </button>
+          </div>
+        )}
       </div>
 
-      <CourseRow label="Front 9" holes={front} byHole={byHole} />
-      <CourseRow label="Back 9" holes={back} byHole={byHole} />
+      {effectiveView === "map" && hasGeo ? (
+        geo ? (
+          <CourseMapSvg course={geo} players={mapPlayers} />
+        ) : (
+          <div
+            className={`skeleton-block cmap-skeleton ${geoLoading ? "" : "cmap-skeleton-static"}`}
+            aria-busy={geoLoading ? "true" : undefined}
+          />
+        )
+      ) : (
+        <>
+          <CourseRow label="Front 9" holes={front} byHole={byHole} />
+          <CourseRow label="Back 9" holes={back} byHole={byHole} />
+        </>
+      )}
 
       {finished.length > 0 && (
         <PlayerStrip
@@ -384,4 +506,14 @@ function parsePosition(pos: string): number {
   if (!m) return 999;
   const n = Number(m[1]);
   return Number.isFinite(n) ? n : 999;
+}
+
+/** Parse leaderboard total strings like "-12" / "E" / "+3" into
+ *  the numeric to-par used by the map dot colouring. */
+function parseTotal(total: string): number {
+  if (!total) return 0;
+  const t = total.trim();
+  if (t === "E") return 0;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : 0;
 }

@@ -1,0 +1,38 @@
+{
+  "augusta-national": {
+    "name": "Augusta National Golf Club",
+    "city": "Augusta, GA",
+    "country": "USA",
+    "bbox": [-82.0309711, 33.4930529, -82.0147293, 33.5088489]
+  },
+  "tpc-sawgrass": {
+    "name": "TPC Sawgrass",
+    "city": "Ponte Vedra Beach, FL",
+    "country": "USA",
+    "bbox": [-81.4061811, 30.1874942, -81.3855238, 30.2176078]
+  },
+  "pinehurst-no-2": {
+    "name": "Pinehurst No. 2",
+    "city": "Pinehurst, NC",
+    "country": "USA",
+    "bbox": [-79.4684522, 35.1843691, -79.4530096, 35.1990453]
+  },
+  "muirfield-village": {
+    "name": "Muirfield Village Golf Club",
+    "city": "Dublin, OH",
+    "country": "USA",
+    "bbox": [-83.1540736, 40.1370500, -83.1287586, 40.1514976]
+  },
+  "riviera-country-club": {
+    "name": "The Riviera Country Club",
+    "city": "Pacific Palisades, CA",
+    "country": "USA",
+    "bbox": [-118.5095295, 34.0400465, -118.4948816, 34.0505699]
+  },
+  "quail-hollow": {
+    "name": "Quail Hollow Club",
+    "city": "Charlotte, NC",
+    "country": "USA",
+    "bbox": [-80.8494741, 35.1084292, -80.8352114, 35.1196997]
+  }
+}
