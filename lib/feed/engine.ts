@@ -28,6 +28,7 @@ import {
   cacheLeaderboard,
   cacheTournamentPars,
   type Enrichment,
+  getCachedPlayerSkill,
   getEnrichments,
   getEvents,
   getSnapshot,
@@ -37,6 +38,7 @@ import {
   putEnrichments,
   putSnapshot,
 } from "./store";
+import { bustLiveStatsCacheIfFresh } from "./live-stats-cache";
 import {
   aceHeadline,
   emojiFor,
@@ -648,6 +650,43 @@ export async function pollAndDiff(
     await enrichRecentEvents(tournamentId);
   } catch (err) {
     console.error("[feed] enrichRecentEvents failed", err);
+  }
+
+  // Force-refresh the in-tournament SG stats cache when a top-skill
+  // player drops a stroke this poll. The default 5-min TTL means the
+  // player page can show "SG #1 in field" for a top player who just
+  // went bogey-bogey — the exact moment users zoom in. Busting the
+  // cache lets the next view fetch fresh from DataGolf (which itself
+  // lags ~2 min, but that's the irreducible floor).
+  try {
+    const lowlightPids = new Set<string>();
+    for (const e of events) {
+      if (
+        e.type === "score" &&
+        (e.result === "bogey" ||
+          e.result === "double" ||
+          e.result === "triple-plus")
+      ) {
+        lowlightPids.add(e.playerId);
+      }
+    }
+    if (lowlightPids.size > 0) {
+      const skill = await getCachedPlayerSkill(tournamentId);
+      if (skill) {
+        // DataGolf sg_total: higher = better player. Top-20 covers
+        // the names users actually have on their bet slips.
+        const topIds = new Set(
+          Object.entries(skill)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 20)
+            .map(([id]) => id),
+        );
+        const busted = [...lowlightPids].some((id) => topIds.has(id));
+        if (busted) await bustLiveStatsCacheIfFresh(tournamentId);
+      }
+    }
+  } catch (err) {
+    console.error("[feed] livestats force-refresh failed", err);
   }
 
   return {

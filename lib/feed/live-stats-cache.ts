@@ -24,6 +24,43 @@ function key(tournamentId: string, round: number | "event_avg"): string {
   return `feed:livestats:v2:${tournamentId}:${round}`;
 }
 
+/** Tracks the last time we force-busted this tournament's stats so a
+ *  bad-scoring stretch (multiple top players bogeying in the same
+ *  minute) doesn't hammer DataGolf. 90 s grace = at most one bust
+ *  every 90 s, which is plenty given DataGolf itself lags ~2 min. */
+const BUST_GRACE_S = 90;
+
+/**
+ * Force-bust this tournament's cached live stats so the next read
+ * fetches fresh from DataGolf. Rate-limited per tournament so a bad
+ * scoring stretch doesn't hammer the upstream. Returns true when the
+ * bust actually happened.
+ *
+ * Called from the feed engine when a top-skill player drops a stroke
+ * — that's the exact moment a user opens their page and finds an
+ * "SG #1 in field" headline that no longer reflects the latest
+ * holes.
+ */
+export async function bustLiveStatsCacheIfFresh(
+  tournamentId: string,
+): Promise<boolean> {
+  const graceKey = `feed:livestats:lastbust:${tournamentId}`;
+  const recent = await redis.get<number>(graceKey);
+  if (recent) return false;
+  await redis.set(graceKey, Date.now(), { ex: BUST_GRACE_S });
+  // Bust event_avg + all per-round keys. R1..R4 covers everything
+  // we'd ever cache; missed keys are harmless no-ops.
+  const keys = [
+    key(tournamentId, "event_avg"),
+    key(tournamentId, 1),
+    key(tournamentId, 2),
+    key(tournamentId, 3),
+    key(tournamentId, 4),
+  ];
+  await redis.del(...keys);
+  return true;
+}
+
 /**
  * Read the cached payload, refreshing from DataGolf on miss.
  * Returns an empty array if the upstream fetch fails so a flaky
