@@ -6965,6 +6965,94 @@ footer {
   }
 }
 
+/* "Play another" end-of-game CTA strip — drops into each game's
+   finish screen so a completed daily funnels into another play
+   instead of stopping dead. */
+.play-another {
+  margin: 22px 0 0;
+}
+
+.play-another-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted, #999);
+}
+
+.play-another-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.play-another-tile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(127, 127, 127, 0.25);
+  background: rgba(127, 127, 127, 0.04);
+  text-decoration: none;
+  color: inherit;
+  transition:
+    transform 0.12s ease,
+    background-color 0.12s,
+    border-color 0.12s;
+  min-height: 56px;
+  border-left: 4px solid var(--accent, #7BAE3F);
+}
+
+.play-another-tile:hover,
+.play-another-tile:focus-visible {
+  background: rgba(127, 127, 127, 0.09);
+  border-color: var(--accent, #7BAE3F);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.play-another-tile:active {
+  transform: translateY(0);
+}
+
+.play-another-emoji {
+  font-size: 26px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.play-another-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.play-another-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text, #fff);
+}
+
+.play-another-blurb {
+  font-size: 12.5px;
+  color: var(--muted, #aaa);
+  line-height: 1.35;
+}
+
+.play-another-arrow {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--muted, #aaa);
+  flex-shrink: 0;
+}
+
 /* PlayerStats — internal "Pardle SG" (vs field today) headline */
 .ps-internal-sg {
   border: 1px solid rgba(0, 217, 110, 0.35);

@@ -23,6 +23,7 @@ import {
   saveChallengerName,
 } from "@/lib/challenge";
 import { NotifySignup } from "@/lib/notify-signup";
+import PlayAnother from "@/app/_components/PlayAnother";
 import { encodeGridConnections, encodeShareCard } from "@/lib/share-card";
 import { recordPlayClient } from "@/lib/stats-client";
 
@@ -591,6 +592,7 @@ export default function ConnectionsPage() {
             </button>
           </div>
 
+          <PlayAnother current="connections" />
           <NotifySignup gameId="connections" dayNumber={dayNumber} />
         </div>
       )}

@@ -21,6 +21,7 @@ import {
 } from "@/lib/streak";
 import { NotifySignup } from "@/lib/notify-signup";
 import PuzzleBridgeCard from "@/app/live/PuzzleBridgeCard";
+import PlayAnother from "@/app/_components/PlayAnother";
 import { recordPlayClient } from "@/lib/stats-client";
 import { encodeGridFaces, encodeShareCard } from "@/lib/share-card";
 import { searchableName } from "@/lib/text";
@@ -424,11 +425,10 @@ export default function FacesPage() {
             <Link className="faces-back" href="/blend">
               🎭 Blend any two pros →
             </Link>
-            <Link className="faces-back" href="/">
-              ← Play another game
-            </Link>
           </div>
         </div>
+
+        <PlayAnother current="faces" />
 
         <PuzzleBridgeCard
           game="faces"

@@ -29,6 +29,7 @@ import {
 } from "@/lib/challenge";
 import { NotifySignup } from "@/lib/notify-signup";
 import PuzzleBridgeCard from "@/app/live/PuzzleBridgeCard";
+import PlayAnother from "@/app/_components/PlayAnother";
 import { encodeGridPros, encodeShareCard } from "@/lib/share-card";
 import { recordPlayClient } from "@/lib/stats-client";
 import { searchableName } from "@/lib/text";
@@ -607,6 +608,7 @@ function ResultModal({
           {challengeCopied ? "Challenge copied!" : "Challenge a friend"}
         </button>
         <PuzzleBridgeCard game="pros" players={[mystery.name]} />
+        <PlayAnother current="pros" />
         <NotifySignup gameId="pros" dayNumber={dayNumber} />
       </div>
     </div>

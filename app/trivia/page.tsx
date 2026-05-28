@@ -14,6 +14,7 @@ import {
   recordResult,
 } from "@/lib/streak";
 import { NotifySignup } from "@/lib/notify-signup";
+import PlayAnother from "@/app/_components/PlayAnother";
 import { recordPlayClient } from "@/lib/stats-client";
 import { encodeTriviaChallenge } from "@/lib/trivia-challenge";
 import {
@@ -603,6 +604,7 @@ export default function TriviaPage() {
               ))}
           </p>
 
+          <PlayAnother current="trivia" />
           <NotifySignup gameId="trivia" dayNumber={dayNumber} />
         </div>
       )}
