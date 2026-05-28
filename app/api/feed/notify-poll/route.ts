@@ -26,6 +26,10 @@ import {
 import { getHotTopFinish } from "@/lib/feed/top-finish-cache";
 import { recordCall, type SharpCategory } from "@/lib/feed/sharp-score";
 import { formatBetCurrency } from "@/lib/format/bet-currency";
+import {
+  getOpenPredictionPolls,
+  settlePredictionPoll,
+} from "@/lib/feed/prediction-polls";
 
 /**
  * GET /api/feed/notify-poll
@@ -505,6 +509,28 @@ async function handle(req: Request) {
     }
   }
 
+  // ── Prediction polls ─────────────────────────────────────────────
+  // Settle any open head-to-head or hold-the-lead poll whose
+  // resolution criteria are met (round complete / tournament
+  // finished). Each settle credits Sharp Score for every voter.
+  // Idempotent via SET NX flag in settlePredictionPoll.
+  let predPollsSettled = 0;
+  try {
+    const open = await getOpenPredictionPolls(tournamentId);
+    for (const { poll } of open) {
+      const winning = resolvePredictionPollOutcome(
+        poll,
+        bundle.leaderboard,
+        playerRoundStates,
+      );
+      if (winning === undefined) continue; // not yet resolvable
+      const res = await settlePredictionPoll(poll.id, winning);
+      if (res.settled) predPollsSettled++;
+    }
+  } catch (err) {
+    console.error("[notify-poll] prediction-poll settle failed", err);
+  }
+
   // ── Followed-player events ────────────────────────────────────────
   // Birdies, eagles, blow-ups, and putt-poll opens for any player a
   // subscribed device follows. Reuses the same web-push pipeline as
@@ -584,6 +610,7 @@ async function handle(req: Request) {
     evaluated,
     notified,
     followNotified,
+    predPollsSettled,
     gonePruned,
   });
 }
@@ -593,6 +620,58 @@ async function handle(req: Request) {
  * Plus any putt-poll-open event (interactive moment — vote before
  * the putt drops). Pars and bogeys are deliberately filtered out.
  */
+/**
+ * Decide whether an open prediction poll can be resolved right
+ * now, and if so which option won.
+ *
+ * Returns:
+ *  - string winning option key when resolvable
+ *  - null when resolvable but no clear winner (we still want to
+ *    flip it closed so it stops appearing in the open list)
+ *  - undefined when the poll is not yet resolvable (caller skips)
+ */
+function resolvePredictionPollOutcome(
+  poll: import("@/lib/feed/prediction-polls").PredictionPoll,
+  leaderboard: Array<{
+    playerId: string;
+    position: string;
+    thru: string;
+    playerState: string;
+  }>,
+  playerStates: Record<string, PlayerRoundState>,
+): string | null | undefined {
+  if (poll.type === "head-to-head") {
+    const round = poll.settle.round;
+    const a = poll.settle.playerA;
+    const b = poll.settle.playerB;
+    if (!round || !a || !b) return null;
+    const sa = playerStates[a.id]?.rounds?.[round];
+    const sb = playerStates[b.id]?.rounds?.[round];
+    if (!sa || !sb) return undefined;
+    if (sa.status !== "complete" || sb.status !== "complete") return undefined;
+    if (sa.strokes < sb.strokes) return a.id;
+    if (sb.strokes < sa.strokes) return b.id;
+    return "tie";
+  }
+  if (poll.type === "hold-the-lead") {
+    const leader = poll.settle.leader;
+    if (!leader) return null;
+    // Resolves once the tournament's done — proxy by every active
+    // player thru "F" with the leader's R4 marked complete.
+    const leaderRow = leaderboard.find((r) => r.playerId === leader.id);
+    if (!leaderRow) return undefined;
+    const allDone = leaderboard.every((r) => {
+      if (r.playerState !== "ACTIVE") return true;
+      return r.thru === "F" || r.thru === "—";
+    });
+    if (!allDone) return undefined;
+    const won =
+      leaderRow.position === "1" || leaderRow.position === "T1";
+    return won ? "yes" : "no";
+  }
+  return null;
+}
+
 function isPushWorthyEvent(e: FeedEvent): boolean {
   if (e.ace) return true;
   if (e.type === "score") {

@@ -62,6 +62,7 @@ import {
 } from "./event-context";
 import { seasonFormTag } from "./season-form";
 import { samplePositions } from "./position-trajectory";
+import { openPredictionPoll } from "./prediction-polls";
 
 /** Player states we don't poll scorecards for. */
 const INACTIVE_STATES = new Set([
@@ -181,6 +182,13 @@ export async function pollAndDiff(
       .map((r) => ({ playerId: r.playerId, position: r.position })),
   ).catch((err) => {
     console.error("[engine] samplePositions failed", err);
+  });
+
+  // Open prediction polls when their triggers fire. Each call is
+  // idempotent via a per-tournament dedup flag, so calling on
+  // every pollAndDiff tick is cheap.
+  await maybeOpenPredictionPolls(tournamentId, leaderboard).catch((err) => {
+    console.error("[engine] maybeOpenPredictionPolls failed", err);
   });
 
   const scorecards = await getScorecards(tournamentId, activeIds);
@@ -655,6 +663,144 @@ export async function pollAndDiff(
  * and any whose enrichment previously failed. Bounded to 40 events per
  * poll so the extra orchestrator calls stay small.
  */
+/** Strip "T" prefix from a leaderboard position string, return
+ *  numeric rank or null for non-numeric (CUT/WD/--). */
+function rankOf(position: string): number | null {
+  if (!position) return null;
+  const m = position.match(/^T?(\d+)$/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Parse total-to-par like "-12", "+3", "E" into a numeric stroke
+ *  diff for hold-the-lead margin checks. Null for non-numeric. */
+function toParOf(total: string): number | null {
+  if (!total) return null;
+  if (total === "E") return 0;
+  const n = Number(total);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Trigger logic for prediction polls. Called on every pollAndDiff
+ * tick; openPredictionPoll's dedup flag means we never double-open
+ * the same trigger.
+ *
+ *  - Head-to-head: open one per round on R3 and R4, between the
+ *    top 2 by current leaderboard position. Closes 8h later
+ *    (round-completion window).
+ *  - Hold-the-lead: open on R4 once the leader has reached the
+ *    back 9 with a 2+ stroke lead. Closes 6h later
+ *    (tournament-end window).
+ */
+async function maybeOpenPredictionPolls(
+  tournamentId: string,
+  leaderboard: Array<{
+    playerId: string;
+    displayName: string;
+    position: string;
+    total: string;
+    thru: string;
+    currentRound: number | null;
+    playerState: string;
+  }>,
+): Promise<void> {
+  const active = leaderboard.filter((r) => !INACTIVE_STATES.has(r.playerState));
+  if (active.length < 2) return;
+
+  // Top 2 by current rank (skipping unranked).
+  const ranked = active
+    .map((r) => ({ row: r, rank: rankOf(r.position) }))
+    .filter((x): x is { row: typeof active[number]; rank: number } => x.rank !== null)
+    .sort((a, b) => a.rank - b.rank);
+  if (ranked.length < 2) return;
+
+  const leader = ranked[0];
+  const chaser = ranked[1];
+  const rounds = active
+    .map((r) => r.currentRound)
+    .filter((n): n is number => typeof n === "number" && n >= 1 && n <= 4);
+  if (rounds.length === 0) return;
+  const maxRound = Math.max(...rounds);
+
+  const HOUR = 60 * 60 * 1000;
+
+  // ── Head-to-head ───────────────────────────────────────────────
+  // Fire only on R3 and R4 — early rounds have too much top-of-
+  // leaderboard volatility to make a meaningful 2-player call.
+  if (maxRound === 3 || maxRound === 4) {
+    if (leader.row.playerId !== chaser.row.playerId) {
+      await openPredictionPoll({
+        type: "head-to-head",
+        tournamentId,
+        dedupKey: `h2h:r${maxRound}`,
+        question: `Who shoots lower in R${maxRound}?`,
+        options: [
+          {
+            key: leader.row.playerId,
+            label: leader.row.displayName,
+            playerId: leader.row.playerId,
+          },
+          {
+            key: chaser.row.playerId,
+            label: chaser.row.displayName,
+            playerId: chaser.row.playerId,
+          },
+          { key: "tie", label: "Tied" },
+        ],
+        closesAt: Date.now() + 8 * HOUR,
+        settle: {
+          round: maxRound,
+          playerA: { id: leader.row.playerId, name: leader.row.displayName },
+          playerB: { id: chaser.row.playerId, name: chaser.row.displayName },
+        },
+      }).catch((err) => {
+        console.error("[engine] open h2h failed", err);
+      });
+    }
+  }
+
+  // ── Hold-the-lead ──────────────────────────────────────────────
+  // R4 only, leader has reached the back 9 with at least a 2-stroke
+  // cushion. By the time we open the poll the user has ~2-3 hours
+  // to call it and the resolution is genuinely uncertain.
+  if (maxRound === 4) {
+    const leaderRow = leader.row;
+    const leaderThru = leaderRow.thru;
+    const thruNum = Number(leaderThru);
+    // "Through" can be "F", "1*", "9", etc. Numeric through-hole
+    // counter falls back to 0 when non-numeric.
+    const holesPlayed = Number.isFinite(thruNum) ? thruNum : 0;
+    if (holesPlayed >= 9 && holesPlayed < 15) {
+      const leaderToPar = toParOf(leaderRow.total);
+      const chaserToPar = toParOf(chaser.row.total);
+      const lead =
+        leaderToPar != null && chaserToPar != null
+          ? chaserToPar - leaderToPar
+          : 0;
+      if (lead >= 2) {
+        await openPredictionPoll({
+          type: "hold-the-lead",
+          tournamentId,
+          dedupKey: "hold-the-lead:r4",
+          question: `Will ${leaderRow.displayName} still be leading at the 72nd?`,
+          options: [
+            { key: "yes", label: `Yes — ${leaderRow.displayName} holds on` },
+            { key: "no", label: "No — someone catches him" },
+          ],
+          closesAt: Date.now() + 6 * HOUR,
+          settle: {
+            leader: { id: leaderRow.playerId, name: leaderRow.displayName },
+          },
+        }).catch((err) => {
+          console.error("[engine] open hold-the-lead failed", err);
+        });
+      }
+    }
+  }
+}
+
 async function enrichRecentEvents(tournamentId: string): Promise<void> {
   const [events, done] = await Promise.all([
     getEvents(tournamentId, 150),

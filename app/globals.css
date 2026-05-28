@@ -8969,6 +8969,173 @@ footer {
   color: rgba(245, 245, 247, 0.85);
 }
 
+/* ── Prediction polls (head-to-head, hold-the-lead) ─────────── */
+
+.predpoll-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
+.predpoll {
+  padding: 16px 18px 14px;
+  border-radius: 14px;
+  background: #0e0f12;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.predpoll-h2h {
+  border-color: rgba(160, 112, 255, 0.5);
+  background:
+    radial-gradient(
+      circle at 0% 0%,
+      rgba(160, 112, 255, 0.16) 0%,
+      rgba(160, 112, 255, 0.04) 60%,
+      transparent 100%
+    ),
+    #0e0f12;
+}
+
+.predpoll-lead {
+  border-color: rgba(0, 217, 110, 0.45);
+  background:
+    radial-gradient(
+      circle at 0% 0%,
+      rgba(0, 217, 110, 0.14) 0%,
+      rgba(0, 217, 110, 0.04) 60%,
+      transparent 100%
+    ),
+    #0e0f12;
+}
+
+.predpoll-eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(245, 245, 247, 0.7);
+}
+
+.predpoll-h2h .predpoll-eyebrow {
+  color: #c5a8ff;
+}
+
+.predpoll-lead .predpoll-eyebrow {
+  color: #00d96e;
+}
+
+.predpoll-question {
+  margin: 0 0 12px;
+  font-size: 17px;
+  font-weight: 900;
+  color: #f5f5f7;
+  line-height: 1.3;
+}
+
+.predpoll-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.predpoll-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: #f5f5f7;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  min-height: 48px;
+  text-align: left;
+  transition: background-color 0.12s, border-color 0.12s, transform 0.08s;
+}
+
+.predpoll-option:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.predpoll-option:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.predpoll-option:disabled {
+  cursor: wait;
+  opacity: 0.85;
+}
+
+.predpoll-option-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.06);
+  transition: width 0.4s ease;
+  pointer-events: none;
+}
+
+.predpoll-h2h .predpoll-option-bar {
+  background: rgba(160, 112, 255, 0.18);
+}
+
+.predpoll-lead .predpoll-option-bar {
+  background: rgba(0, 217, 110, 0.18);
+}
+
+.predpoll-option-mine {
+  border-color: rgba(0, 217, 110, 0.6);
+  background: rgba(0, 217, 110, 0.1);
+}
+
+.predpoll-option-mine:hover:not(:disabled) {
+  background: rgba(0, 217, 110, 0.16);
+}
+
+.predpoll-option-mine .predpoll-option-bar {
+  background: rgba(0, 217, 110, 0.3);
+}
+
+.predpoll-option-label {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.predpoll-option-count {
+  position: relative;
+  z-index: 1;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: rgba(245, 245, 247, 0.75);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.predpoll-meta {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: rgba(245, 245, 247, 0.6);
+  text-align: center;
+}
+
 /* Brief highlight ring + glow applied to a feed row that the
    user arrived at via a deep-link (e.g. the bridge card on
    /pros sending them straight to a specific putt-poll row).

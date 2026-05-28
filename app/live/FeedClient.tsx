@@ -13,6 +13,11 @@ import {
 import dynamic from "next/dynamic";
 import CatchMeUp from "./CatchMeUp";
 import FeedSkeleton from "./FeedSkeleton";
+import PredictionPollCard from "./PredictionPollCard";
+import type {
+  PredictionPoll,
+  PredictionPollCounts,
+} from "@/lib/feed/prediction-polls";
 
 // CommentThread + ReelGroup are off the initial-paint critical
 // path — comments only render when a row is expanded, the reel
@@ -176,6 +181,13 @@ interface FeedResponse {
     currentStreak: number;
     rank: number | null;
   } | null;
+  /** Open head-to-head / hold-the-lead prediction polls + the
+   *  caller's own pick on each. Empty when nothing's open. */
+  predictionPolls?: Array<{
+    poll: PredictionPoll;
+    counts: PredictionPollCounts;
+    myVote: string | null;
+  }>;
   /** Hot/cold hand status keyed by playerId — sparse (only the top 5
    *  / bottom 5 by today's sg_total who clear the magnitude floor). */
   handStatus?: Record<string, "hot" | "cold">;
@@ -411,6 +423,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   >({});
   const [pollCounts, setPollCounts] = useState<
     Record<string, { yes: number; no: number }>
+  >({});
+  // Optimistic state for prediction polls (head-to-head, hold-the-
+  // lead) — same pattern as putt polls, keyed by pollId.
+  const [myPredictionVotes, setMyPredictionVotes] = useState<
+    Record<string, { myVote: string | null; counts: PredictionPollCounts }>
   >({});
   const [expanded, setExpanded] = useState<string | null>(null);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>(
@@ -722,6 +739,48 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     }
   }
 
+  /** Cast a vote on a prediction poll (head-to-head / hold-the-
+   *  lead). Optimistic — bump the chosen option immediately, snap
+   *  back on a server error. Next /api/feed refresh re-syncs. */
+  async function sendPredictionVote(pollId: string, optionKey: string) {
+    const server = data?.predictionPolls?.find((p) => p.poll.id === pollId);
+    if (!server) return;
+    const base = myPredictionVotes[pollId];
+    const prevVote = base?.myVote ?? server.myVote;
+    if (prevVote === optionKey) return;
+    const baseCounts = base?.counts ?? server.counts;
+    const nextCounts: PredictionPollCounts = { ...baseCounts };
+    if (prevVote && nextCounts[prevVote] != null) {
+      nextCounts[prevVote] = Math.max(0, nextCounts[prevVote] - 1);
+    }
+    nextCounts[optionKey] = (nextCounts[optionKey] ?? 0) + 1;
+    setMyPredictionVotes((m) => ({
+      ...m,
+      [pollId]: { myVote: optionKey, counts: nextCounts },
+    }));
+    try {
+      const res = await fetch("/api/predictions/vote", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          pollId,
+          authorKey: authorKey.current,
+          optionKey,
+        }),
+      });
+      if (!res.ok) {
+        // Revert on rejection (closed poll, rate-limited).
+        setMyPredictionVotes((m) => {
+          const out = { ...m };
+          delete out[pollId];
+          return out;
+        });
+      }
+    } catch {
+      // Network blip — keep optimistic state; next refresh corrects.
+    }
+  }
+
   // ── Empty / loading / not-live states ───────────────────────────
   if (error && !data) {
     return (
@@ -839,6 +898,26 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       ) : (data.mySharp?.total ?? 0) === 0 ? (
         <SharpScoreOnboard />
       ) : null}
+
+      {/* Open prediction polls — head-to-head + hold-the-lead.
+          Rendered above the momentum strip so they catch the eye
+          when the user lands on the feed. The cards are sized big
+          enough to read like real moments, not background chips. */}
+      {data.predictionPolls && data.predictionPolls.length > 0 && (
+        <div className="predpoll-stack">
+          {data.predictionPolls.map(({ poll, counts, myVote }) => (
+            <PredictionPollCard
+              key={poll.id}
+              poll={poll}
+              counts={
+                myPredictionVotes[poll.id]?.counts ?? counts
+              }
+              myVote={myPredictionVotes[poll.id]?.myVote ?? myVote}
+              onVote={(opt) => sendPredictionVote(poll.id, opt)}
+            />
+          ))}
+        </div>
+      )}
 
       <MomentumStrip momentum={data.fieldMomentum} />
 

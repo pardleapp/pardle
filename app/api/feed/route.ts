@@ -53,6 +53,12 @@ import {
   getSharpScore,
   type SharpScoreStats,
 } from "@/lib/feed/sharp-score";
+import {
+  getOpenPredictionPolls,
+  getMyPredictionVotes,
+  type PredictionPoll,
+  type PredictionPollCounts,
+} from "@/lib/feed/prediction-polls";
 
 export const dynamic = "force-dynamic";
 
@@ -280,6 +286,7 @@ async function handle(req: Request) {
     puttPollMyVotes,
     myPuttIq,
     mySharp,
+    predictionPollsRaw,
   ] = await Promise.all([
     getReactionsBulk(ids),
     getCommentCountsBulk(ids),
@@ -314,7 +321,23 @@ async function handle(req: Request) {
     visitorId
       ? getSharpScore(visitorId)
       : Promise.resolve(null as SharpScoreStats | null),
+    // Open prediction polls for this tournament (head-to-head,
+    // hold-the-lead). Empty array when none are open.
+    getOpenPredictionPolls(tournament.id),
   ]);
+
+  // Caller's own pick on each open prediction poll.
+  const predictionPollIds = predictionPollsRaw.map((p) => p.poll.id);
+  const myPredictionVotes =
+    predictionPollIds.length > 0 && visitorId
+      ? await getMyPredictionVotes(predictionPollIds, visitorId)
+      : ({} as Record<string, string | null>);
+
+  const predictionPolls = predictionPollsRaw.map(({ poll, counts }) => ({
+    poll,
+    counts,
+    myVote: myPredictionVotes[poll.id] ?? null,
+  }));
 
   // Pull odds buffers for the union of players in this response. We
   // compute the per-event "before / after" shift here at response
@@ -691,6 +714,11 @@ async function handle(req: Request) {
      *  chip in the feed header. Null when no visitorId is supplied;
      *  empty-stats shape (total: 0) when the visitor has no calls. */
     mySharp,
+    /** Open prediction polls — head-to-head + hold-the-lead. Each
+     *  carries the poll definition, current vote counts, and the
+     *  caller's own pick (null if they haven't voted). Empty when
+     *  no polls are open. */
+    predictionPolls,
     /** Hot/cold-hand status keyed by playerId. Sparse — only contains
      *  the top 5 by sg_total today (🔥) and bottom 5 (🥶), magnitude
      *  floors applied. Renders as a small emoji prefix next to player
