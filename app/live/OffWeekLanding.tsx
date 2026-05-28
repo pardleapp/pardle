@@ -113,23 +113,6 @@ export default function OffWeekLanding({ tournament }: Props) {
         </Link>
       )}
 
-      {tournament && (
-        <Link href="/picks" className="offweek-sharp offweek-picks">
-          <div className="offweek-sharp-head">
-            <span className="offweek-sharp-pill">⚡ Pick the winner</span>
-            <span className="offweek-sharp-arrow" aria-hidden="true">→</span>
-          </div>
-          <p className="offweek-sharp-title">
-            Call the {tournament.name} winner.
-          </p>
-          <p className="offweek-sharp-blurb">
-            One pick. Locks at tee-off. Right or wrong, it counts
-            toward your Sharp Score — no money down.
-          </p>
-          <p className="offweek-sharp-foot">Make your pick →</p>
-        </Link>
-      )}
-
       <Link href="/sharp" className="offweek-sharp">
         <div className="offweek-sharp-head">
           <span className="offweek-sharp-pill">⚡ Sharp Score</span>

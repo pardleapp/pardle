@@ -34,8 +34,7 @@ export type SharpCategory =
   | "bet-outright"
   | "bet-top-finish"
   | "bet-round-score"
-  | "bet-winning-score"
-  | "event-winner-pick";
+  | "bet-winning-score";
 
 /** Minimum settled calls before a user's Sharp Score displays
  *  publicly. Low-data accuracy lies — 3/4 = 75% reads as elite but
@@ -168,7 +167,6 @@ export async function getSharpScore(
       "bet-top-finish": { total: 0, correct: 0 },
       "bet-round-score": { total: 0, correct: 0 },
       "bet-winning-score": { total: 0, correct: 0 },
-      "event-winner-pick": { total: 0, correct: 0 },
     },
     rank: null,
   };
@@ -192,7 +190,6 @@ export async function getSharpScore(
     "bet-top-finish",
     "bet-round-score",
     "bet-winning-score",
-    "event-winner-pick",
   ];
   const catReads = await Promise.all(
     cats.map((c) =>
