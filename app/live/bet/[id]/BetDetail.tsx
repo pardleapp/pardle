@@ -675,28 +675,39 @@ function LiveRoundStatus({
 }) {
   if (!state) return null;
   const r = round ?? state.currentRound;
-  // PlayerRoundState doesn't carry a status flag — derive from
-  // holesPlayed / holesRemaining (both summed across the current
-  // round only, per the server projection).
-  const notStarted = state.holesPlayed <= 0;
-  const complete = state.holesRemaining <= 0 && state.holesPlayed >= 18;
+  // Read from the per-round snapshot when available. The top-level
+  // PlayerRoundState fields (holesPlayed / toPar) describe the
+  // current round only — for a bet on R1, those fields would say
+  // "R2, thru 0" once R1 finished, painting an in-progress R1 bet
+  // as "Yet to tee off".
+  const snap = state.rounds?.[r];
+  const holesPlayed = snap?.holesPlayed ?? state.holesPlayed;
+  const holesRemaining = snap?.holesRemaining ?? state.holesRemaining;
+  const toPar = snap?.toPar ?? state.toPar;
+  const status: "not-started" | "in-progress" | "complete" =
+    snap?.status ??
+    (holesPlayed <= 0
+      ? "not-started"
+      : holesRemaining <= 0 && holesPlayed >= 18
+        ? "complete"
+        : "in-progress");
   let primary: string;
   let secondary: string | null = null;
-  if (notStarted) {
+  if (status === "not-started") {
     primary = "Yet to tee off";
-  } else if (complete) {
+  } else if (status === "complete") {
     primary = "Round complete";
-    secondary = formatToPar(state.toPar);
+    secondary = formatToPar(toPar);
   } else {
-    primary = `Thru ${state.holesPlayed}`;
-    secondary = formatToPar(state.toPar);
+    primary = `Thru ${holesPlayed}`;
+    secondary = formatToPar(toPar);
   }
   const tone =
     secondary == null
       ? "neutral"
-      : state.toPar < 0
+      : toPar < 0
         ? "down"
-        : state.toPar > 0
+        : toPar > 0
           ? "up"
           : "neutral";
   return (
