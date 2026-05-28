@@ -8000,7 +8000,7 @@ footer {
 }
 
 .bd-hero-amt {
-  font-size: 44px;
+  font-size: clamp(30px, 9vw, 44px);
   font-weight: 900;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -8109,15 +8109,19 @@ footer {
   gap: 6px;
 }
 
-/* Live round status — small pill above the round-score chart so
-   the bettor sees "Thru X · −Y" in their eyeline alongside the
-   chart trajectory. */
-.bd-live-status-row {
+/* Chart header — flex row holding the PnL/Win toggle on the left
+   and an optional status pill on the right (used by round-score
+   bets to surface "Thru X · −Y" without consuming its own row). */
+.bd-chart-header {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
+/* Live round status — compact pill that shares the chart's
+   header row with the mode toggle. */
 .bd-live-status {
   display: inline-flex;
   align-items: baseline;
@@ -11048,20 +11052,33 @@ footer {
   display: flex;
   justify-content: center;
   gap: 6px;
-  padding: 10px 8px calc(10px + env(safe-area-inset-bottom));
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
   margin: 8px -12px 0;
   background: var(--bg, #fff);
   border-top: 1px solid var(--border);
   z-index: 41;
 }
 
+@media (max-width: 540px) {
+  .feed-burst-bar {
+    /* Shrink the sticky burst bar on phones — it was eating ~70 px
+       of viewport (48 px buttons + 20 px padding) and covering the
+       last feed row above the iOS home indicator. Compact emoji-
+       only chips give the same affordance in ~36 px. */
+    padding: 4px 6px calc(4px + env(safe-area-inset-bottom));
+    gap: 4px;
+    background: rgba(10, 13, 18, 0.92);
+    backdrop-filter: blur(8px);
+  }
+}
+
 .feed-burst-btn {
   background: rgba(0, 0, 0, 0.04);
   border: 1px solid var(--border);
   border-radius: 999px;
-  width: 48px;
-  height: 48px;
-  font-size: 24px;
+  width: 44px;
+  height: 44px;
+  font-size: 22px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -11072,6 +11089,16 @@ footer {
 .feed-burst-btn:active {
   transform: scale(0.82);
   background: rgba(123, 174, 63, 0.18);
+}
+
+@media (max-width: 540px) {
+  .feed-burst-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -16098,19 +16125,22 @@ body:has(.v4-theme) {
     height: 32px;
     font-size: 11px;
   }
-  /* Stack name and chip vertically on mobile so long names like
-     "N. Petronzio" can't get clipped by a wide score chip
-     ("BOGEY · H18 · +1") sharing the same row. Both items left-
-     align under the body column; layout reads name → chip → body. */
+  /* Keep name + score chip on the same line — the chip is the
+     headline ("BOGEY · H18 · +1"), the name is just the label
+     (already visually carried by the avatar). Demoting the chip
+     to a second line wastes prime row space. Ellipsis the name
+     instead, leaving the chip its full width. */
   .v4-theme .feed-row-head {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
   }
   .v4-theme .feed-row-name {
     font-size: 14px;
-    overflow: visible;
-    white-space: normal;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .v4-theme .feed-row-score-num {
     font-size: 15px;

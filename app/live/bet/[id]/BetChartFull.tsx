@@ -7,6 +7,12 @@ import PastBetReplay from "./PastBetReplay";
 interface Props {
   bet: TrackedBet;
   history: PnlSample[];
+  /** Optional element rendered to the right of the chart's mode
+   *  toggle (PnL £ / Win %). Used by the round-score view to put
+   *  the "R1 LIVE · Thru X · −Y" pill on the same row as the
+   *  toggle, saving a full stacked row of vertical space on
+   *  phones. */
+  headerRight?: React.ReactNode;
 }
 
 type Mode = "pnl" | "prob";
@@ -20,7 +26,7 @@ const H = 380;
 // symbol throughout the chart.
 import { formatBetCurrency, type BetCurrency } from "@/lib/format/bet-currency";
 
-export default function BetChartFull({ bet, history }: Props) {
+export default function BetChartFull({ bet, history, headerRight }: Props) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [mode, setMode] = useState<Mode>("prob");
 
@@ -107,7 +113,10 @@ export default function BetChartFull({ bet, history }: Props) {
     }
     return (
       <div className="bd-chart">
-        <ChartToggle mode={mode} setMode={setMode} />
+        <div className="bd-chart-header">
+          <ChartToggle mode={mode} setMode={setMode} />
+          {headerRight}
+        </div>
         <div className="bd-chart-empty">
           {isRound
             ? "Chart will fill in as holes complete."
@@ -143,7 +152,10 @@ export default function BetChartFull({ bet, history }: Props) {
 
   return (
     <div className="bd-chart">
-      <ChartToggle mode={mode} setMode={setMode} />
+      <div className="bd-chart-header">
+        <ChartToggle mode={mode} setMode={setMode} />
+        {headerRight}
+      </div>
 
       <svg
         viewBox={`0 0 ${W} ${H}`}

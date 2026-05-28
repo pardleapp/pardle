@@ -553,13 +553,18 @@ export default function BetDetail({ betId }: { betId: string }) {
         </>
       ) : (
         <>
-          {bet.kind === "round-score" && (
-            <LiveRoundStatus
-              state={data.playerRoundStates[bet.playerId]}
-              round={roundForBet}
-            />
-          )}
-          <BetChartFull bet={resolvedBet} history={history} />
+          <BetChartFull
+            bet={resolvedBet}
+            history={history}
+            headerRight={
+              bet.kind === "round-score" ? (
+                <LiveRoundStatus
+                  state={data.playerRoundStates[bet.playerId]}
+                  round={roundForBet}
+                />
+              ) : undefined
+            }
+          />
           {insight && <InsightCard insight={insight} />}
           {bet.kind === "round-score" ? (
             <RoundDetailTable
@@ -712,14 +717,12 @@ function LiveRoundStatus({
           ? "up"
           : "neutral";
   return (
-    <div className="bd-live-status-row">
-      <div className={`bd-live-status bd-live-status-${tone}`}>
-        <span className="bd-live-status-eyebrow">R{r} live</span>
-        <span className="bd-live-status-primary">{primary}</span>
-        {secondary && (
-          <span className="bd-live-status-secondary">{secondary}</span>
-        )}
-      </div>
+    <div className={`bd-live-status bd-live-status-${tone}`}>
+      <span className="bd-live-status-eyebrow">R{r} live</span>
+      <span className="bd-live-status-primary">{primary}</span>
+      {secondary && (
+        <span className="bd-live-status-secondary">{secondary}</span>
+      )}
     </div>
   );
 }
