@@ -33,6 +33,9 @@ export default function SiteFooter() {
         (US).
       </p>
       <div className="site-footer-links">
+        <Link href="/picks" className="site-footer-link">
+          Picks
+        </Link>
         <Link href="/sharp" className="site-footer-link">
           Sharp Score
         </Link>

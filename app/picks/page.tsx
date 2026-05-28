@@ -18,7 +18,7 @@ export default function PicksPage() {
       <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
         <div className="brand-nav">
-          <MainNav active="none" />
+          <MainNav active="picks" />
           <AuthChip />
         </div>
       </header>

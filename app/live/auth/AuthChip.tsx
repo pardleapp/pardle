@@ -91,6 +91,13 @@ export default function AuthChip() {
               Your bets
             </Link>
             <Link
+              href="/picks"
+              className="auth-chip-menu-item"
+              onClick={() => setMenuOpen(false)}
+            >
+              Pick the winner
+            </Link>
+            <Link
               href="/sharp"
               className="auth-chip-menu-item"
               onClick={() => setMenuOpen(false)}
