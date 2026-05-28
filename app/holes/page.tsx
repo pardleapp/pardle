@@ -35,6 +35,7 @@ import {
   saveChallengerName,
 } from "@/lib/challenge";
 import { NotifySignup } from "@/lib/notify-signup";
+import PuzzleBridgeCard from "@/app/live/PuzzleBridgeCard";
 import { encodeGridPros, encodeShareCard } from "@/lib/share-card";
 import { recordPlayClient } from "@/lib/stats-client";
 import { searchableName } from "@/lib/text";
@@ -991,6 +992,7 @@ export default function HolesPage() {
             </button>
           </div>
 
+          <PuzzleBridgeCard game="holes" />
           <NotifySignup gameId="holes" dayNumber={dayNumber} />
         </div>
       )}

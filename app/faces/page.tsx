@@ -20,6 +20,7 @@ import {
   type PardleStats,
 } from "@/lib/streak";
 import { NotifySignup } from "@/lib/notify-signup";
+import PuzzleBridgeCard from "@/app/live/PuzzleBridgeCard";
 import { recordPlayClient } from "@/lib/stats-client";
 import { encodeGridFaces, encodeShareCard } from "@/lib/share-card";
 import { searchableName } from "@/lib/text";
@@ -428,6 +429,11 @@ export default function FacesPage() {
             </Link>
           </div>
         </div>
+
+        <PuzzleBridgeCard
+          game="faces"
+          players={puzzles.flatMap((p) => [p.left.name, p.right.name])}
+        />
 
         <NotifySignup gameId="faces" dayNumber={dayNumber} />
 

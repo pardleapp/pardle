@@ -8758,6 +8758,182 @@ footer {
   letter-spacing: 0.02em;
 }
 
+/* ── Puzzle bridge card ─────────────────────────────────────── */
+/* Lives at the end-of-puzzle screen on /pros, /holes, /faces.
+   Routes daily-puzzle players into the live-feed gamification
+   loop (putt polls + Sharp Score). Four visual variants — putt
+   poll (amber, loudest), personalised player match (green),
+   generic live (green), upcoming tournament (subtle). All share
+   the same card chrome so the layout stays predictable. */
+
+.bridge-card {
+  display: block;
+  margin: 16px auto;
+  max-width: 460px;
+  padding: 16px 18px 14px;
+  border-radius: 14px;
+  text-decoration: none;
+  color: #f5f5f7;
+  background: #0e0f12;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+  transition: transform 80ms, border-color 120ms;
+}
+
+.bridge-card:hover {
+  transform: translateY(-1px);
+}
+
+.bridge-card::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  right: -10%;
+  width: 50%;
+  height: 180%;
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.bridge-card-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.bridge-card-title {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 900;
+  color: #f5f5f7;
+  line-height: 1.3;
+  position: relative;
+  z-index: 1;
+}
+
+.bridge-card-sub {
+  margin: 0 0 10px;
+  font-size: 13.5px;
+  color: rgba(245, 245, 247, 0.78);
+  line-height: 1.45;
+  position: relative;
+  z-index: 1;
+}
+
+.bridge-card-sub strong {
+  color: #f5f5f7;
+  font-weight: 800;
+}
+
+.bridge-card-cta {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13.5px;
+  font-weight: 800;
+  position: relative;
+  z-index: 1;
+}
+
+/* Variant: open putt poll — amber, attention-grabbing. */
+.bridge-card-poll {
+  border-color: rgba(255, 157, 46, 0.55);
+  background:
+    radial-gradient(
+      circle at 0% 0%,
+      rgba(255, 157, 46, 0.18) 0%,
+      rgba(255, 157, 46, 0.04) 60%,
+      transparent 100%
+    ),
+    #0e0f12;
+}
+
+.bridge-card-poll::after {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 157, 46, 0.2) 0%,
+    transparent 70%
+  );
+}
+
+.bridge-card-poll .bridge-card-tag {
+  background: rgba(255, 157, 46, 0.22);
+  border: 1px solid rgba(255, 157, 46, 0.5);
+  color: #ffb55a;
+}
+
+.bridge-card-poll .bridge-card-cta {
+  color: #ffb55a;
+}
+
+/* Variant: personalised player match — green, brand-positive. */
+.bridge-card-player {
+  border-color: rgba(0, 217, 110, 0.45);
+  background:
+    radial-gradient(
+      circle at 0% 0%,
+      rgba(0, 217, 110, 0.14) 0%,
+      rgba(0, 217, 110, 0.02) 60%,
+      transparent 100%
+    ),
+    #0e0f12;
+}
+
+.bridge-card-player::after {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 217, 110, 0.16) 0%,
+    transparent 70%
+  );
+}
+
+.bridge-card-player .bridge-card-tag {
+  background: rgba(0, 217, 110, 0.18);
+  border: 1px solid rgba(0, 217, 110, 0.4);
+  color: #00d96e;
+}
+
+.bridge-card-player .bridge-card-cta {
+  color: #00d96e;
+}
+
+/* Variant: live but no specific hook — softer green. */
+.bridge-card-generic {
+  border-color: rgba(0, 217, 110, 0.3);
+}
+
+.bridge-card-generic .bridge-card-tag {
+  background: rgba(0, 217, 110, 0.12);
+  border: 1px solid rgba(0, 217, 110, 0.3);
+  color: #00d96e;
+}
+
+.bridge-card-generic .bridge-card-cta {
+  color: #00d96e;
+}
+
+/* Variant: upcoming event — quiet info treatment. */
+.bridge-card-upcoming {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #0e0f12;
+}
+
+.bridge-card-upcoming .bridge-card-tag {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(245, 245, 247, 0.7);
+}
+
+.bridge-card-upcoming .bridge-card-cta {
+  color: rgba(245, 245, 247, 0.85);
+}
+
 .feed-tag {
   display: inline-block;
   padding: 2px 7px;
