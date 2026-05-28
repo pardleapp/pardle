@@ -284,16 +284,18 @@ export default function CourseMapClient() {
 
   const hasGeo = !!data.courseId;
   const effectiveView: CourseView = hasGeo ? view : "grid";
-  const mapPlayers: CourseMapPlayer[] = data.players
-    .filter((p) => p.status === "active" && p.currentHole != null)
-    .map((p) => ({
-      playerId: p.playerId,
-      displayName: p.displayName,
-      currentHole: p.currentHole,
-      toPar: parseTotal(p.total),
-      position: p.position,
-      thru: p.thru,
-    }));
+  // Pass ALL players to the map (not just active) so the player
+  // search can locate finished / not-started / cut entries too —
+  // those just get a banner instead of a dot highlight.
+  const mapPlayers: CourseMapPlayer[] = data.players.map((p) => ({
+    playerId: p.playerId,
+    displayName: p.displayName,
+    currentHole: p.currentHole,
+    toPar: parseTotal(p.total),
+    position: p.position,
+    thru: p.thru,
+    status: p.status,
+  }));
 
   return (
     <section className="course-map">

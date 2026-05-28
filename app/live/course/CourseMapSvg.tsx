@@ -37,6 +37,10 @@ export interface CourseMapPlayer {
   toPar: number;
   position: string;
   thru: string;
+  /** Round status — gates whether selecting them from search
+   *  highlights a dot (active) or shows an off-course banner
+   *  (finished / not-started / cut). */
+  status: "active" | "finished" | "not-started" | "out";
   isFollowed?: boolean;
   state?: "hot" | "cold" | null;
 }
@@ -176,6 +180,13 @@ export default function CourseMapSvg({ course, players }: Props) {
   // steps is enough to inspect any tight cluster of dots without
   // adding pan complexity. Native pinch still works on top.
   const [zoom, setZoom] = useState(1);
+  // Player search / locator. Typing in the search input filters
+  // the player list; selecting a result highlights their dot with
+  // a pulsing glow and re-centres the viewBox on their hole.
+  // Off-course players (finished / cut / not-started) get a
+  // dismissible banner since there's no dot to highlight.
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const project = useMemo(
     () => makeProject(course.bbox, SVG_W, SVG_H),
@@ -185,11 +196,13 @@ export default function CourseMapSvg({ course, players }: Props) {
   // Group players by hole so we can fan-cluster them. Sort within
   // each hole by playerId so the fan-cluster index `i` is stable
   // across polls — otherwise dots reshuffle every 6 s as the
-  // leaderboard order shifts, which reads as flicker.
+  // leaderboard order shifts, which reads as flicker. Only active
+  // players get dots; finished / cut / not-started are searchable
+  // but render as a banner not a dot.
   const byHole = useMemo(() => {
     const m = new Map<number, CourseMapPlayer[]>();
     for (const p of players) {
-      if (p.currentHole == null) continue;
+      if (p.currentHole == null || p.status !== "active") continue;
       if (!m.has(p.currentHole)) m.set(p.currentHole, []);
       m.get(p.currentHole)!.push(p);
     }
@@ -238,6 +251,47 @@ export default function CourseMapSvg({ course, players }: Props) {
   const selectedPlayers = selectedHole != null ? byHole.get(selectedHole) ?? [] : [];
   const selectedHoleMeta = selectedHole != null ? holeByNum.get(selectedHole) : null;
 
+  const playerById = useMemo(() => {
+    const m = new Map<string, CourseMapPlayer>();
+    for (const p of players) m.set(p.playerId, p);
+    return m;
+  }, [players]);
+
+  const selectedPlayer =
+    selectedPlayerId != null ? playerById.get(selectedPlayerId) ?? null : null;
+
+  const searchResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [] as CourseMapPlayer[];
+    const statusOrder = (p: CourseMapPlayer) =>
+      p.status === "active" ? 0 : p.status === "finished" ? 1 : p.status === "not-started" ? 2 : 3;
+    return players
+      .filter((p) => p.displayName.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const d = statusOrder(a) - statusOrder(b);
+        if (d !== 0) return d;
+        return a.displayName.localeCompare(b.displayName);
+      })
+      .slice(0, 8);
+  }, [players, search]);
+
+  function selectPlayer(p: CourseMapPlayer) {
+    setSelectedPlayerId(p.playerId);
+    setSearch("");
+    if (p.currentHole != null && p.status === "active") {
+      setSelectedHole(p.currentHole);
+      setZoom((z) => Math.max(z, 2));
+    }
+  }
+
+  function statusBlurb(p: CourseMapPlayer): string {
+    if (p.status === "finished") return `Finished · ${p.position}`;
+    if (p.status === "not-started") return "Yet to tee off";
+    if (p.status === "out") return "Out of the field";
+    if (p.currentHole != null) return `H${p.currentHole}${p.thru ? ` · ${p.thru}` : ""}`;
+    return "";
+  }
+
   // Centre the zoomed viewBox on the selected hole when one is
   // active; otherwise centre the whole course. Each zoom step
   // halves the viewBox extent.
@@ -263,6 +317,64 @@ export default function CourseMapSvg({ course, players }: Props) {
 
   return (
     <div className="cmap-wrap">
+      <div className="cmap-search">
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Find a player"
+          className="cmap-search-input"
+          aria-label="Search players"
+          autoComplete="off"
+          spellCheck={false}
+        />
+        {searchResults.length > 0 && (
+          <ul className="cmap-search-results" role="listbox">
+            {searchResults.map((p) => (
+              <li key={p.playerId}>
+                <button
+                  type="button"
+                  className="cmap-search-row"
+                  onClick={() => selectPlayer(p)}
+                >
+                  <span className="cmap-search-name">{p.displayName}</span>
+                  <span
+                    className={`cmap-search-meta cmap-search-meta-${p.status}`}
+                  >
+                    {p.status === "active" && p.currentHole != null
+                      ? `H${p.currentHole}${p.thru ? ` · ${p.thru}` : ""}`
+                      : p.status === "finished"
+                        ? "Done"
+                        : p.status === "not-started"
+                          ? "TBD"
+                          : "Out"}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {selectedPlayer &&
+        (selectedPlayer.status !== "active" ||
+          selectedPlayer.currentHole == null) && (
+          <div className="cmap-offcourse" role="status">
+            <span className="cmap-offcourse-name">
+              {selectedPlayer.displayName}
+            </span>
+            <span className="cmap-offcourse-status">
+              {statusBlurb(selectedPlayer)}
+            </span>
+            <button
+              type="button"
+              className="cmap-offcourse-close"
+              onClick={() => setSelectedPlayerId(null)}
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        )}
       <svg
         className="cmap-svg"
         viewBox={`${clampedX} ${clampedY} ${viewSize} ${viewSize}`}
@@ -440,6 +552,7 @@ export default function CourseMapSvg({ course, players }: Props) {
               );
               if (!pos) return null;
               const [x, y] = project(pos[0], pos[1]);
+              const isSelectedPlayer = p.playerId === selectedPlayerId;
               return (
                 <g
                   key={`p-${p.playerId}`}
@@ -469,6 +582,30 @@ export default function CourseMapSvg({ course, players }: Props) {
                       strokeDasharray="2 3"
                       pointerEvents="none"
                     />
+                  )}
+                  {isSelectedPlayer && (
+                    <>
+                      <circle
+                        cx={x}
+                        cy={y}
+                        r={9}
+                        fill="none"
+                        stroke="#ff9d2e"
+                        strokeWidth={3}
+                        className="cmap-player-pulse"
+                        pointerEvents="none"
+                      />
+                      <circle
+                        cx={x}
+                        cy={y}
+                        r={9}
+                        fill="none"
+                        stroke="#ff9d2e"
+                        strokeWidth={3}
+                        className="cmap-player-pulse cmap-player-pulse-delay"
+                        pointerEvents="none"
+                      />
+                    </>
                   )}
                 </g>
               );
