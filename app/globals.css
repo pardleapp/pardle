@@ -7599,6 +7599,29 @@ footer {
   color: #b13838;
 }
 
+/* Hide the inline ✕ on phones — 26 px destructive target one
+   accidental thumb-swipe away from the row's tap-to-detail
+   surface. Removal still works from the bet detail page. */
+@media (max-width: 540px) {
+  .bets-row-x {
+    display: none;
+  }
+}
+
+/* Promote the PnL on mobile — this view's whole purpose is "what
+   is my book worth right now"; the number deserves to dominate.
+   Robinhood-style hierarchy: big PnL, smaller meta beneath. */
+@media (max-width: 540px) {
+  .bets-row-value strong {
+    font-size: 22px;
+    line-height: 1;
+  }
+  .bets-row-value span {
+    font-size: 11px;
+    margin-top: 3px;
+  }
+}
+
 .bets-totals {
   margin: 6px 0 0;
   font-size: 13px;
@@ -9146,13 +9169,13 @@ footer {
 }
 
 .predpoll-deck-nav-btn {
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 800;
   cursor: pointer;
   display: flex;
@@ -9595,14 +9618,14 @@ footer {
   bottom: 10px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   z-index: 2;
 }
 
 .cmap-zoom-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: rgba(10, 13, 18, 0.85);
   color: var(--text);
@@ -17572,28 +17595,47 @@ body:has(.v4-theme) {
    classes, no text. Tap-through still works because the link
    wraps the dot. */
 @media (max-width: 720px) {
+  /* Each player chip = a coloured dot, but the tap target grows
+     to a 22 × 22 hit-area (still under 44 but a big jump from the
+     prior 6 px). PlayerAvatar + total inside the link are hidden;
+     we paint the dot via the link's own background so the touch
+     area equals the chip size. */
   .course-player {
-    min-height: 8px;
+    min-height: 22px;
+    min-width: 22px;
     padding: 0;
     gap: 0;
     background: transparent;
     border-radius: 999px;
-    width: 6px;
-    height: 6px;
+    width: 22px;
+    height: 22px;
     align-self: center;
     flex-shrink: 0;
+    position: relative;
+    display: inline-block;
   }
-  .course-player-up {
-    background: var(--green);
-    border-left: none;
+  .course-player > * {
+    display: none;
   }
-  .course-player-down {
-    background: var(--red);
-    border-left: none;
-  }
-  .course-player-even {
+  .course-player::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 999px;
     background: var(--text-faint);
-    border-left: none;
+  }
+  .course-player-up::after {
+    background: var(--green);
+  }
+  .course-player-down::after {
+    background: var(--red);
+  }
+  .course-player-even::after {
+    background: var(--text-faint);
   }
   .course-player-name {
     display: none;
