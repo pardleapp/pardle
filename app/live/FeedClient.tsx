@@ -807,12 +807,20 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   // poll record is no longer loaded) — once the putt has dropped or
   // missed, the "will it drop?" row is dead weight in the scroll-
   // back. The hole-out / birdie / bogey event already covers the
-  // outcome with the real headline.
+  // outcome with the real headline. Also bound by age: an unsettled
+  // poll that's older than ~8 min is almost certainly a stale relic
+  // (the player has long since finished the hole; the poll never
+  // got settled because of an earlier bug in the engine).
+  const POLL_MAX_AGE_MS = 8 * 60 * 1000;
   const rowsAfterPollFilter = data.rows.filter((r) => {
     const ev = r.event;
     if (ev.type !== "putt-poll" || !ev.pollId) return true;
     const ps = data.puttPolls?.[ev.pollId];
-    return !!ps && ps.closedAt == null;
+    if (!ps || ps.closedAt != null) return false;
+    if (typeof ev.ts === "number" && Date.now() - ev.ts > POLL_MAX_AGE_MS) {
+      return false;
+    }
+    return true;
   });
   const visibleRows =
     filterMode === "following"

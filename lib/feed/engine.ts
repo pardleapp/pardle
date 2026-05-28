@@ -244,6 +244,17 @@ export async function pollAndDiff(
   // Diff: every hole that went from unplayed → played is an event.
   const now = Date.now();
   const events: FeedEvent[] = [];
+  // Every hole completion this poll, including pars. Pars don't get
+  // a feed event (they're not reaction-worthy), but they still close
+  // out any open putt poll on that hole — a "putt for birdie" that
+  // misses + taps in for par needs to settle the same as one that
+  // drops.
+  const holeCompletions: {
+    playerId: string;
+    round: number;
+    hole: number;
+    strokes: number;
+  }[] = [];
 
   for (const [pid, sc] of Object.entries(scorecards)) {
     const playerName = nameById.get(pid) ?? "Unknown";
@@ -256,6 +267,13 @@ export async function pollAndDiff(
 
         const strokes = Number(after);
         if (!Number.isFinite(strokes) || strokes <= 0) continue;
+
+        holeCompletions.push({
+          playerId: pid,
+          round,
+          hole: h.holeNumber,
+          strokes,
+        });
 
         const result = resultFor(strokes, h.par);
         // Pars are noise in a reaction feed — nobody shouts "what a par".
@@ -620,23 +638,22 @@ export async function pollAndDiff(
   events.sort((a, b) => interestOf(a) - interestOf(b));
 
   // ── Settle any open putt polls whose hole just completed ──────
-  // Score events tell us the final strokes for a hole; if there was
-  // an open poll waiting on that hole, we know whether the putt
-  // dropped (finalStrokes === polledAtStroke + 1).
-  const scoreEventsThisPoll = events.filter(
-    (e) => e.type === "score" && e.hole != null && e.strokes != null,
-  );
-  if (scoreEventsThisPoll.length > 0) {
+  // Hole completions tell us the final strokes; if there was an
+  // open poll waiting on that hole, we know whether the putt
+  // dropped (finalStrokes === polledAtStroke + 1). Pars are part of
+  // this loop too — a missed birdie putt + tap-in for par needs to
+  // settle the open poll just like a dropped one.
+  if (holeCompletions.length > 0) {
     await Promise.all(
-      scoreEventsThisPoll.map(async (e) => {
+      holeCompletions.map(async (c) => {
         try {
           const pollId = await findOpenPollForHole(
             tournamentId,
-            e.playerId,
-            e.round,
-            e.hole!,
+            c.playerId,
+            c.round,
+            c.hole,
           );
-          if (pollId) await settlePuttPoll(pollId, e.strokes!);
+          if (pollId) await settlePuttPoll(pollId, c.strokes);
         } catch (err) {
           console.error("[feed] settlePuttPoll failed", err);
         }
