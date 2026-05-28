@@ -75,10 +75,16 @@ export interface SharpScoreStats {
 
 /**
  * Record one settled prediction. Caller already knows the outcome
- * (correct/incorrect). Idempotent at the caller level — we
- * don't dedupe by call ID here. The two existing callers (putt-
- * poll settlement + bet settlement) already gate on first-close,
- * so double-counting isn't possible in normal flow.
+ * (correct/incorrect). Idempotent at the caller level — we don't
+ * dedupe by call ID here; the two existing callers (putt-poll
+ * settlement + bet settlement) already gate on first-close, so
+ * double-counting isn't possible in normal flow.
+ *
+ * Single-round-trip pipeline for the main counter bumps + streak,
+ * then a follow-up only when longestStreak needs to climb. Was 7
+ * sequential awaits — a Redis blip mid-sequence could leave a
+ * user's total incremented but correct not, skewing their public
+ * accuracy.
  */
 export async function recordCall(args: {
   authorKey: string;
@@ -90,38 +96,53 @@ export async function recordCall(args: {
   if (!authorKey) return;
   const uKey = userKey(authorKey);
   const ucKey = userCatKey(authorKey, category);
+  const now = Date.now();
 
-  await redis.hincrby(uKey, "total", 1);
-  await redis.hincrby(ucKey, "total", 1);
+  // Pipeline #1: all the count writes in one round-trip. We also
+  // hset firstAt unconditionally — hsetnx would be more correct
+  // semantically but two writes on a first call costs less than
+  // an extra hget on every call. The first-ever value sticks; we
+  // overwrite on subsequent calls with a slightly later ts, which
+  // is fine for the "age-gate by 30 days" use case (the precise
+  // ms doesn't matter; we just need some early timestamp).
+  const pipe = redis.pipeline();
+  pipe.hincrby(uKey, "total", 1);
+  pipe.hincrby(ucKey, "total", 1);
   if (correct) {
-    await redis.hincrby(uKey, "correct", 1);
-    await redis.hincrby(ucKey, "correct", 1);
-    await redis.zincrby(lbKey(), 1, authorKey);
-  }
-
-  // Streak tracking — increment on correct, reset on incorrect.
-  if (correct) {
-    const cur = (await redis.hincrby(uKey, "currentStreak", 1)) as number;
-    const u = await redis.hgetall<Record<string, string>>(uKey);
-    const longest = Number(u?.longestStreak ?? 0);
-    if (cur > longest) {
-      await redis.hset(uKey, { longestStreak: cur });
-    }
+    pipe.hincrby(uKey, "correct", 1);
+    pipe.hincrby(ucKey, "correct", 1);
+    pipe.zincrby(lbKey(), 1, authorKey);
+    pipe.hincrby(uKey, "currentStreak", 1);
   } else {
-    await redis.hset(uKey, { currentStreak: 0 });
+    pipe.hset(uKey, { currentStreak: 0 });
   }
-
-  // First-seen timestamp so we can age-gate the leaderboard later
-  // ("must have at least 30 days of calls"). Cheap conditional set.
-  const u = await redis.hgetall<Record<string, string>>(uKey);
-  if (!u?.firstAt) {
-    await redis.hset(uKey, { firstAt: Date.now() });
-  }
-
-  // Mirror display name onto the leaderboard names lookup so the
-  // leaderboard page can render without a join. Last-write wins.
+  // Mirror display name + first-seen in the same round-trip.
   if (args.displayName) {
-    await redis.hset(lbNamesKey(), { [authorKey]: args.displayName });
+    pipe.hset(lbNamesKey(), { [authorKey]: args.displayName });
+  }
+  // hsetnx so an existing firstAt isn't clobbered.
+  pipe.hsetnx(uKey, "firstAt", now);
+  // Read longestStreak last so we know what to compare against.
+  pipe.hget(uKey, "longestStreak");
+
+  const results = (await pipe.exec()) as unknown[];
+
+  // Update longestStreak only when this correct call beats the
+  // previous record. Cheap one-write follow-up; skipped entirely
+  // on incorrect calls and on streaks under the existing high.
+  if (correct) {
+    // Index of hincrby(uKey, "currentStreak", 1) — its result is
+    // the new streak value. Position depends on whether correct.
+    // Counts: total(0), cat.total(1), correct(2), cat.correct(3),
+    // zincrby(4), hincrby streak(5) → index 5.
+    const newStreak = Number(results[5] ?? 0);
+    // longestStreak is the LAST pipe entry.
+    const longest = Number(
+      (results[results.length - 1] as string | number | null) ?? 0,
+    );
+    if (newStreak > longest) {
+      await redis.hset(uKey, { longestStreak: newStreak });
+    }
   }
 }
 

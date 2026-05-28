@@ -367,19 +367,29 @@ async function handle(req: Request) {
   }
 
   const admin = getSupabaseAdmin();
-  // Pull every candidate bet across users in a single query.
-  const { data: rowsRaw, error } = await admin
-    .from("bets")
-    .select(
-      "id, user_id, kind, data, placed_at, author_key, last_notified_prob, last_notified_value, last_notified_at, notif_mode, notif_crossed_50_up, notif_crossed_50_down, notif_crossed_80, notif_crossed_20",
-    )
-    .is("removed_at", null)
-    .is("settled_at", null)
-    .neq("notif_mode", "off");
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // Pull every candidate bet across users — paginated since
+  // Supabase JS silently caps at 1000 rows per response.
+  const BET_PAGE_SIZE = 1000;
+  const rows: BetRow[] = [];
+  let betPageStart = 0;
+  for (;;) {
+    const { data: pageRows, error: pageErr } = await admin
+      .from("bets")
+      .select(
+        "id, user_id, kind, data, placed_at, author_key, last_notified_prob, last_notified_value, last_notified_at, notif_mode, notif_crossed_50_up, notif_crossed_50_down, notif_crossed_80, notif_crossed_20",
+      )
+      .is("removed_at", null)
+      .is("settled_at", null)
+      .neq("notif_mode", "off")
+      .range(betPageStart, betPageStart + BET_PAGE_SIZE - 1);
+    if (pageErr) {
+      return NextResponse.json({ error: pageErr.message }, { status: 500 });
+    }
+    if (!pageRows || pageRows.length === 0) break;
+    rows.push(...(pageRows as BetRow[]));
+    if (pageRows.length < BET_PAGE_SIZE) break;
+    betPageStart += BET_PAGE_SIZE;
   }
-  const rows = (rowsRaw ?? []) as BetRow[];
 
   // Subscriptions: fetch in one query for the set of users involved.
   const userIds = Array.from(new Set(rows.map((r) => r.user_id)));
@@ -507,20 +517,32 @@ async function handle(req: Request) {
     .sort((a, b) => a.ts - b.ts);
 
   if (pushWorthy.length > 0) {
-    // Use the `gt` filter on array_length(follows, 1) — Supabase JS
-    // can't express that, so we order/limit broadly and skip empties.
-    const { data: followSubs } = await admin
-      .from("push_subscriptions")
-      .select(
-        "id, user_id, endpoint, p256dh, auth_key, follows, last_notified_event_ts",
-      );
+    // Paginate the subscription scan — Supabase JS caps at 1000 by
+    // default and that ceiling fails silently (no error, just a
+    // truncated slice), so anyone past row 1000 was getting no
+    // follow-event pushes at scale. Page through with .range() in
+    // chunks of 1000 until the API returns a short page.
+    const PAGE_SIZE = 1000;
+    let pageStart = 0;
+    type FollowSubRow = SubscriptionLike & {
+      follows: string[] | null;
+      last_notified_event_ts: number | null;
+    };
+    const followSubs: FollowSubRow[] = [];
+    for (;;) {
+      const { data: pageRows, error: pageErr } = await admin
+        .from("push_subscriptions")
+        .select(
+          "id, user_id, endpoint, p256dh, auth_key, follows, last_notified_event_ts",
+        )
+        .range(pageStart, pageStart + PAGE_SIZE - 1);
+      if (pageErr || !pageRows || pageRows.length === 0) break;
+      followSubs.push(...(pageRows as FollowSubRow[]));
+      if (pageRows.length < PAGE_SIZE) break;
+      pageStart += PAGE_SIZE;
+    }
 
-    for (const sub of (followSubs ?? []) as Array<
-      SubscriptionLike & {
-        follows: string[] | null;
-        last_notified_event_ts: number | null;
-      }
-    >) {
+    for (const sub of followSubs) {
       const follows = sub.follows ?? [];
       if (follows.length === 0) continue;
       const followSet = new Set(follows);
