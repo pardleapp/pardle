@@ -803,24 +803,28 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
   // ── Live feed ───────────────────────────────────────────────────
   const followSet = new Set(follows);
-  // Hide putt-poll events whose poll has already settled (or whose
-  // poll record is no longer loaded) — once the putt has dropped or
-  // missed, the "will it drop?" row is dead weight in the scroll-
-  // back. The hole-out / birdie / bogey event already covers the
-  // outcome with the real headline. Also bound by age: an unsettled
-  // poll that's older than ~8 min is almost certainly a stale relic
-  // (the player has long since finished the hole; the poll never
-  // got settled because of an earlier bug in the engine).
+  // Putt-poll rows: only keep the single latest open poll (the one
+  // that shows the vote widget). Older open polls + closed polls
+  // both render as plain "Has X ft for birdie…" rows that read as
+  // historical noise — the user has no widget to vote on and the
+  // eventual score event already lands the outcome. Compute the
+  // latest open pollId first, then drop every other putt-poll row.
   const POLL_MAX_AGE_MS = 8 * 60 * 1000;
+  const _latestOpenPollIdForFilter: string | null =
+    data.rows.find((r) => {
+      const ev = r.event;
+      if (ev.type !== "putt-poll" || !ev.pollId) return false;
+      const ps = data.puttPolls?.[ev.pollId];
+      if (!ps || ps.closedAt != null) return false;
+      if (typeof ev.ts === "number" && Date.now() - ev.ts > POLL_MAX_AGE_MS) {
+        return false;
+      }
+      return true;
+    })?.event.pollId ?? null;
   const rowsAfterPollFilter = data.rows.filter((r) => {
     const ev = r.event;
-    if (ev.type !== "putt-poll" || !ev.pollId) return true;
-    const ps = data.puttPolls?.[ev.pollId];
-    if (!ps || ps.closedAt != null) return false;
-    if (typeof ev.ts === "number" && Date.now() - ev.ts > POLL_MAX_AGE_MS) {
-      return false;
-    }
-    return true;
+    if (ev.type !== "putt-poll") return true;
+    return ev.pollId != null && ev.pollId === _latestOpenPollIdForFilter;
   });
   const visibleRows =
     filterMode === "following"
