@@ -10482,6 +10482,30 @@ footer {
   overflow: hidden;
 }
 
+.sharp-onboard-dismiss {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sharp-onboard-dismiss:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
 .sharp-onboard::after {
   content: "";
   position: absolute;
@@ -13950,6 +13974,31 @@ body:has(.v4-theme) {
   border-radius: 0;
   box-shadow: none;
   align-items: start;
+}
+
+/* Mobile: 4 reaction buttons × 44 px touch targets eat ~200 px of
+   the 360–430 px viewport, leaving the headline text squashed to
+   3 lines for any normal-length sentence ("Has 13 ft for birdie on
+   the 17th"). Drop actions to their own row below the body so the
+   text gets the full row width. Threshold at 540 px so Plus / Pro
+   Max phones (428/430 px) still pick this up; desktop stays inline. */
+@media (max-width: 540px) {
+  .v4-theme .feed-row {
+    grid-template-columns: 40px 1fr;
+    grid-template-areas:
+      "avatar body"
+      "spacer actions"
+      "poll   poll";
+    column-gap: 12px;
+    row-gap: 4px;
+    padding: 12px 12px 10px;
+  }
+  .v4-theme .feed-row > .feed-actions {
+    grid-area: actions;
+    justify-self: start;
+    margin-top: 2px;
+    margin-left: -4px; /* unindent so first button aligns with body */
+  }
 }
 
 .v4-theme .feed-row::before {

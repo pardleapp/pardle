@@ -1635,9 +1635,40 @@ function HandBadge({ status }: { status: "hot" | "cold" }) {
 
 // ── Sharp Score onboarding card ─────────────────────────────────────
 
+const SHARP_ONBOARD_DISMISS_KEY = "pardle_sharp_onboard_dismissed_v1";
+
 function SharpScoreOnboard() {
+  // Persistent local dismissal — once the user has seen + tapped
+  // the X, this card never reappears (until they clear storage).
+  // The server-side "show only when total === 0" gate handles the
+  // common case once they vote on anything; this covers the user
+  // who keeps coming back to the feed without yet voting.
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.localStorage.getItem(SHARP_ONBOARD_DISMISS_KEY) === "1") {
+      setDismissed(true);
+    }
+  }, []);
+  if (dismissed) return null;
+  const dismiss = () => {
+    setDismissed(true);
+    try {
+      window.localStorage.setItem(SHARP_ONBOARD_DISMISS_KEY, "1");
+    } catch {
+      // silent
+    }
+  };
   return (
     <section className="sharp-onboard" aria-label="Build your Sharp Score">
+      <button
+        type="button"
+        className="sharp-onboard-dismiss"
+        onClick={dismiss}
+        aria-label="Dismiss"
+      >
+        ×
+      </button>
       <div className="sharp-onboard-head">
         <span className="sharp-onboard-pill">⚡ Sharp Score</span>
         <h3 className="sharp-onboard-title">

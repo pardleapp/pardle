@@ -63,6 +63,12 @@ export default function PredictionPollDeck({ polls, myVotes, onVote }: Props) {
 
   const [idx, setIdx] = useState(0);
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // When the user fires the last vote we want them to SEE the
+  // community % on their selection before the deck collapses.
+  // Gate the "all voted → hide" check on this flag so we hold the
+  // deck for ~2 s after the most-recent vote.
+  const [holdOpenAfterVote, setHoldOpenAfterVote] = useState(false);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clamp idx if the deck shrinks (a poll just settled and dropped out).
   useEffect(() => {
@@ -89,14 +95,33 @@ export default function PredictionPollDeck({ polls, myVotes, onVote }: Props) {
   useEffect(() => {
     return () => {
       if (advanceTimer.current) clearTimeout(advanceTimer.current);
+      if (holdTimer.current) clearTimeout(holdTimer.current);
     };
   }, []);
 
   if (ordered.length === 0) return null;
+  // Hide the whole deck once the user has voted on every open
+  // poll — there's nothing left for them to do, and the section
+  // would just be dead weight on the feed until new polls open.
+  // We hold the deck open briefly after the user's last vote so
+  // they see the community-% reveal before it collapses.
+  if (ordered.every((e) => e.myVote != null) && !holdOpenAfterVote) {
+    return null;
+  }
   const current = ordered[Math.min(idx, ordered.length - 1)];
 
   const handleVote = (opt: string) => {
     onVote(current.poll.id, opt);
+    // Hold deck open for the duration of the community-% reveal
+    // (matters when this is the last unvoted poll — without the
+    // hold, the deck would collapse the instant the optimistic
+    // vote lands).
+    setHoldOpenAfterVote(true);
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = setTimeout(
+      () => setHoldOpenAfterVote(false),
+      ADVANCE_AFTER_VOTE_MS + 200,
+    );
     if (advanceTimer.current) clearTimeout(advanceTimer.current);
     // Hold the community-% reveal for a beat, then advance to the
     // next still-unvoted poll if there is one.
