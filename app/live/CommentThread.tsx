@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FeedComment } from "@/lib/feed/types";
+import type { SharpBulkResponse } from "@/app/api/sharp/bulk/route";
+
+/** Minimum settled calls before we'll show the Sharp Score chip
+ *  in the comments thread. A 1-of-1 "100%" chip overstates a
+ *  brand-new commenter; once they have a small sample the chip
+ *  carries real signal. */
+const SHARP_CHIP_MIN_CALLS = 3;
 
 const NAME_STORAGE = "pardle_feed_name";
 const COMMENT_MAX = 280;
@@ -27,6 +34,7 @@ export default function CommentThread({
   onCountChange,
 }: Props) {
   const [comments, setComments] = useState<FeedComment[] | null>(null);
+  const [sharpStats, setSharpStats] = useState<SharpBulkResponse["stats"]>({});
   const [name, setName] = useState("");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -63,6 +71,41 @@ export default function CommentThread({
   useEffect(() => {
     load();
   }, [load]);
+
+  // Bulk-fetch Sharp Score for every commenter whose stats we don't
+  // already have, in one round-trip. Re-runs only when new authorKeys
+  // appear (e.g. a new comment posted by someone we haven't seen).
+  useEffect(() => {
+    if (!comments || comments.length === 0) return;
+    const seen = new Set(Object.keys(sharpStats));
+    const need = Array.from(
+      new Set(
+        comments
+          .map((c) => c.authorKey)
+          .filter((k) => k && !seen.has(k)),
+      ),
+    );
+    if (need.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/sharp/bulk", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ authorKeys: need }),
+        });
+        if (!res.ok) return;
+        const json = (await res.json()) as SharpBulkResponse;
+        if (cancelled) return;
+        setSharpStats((prev) => ({ ...prev, ...json.stats }));
+      } catch {
+        // Silent fail — chip just won't render for these commenters.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [comments, sharpStats]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -134,13 +177,29 @@ export default function CommentThread({
         </p>
       ) : (
         <ul className="feed-thread-list">
-          {comments.map((c) => (
-            <li key={c.id} className="feed-comment">
-              <span className="feed-comment-author">{c.authorName}</span>
-              <span className="feed-comment-text">{c.text}</span>
-              <span className="feed-comment-time">{timeAgo(c.ts)}</span>
-            </li>
-          ))}
+          {comments.map((c) => {
+            const s = sharpStats[c.authorKey];
+            const showChip = s && s.total >= SHARP_CHIP_MIN_CALLS;
+            return (
+              <li key={c.id} className="feed-comment">
+                <span className="feed-comment-author">{c.authorName}</span>
+                {showChip && (
+                  <span
+                    className={`feed-comment-sharp ${
+                      s.qualified ? "feed-comment-sharp-qual" : ""
+                    }`}
+                    title={`Sharp Score · ${s.correct}/${s.total} calls${
+                      s.qualified ? "" : " (need 10 to qualify)"
+                    }`}
+                  >
+                    {s.qualified ? `${Math.round(s.accuracy * 100)}%` : "·"}
+                  </span>
+                )}
+                <span className="feed-comment-text">{c.text}</span>
+                <span className="feed-comment-time">{timeAgo(c.ts)}</span>
+              </li>
+            );
+          })}
         </ul>
       )}
 

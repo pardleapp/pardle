@@ -8934,6 +8934,44 @@ footer {
   color: rgba(245, 245, 247, 0.85);
 }
 
+/* Brief highlight ring + glow applied to a feed row that the
+   user arrived at via a deep-link (e.g. the bridge card on
+   /pros sending them straight to a specific putt-poll row).
+   Removed after ~2.4s by the FeedClient effect. */
+.feed-row-wrap.feed-row-deep-linked .feed-row {
+  position: relative;
+  border-radius: 12px;
+  animation: feed-deep-link-flash 2.2s ease-out 1;
+}
+
+@keyframes feed-deep-link-flash {
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(255, 157, 46, 0.7),
+      0 0 0 0 rgba(255, 157, 46, 0.3);
+    background-color: rgba(255, 157, 46, 0.12);
+  }
+  60% {
+    box-shadow:
+      0 0 0 3px rgba(255, 157, 46, 0.5),
+      0 0 24px 6px rgba(255, 157, 46, 0.18);
+    background-color: rgba(255, 157, 46, 0.06);
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(255, 157, 46, 0),
+      0 0 0 0 rgba(255, 157, 46, 0);
+    background-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feed-row-wrap.feed-row-deep-linked .feed-row {
+    animation: none;
+    background-color: rgba(255, 157, 46, 0.08);
+  }
+}
+
 .feed-tag {
   display: inline-block;
   padding: 2px 7px;
@@ -10221,6 +10259,37 @@ footer {
   gap: 8px;
 }
 
+/* Sharp Score chip rendered next to commenter names — closes the
+   social-currency loop by making the credibility metric visible
+   wherever the user appears across Pardle. Pre-qualified
+   commenters show a small dot, qualified ones show their %. Only
+   renders for commenters with >= SHARP_CHIP_MIN_CALLS settled
+   calls so a new user posting their first comment doesn't get a
+   misleading "100%" chip. */
+.feed-comment-sharp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  min-width: 18px;
+  height: 16px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  background: rgba(255, 157, 46, 0.18);
+  color: #ffb55a;
+  border: 1px solid rgba(255, 157, 46, 0.35);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.feed-comment-sharp-qual {
+  background: rgba(0, 217, 110, 0.18);
+  color: var(--green, #00d96e);
+  border-color: rgba(0, 217, 110, 0.4);
+}
+
 .v4-theme .feed-comment-skel-author {
   width: 70px;
   height: 14px;
@@ -10586,6 +10655,72 @@ footer {
 
 .v4-theme .notif-prompt-enable:hover {
   filter: brightness(1.08);
+}
+
+/* ── iOS Add-to-Home-Screen hint ─────────────────────────────
+   Shown only on iOS Safari (not standalone PWA, not in-app
+   browsers) after the user has placed at least one bet or
+   followed one player. iOS doesn't support web push without
+   PWA install, so this is the bridge from engagement → push
+   for the iPhone Safari cohort. */
+.ios-hint {
+  position: relative;
+  margin: 12px 0;
+  padding: 14px 38px 14px 16px;
+  border-radius: 12px;
+  background: var(--bg-card, #0e0f12);
+  border: 1px solid rgba(0, 217, 110, 0.4);
+  color: var(--text, #f5f5f7);
+}
+
+.ios-hint-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: transparent;
+  border: none;
+  color: var(--muted, #9aa0a8);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 999px;
+  min-width: 32px;
+  min-height: 32px;
+}
+
+.ios-hint-dismiss:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ios-hint-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--green, #00d96e);
+  letter-spacing: -0.005em;
+}
+
+.ios-hint-blurb {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text, #f5f5f7);
+  line-height: 1.5;
+  opacity: 0.92;
+}
+
+.ios-hint-blurb strong {
+  color: var(--text, #f5f5f7);
+  font-weight: 800;
+}
+
+.ios-hint-icon {
+  display: inline-block;
+  font-size: 13.5px;
+  margin: 0 1px;
+  vertical-align: -1px;
+  opacity: 0.85;
 }
 
 .notif-prompt-enable[disabled] {

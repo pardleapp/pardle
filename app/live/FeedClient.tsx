@@ -24,6 +24,7 @@ import {
   headlineImpactForEvent,
 } from "./bet-impact";
 import NotificationPrompt from "./notifications/NotificationPrompt";
+import IosInstallHint from "./notifications/IosInstallHint";
 import { useNotifications } from "./notifications/useNotifications";
 import PlayerAvatar from "./PlayerAvatar";
 import PlayerSearch from "./PlayerSearch";
@@ -309,16 +310,68 @@ interface FeedClientProps {
 
 const FIRST_BET_DISMISSED_KEY = "pardle_first_bet_dismissed_v1";
 
+/** Resolve a poll ID's matching event ID. Used by the deep-link
+ *  handler — the bridge card on /pros / /faces sends users here
+ *  with ?poll=<id> after they finish a puzzle, and we need to
+ *  find which feed row carries that poll so we can scroll it
+ *  into view. */
+function findEventIdForPoll(
+  rows: FeedResponse["rows"] | undefined,
+  pollId: string,
+): string | null {
+  if (!rows) return null;
+  for (const r of rows) {
+    if (r.event.type === "putt-poll" && r.event.pollId === pollId) {
+      return r.event.id;
+    }
+  }
+  return null;
+}
+
 export default function FeedClient({ forcedTournamentId }: FeedClientProps = {}) {
   const [data, setData] = useState<FeedResponse | null>(null);
   const [firstBetDismissed, setFirstBetDismissed] = useState(false);
+  /** Pulled from ?poll=<id> on first mount. When set, the matching
+   *  feed row scrolls into view + flashes a highlight ring once
+   *  the data resolves. */
+  const [deepLinkPollId, setDeepLinkPollId] = useState<string | null>(null);
+  const [deepLinkFired, setDeepLinkFired] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     setFirstBetDismissed(
       !!window.localStorage.getItem(FIRST_BET_DISMISSED_KEY),
     );
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get("poll");
+    if (p) setDeepLinkPollId(p);
   }, []);
+
+  // Once data arrives + the deep-link poll exists, scroll its row
+  // into view and apply a brief highlight ring. Strip the ?poll
+  // param from the URL so a refresh doesn't re-fire the scroll.
+  useEffect(() => {
+    if (!deepLinkPollId || deepLinkFired || !data) return;
+    const eventId = findEventIdForPoll(data.rows, deepLinkPollId);
+    if (!eventId) return;
+    setDeepLinkFired(true);
+    // Defer one paint so the row's actually in the DOM.
+    window.requestAnimationFrame(() => {
+      const node = document.querySelector<HTMLElement>(
+        `[data-event-id="${CSS.escape(eventId)}"]`,
+      );
+      if (!node) return;
+      node.scrollIntoView({ behavior: "smooth", block: "center" });
+      node.classList.add("feed-row-deep-linked");
+      window.setTimeout(() => {
+        node.classList.remove("feed-row-deep-linked");
+      }, 2400);
+    });
+    // Strip ?poll so a refresh doesn't loop us back.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("poll");
+    window.history.replaceState({}, "", url.toString());
+  }, [data, deepLinkPollId, deepLinkFired]);
 
   const dismissFirstBet = useCallback(() => {
     if (typeof window !== "undefined") {
@@ -696,6 +749,10 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         followCount={follows.length}
         follows={follows}
       />
+      <IosInstallHint
+        betCount={trackedBets.length}
+        followCount={follows.length}
+      />
       <div className="feed-header-row">
         <h2 className="feed-tournament-name">
           <span
@@ -825,6 +882,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
             return (
               <li
                 key={event.id}
+                data-event-id={event.id}
                 className={`feed-row-wrap ${isOpen ? "feed-row-wrap-open" : ""}`}
               >
                 <div
