@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase/server";
 import { sendPush, type SubscriptionLike } from "@/lib/notifications/web-push";
+import { formatBetCurrency } from "@/lib/format/bet-currency";
 
 export const dynamic = "force-dynamic";
 
@@ -47,12 +48,11 @@ function summariseBet(bet: Record<string, unknown>): string {
   const kind = bet.kind as string;
   const oddsLabel = (bet.oddsTakenLabel as string) ?? "";
   const stake = bet.stake as number;
+  const currency = bet.currency as
+    | import("@/lib/format/bet-currency").BetCurrency
+    | undefined;
   const stakeStr = Number.isFinite(stake)
-    ? new Intl.NumberFormat("en-GB", {
-        style: "currency",
-        currency: "GBP",
-        maximumFractionDigits: 0,
-      }).format(stake)
+    ? formatBetCurrency(stake, currency, { maximumFractionDigits: 0 })
     : "";
   if (kind === "outright") {
     return `${(bet.playerName as string) ?? "Pick"} to win${oddsLabel ? ` @ ${oddsLabel}` : ""}${stakeStr ? ` · ${stakeStr}` : ""}`;

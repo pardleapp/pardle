@@ -5,6 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/app/live/auth/useAuth";
 import { useToast } from "@/app/live/Toast";
 import FeedClient from "@/app/live/FeedClient";
+import {
+  formatBetCurrency,
+  type BetCurrency,
+} from "@/lib/format/bet-currency";
 
 interface OwnerPuttIq {
   total: number;
@@ -70,16 +74,12 @@ interface ChatMessage {
 
 const REFRESH_MS = 5_000;
 
-const gbp = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-  maximumFractionDigits: 0,
-});
-
 function summariseTip(t: Tip): string {
   const odds = (t.oddsTakenLabel as string) ?? "";
   const stake = (t.stake as number) ?? null;
-  const stakeStr = stake ? ` · ${gbp.format(stake)}` : "";
+  const stakeStr = stake
+    ? ` · ${formatBetCurrency(stake, t.currency as BetCurrency | undefined, { maximumFractionDigits: 0 })}`
+    : "";
   if (t.kind === "outright") {
     return `${(t.playerName as string) ?? "?"} to win${odds ? ` @ ${odds}` : ""}${stakeStr}`;
   }

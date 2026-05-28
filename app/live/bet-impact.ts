@@ -13,6 +13,11 @@
 import type { FeedEvent } from "@/lib/feed/types";
 import type { CachedLeaderboardRow } from "@/lib/feed/store";
 import type { TrackedBet } from "./bet-shared";
+import {
+  formatBetCurrency,
+  normaliseBetCurrency,
+  type BetCurrency,
+} from "@/lib/format/bet-currency";
 
 export interface EventBetImpact {
   /** Which bet this impact is for. Multiple bets can be impacted by
@@ -221,14 +226,30 @@ export function headlineImpactForEvent(
   return best;
 }
 
-/** Pretty-print the £ figure with sign — e.g. "+£42" / "−£18". The
- *  minus uses U+2212 (true minus) for visual balance against +. */
-export function formatImpactGbp(deltaValue: number): string {
-  const sign = deltaValue >= 0 ? "+" : "−";
+/** Currency-aware compact impact formatter for feed-row chips.
+ *  Was GBP-hardcoded; now reads currency off the bet carrying
+ *  the impact and falls back to GBP for legacy bets without the
+ *  field. Uses no decimals at ≥10 units to keep chip width
+ *  manageable on mobile. Minus uses U+2212 (true minus) for
+ *  visual balance against +. */
+export function formatImpactCurrency(
+  deltaValue: number,
+  currency?: BetCurrency,
+): string {
+  const cur = normaliseBetCurrency(currency);
   const abs = Math.abs(deltaValue);
-  if (abs >= 100) return `${sign}£${Math.round(abs)}`;
-  if (abs >= 10) return `${sign}£${abs.toFixed(0)}`;
-  return `${sign}£${abs.toFixed(abs < 1 ? 2 : 1)}`;
+  const sign = deltaValue >= 0 ? "+" : "−";
+  const unsigned = formatBetCurrency(abs, cur, {
+    maximumFractionDigits: abs >= 10 ? 0 : abs < 1 ? 2 : 1,
+    minimumFractionDigits: 0,
+  });
+  return `${sign}${unsigned}`;
+}
+
+/** @deprecated kept for any straggling callers; prefer
+ *  formatImpactCurrency(amount, bet.currency). */
+export function formatImpactGbp(deltaValue: number): string {
+  return formatImpactCurrency(deltaValue, "GBP");
 }
 
 /** Short label for the bet kind, used inline on the impact chip. */

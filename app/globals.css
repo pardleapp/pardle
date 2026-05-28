@@ -7745,6 +7745,41 @@ footer {
   letter-spacing: 0;
 }
 
+/* Stake input + currency picker side-by-side. Picker is a compact
+   3-letter dropdown (GBP / USD / EUR / AUD / CAD) flush against
+   the stake number so the user reads the row as a single field. */
+.bets-form-stake-row {
+  display: flex;
+  gap: 6px;
+}
+
+.bets-form-stake-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.bets-form-currency {
+  padding: 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  min-height: 44px;
+  outline: none;
+  background: var(--bg, #fff);
+  color: var(--text);
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: 0;
+  flex-shrink: 0;
+  appearance: none;
+  padding-right: 22px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%239aa0a8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  background-size: 10px;
+}
+
 .bets-form-err {
   margin: 0;
   font-size: 13px;

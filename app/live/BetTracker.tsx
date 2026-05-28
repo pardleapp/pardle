@@ -37,6 +37,27 @@ import RecentFormSparkline, {
   type RecentEvent,
 } from "./RecentFormSparkline";
 import { abbreviateName } from "@/lib/text/abbreviate";
+import {
+  BET_CURRENCIES,
+  DEFAULT_BET_CURRENCY,
+  formatBetCurrency,
+  normaliseBetCurrency,
+  type BetCurrency,
+} from "@/lib/format/bet-currency";
+
+const CURRENCY_STORAGE_KEY = "pardle_bet_currency";
+
+function loadBetCurrency(): BetCurrency {
+  if (typeof window === "undefined") return DEFAULT_BET_CURRENCY;
+  return normaliseBetCurrency(
+    window.localStorage.getItem(CURRENCY_STORAGE_KEY),
+  );
+}
+
+function saveBetCurrency(c: BetCurrency): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(CURRENCY_STORAGE_KEY, c);
+}
 
 type BetKind = "outright" | "round-score" | "winning-score" | "top-finish";
 
@@ -123,11 +144,10 @@ function parseOdds(
   };
 }
 
-const gbp = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-  maximumFractionDigits: 2,
-});
+// Currency formatting now lives in lib/format/bet-currency; each
+// per-bet call site passes bet.currency (falls back to GBP) and
+// the BetTracker totals use primaryCurrency derived from the user's
+// preference + first-bet currency.
 
 export default function BetTracker({
   players,
@@ -145,12 +165,25 @@ export default function BetTracker({
   const [open, setOpen] = useState(false);
   const [presetKind, setPresetKind] = useState<BetKind | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [betCurrency, setBetCurrency] = useState<BetCurrency>(
+    DEFAULT_BET_CURRENCY,
+  );
   const { user } = useAuth();
 
   useEffect(() => {
     setBets(readBets());
+    setBetCurrency(loadBetCurrency());
     setHydrated(true);
   }, []);
+
+  // Totals roll into the user's preferred currency picked in the
+  // form (saved to localStorage). Per-row displays still honour
+  // each bet's own captured currency. Mixed-currency rollups would
+  // mislead — keep totals in a single currency until a real
+  // FX-rate layer exists.
+  const primaryCurrency: BetCurrency = bets[0]?.currency
+    ? normaliseBetCurrency(bets[0].currency)
+    : betCurrency;
 
   // When the user signs in, migrate any localStorage-only bets to
   // the server and then load the server's view as the source of
@@ -474,7 +507,11 @@ export default function BetTracker({
 
       {bets.length > 0 && totals.hasValue && (
         <p className="bets-totals">
-          Staked <strong>{gbp.format(totals.valued)}</strong> · Worth now{" "}
+          Staked{" "}
+          <strong>
+            {formatBetCurrency(totals.valued, primaryCurrency)}
+          </strong>{" "}
+          · Worth now{" "}
           <strong
             className={
               totals.value > totals.valued
@@ -484,10 +521,10 @@ export default function BetTracker({
                 : ""
             }
           >
-            {gbp.format(totals.value)}
+            {formatBetCurrency(totals.value, primaryCurrency)}
           </strong>{" "}
           ({totals.value >= totals.valued ? "+" : ""}
-          {gbp.format(totals.value - totals.valued)})
+          {formatBetCurrency(totals.value - totals.valued, primaryCurrency)})
         </p>
       )}
 
@@ -500,6 +537,11 @@ export default function BetTracker({
           handStatus={handStatus}
           oddsFormat={oddsFormat}
           initialKind={presetKind ?? "outright"}
+          currency={betCurrency}
+          onCurrencyChange={(c) => {
+            setBetCurrency(c);
+            saveBetCurrency(c);
+          }}
           onAdd={(b) => {
             addBet(b);
             setOpen(false);
@@ -632,7 +674,7 @@ function OutrightRow({
           />
           <p className="bets-row-meta">
             Win @ {formatOdds(bet.oddsTaken, oddsFormat)} ·{" "}
-            {gbp.format(bet.stake)}
+            {formatBetCurrency(bet.stake, bet.currency)}
             {settled ? (
               <> · {settled.won ? "won ✓" : "lost"}</>
             ) : (
@@ -643,10 +685,10 @@ function OutrightRow({
         <div className={`bets-row-value ${profitClass}`}>
           {currentValue !== null ? (
             <>
-              <strong>{gbp.format(currentValue)}</strong>
+              <strong>{formatBetCurrency(currentValue, bet.currency)}</strong>
               <span>
                 {profit !== null && profit >= 0 ? "+" : ""}
-                {profit !== null ? gbp.format(profit) : ""}
+                {profit !== null ? formatBetCurrency(profit, bet.currency) : ""}
               </span>
             </>
           ) : (
@@ -727,7 +769,7 @@ function TopFinishRow({
             </>
           </PlayerRowName>
           <p className="bets-row-meta">
-            @ {formatOdds(bet.oddsTaken, oddsFormat)} · {gbp.format(bet.stake)}
+            @ {formatOdds(bet.oddsTaken, oddsFormat)} · {formatBetCurrency(bet.stake, bet.currency)}
             {settled ? (
               <> · {settled.won ? "won ✓" : "lost"}</>
             ) : (
@@ -746,10 +788,10 @@ function TopFinishRow({
         <div className={`bets-row-value ${profitClass}`}>
           {currentValue !== null ? (
             <>
-              <strong>{gbp.format(currentValue)}</strong>
+              <strong>{formatBetCurrency(currentValue, bet.currency)}</strong>
               <span>
                 {profit !== null && profit >= 0 ? "+" : ""}
-                {profit !== null ? gbp.format(profit) : ""}
+                {profit !== null ? formatBetCurrency(profit, bet.currency) : ""}
               </span>
             </>
           ) : (
@@ -854,7 +896,7 @@ function WinningScoreRow({
             </span>
           </p>
           <p className="bets-row-meta">
-            @ {formatOdds(bet.oddsTaken, oddsFormat)} · {gbp.format(bet.stake)}
+            @ {formatOdds(bet.oddsTaken, oddsFormat)} · {formatBetCurrency(bet.stake, bet.currency)}
             {settled ? (
               <> · {settled.won ? "won ✓" : "lost"}</>
             ) : (
@@ -873,10 +915,10 @@ function WinningScoreRow({
         <div className={`bets-row-value ${profitClass}`}>
           {currentValue !== null ? (
             <>
-              <strong>{gbp.format(currentValue)}</strong>
+              <strong>{formatBetCurrency(currentValue, bet.currency)}</strong>
               <span>
                 {profit !== null && profit >= 0 ? "+" : ""}
-                {profit !== null ? gbp.format(profit) : ""}
+                {profit !== null ? formatBetCurrency(profit, bet.currency) : ""}
               </span>
             </>
           ) : (
@@ -930,8 +972,8 @@ function RoundScoreRow({
     valueBlock = (
       <strong className={profitClass}>
         {settled.won
-          ? `+${gbp.format(bet.stake * (bet.oddsTaken - 1))}`
-          : `-${gbp.format(bet.stake)}`}
+          ? `+${formatBetCurrency(bet.stake * (bet.oddsTaken - 1), bet.currency)}`
+          : `-${formatBetCurrency(bet.stake, bet.currency)}`}
       </strong>
     );
   } else if (!ev) {
@@ -941,7 +983,7 @@ function RoundScoreRow({
     stateText = `R${ev.round} not started yet`;
     valueBlock = (
       <>
-        <strong>{gbp.format(bet.stake)}</strong>
+        <strong>{formatBetCurrency(bet.stake, bet.currency)}</strong>
         <span>+£0.00</span>
       </>
     );
@@ -951,8 +993,8 @@ function RoundScoreRow({
     valueBlock = (
       <strong className={profitClass}>
         {ev.won
-          ? `+${gbp.format(bet.stake * (bet.oddsTaken - 1))}`
-          : `-${gbp.format(bet.stake)}`}
+          ? `+${formatBetCurrency(bet.stake * (bet.oddsTaken - 1), bet.currency)}`
+          : `-${formatBetCurrency(bet.stake, bet.currency)}`}
       </strong>
     );
   } else {
@@ -970,10 +1012,10 @@ function RoundScoreRow({
     stateText = `R${ev.round}: ${r.strokes} thru ${r.holesPlayed} (${r.toPar >= 0 ? "+" : ""}${r.toPar}) · ${r.holesRemaining} to play`;
     valueBlock = (
       <>
-        <strong>{gbp.format(currentValue)}</strong>
+        <strong>{formatBetCurrency(currentValue, bet.currency)}</strong>
         <span>
           {profit >= 0 ? "+" : ""}
-          {gbp.format(profit)}
+          {formatBetCurrency(profit, bet.currency)}
         </span>
       </>
     );
@@ -996,7 +1038,7 @@ function RoundScoreRow({
             </>
           </PlayerRowName>
           <p className="bets-row-meta">
-            @ {formatOdds(bet.oddsTaken, oddsFormat)} · {gbp.format(bet.stake)} ·{" "}
+            @ {formatOdds(bet.oddsTaken, oddsFormat)} · {formatBetCurrency(bet.stake, bet.currency)} ·{" "}
             {stateText}
           </p>
           {ev?.kind === "in-progress" && (
@@ -1033,6 +1075,8 @@ function AddBetForm({
   handStatus,
   oddsFormat,
   initialKind = "outright",
+  currency,
+  onCurrencyChange,
   onAdd,
   onCancel,
 }: {
@@ -1043,6 +1087,8 @@ function AddBetForm({
   handStatus: Record<string, "hot" | "cold"> | undefined;
   oddsFormat: OddsFormat;
   initialKind?: BetKind;
+  currency: BetCurrency;
+  onCurrencyChange: (c: BetCurrency) => void;
   onAdd: (b: TrackedBet) => void;
   onCancel: () => void;
 }) {
@@ -1099,6 +1145,7 @@ function AddBetForm({
         oddsTaken: odds.decimal,
         oddsTakenLabel: odds.label,
         stake,
+        currency,
       });
       return;
     }
@@ -1117,6 +1164,7 @@ function AddBetForm({
         oddsTaken: odds.decimal,
         oddsTakenLabel: odds.label,
         stake,
+        currency,
       });
       return;
     }
@@ -1131,6 +1179,7 @@ function AddBetForm({
         oddsTaken: odds.decimal,
         oddsTakenLabel: odds.label,
         stake,
+        currency,
       });
       return;
     }
@@ -1159,6 +1208,7 @@ function AddBetForm({
       oddsTaken: odds.decimal,
       oddsTakenLabel: odds.label,
       stake,
+      currency,
       placement,
     });
   }
@@ -1235,16 +1285,32 @@ function AddBetForm({
               />
             </label>
             <label className="bets-form-label">
-              <span>Stake (£)</span>
-              <input
-                type="number"
-                placeholder="10"
-                value={stakeText}
-                onChange={(e) => setStakeText(e.target.value)}
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-              />
+              <span>Stake</span>
+              <div className="bets-form-stake-row">
+                <select
+                  value={currency}
+                  onChange={(e) =>
+                    onCurrencyChange(e.target.value as BetCurrency)
+                  }
+                  aria-label="Currency"
+                  className="bets-form-currency"
+                >
+                  {BET_CURRENCIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  placeholder="10"
+                  value={stakeText}
+                  onChange={(e) => setStakeText(e.target.value)}
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                />
+              </div>
             </label>
           </div>
           <WinningScoreFairOdds
@@ -1424,16 +1490,32 @@ function AddBetForm({
               />
             </label>
             <label className="bets-form-label">
-              <span>Stake (£)</span>
-              <input
-                type="number"
-                placeholder="10"
-                value={stakeText}
-                onChange={(e) => setStakeText(e.target.value)}
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-              />
+              <span>Stake</span>
+              <div className="bets-form-stake-row">
+                <select
+                  value={currency}
+                  onChange={(e) =>
+                    onCurrencyChange(e.target.value as BetCurrency)
+                  }
+                  aria-label="Currency"
+                  className="bets-form-currency"
+                >
+                  {BET_CURRENCIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  placeholder="10"
+                  value={stakeText}
+                  onChange={(e) => setStakeText(e.target.value)}
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                />
+              </div>
             </label>
           </div>
           {err && <p className="bets-form-err">{err}</p>}

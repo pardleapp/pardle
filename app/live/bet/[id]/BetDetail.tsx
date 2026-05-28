@@ -36,6 +36,7 @@ import {
 import BetChartFull from "./BetChartFull";
 import { computeBetInsight } from "@/lib/feed/bet-insights";
 import { useToast } from "@/app/live/Toast";
+import { formatBetCurrency } from "@/lib/format/bet-currency";
 
 const REFRESH_MS = 6_000;
 
@@ -88,21 +89,17 @@ interface FeedResponse {
   tournamentPars?: Record<number, Record<number, number>>;
 }
 
-const gbp = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-  maximumFractionDigits: 2,
-});
-
 /** Build the friendly WhatsApp-style message we drop into the share
  *  sheet. Reads naturally as "I've got £50 on Rahm to win @ +1500.
- *  Follow it live → URL". One sentence per bet kind plus the URL. */
+ *  Follow it live → URL". One sentence per bet kind plus the URL.
+ *  Currency comes from the bet itself (multi-currency support) so
+ *  US visitors share "$50 on Rahm" not "£50". */
 function buildShareText(
   bet: TrackedBet,
   oddsFormat: OddsFormat,
   url: string,
 ): string {
-  const stake = gbp.format(bet.stake);
+  const stake = formatBetCurrency(bet.stake, bet.currency);
   const odds = formatOdds(bet.oddsTaken, oddsFormat);
   let line: string;
   if (bet.kind === "outright") {
@@ -480,12 +477,12 @@ export default function BetDetail({ betId }: { betId: string }) {
           <span className="bd-hero-amt">
             {profit == null
               ? "—"
-              : `${profit >= 0 ? "+" : "−"}${gbp.format(Math.abs(profit))}`}
+              : `${profit >= 0 ? "+" : "−"}${formatBetCurrency(Math.abs(profit), bet.currency)}`}
           </span>
           <span className="bd-hero-meta">
             {nowValue == null
               ? "Settling soon"
-              : `Now worth ${gbp.format(nowValue)}`}
+              : `Now worth ${formatBetCurrency(nowValue, bet.currency)}`}
             {profitPct != null && (
               <>
                 {" · "}
@@ -521,7 +518,7 @@ export default function BetDetail({ betId }: { betId: string }) {
           </p>
           <p className="bd-sub">
             @ {formatOdds(bet.oddsTaken, oddsFormat)} · stake{" "}
-            {gbp.format(bet.stake)} · placed{" "}
+            {formatBetCurrency(bet.stake, bet.currency)} · placed{" "}
             {new Date(bet.placedAt).toLocaleString("en-GB", {
               day: "numeric",
               month: "short",
@@ -688,14 +685,14 @@ function RoundDetailTable({
                 Hole {s.holesPlayed ?? i + 1}
               </span>
               <span className="bd-table-val">
-                {gbp.format(s.v)}
+                {formatBetCurrency(s.v, bet.currency)}
               </span>
               <span className={`bd-table-pct ${cls}`}>
                 {pct > 0 ? "+" : ""}
                 {pct.toFixed(1)}%
               </span>
               <span className={`bd-table-swing ${swing > 0 ? "bets-profit-up" : swing < 0 ? "bets-profit-down" : ""}`}>
-                {swing >= 0 ? "▲" : "▼"} {gbp.format(Math.abs(swing))}
+                {swing >= 0 ? "▲" : "▼"} {formatBetCurrency(Math.abs(swing), bet.currency)}
               </span>
             </li>
           );
@@ -756,13 +753,13 @@ function OutrightDetailTable({
                   minute: "2-digit",
                 })}
               </span>
-              <span className="bd-table-val">{gbp.format(it.v)}</span>
+              <span className="bd-table-val">{formatBetCurrency(it.v, bet.currency)}</span>
               <span className={`bd-table-pct ${cls}`}>
                 {pct > 0 ? "+" : ""}
                 {pct.toFixed(1)}%
               </span>
               <span className={`bd-table-swing ${cls}`}>
-                {it.swing >= 0 ? "▲" : "▼"} {gbp.format(Math.abs(it.swing))}
+                {it.swing >= 0 ? "▲" : "▼"} {formatBetCurrency(Math.abs(it.swing), bet.currency)}
               </span>
             </li>
           );

@@ -23,6 +23,7 @@ import {
   type WinningScoreSnapshot,
 } from "@/app/live/bet-shared";
 import BetChartFull from "@/app/live/bet/[id]/BetChartFull";
+import { formatBetCurrency } from "@/lib/format/bet-currency";
 
 const REFRESH_MS = 6_000;
 
@@ -42,12 +43,6 @@ interface FeedResponse {
     fanduel: Record<string, OddsHistorySample[] | null>;
   };
 }
-
-const gbp = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-  maximumFractionDigits: 2,
-});
 
 interface Props {
   bet: TrackedBet;
@@ -193,7 +188,7 @@ export default function SharedBetView({ bet, ownerName }: Props) {
           <h2 className="bd-name">{subject}</h2>
           <p className="bd-sub">
             @ {formatOdds(bet.oddsTaken, oddsFormat)} · stake{" "}
-            {gbp.format(bet.stake)} · {ownerName}&apos;s bet
+            {formatBetCurrency(bet.stake, bet.currency)} · {ownerName}&apos;s bet
           </p>
         </div>
         <div className="bd-pnl">
@@ -205,10 +200,10 @@ export default function SharedBetView({ bet, ownerName }: Props) {
           <span className={`bd-pnl-amt ${profitClass}`}>
             {profit == null
               ? "—"
-              : `${profit >= 0 ? "+" : ""}${gbp.format(profit)}`}
+              : `${profit >= 0 ? "+" : ""}${formatBetCurrency(profit, bet.currency)}`}
           </span>
           <span className="bd-pnl-value">
-            Now worth {nowValue == null ? "—" : gbp.format(nowValue)}
+            Now worth {nowValue == null ? "—" : formatBetCurrency(nowValue, bet.currency)}
           </span>
         </div>
       </header>

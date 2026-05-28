@@ -25,6 +25,7 @@ import {
 } from "@/app/live/bet-shared";
 import { getHotTopFinish } from "@/lib/feed/top-finish-cache";
 import { recordCall, type SharpCategory } from "@/lib/feed/sharp-score";
+import { formatBetCurrency } from "@/lib/format/bet-currency";
 
 /**
  * GET /api/feed/notify-poll
@@ -58,11 +59,9 @@ const COOLDOWN_MS = 30 * 60 * 1000;
 const EVENT_PUSH_MAX_AGE_MS = 5 * 60 * 1000;
 const ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || "https://pardle.app";
 
-const gbp = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-  maximumFractionDigits: 2,
-});
+// Currency formatting now per-bet. Push notification copy carries
+// the bet's own currency so US users see "$50" not "£50" in the
+// banner.
 
 interface BetRow {
   id: string;
@@ -147,8 +146,8 @@ function decideForBet(
       payload: {
         title: settlement.won ? "Your bet just landed 🎉" : "Your bet didn't land",
         body: settlement.won
-          ? `${subject} hit. ${gbp.format(bet.stake * bet.oddsTaken - bet.stake)} profit.`
-          : `${subject} didn't get there. -${gbp.format(bet.stake)}.`,
+          ? `${subject} hit. ${formatBetCurrency(bet.stake * bet.oddsTaken - bet.stake, bet.currency)} profit.`
+          : `${subject} didn't get there. -${formatBetCurrency(bet.stake, bet.currency)}.`,
         url,
         tag: `settle-${row.id}`,
       },
@@ -207,7 +206,7 @@ function decideForBet(
     decisions.push({
       payload: {
         title: "Near-certain — your bet looks great",
-        body: `${subject} — model at ${pct}%. Worth ${gbp.format(currentValue)}.`,
+        body: `${subject} — model at ${pct}%. Worth ${formatBetCurrency(currentValue, bet.currency)}.`,
         url,
         tag: `cross-80-${row.id}`,
       },
@@ -249,7 +248,7 @@ function decideForBet(
       decisions.push({
         payload: {
           title: isUp ? "Your bet is moving up" : "Your bet is moving down",
-          body: `${subject} — now ${pct}% chance, worth ${gbp.format(currentValue)}.`,
+          body: `${subject} — now ${pct}% chance, worth ${formatBetCurrency(currentValue, bet.currency)}.`,
           url,
           tag: `swing-${row.id}`,
         },

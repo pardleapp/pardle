@@ -29,11 +29,7 @@ interface ReplayResponse {
   }>;
 }
 
-const gbp = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-  maximumFractionDigits: 2,
-});
+import { formatBetCurrency } from "@/lib/format/bet-currency";
 
 export default function PastBetReplay({ bet }: { bet: TrackedBet }) {
   const [data, setData] = useState<ReplayResponse | null>(null);
@@ -136,7 +132,7 @@ function PastSettledHeadline({ bet }: { bet: TrackedBet }) {
       </div>
       <div className="bd-chart-settled-pnl">
         {profit >= 0 ? "+" : ""}
-        {gbp.format(profit)}
+        {formatBetCurrency(profit, bet.currency)}
       </div>
     </>
   );
@@ -160,7 +156,7 @@ function PastSettledHeadlineInline({ bet }: { bet: TrackedBet }) {
         }`}
       >
         {profit >= 0 ? "+" : ""}
-        {gbp.format(profit)}
+        {formatBetCurrency(profit, bet.currency)}
       </span>
     </div>
   );

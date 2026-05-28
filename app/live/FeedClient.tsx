@@ -20,7 +20,7 @@ import { abbreviateName } from "@/lib/text/abbreviate";
 import { readBets, type TrackedBet } from "./bet-shared";
 import {
   betKindShortLabel,
-  formatImpactGbp,
+  formatImpactCurrency,
   headlineImpactForEvent,
 } from "./bet-impact";
 import NotificationPrompt from "./notifications/NotificationPrompt";
@@ -994,11 +994,16 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                             }`}
                             title={
                               indirect
-                                ? `Competitor moved the market — estimated ${formatImpactGbp(impact.deltaValue)} on your ${kindLabel}`
-                                : `${formatImpactGbp(impact.deltaValue)} change to your ${kindLabel}`
+                                ? `Competitor moved the market — estimated ${formatImpactCurrency(impact.deltaValue, impact.bet.currency)} on your ${kindLabel}`
+                                : `${formatImpactCurrency(impact.deltaValue, impact.bet.currency)} change to your ${kindLabel}`
                             }
                           >
-                            {emoji} {formatImpactGbp(impact.deltaValue)} {verb} your {kindLabel}
+                            {emoji}{" "}
+                            {formatImpactCurrency(
+                              impact.deltaValue,
+                              impact.bet.currency,
+                            )}{" "}
+                            {verb} your {kindLabel}
                           </Link>,
                         );
                       }

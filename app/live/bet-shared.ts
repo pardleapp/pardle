@@ -30,6 +30,11 @@ export interface PnlSample {
 export interface BetSettlementFields {
   settledAt?: number | null;
   settledWon?: boolean | null;
+  /** Currency captured at placement so PnL/share/notify can render
+   *  in the user's actual betting currency. Optional for back-compat
+   *  with bets placed before multi-currency landed — those default
+   *  to GBP at render time. */
+  currency?: import("@/lib/format/bet-currency").BetCurrency;
 }
 
 

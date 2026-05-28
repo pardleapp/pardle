@@ -15,11 +15,10 @@ const PAD = { top: 28, right: 18, bottom: 36, left: 60 };
 const W = 900;
 const H = 380;
 
-const gbp = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-  maximumFractionDigits: 2,
-});
+// Currency moved to lib/format/bet-currency. Formatters below take
+// the BetCurrency carried on each bet so US/EU users see their own
+// symbol throughout the chart.
+import { formatBetCurrency, type BetCurrency } from "@/lib/format/bet-currency";
 
 export default function BetChartFull({ bet, history }: Props) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
@@ -125,7 +124,9 @@ export default function BetChartFull({ bet, history }: Props) {
   const { points, linePath, baseY, baseline, xMin, xMax, yMin, yMax, xScale, latestY } =
     data;
 
-  const yTicks = buildYTicks(yMin, yMax, baseline, (v) => formatY(v, mode));
+  const yTicks = buildYTicks(yMin, yMax, baseline, (v) =>
+    formatY(v, mode, bet.currency),
+  );
   const xTicks = isRound
     ? buildHoleTicks(xMin, xMax)
     : buildTimeTicks(xMin, xMax);
@@ -293,7 +294,7 @@ export default function BetChartFull({ bet, history }: Props) {
             </strong>{" "}
             ·{" "}
             <span className={tintFor(hover.yVal, baseline)}>
-              {formatHoverValue(hover.yVal, mode)}
+              {formatHoverValue(hover.yVal, mode, bet.currency)}
             </span>
           </span>
         ) : (
@@ -363,7 +364,7 @@ function tintFor(v: number, baseline: number): string {
   return "";
 }
 
-function formatY(v: number, mode: Mode): string {
+function formatY(v: number, mode: Mode, currency?: BetCurrency): string {
   if (mode === "prob") {
     // Sub-percent values lose visual fidelity at toFixed(0). Show 1
     // decimal under 5% so a 0.2% baseline doesn't read the same as
@@ -371,15 +372,21 @@ function formatY(v: number, mode: Mode): string {
     if (v > 0 && v < 5) return `${v.toFixed(1)}%`;
     return `${v.toFixed(0)}%`;
   }
-  if (Math.abs(v) < 0.005) return "£0";
-  const sign = v > 0 ? "+" : "-";
-  return `${sign}${gbp.format(Math.abs(v)).replace(".00", "")}`;
+  if (Math.abs(v) < 0.005) {
+    return formatBetCurrency(0, currency, { maximumFractionDigits: 0 });
+  }
+  const sign = v > 0 ? "+" : "−";
+  return `${sign}${formatBetCurrency(Math.abs(v), currency, { maximumFractionDigits: 0 })}`;
 }
 
-function formatHoverValue(v: number, mode: Mode): string {
+function formatHoverValue(
+  v: number,
+  mode: Mode,
+  currency?: BetCurrency,
+): string {
   if (mode === "prob") return `${v.toFixed(1)}% chance`;
-  if (v >= 0) return `+${gbp.format(v)}`;
-  return `-${gbp.format(Math.abs(v))}`;
+  const sign = v >= 0 ? "+" : "−";
+  return `${sign}${formatBetCurrency(Math.abs(v), currency)}`;
 }
 
 function buildYTicks(

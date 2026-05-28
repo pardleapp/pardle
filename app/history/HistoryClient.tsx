@@ -3,6 +3,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/app/live/auth/useAuth";
+import {
+  DEFAULT_BET_CURRENCY,
+  formatBetCurrency,
+  normaliseBetCurrency,
+  type BetCurrency,
+} from "@/lib/format/bet-currency";
 
 interface HistoryBet {
   id: string;
@@ -16,6 +22,7 @@ interface HistoryBet {
   rationale: string | null;
   channelId: string | null;
   sourceTipId: string | null;
+  currency?: BetCurrency;
   // Variable per kind:
   playerName?: string;
   cutoff?: number;
@@ -23,12 +30,6 @@ interface HistoryBet {
   side?: string;
   round?: number;
 }
-
-const gbp = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-  maximumFractionDigits: 2,
-});
 
 function describe(b: HistoryBet): string {
   const odds = b.oddsTakenLabel ? ` @ ${b.oddsTakenLabel}` : "";
@@ -63,7 +64,13 @@ function buildPnlSeries(bets: HistoryBet[]): { ts: number; cum: number }[] {
   });
 }
 
-function PnlChart({ series }: { series: { ts: number; cum: number }[] }) {
+function PnlChart({
+  series,
+  currency,
+}: {
+  series: { ts: number; cum: number }[];
+  currency: BetCurrency;
+}) {
   if (series.length < 2) return null;
   const W = 600;
   const H = 200;
@@ -141,7 +148,7 @@ function PnlChart({ series }: { series: { ts: number; cum: number }[] }) {
         fill="var(--muted)"
         textAnchor="end"
       >
-        £0
+        {formatBetCurrency(0, currency, { maximumFractionDigits: 0 })}
       </text>
       <text
         x={PAD.left - 10}
@@ -151,7 +158,7 @@ function PnlChart({ series }: { series: { ts: number; cum: number }[] }) {
         fill="var(--muted)"
         textAnchor="end"
       >
-        {gbp.format(yMax)}
+        {formatBetCurrency(yMax, currency, { maximumFractionDigits: 0 })}
       </text>
       {yMin < 0 && (
         <text
@@ -162,7 +169,7 @@ function PnlChart({ series }: { series: { ts: number; cum: number }[] }) {
           fill="var(--muted)"
           textAnchor="end"
         >
-          {gbp.format(yMin)}
+          {formatBetCurrency(yMin, currency, { maximumFractionDigits: 0 })}
         </text>
       )}
       {/* x-axis date labels */}
@@ -314,6 +321,13 @@ export default function HistoryClient({
   const { user, loading: authLoading } = useAuth();
   const [bets, setBets] = useState<HistoryBet[] | null>(null);
 
+  // Mixed-currency rollups would mislead — pick the first bet's
+  // currency as the chart + stats currency, falling back to GBP.
+  // Per-row PnL still honours each bet's own currency.
+  const summaryCurrency: BetCurrency = bets && bets[0]?.currency
+    ? normaliseBetCurrency(bets[0].currency)
+    : DEFAULT_BET_CURRENCY;
+
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -410,7 +424,7 @@ export default function HistoryClient({
             }`}
           >
             {stats.profit >= 0 ? "+" : ""}
-            {gbp.format(stats.profit)}
+            {formatBetCurrency(stats.profit, summaryCurrency)}
           </div>
           <div className="history-stat-label">
             Profit{" "}
@@ -424,7 +438,7 @@ export default function HistoryClient({
       {series.length >= 2 && (
         <div className="history-chart-wrap">
           <h3 className="history-section-title">Running P&L</h3>
-          <PnlChart series={series} />
+          <PnlChart series={series} currency={summaryCurrency} />
         </div>
       )}
 
@@ -461,7 +475,7 @@ export default function HistoryClient({
                   {row.settled > 0 && (
                     <span className={`history-breakdown-pnl ${profitClass}`}>
                       {row.profit >= 0 ? "+" : ""}
-                      {gbp.format(row.profit)}
+                      {formatBetCurrency(row.profit, summaryCurrency)}
                     </span>
                   )}
                 </li>
@@ -489,7 +503,7 @@ export default function HistoryClient({
                       <div className="history-row-main">
                         <div className="history-row-desc">{describe(b)}</div>
                         <div className="history-row-sub">
-                          {gbp.format(b.stake)} stake ·{" "}
+                          {formatBetCurrency(b.stake, b.currency)} stake ·{" "}
                           {new Date(b.placedAt).toLocaleDateString("en-GB", {
                             day: "numeric",
                             month: "short",
@@ -521,7 +535,7 @@ export default function HistoryClient({
                             }`}
                           >
                             {v > 0 ? "+" : ""}
-                            {gbp.format(v)}
+                            {formatBetCurrency(v, b.currency)}
                           </span>
                         )}
                       </div>

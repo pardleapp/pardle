@@ -18,6 +18,7 @@ const VALID_KINDS = new Set([
 ]);
 const VALID_SIDES = new Set(["under", "over"]);
 const VALID_TOP_CUTOFFS = new Set([5, 10, 20]);
+const VALID_CURRENCIES = new Set(["GBP", "USD", "EUR", "AUD", "CAD"]);
 const PLAYER_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
@@ -52,6 +53,14 @@ function validateBet(bet: Record<string, unknown>): string | null {
   if (!isPositiveNumberInRange(stake, 0.01, MAX_STAKE)) return "bad-stake";
   if (!isPositiveNumberInRange(oddsTaken, 1, MAX_ODDS)) return "bad-oddsTaken";
   if (!isOptString(oddsTakenLabel, 32)) return "bad-oddsTakenLabel";
+  // Currency is optional for back-compat with legacy bets; when
+  // present must be in the supported set.
+  if (
+    bet.currency !== undefined &&
+    !(typeof bet.currency === "string" && VALID_CURRENCIES.has(bet.currency))
+  ) {
+    return "bad-currency";
+  }
 
   if (kind === "outright" || kind === "round-score" || kind === "top-finish") {
     const playerId = bet.playerId;
