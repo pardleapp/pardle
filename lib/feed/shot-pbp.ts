@@ -257,11 +257,17 @@ function buildStuffedVerdict(parsed: ParsedShot, dist: string): string {
     parsed.fromLie && parsed.fromLie !== "fairway"
       ? ` from the ${parsed.fromLie}`
       : "";
-  const noun = clubBit ? "approach" : `${yardBit}approach`;
   // When club is known we want "stiffs an 8-iron approach" not "stiffs
   // a 192-yard 8-iron approach" — the yardage adds little next to a
-  // named club. Keep yardage as fallback when club is unknown.
-  const subject = clubBit ? `a ${clubBit}approach` : `${yardBit}${noun}` || "an approach";
+  // named club. Yardage is the fallback when club is unknown. Both
+  // empty falls back to "an approach". The previous form combined
+  // yardBit with a noun that *already* contained yardBit, producing
+  // "stiffs 69-yard 69-yard approach".
+  const subject = clubBit
+    ? `a ${clubBit}approach`
+    : yardBit
+      ? `${yardBit}approach`
+      : "an approach";
   return `stiffs ${subject.trim()}${fromBit} to ${dist}`;
 }
 
