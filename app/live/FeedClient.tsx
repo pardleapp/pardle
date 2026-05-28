@@ -803,10 +803,21 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
   // ── Live feed ───────────────────────────────────────────────────
   const followSet = new Set(follows);
+  // Hide putt-poll events whose poll has already settled (or whose
+  // poll record is no longer loaded) — once the putt has dropped or
+  // missed, the "will it drop?" row is dead weight in the scroll-
+  // back. The hole-out / birdie / bogey event already covers the
+  // outcome with the real headline.
+  const rowsAfterPollFilter = data.rows.filter((r) => {
+    const ev = r.event;
+    if (ev.type !== "putt-poll" || !ev.pollId) return true;
+    const ps = data.puttPolls?.[ev.pollId];
+    return !!ps && ps.closedAt == null;
+  });
   const visibleRows =
     filterMode === "following"
-      ? data.rows.filter((r) => followSet.has(r.event.playerId))
-      : data.rows;
+      ? rowsAfterPollFilter.filter((r) => followSet.has(r.event.playerId))
+      : rowsAfterPollFilter;
 
   // Only show the vote widget on the LATEST open putt poll in the
   // feed. Older open polls (their putt was struck minutes ago) and
