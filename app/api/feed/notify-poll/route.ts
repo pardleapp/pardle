@@ -14,7 +14,9 @@ import {
   detectBetSettlement,
   evaluateRoundScore,
   evaluateWinningScore,
+  findOutrightWinner,
   resolveBetRound,
+  type PlayerForSettlement,
   type RoundScoreBet,
   type TopFinishProbs,
   type TournamentProjection,
@@ -26,6 +28,7 @@ import {
 import { getHotTopFinish } from "@/lib/feed/top-finish-cache";
 import { recordCall, type SharpCategory } from "@/lib/feed/sharp-score";
 import { formatBetCurrency } from "@/lib/format/bet-currency";
+import { settleEventPicks } from "@/lib/feed/event-picks";
 
 /**
  * GET /api/feed/notify-poll
@@ -505,6 +508,37 @@ async function handle(req: Request) {
     }
   }
 
+  // ── Pre-event picks settlement ───────────────────────────────────
+  // Once the tournament's leaderboard is final, credit every
+  // user's pre-event winner pick against the actual winner(s).
+  // Tied finishes credit all co-winners (industry dead-heat).
+  // Idempotent via a Redis SET NX flag inside settleEventPicks.
+  let picksSettled = 0;
+  try {
+    const playersForSettle: PlayerForSettlement[] = bundle.leaderboard.map(
+      (r) => ({
+        playerId: r.playerId,
+        position: r.position,
+        thru: r.thru,
+        playerState: r.playerState,
+      }),
+    );
+    const winner = findOutrightWinner(playersForSettle, playerRoundStates);
+    if (winner) {
+      // Collect every co-winner (T1 group) for the credit pass.
+      const winnerIds = playersForSettle
+        .filter((p) => p.position === "1" || p.position === "T1")
+        .map((p) => p.playerId);
+      const res = await settleEventPicks(
+        tournamentId,
+        winnerIds.length > 0 ? winnerIds : [winner],
+      );
+      picksSettled = res.settled;
+    }
+  } catch (err) {
+    console.error("[notify-poll] event-picks settlement failed", err);
+  }
+
   // ── Followed-player events ────────────────────────────────────────
   // Birdies, eagles, blow-ups, and putt-poll opens for any player a
   // subscribed device follows. Reuses the same web-push pipeline as
@@ -584,6 +618,7 @@ async function handle(req: Request) {
     evaluated,
     notified,
     followNotified,
+    picksSettled,
     gonePruned,
   });
 }
