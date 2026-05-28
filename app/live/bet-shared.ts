@@ -1247,12 +1247,18 @@ export function reconstructHistory(
     if (Math.abs(nowValue - last.v) > 0.01) {
       const nowProb =
         currentProbForBet(bet, playerRoundStates) ?? last.prob ?? probAtP;
-      series.push({
-        t: Date.now(),
+      // The live valuation refines the projection of the same last
+      // completed hole — refresh that sample in place rather than
+      // pushing a new one. Pushing would carry the same
+      // `holesPlayed` and the hole-by-hole table would render two
+      // rows for that hole (one walk-projection, one fresher live).
+      // Keep the original timestamp so the chart's x-axis stays
+      // anchored to the hole-completion event.
+      series[series.length - 1] = {
+        ...last,
         v: nowValue,
-        holesPlayed: last.holesPlayed,
         prob: nowProb,
-      });
+      };
     }
   }
   return series;
