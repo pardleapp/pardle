@@ -29,6 +29,7 @@ import {
   cacheTournamentPars,
   type Enrichment,
   getCachedPlayerSkill,
+  getCachedTournamentPars,
   getEnrichments,
   getEvents,
   getSnapshot,
@@ -734,6 +735,45 @@ function rankOf(position: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Parse `thru` field ("9", "9*", "F", "-", "") into a count of
+ *  holes completed this round. F → 18, blank/- → 0. */
+function parseThruHoles(thru: string | null | undefined): number {
+  if (!thru) return 0;
+  const t = thru.trim();
+  if (t === "" || t === "-" || t === "—") return 0;
+  if (t === "F" || t === "F*") return 18;
+  const m = /^(\d+)\*?$/.exec(t);
+  if (!m) return 0;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? Math.max(0, Math.min(18, n)) : 0;
+}
+
+/** Sum a {hole → par} map for the round; null if the map's missing
+ *  or doesn't cover the full 18 holes. */
+function sumRoundPars(
+  pr: Record<number, number> | undefined,
+): number | null {
+  if (!pr) return null;
+  let sum = 0;
+  let n = 0;
+  for (let h = 1; h <= 18; h++) {
+    const p = pr[h];
+    if (typeof p === "number" && Number.isFinite(p)) {
+      sum += p;
+      n++;
+    }
+  }
+  return n === 18 ? sum : null;
+}
+
+/** Round a stroke expectation to the nearest .5, biasing toward the
+ *  "under" side so settlement can never push. e.g. 67.4 → 67.5,
+ *  68.0 → 67.5, 68.4 → 68.5. */
+function roundToHalfStrokeUnder(x: number): number {
+  const nearest = Math.round(x * 2) / 2;
+  return Number.isInteger(nearest) ? nearest - 0.5 : nearest;
+}
+
 /** Parse total-to-par like "-12", "+3", "E" into a numeric stroke
  *  diff for hold-the-lead margin checks. Null for non-numeric. */
 function toParOf(total: string): number | null {
@@ -748,12 +788,18 @@ function toParOf(total: string): number | null {
  * tick; openPredictionPoll's dedup flag means we never double-open
  * the same trigger.
  *
- *  - Head-to-head: open one per round on R3 and R4, between the
- *    top 2 by current leaderboard position. Closes 8h later
- *    (round-completion window).
+ *  - Head-to-head (leaderboard): open one per round on R3 and R4,
+ *    between the top 2 by current leaderboard position. Closes 8h
+ *    later (round-completion window).
+ *  - Head-to-head (marquee): R1/R2 only — between the top 2 still-
+ *    active players by DataGolf pre-tournament SG, so users get
+ *    something to vote on before the leaderboard is meaningful.
  *  - Hold-the-lead: open on R4 once the leader has reached the
- *    back 9 with a 2+ stroke lead. Closes 6h later
- *    (tournament-end window).
+ *    back 9 with a 2+ stroke lead. Closes 6h later (tournament-end
+ *    window).
+ *  - Round over/under: per top-6 skill player, open as soon as
+ *    they tee off in any round. Line is roundPar − SG, rounded to
+ *    nearest .5 with whole numbers nudged down so there's no push.
  */
 async function maybeOpenPredictionPolls(
   tournamentId: string,
@@ -819,6 +865,103 @@ async function maybeOpenPredictionPolls(
       }).catch((err) => {
         console.error("[engine] open h2h failed", err);
       });
+    }
+  }
+
+  // ── Marquee head-to-head (R1/R2) ───────────────────────────────
+  // The R3/R4 trigger above keys off leaderboard position, which is
+  // noise in early rounds. For R1/R2, fall back to the two best
+  // active players by DataGolf pre-tournament SG so the user gets a
+  // meaningful 2-player call from the first tee.
+  if (maxRound === 1 || maxRound === 2) {
+    const skill = await getCachedPlayerSkill(tournamentId).catch(() => null);
+    if (skill) {
+      const skilled = active
+        .map((r) => ({ row: r, sg: skill[r.playerId] }))
+        .filter(
+          (x): x is { row: typeof active[number]; sg: number } =>
+            typeof x.sg === "number" && Number.isFinite(x.sg),
+        )
+        .sort((a, b) => b.sg - a.sg);
+      if (skilled.length >= 2) {
+        const a = skilled[0].row;
+        const b = skilled[1].row;
+        if (a.playerId !== b.playerId) {
+          await openPredictionPoll({
+            type: "head-to-head",
+            tournamentId,
+            dedupKey: `h2h:marquee:r${maxRound}`,
+            question: `Who shoots lower in R${maxRound}?`,
+            options: [
+              { key: a.playerId, label: a.displayName, playerId: a.playerId },
+              { key: b.playerId, label: b.displayName, playerId: b.playerId },
+              { key: "tie", label: "Tied" },
+            ],
+            closesAt: Date.now() + 10 * HOUR,
+            settle: {
+              round: maxRound,
+              playerA: { id: a.playerId, name: a.displayName },
+              playerB: { id: b.playerId, name: b.displayName },
+            },
+          }).catch((err) => {
+            console.error("[engine] open marquee h2h failed", err);
+          });
+        }
+      }
+    }
+  }
+
+  // ── Round over/under ───────────────────────────────────────────
+  // Per top-6 skill player, once they've teed off this round. Line
+  // is roundPar − SG, half-stroke (always a non-integer) so settles
+  // can't push.
+  {
+    const [skill, pars] = await Promise.all([
+      getCachedPlayerSkill(tournamentId).catch(() => null),
+      getCachedTournamentPars(tournamentId).catch(() => ({}) as TournamentPars),
+    ]);
+    if (skill) {
+      const topSkill = Object.entries(skill)
+        .map(([id, sg]) => ({ id, sg }))
+        .filter(
+          (x): x is { id: string; sg: number } =>
+            typeof x.sg === "number" && Number.isFinite(x.sg),
+        )
+        .sort((a, b) => b.sg - a.sg)
+        .slice(0, 6);
+      for (const { id, sg } of topSkill) {
+        const row = active.find((r) => r.playerId === id);
+        if (!row || row.currentRound == null) continue;
+        const round = row.currentRound;
+        const holesPlayed = parseThruHoles(row.thru);
+        // Need them on the course but not done. 1..17 only (skip "F"
+        // — too late to vote — and 0 — not teed off yet).
+        if (holesPlayed < 1 || holesPlayed >= 18) continue;
+        const parsForRound = pars?.[round];
+        if (!parsForRound) continue;
+        const roundPar = sumRoundPars(parsForRound);
+        if (roundPar == null) continue;
+        const expected = roundPar - sg;
+        const line = roundToHalfStrokeUnder(expected);
+        await openPredictionPoll({
+          type: "round-over-under",
+          tournamentId,
+          dedupKey: `round-ou:p${id}:r${round}`,
+          question: `Will ${row.displayName} shoot under ${line} in R${round}?`,
+          options: [
+            { key: "yes", label: `Yes — under ${line}` },
+            { key: "no", label: `No — ${line} or worse` },
+          ],
+          closesAt: Date.now() + 10 * HOUR,
+          settle: {
+            round,
+            player: { id, name: row.displayName },
+            line,
+          },
+        }).catch((err) => {
+          console.error("[engine] open round-ou failed", err);
+        });
+      }
     }
   }
 

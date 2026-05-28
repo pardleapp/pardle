@@ -669,6 +669,22 @@ function resolvePredictionPollOutcome(
       leaderRow.position === "1" || leaderRow.position === "T1";
     return won ? "yes" : "no";
   }
+  if (poll.type === "round-over-under") {
+    const round = poll.settle.round;
+    const player = poll.settle.player;
+    const line = poll.settle.line;
+    if (!round || !player || line == null) return null;
+    const snap = playerStates[player.id]?.rounds?.[round];
+    if (!snap) return undefined;
+    // WD or DQ mid-round leaves the snapshot stuck in-progress.
+    // Resolve "no" rather than holding the poll open forever.
+    const row = leaderboard.find((r) => r.playerId === player.id);
+    if (row && row.playerState && row.playerState !== "ACTIVE") {
+      return "no";
+    }
+    if (snap.status !== "complete") return undefined;
+    return snap.strokes < line ? "yes" : "no";
+  }
   return null;
 }
 

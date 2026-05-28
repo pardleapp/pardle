@@ -37,7 +37,10 @@ const redis = Redis.fromEnv();
 const VOTED_TTL = 7 * 24 * 60 * 60;
 const POLL_TTL = 14 * 24 * 60 * 60;
 
-export type PredictionPollType = "head-to-head" | "hold-the-lead";
+export type PredictionPollType =
+  | "head-to-head"
+  | "hold-the-lead"
+  | "round-over-under";
 
 /** Per-type Sharp Score category. Each prediction poll credits a
  *  distinct slice of the user's record so we can later display
@@ -47,6 +50,7 @@ export type PredictionPollType = "head-to-head" | "hold-the-lead";
 const SHARP_CATEGORY_FOR_TYPE: Record<PredictionPollType, SharpCategory> = {
   "head-to-head": "putt-poll",
   "hold-the-lead": "putt-poll",
+  "round-over-under": "putt-poll",
 };
 
 export interface PredictionPollOption {
@@ -75,13 +79,18 @@ export interface PredictionPoll {
   settledAt?: number | null;
   /** Type-specific resolution metadata read by the settler. */
   settle: {
-    /** Round the poll resolves at the end of — used by head-to-head. */
+    /** Round the poll resolves at the end of — used by head-to-head
+     *  and round-over-under. */
     round?: number;
     /** Two competing players for head-to-head. */
     playerA?: { id: string; name: string };
     playerB?: { id: string; name: string };
     /** Subject player for hold-the-lead. */
     leader?: { id: string; name: string };
+    /** Subject player for round-over-under. */
+    player?: { id: string; name: string };
+    /** O/U line for round-over-under, in absolute strokes (e.g. 67.5). */
+    line?: number;
   };
 }
 
