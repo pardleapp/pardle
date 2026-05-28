@@ -8392,6 +8392,39 @@ footer {
   align-items: baseline;
 }
 
+/* Header row above the hole list — labels each numeric column so
+   the user knows what they're reading. Same column template as
+   .bd-table-row so the labels sit directly above their values. */
+.bd-table-headrow {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 10px;
+  padding: 4px 4px 6px;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.bd-table-headrow > span:nth-child(n + 2) {
+  text-align: right;
+  min-width: 56px;
+}
+
+.bd-table-pnl,
+.bd-table-prob {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 56px;
+}
+
+.bd-table-prob {
+  color: var(--text);
+}
+
 .bd-table-row + .bd-table-row {
   border-top: 1px dashed var(--border);
 }
@@ -8577,9 +8610,19 @@ footer {
   .bd-name {
     font-size: 18px;
   }
-  .bd-table-row {
-    grid-template-columns: 1fr auto auto;
+  .bd-table-row,
+  .bd-table-headrow {
+    grid-template-columns: 1fr auto auto auto;
     column-gap: 8px;
+    font-size: 12px;
+  }
+  .bd-table-pnl,
+  .bd-table-prob,
+  .bd-table-val {
+    min-width: 48px;
+  }
+  .bd-table-headrow > span:nth-child(n + 2) {
+    min-width: 48px;
   }
   .bd-table-swing {
     display: none;

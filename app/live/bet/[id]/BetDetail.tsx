@@ -763,13 +763,30 @@ function RoundDetailTable({
   return (
     <div className="bd-table">
       <p className="bd-table-title">Hole-by-hole</p>
+      <div className="bd-table-headrow" aria-hidden="true">
+        <span />
+        <span>Value</span>
+        <span>PnL</span>
+        <span>Win %</span>
+      </div>
       <ul>
         {steps.map((s, i) => {
-          const pct = ((s.v - stake) / stake) * 100;
-          const profit = s.v - stake;
-          const cls = profit > 0 ? "bets-profit-up" : profit < 0 ? "bets-profit-down" : "";
-          const prev = steps[i - 1]?.v ?? stake;
-          const swing = s.v - prev;
+          const pnl = s.v - stake;
+          const cls =
+            pnl > 0
+              ? "bets-profit-up"
+              : pnl < 0
+                ? "bets-profit-down"
+                : "";
+          // Use the model probability that was baked onto the
+          // sample when the history was reconstructed. Fall back
+          // to value-over-max-payout if absent on older shapes.
+          const winProb =
+            typeof s.prob === "number" && Number.isFinite(s.prob)
+              ? s.prob
+              : bet.stake * bet.oddsTaken > 0
+                ? Math.max(0, Math.min(1, s.v / (bet.stake * bet.oddsTaken)))
+                : 0;
           return (
             <li key={i} className="bd-table-row">
               <span className="bd-table-hole">
@@ -778,12 +795,12 @@ function RoundDetailTable({
               <span className="bd-table-val">
                 {formatBetCurrency(s.v, bet.currency)}
               </span>
-              <span className={`bd-table-pct ${cls}`}>
-                {pct > 0 ? "+" : ""}
-                {pct.toFixed(1)}%
+              <span className={`bd-table-pnl ${cls}`}>
+                {pnl >= 0 ? "+" : "−"}
+                {formatBetCurrency(Math.abs(pnl), bet.currency)}
               </span>
-              <span className={`bd-table-swing ${swing > 0 ? "bets-profit-up" : swing < 0 ? "bets-profit-down" : ""}`}>
-                {swing >= 0 ? "▲" : "▼"} {formatBetCurrency(Math.abs(swing), bet.currency)}
+              <span className="bd-table-prob">
+                {formatWinPct(winProb)}
               </span>
             </li>
           );
@@ -861,6 +878,37 @@ function OutrightDetailTable({
     }
     return history[history.length - 1].v;
   };
+  // Same interpolation for model probability — the win % column.
+  // Falls back to (value / max-payout) when prob isn't carried on
+  // the sample (older history shapes for non-outright bets).
+  const probAt = (ts: number): number => {
+    const maxPayout = bet.stake * bet.oddsTaken;
+    const fromValue = (v: number) =>
+      maxPayout > 0
+        ? Math.max(0, Math.min(1, v / maxPayout))
+        : 0;
+    if (history.length === 0) return fromValue(bet.stake);
+    const pick = (s: { v: number; prob?: number }): number =>
+      typeof s.prob === "number" && Number.isFinite(s.prob)
+        ? s.prob
+        : fromValue(s.v);
+    if (ts <= history[0].t) return pick(history[0]);
+    if (ts >= history[history.length - 1].t) {
+      return pick(history[history.length - 1]);
+    }
+    for (let i = 1; i < history.length; i++) {
+      if (history[i].t >= ts) {
+        const a = history[i - 1];
+        const b = history[i];
+        const pa = pick(a);
+        const pb = pick(b);
+        const span = b.t - a.t || 1;
+        const t = (ts - a.t) / span;
+        return pa + (pb - pa) * t;
+      }
+    }
+    return pick(history[history.length - 1]);
+  };
 
   if (holeEvents.length === 0) {
     return (
@@ -877,8 +925,22 @@ function OutrightDetailTable({
   }
 
   type Row =
-    | { kind: "hole"; key: string; ts: number; label: string; value: number }
-    | { kind: "gap"; key: string; ts: number; label: string; value: number };
+    | {
+        kind: "hole";
+        key: string;
+        ts: number;
+        label: string;
+        value: number;
+        prob: number;
+      }
+    | {
+        kind: "gap";
+        key: string;
+        ts: number;
+        label: string;
+        value: number;
+        prob: number;
+      };
 
   // Build the row list — each player hole, plus optional "between"
   // rows when odds moved materially while the player wasn't playing
@@ -902,6 +964,7 @@ function OutrightDetailTable({
       }
     }
     const evValue = valueAt(ev.ts);
+    const evProb = probAt(ev.ts);
     if (peak) {
       const peakSwing = peak.v - prevValue;
       const postPeakDelta = peak.v - evValue;
@@ -915,6 +978,7 @@ function OutrightDetailTable({
           ts: peak.t,
           label: gapLabel(prevTs, ev.ts, peak.t),
           value: peak.v,
+          prob: probAt(peak.t),
         });
       }
     }
@@ -928,6 +992,7 @@ function OutrightDetailTable({
           : ""
       }`,
       value: evValue,
+      prob: evProb,
     });
     prevTs = ev.ts;
     prevValue = evValue;
@@ -936,15 +1001,19 @@ function OutrightDetailTable({
   return (
     <div className="bd-table">
       <p className="bd-table-title">Hole by hole</p>
+      <div className="bd-table-headrow" aria-hidden="true">
+        <span />
+        <span>Value</span>
+        <span>PnL</span>
+        <span>Win %</span>
+      </div>
       <ul>
-        {rows.map((r, i) => {
-          const prev = i > 0 ? rows[i - 1].value : bet.stake;
-          const swing = r.value - prev;
-          const pct = ((r.value - bet.stake) / bet.stake) * 100;
+        {rows.map((r) => {
+          const pnl = r.value - bet.stake;
           const cls =
-            swing > 0
+            pnl > 0
               ? "bets-profit-up"
-              : swing < 0
+              : pnl < 0
                 ? "bets-profit-down"
                 : "";
           return (
@@ -956,21 +1025,29 @@ function OutrightDetailTable({
               <span className="bd-table-val">
                 {formatBetCurrency(r.value, bet.currency)}
               </span>
-              <span className={`bd-table-pct ${cls}`}>
-                {pct > 0 ? "+" : ""}
-                {pct.toFixed(1)}%
+              <span className={`bd-table-pnl ${cls}`}>
+                {pnl >= 0 ? "+" : "−"}
+                {formatBetCurrency(Math.abs(pnl), bet.currency)}
               </span>
-              <span className={`bd-table-swing ${cls}`}>
-                {swing >= 0 ? "▲" : "▼"}{" "}
-                {formatBetCurrency(Math.abs(swing), bet.currency)}
+              <span className="bd-table-prob">
+                {formatWinPct(r.prob)}
               </span>
             </li>
           );
         })}
       </ul>
-      <p className="bd-table-foot">Odds format: {oddsFormat}</p>
     </div>
   );
+}
+
+/** Format a model probability as a compact percentage —
+ *  1 decimal under 5%, integer otherwise. Used in the hole-by-
+ *  hole tables across all bet kinds. */
+function formatWinPct(p: number): string {
+  if (!Number.isFinite(p) || p < 0) return "—";
+  const pct = p * 100;
+  if (pct > 0 && pct < 5) return `${pct.toFixed(1)}%`;
+  return `${Math.round(pct)}%`;
 }
 
 /** Label a significant odds move that happened between two of the
