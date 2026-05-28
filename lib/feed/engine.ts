@@ -347,13 +347,18 @@ export async function pollAndDiff(
     ) {
       const playerName = nameById.get(pid) ?? "Unknown";
       const distFt = Math.round(parsed.toHoleFeet);
-      // "For" label — what's at stake on this putt.
+      // "For" label — what's at stake on this putt. The just-landed
+      // shot is #shotNumber; the upcoming putt is shot #(shotNumber+1)
+      // and its drop closes the hole at that stroke count. So a putt
+      // for eagle on a par 4 = score 2 = putt is shot #2 = next===par−2.
+      // The previous version was off by one — labelling regulation
+      // birdie putts as eagle.
       let puttFor: "birdie" | "eagle" | "par save" | "the hole" = "the hole";
       if (par != null) {
         const next = shotNumber + 1;
-        if (next === par - 1) puttFor = "eagle";
-        else if (next === par) puttFor = "birdie";
-        else if (next === par + 1) puttFor = "par save";
+        if (next === par - 2) puttFor = "eagle";
+        else if (next === par - 1) puttFor = "birdie";
+        else if (next === par) puttFor = "par save";
       }
       try {
         const pollId = await openPuttPoll({
