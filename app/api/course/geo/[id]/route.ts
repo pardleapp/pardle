@@ -15,11 +15,12 @@ import path from "node:path";
  * actually view the map — visitors who stay on the grid view, or
  * who never touch /course, never pay that bandwidth.
  *
- * Edge-cached for an hour since the data is immutable per
- * extraction run.
+ * Cached lightly (5 min) while we iterate on extractions —
+ * stale-while-revalidate keeps hits fast on the next deploy.
+ * Bump back to an hour once the data set stabilises.
  */
 export const dynamic = "force-dynamic";
-export const revalidate = 3600;
+export const revalidate = 300;
 
 const ID_RE = /^[a-z0-9-]{2,64}$/;
 
@@ -44,7 +45,10 @@ export async function GET(
       status: 200,
       headers: {
         "content-type": "application/json",
-        "cache-control": "public, max-age=3600, s-maxage=3600",
+        // Short TTL + SWR so iteration on extraction lands fast.
+        // 300s edge cache, 24h SWR window.
+        "cache-control":
+          "public, max-age=300, s-maxage=300, stale-while-revalidate=86400",
       },
     });
   } catch {

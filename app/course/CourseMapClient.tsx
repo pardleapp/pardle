@@ -125,7 +125,10 @@ export default function CourseMapClient() {
       try {
         const res = await fetch(
           `/api/course/geo/${encodeURIComponent(courseId)}`,
-          { cache: "force-cache" },
+          // default cache (respects server cache-control) — the
+          // route's 5-min s-maxage handles edge dedup while letting
+          // iteration on the geometry land fast.
+          { cache: "default" },
         );
         if (!res.ok) throw new Error(String(res.status));
         const json = (await res.json()) as CourseGeo;
