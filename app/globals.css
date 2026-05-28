@@ -81,6 +81,13 @@ html, body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Disable iOS Safari's per-block "auto inflate small text" heuristic.
+     Without this, 10–11 px elements (feed-meta, chip labels) get
+     boosted to ~14 px on rows that Safari decides are "tall enough",
+     producing inconsistent "occasionally the R1 · just now is in
+     bigger text" appearance. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -14051,6 +14058,13 @@ body:has(.v4-theme) {
     display: flex;
     align-items: center;
     gap: 4px;
+    /* Without min-width: 0 the flex children's intrinsic widths
+       (4 × 44 px reactions + 36 px follow + the nowrap tag chip)
+       blow past the actions track and clip on the right edge of
+       the viewport at 390–430 px. Allows the tag's max-width:60%
+       + ellipsis to actually apply. */
+    min-width: 0;
+    overflow: hidden;
   }
   /* Primary context tag rides the right side of the actions row on
      mobile — uses the empty space to the right of the four 44 px
@@ -16137,9 +16151,14 @@ body:has(.v4-theme) {
     font-size: 12px;
   }
 
-  /* Feed row: tighter padding, smaller avatar, smaller chip + name */
+  /* Feed row: tighter padding, smaller avatar, smaller chip + name.
+     The 540 px parent block redefined the grid as 2-col with
+     "avatar body / spacer actions / poll poll" template-areas.
+     Match that here — using 3-col would leave grid-area: actions
+     unresolvable and silently fall back to auto-placement,
+     defeating the whole "stack actions below body" intent. */
   .v4-theme .feed-row {
-    grid-template-columns: 32px 1fr auto;
+    grid-template-columns: 32px 1fr;
     gap: 4px 10px;
     padding: 10px 12px;
   }
