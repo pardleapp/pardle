@@ -675,11 +675,16 @@ function LiveRoundStatus({
 }) {
   if (!state) return null;
   const r = round ?? state.currentRound;
+  // PlayerRoundState doesn't carry a status flag — derive from
+  // holesPlayed / holesRemaining (both summed across the current
+  // round only, per the server projection).
+  const notStarted = state.holesPlayed <= 0;
+  const complete = state.holesRemaining <= 0 && state.holesPlayed >= 18;
   let primary: string;
   let secondary: string | null = null;
-  if (state.status === "not-started") {
+  if (notStarted) {
     primary = "Yet to tee off";
-  } else if (state.status === "complete") {
+  } else if (complete) {
     primary = "Round complete";
     secondary = formatToPar(state.toPar);
   } else {
