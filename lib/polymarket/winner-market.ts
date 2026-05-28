@@ -23,6 +23,16 @@ const redis = Redis.fromEnv();
 
 const CACHE_PREFIX = "polymarket:winner-event:";
 const CACHE_TTL_S = 24 * 60 * 60;
+// Negative cache for "no event found" — lots of smaller PGA events
+// (Schwab Challenge, Sanderson Farms, etc.) have no Polymarket market
+// at all. Without this, every viewer hit re-lists golf events from
+// the gamma-api at ~500 ms each. 10 min is short enough that a market
+// appearing mid-tournament gets picked up within minutes.
+const MISS_CACHE_PREFIX = "polymarket:winner-event-miss:";
+const MISS_CACHE_TTL_S = 10 * 60;
+function missKey(tournamentId: string): string {
+  return `${MISS_CACHE_PREFIX}${tournamentId}`;
+}
 
 export interface WinnerEventInfo {
   eventId: number;
@@ -88,6 +98,12 @@ export async function discoverWinnerEvent(
   tournamentName: string,
   leaderboard: CachedLeaderboardRow[],
 ): Promise<WinnerEventInfo | null> {
+  // Negative cache short-circuit — when we already failed to find a
+  // market in the last MISS_CACHE_TTL_S window, skip the gamma-api
+  // list call.
+  const recentMiss = await redis.get<number>(missKey(tournamentId));
+  if (recentMiss) return null;
+
   const events = await listGolfEvents();
   const needle = norm(tournamentName);
   // Prefer events that contain BOTH the tournament name and the word
@@ -96,7 +112,12 @@ export async function discoverWinnerEvent(
     const t = norm(e.title);
     return t.includes(needle) && t.includes("winner");
   });
-  if (winnerEvents.length === 0) return null;
+  if (winnerEvents.length === 0) {
+    await redis.set(missKey(tournamentId), Date.now(), {
+      ex: MISS_CACHE_TTL_S,
+    });
+    return null;
+  }
   // Most-liquid event wins ties.
   winnerEvents.sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0));
   const event = winnerEvents[0];

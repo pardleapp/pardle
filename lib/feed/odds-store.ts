@@ -34,6 +34,65 @@ function key(t: string): string {
 }
 
 /**
+ * Polling logic shared between the cron route
+ * (`/api/feed/odds-poll`) and the inline poller in `/api/feed`.
+ * Discovers (or reuses the cached) Polymarket winner event for the
+ * active tournament, reads the latest mid-price per child market,
+ * and appends to the per-player buffer.
+ *
+ * Returns a status object so callers can log; never throws.
+ */
+export async function pollPolymarketWinner(
+  tournamentId: string,
+  tournamentName: string,
+): Promise<{ ok: boolean; matched: number; reason?: string }> {
+  const { getEvent, midOddsFromMarket } = await import(
+    "@/lib/polymarket/client"
+  );
+  const { discoverWinnerEvent, getCachedWinnerEvent } = await import(
+    "@/lib/polymarket/winner-market"
+  );
+  const { getCachedLeaderboard } = await import("./store");
+
+  const leaderboard = await getCachedLeaderboard(tournamentId);
+  if (leaderboard.length === 0) {
+    return { ok: false, matched: 0, reason: "no-leaderboard" };
+  }
+  let winner = await getCachedWinnerEvent(tournamentId);
+  if (!winner) {
+    try {
+      winner = await discoverWinnerEvent(
+        tournamentId,
+        tournamentName,
+        leaderboard,
+      );
+    } catch (err) {
+      console.error("[odds-poll-inline] discover failed", err);
+      return { ok: false, matched: 0, reason: "discover-failed" };
+    }
+  }
+  if (!winner) return { ok: false, matched: 0, reason: "event-not-found" };
+
+  let event;
+  try {
+    event = await getEvent(winner.eventId);
+  } catch (err) {
+    console.error("[odds-poll-inline] event fetch failed", err);
+    return { ok: false, matched: 0, reason: "fetch-failed" };
+  }
+  const latest: Record<string, number> = {};
+  for (const m of event.markets) {
+    const pid = winner.marketToPlayer[m.id];
+    if (!pid) continue;
+    const odds = midOddsFromMarket(m);
+    if (odds == null) continue;
+    latest[pid] = odds;
+  }
+  const result = await pushOddsSamples(tournamentId, latest, Date.now());
+  return { ok: true, matched: result.updated };
+}
+
+/**
  * Append the current price reading for each player. `latest` is keyed
  * by orchestrator playerId. Existing samples per player are kept
  * unless `force` is passed; identical readings (price within 0.5%) at

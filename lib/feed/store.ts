@@ -182,6 +182,27 @@ export async function acquirePollLock(
   return res === "OK";
 }
 
+/**
+ * Generic subsystem lock — used by the odds + DataGolf inline pollers
+ * triggered from /api/feed. Each subsystem (polymarket, datagolf, ...)
+ * gets its own self-expiring key so the first viewer in a window runs
+ * the upstream fetch and the rest read from the freshly-written Redis
+ * buffer. Independent from the main poll-lock so a fast feed poll
+ * doesn't block a slower odds poll.
+ */
+export async function acquireSubsystemLock(
+  tournamentId: string,
+  subsystem: string,
+  ttlSeconds: number,
+): Promise<boolean> {
+  const res = await redis.set(
+    `feed:sublock:${subsystem}:${tournamentId}`,
+    "1",
+    { nx: true, ex: ttlSeconds },
+  );
+  return res === "OK";
+}
+
 // ──────────────────────────────────────────────────────────────────
 // Events
 // ──────────────────────────────────────────────────────────────────

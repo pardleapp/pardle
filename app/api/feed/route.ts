@@ -6,6 +6,7 @@ import {
 import { pollAndDiff } from "@/lib/feed/engine";
 import {
   acquirePollLock,
+  acquireSubsystemLock,
   cacheLeaderboard,
   computeFieldStats,
   getCommentCountsBulk,
@@ -19,6 +20,8 @@ import {
   type PlayerSkillMap,
   type WinningScoreSnapshot,
 } from "@/lib/feed/store";
+import { pollPolymarketWinner } from "@/lib/feed/odds-store";
+import { pollDataGolfInPlay } from "@/lib/feed/dg-store";
 import { simulateTopFinish } from "@/lib/feed/top-finish-model";
 import {
   getCachedDgTopFinish,
@@ -193,6 +196,44 @@ async function handle(req: Request) {
         console.error("[feed] pollAndDiff failed", err);
       }
     }
+    // Outright-bet chart sources — Polymarket primary, DataGolf
+    // merged in alongside. Inline-poll the two upstreams with their
+    // own self-expiring locks (90 s each) so the buffers populate
+    // without needing external cron. First viewer in each window
+    // pays the upstream-fetch latency; the rest skip both polls.
+    // Awaited (not fire-and-forget) so the freshly-written samples
+    // land in THIS response's getFeedBundle below — the bet detail
+    // page gets a populated chart on the same hit that triggered
+    // the poll.
+    const pollOddsPromise = (async () => {
+      try {
+        const gotOdds = await acquireSubsystemLock(
+          tournament.id,
+          "polymarket",
+          90,
+        );
+        if (gotOdds) {
+          await pollPolymarketWinner(tournament.id, tournament.name);
+        }
+      } catch (err) {
+        console.error("[feed] inline polymarket poll failed", err);
+      }
+    })();
+    const pollDgPromise = (async () => {
+      try {
+        const gotDg = await acquireSubsystemLock(
+          tournament.id,
+          "datagolf",
+          90,
+        );
+        if (gotDg) {
+          await pollDataGolfInPlay(tournament.id);
+        }
+      } catch (err) {
+        console.error("[feed] inline datagolf poll failed", err);
+      }
+    })();
+    await Promise.allSettled([pollOddsPromise, pollDgPromise]);
   }
 
   // Pipelined single-HTTP-request fetch of every read this endpoint

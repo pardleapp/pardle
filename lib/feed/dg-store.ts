@@ -80,3 +80,52 @@ export async function getDgProbBuffers(
   );
   return v ?? {};
 }
+
+function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Polling logic shared between the cron route (`/api/feed/datagolf-poll`)
+ * and the inline poller in `/api/feed`. Fetches DataGolf in-play win
+ * probs, matches them by display name to the cached leaderboard, and
+ * appends to the per-player Redis buffer.
+ *
+ * Returns a small status object so callers can log; never throws —
+ * DataGolf flakes are common and the outright chart degrades gracefully
+ * to Polymarket alone (or vice versa).
+ */
+export async function pollDataGolfInPlay(tournamentId: string): Promise<{
+  ok: boolean;
+  matched: number;
+  reason?: string;
+}> {
+  const { getInPlayWinProbs } = await import("@/lib/golf-api/datagolf");
+  const { getCachedLeaderboard } = await import("./store");
+
+  const leaderboard = await getCachedLeaderboard(tournamentId);
+  if (leaderboard.length === 0) {
+    return { ok: false, matched: 0, reason: "no-leaderboard" };
+  }
+  let probs;
+  try {
+    probs = await getInPlayWinProbs();
+  } catch (err) {
+    console.error("[dg-poll-inline] fetch failed", err);
+    return { ok: false, matched: 0, reason: "fetch-failed" };
+  }
+  const lbByName = new Map<string, string>();
+  for (const r of leaderboard) lbByName.set(normalizeName(r.displayName), r.playerId);
+  const latest: Record<string, number> = {};
+  for (const p of probs) {
+    const pid = lbByName.get(normalizeName(p.name));
+    if (!pid) continue;
+    latest[pid] = p.winProb;
+  }
+  const result = await pushDgProbSamples(tournamentId, latest, Date.now());
+  return { ok: true, matched: result.updated };
+}
