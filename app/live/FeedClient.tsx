@@ -10,9 +10,27 @@ import {
   ODDS_FORMAT_STORAGE_KEY,
   type OddsFormat,
 } from "@/lib/odds-format";
+import dynamic from "next/dynamic";
 import CatchMeUp from "./CatchMeUp";
-import CommentThread from "./CommentThread";
 import FeedSkeleton from "./FeedSkeleton";
+
+// CommentThread + ReelGroup are off the initial-paint critical
+// path — comments only render when a row is expanded, the reel
+// group sits well below the fold. Dynamic-import both so the
+// home-feed first-contentful-paint bundle drops by ~25KB combined.
+const CommentThread = dynamic(() => import("./CommentThread"), {
+  ssr: false,
+  loading: () => (
+    <ul className="feed-thread-list" aria-busy="true">
+      {[0, 1].map((i) => (
+        <li key={i} className="feed-comment feed-comment-skeleton">
+          <span className="skeleton-line feed-comment-skel-author" />
+          <span className="skeleton-line feed-comment-skel-text" />
+        </li>
+      ))}
+    </ul>
+  ),
+});
 import FollowButton, { getFollows } from "./FollowButton";
 import HeroIntro from "./HeroIntro";
 import OffWeekLanding from "./OffWeekLanding";
@@ -29,7 +47,10 @@ import { useNotifications } from "./notifications/useNotifications";
 import PlayerAvatar from "./PlayerAvatar";
 import PlayerSearch from "./PlayerSearch";
 import PuttPollWidget from "./PuttPollWidget";
-import ReelGroup from "./ReelGroup";
+const ReelGroup = dynamic(() => import("./ReelGroup"), {
+  ssr: false,
+  loading: () => null,
+});
 
 // Faster ticks during live play so the feed feels close to real-time
 // alongside the IMG-ingest path; visibility-gated below so a backgrounded

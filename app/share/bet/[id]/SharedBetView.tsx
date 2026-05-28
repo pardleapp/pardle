@@ -22,8 +22,20 @@ import {
   type TrackedBet,
   type WinningScoreSnapshot,
 } from "@/app/live/bet-shared";
-import BetChartFull from "@/app/live/bet/[id]/BetChartFull";
+import dynamic from "next/dynamic";
 import { formatBetCurrency } from "@/lib/format/bet-currency";
+
+// Heavy SVG chart — defer to first paint past the hero so the share
+// view paints something fast even on a cold viral visit.
+const BetChartFull = dynamic(
+  () => import("@/app/live/bet/[id]/BetChartFull"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="skeleton-block bd-skeleton-chart" aria-busy="true" />
+    ),
+  },
+);
 
 const REFRESH_MS = 6_000;
 

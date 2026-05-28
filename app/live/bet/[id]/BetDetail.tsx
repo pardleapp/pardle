@@ -33,10 +33,22 @@ import {
   type WinningScoreBet,
   type WinningScoreSnapshot,
 } from "../../bet-shared";
-import BetChartFull from "./BetChartFull";
+import dynamic from "next/dynamic";
 import { computeBetInsight } from "@/lib/feed/bet-insights";
 import { useToast } from "@/app/live/Toast";
 import { formatBetCurrency } from "@/lib/format/bet-currency";
+
+// BetChartFull is the heaviest piece of the bet-detail page (SVG
+// chart engine, axis helpers, hover tooltip, optional PastBetReplay
+// branch). Dynamic-import with SSR off so it doesn't drag the
+// shared lazy-loaded bundle into the home-feed initial paint when
+// users navigate to /live/bet/X from a row chip.
+const BetChartFull = dynamic(() => import("./BetChartFull"), {
+  ssr: false,
+  loading: () => (
+    <div className="skeleton-block bd-skeleton-chart" aria-busy="true" />
+  ),
+});
 
 const REFRESH_MS = 6_000;
 
