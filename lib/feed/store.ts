@@ -266,8 +266,17 @@ export async function react(
   dir: "up" | "down",
 ): Promise<ReactionCounts | null> {
   const marker = reactedKey(eventId, authorKey);
-  const prev = await redis.get<string>(marker);
   const want = dir === "up" ? "u" : "d";
+
+  // Atomic claim — set marker to the new direction only if it
+  // changed. Returns the previous value so we know which counter
+  // to decrement. Two concurrent taps from the same author can't
+  // both win this transition, fixing the double-increment race
+  // where prev was checked in a separate round-trip from the set.
+  const prev = (await redis.set(marker, want, {
+    ex: REACTED_TTL,
+    get: true,
+  })) as string | null;
   if (prev === want) return null; // already reacted this way
 
   const key = reactionsKey(eventId);
@@ -280,7 +289,6 @@ export async function react(
   } else {
     await redis.hincrby(key, dir, 1);
   }
-  await redis.set(marker, want, { ex: REACTED_TTL });
   // Record the reaction timestamp for hot-chip velocity tracking.
   // Use authorKey as member so re-reactions (down→up flip) update
   // the same entry rather than double-counting one person as two

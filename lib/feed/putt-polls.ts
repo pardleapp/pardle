@@ -191,8 +191,15 @@ export async function votePuttPoll(
   if (poll.closedAt != null) return null;
 
   const marker = votedKey(pollId, authorKey);
-  const prev = await redis.get<string>(marker);
   const want = vote === "yes" ? "y" : "n";
+  // Atomic SET+GET so two concurrent taps from the same author
+  // can't both pass the prev==want check independently and
+  // double-increment the counter. Previously prev/set were two
+  // separate round-trips with a race window between them.
+  const prev = (await redis.set(marker, want, {
+    ex: VOTED_TTL,
+    get: true,
+  })) as string | null;
   if (prev === want) return null;
 
   const key = countsKey(pollId);
@@ -205,7 +212,6 @@ export async function votePuttPoll(
   } else {
     await redis.hincrby(key, vote, 1);
   }
-  await redis.set(marker, want, { ex: VOTED_TTL });
   // Track the voter explicitly so settlement can sweep all voters and
   // update their personal accuracy stats. Stored separately from the
   // dedup marker so a single Redis lookup at settle-time enumerates

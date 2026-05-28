@@ -155,7 +155,14 @@ export async function castVote(
   if (!poll) return null;
   if (!poll.options.some((o) => o.id === optionId)) return null;
 
-  const prev = await getVoterChoice(pollId, visitor);
+  // Atomic SET+GET so two concurrent taps from the same visitor
+  // can't both pass the prev != optionId check and double-
+  // increment the new option. Was previously a read-then-write
+  // pair with a race window between them.
+  const prev = (await redis.set(voterKey(pollId, visitor), optionId, {
+    ex: VOTER_TTL,
+    get: true,
+  })) as string | null;
   if (prev === optionId) {
     return getPollVotes(pollId); // no-op
   }
@@ -165,7 +172,6 @@ export async function castVote(
     await redis.hincrby(key, prev, -1);
   }
   await redis.hincrby(key, optionId, 1);
-  await redis.set(voterKey(pollId, visitor), optionId, { ex: VOTER_TTL });
   return getPollVotes(pollId);
 }
 

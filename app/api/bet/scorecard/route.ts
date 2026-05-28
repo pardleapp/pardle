@@ -22,6 +22,14 @@ export const dynamic = "force-dynamic";
  * route falls back to whichever tournament is currently active, which
  * is the wrong tournament for any historical round-score chart.
  */
+/** PGA Tour player + tournament IDs are alphanumeric tokens with
+ *  occasional dashes/underscores. Reject anything else so user-
+ *  supplied values can't smuggle quotes or braces into the GraphQL
+ *  string the orchestrator client builds. The orchestrator may have
+ *  field-level guards, but defence-in-depth: validate at the API
+ *  boundary too. */
+const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -31,6 +39,15 @@ export async function GET(req: Request) {
     if (!playerId || !roundStr) {
       return NextResponse.json(
         { error: "missing-params" },
+        { status: 400 },
+      );
+    }
+    if (!ID_RE.test(playerId)) {
+      return NextResponse.json({ error: "bad-playerId" }, { status: 400 });
+    }
+    if (tournamentIdOverride && !ID_RE.test(tournamentIdOverride)) {
+      return NextResponse.json(
+        { error: "bad-tournamentId" },
         { status: 400 },
       );
     }
