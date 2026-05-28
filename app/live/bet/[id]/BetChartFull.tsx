@@ -315,12 +315,11 @@ export default function BetChartFull({ bet, history, headerRight }: Props) {
               ? isRound
                 ? "Each step = a completed hole. Baseline = break-even (stake)."
                 : "Profit/loss since bet placement, valued from live market odds."
-              : `Model win chance — pre-round ${(
-                  preRoundProbFor(history) * 100
-                ).toFixed(1)}% (your @ ${bet.oddsTakenLabel} price = ${(
-                  (1 / bet.oddsTaken) *
-                  100
-                ).toFixed(1)}% implied).`}
+              : `Now ${formatProbForFoot(currentProbFor(history))} · pre-round ${formatProbForFoot(
+                  preRoundProbFor(history),
+                )} · your @ ${bet.oddsTakenLabel} = ${formatProbForFoot(
+                  1 / bet.oddsTaken,
+                )} implied`}
           </span>
         )}
       </div>
@@ -361,6 +360,27 @@ function ChartToggle({
 
 function preRoundProbFor(history: PnlSample[]): number {
   return history[0]?.prob ?? 0;
+}
+
+/** Latest model probability — last sample in the history series.
+ *  Falls back through the chain so we always have something
+ *  sensible to render in the footer summary. */
+function currentProbFor(history: PnlSample[]): number {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const p = history[i]?.prob;
+    if (typeof p === "number" && Number.isFinite(p)) return p;
+  }
+  return history[0]?.prob ?? 0;
+}
+
+/** Compact win-prob format for the chart footer summary: 1
+ *  decimal under 5 %, integer otherwise. */
+function formatProbForFoot(p: number): string {
+  if (!Number.isFinite(p) || p <= 0) return "—";
+  if (p >= 1) return "100%";
+  const pct = p * 100;
+  if (pct < 5) return `${pct.toFixed(1)}%`;
+  return `${Math.round(pct)}%`;
 }
 
 function clamp01(x: number): number {
