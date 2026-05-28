@@ -388,10 +388,34 @@ async function handle(req: Request) {
   // Also: pull the current-odds-per-player map (latest sample from
   // each buffer) so the client can live-value tracked bets.
   // Odds buffers come from the pipelined bundle — no extra HTTP call.
+  //
+  // SOURCE PREFERENCE — DataGolf primary, Polymarket fallback.
+  // Polymarket markets on smaller PGA events are illiquid: mid-of-
+  // book on a longshot can be $0.01 bid vs $0.30 ask, producing a
+  // "fair" of $0.155 ≈ +544 for a player whose real win probability
+  // is well under 1%. That was painting bets at +40000 as worth
+  // +556 in the tracker. DataGolf's in-play model is a Monte Carlo
+  // over current leaderboard + skill, so its probability is sane
+  // even on illiquid players. Falls back to Polymarket only when
+  // we don't have a DG sample for the player (e.g. before in-play
+  // model kicks in pre-tournament).
   const oddsBuffers = bundle.oddsBuffers;
+  const dgWinProbs = bundle.dgWinProbs;
   const currentOdds: Record<string, number> = {};
+  // Pre-seed from DataGolf — its in-play probability is the more
+  // trustworthy live source.
+  for (const [pid, buf] of Object.entries(dgWinProbs)) {
+    if (!Array.isArray(buf) || buf.length === 0) continue;
+    const last = buf[buf.length - 1];
+    if (!last || !Number.isFinite(last.prob) || last.prob <= 0 || last.prob >= 1) {
+      continue;
+    }
+    currentOdds[pid] = 1 / last.prob;
+  }
+  // Fill in any player without DG using Polymarket (still useful
+  // pre-round / for players DataGolf hasn't modelled yet).
   for (const [pid, buf] of Object.entries(oddsBuffers)) {
-    // hmget returns null for missing fields — guard before reading length.
+    if (currentOdds[pid] != null) continue;
     if (!Array.isArray(buf) || buf.length === 0) continue;
     const last = buf[buf.length - 1];
     if (last) currentOdds[pid] = last.p;
