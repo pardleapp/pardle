@@ -8109,6 +8109,58 @@ footer {
   gap: 6px;
 }
 
+/* Live round status — small pill above the round-score chart so
+   the bettor sees "Thru X · −Y" in their eyeline alongside the
+   chart trajectory. */
+.bd-live-status-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.bd-live-status {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(10, 13, 18, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+.bd-live-status-eyebrow {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.bd-live-status-primary {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.bd-live-status-secondary {
+  font-size: 14px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.bd-live-status-down .bd-live-status-secondary {
+  color: #00d96e;
+}
+
+.bd-live-status-up .bd-live-status-secondary {
+  color: #ff4b6b;
+}
+
+.bd-live-status-neutral .bd-live-status-secondary {
+  color: var(--text);
+}
+
 .bd-chart-svg {
   width: 100%;
   height: auto;

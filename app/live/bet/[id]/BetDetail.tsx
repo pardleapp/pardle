@@ -553,6 +553,12 @@ export default function BetDetail({ betId }: { betId: string }) {
         </>
       ) : (
         <>
+          {bet.kind === "round-score" && (
+            <LiveRoundStatus
+              state={data.playerRoundStates[bet.playerId]}
+              round={roundForBet}
+            />
+          )}
           <BetChartFull bet={resolvedBet} history={history} />
           {insight && <InsightCard insight={insight} />}
           {bet.kind === "round-score" ? (
@@ -652,6 +658,59 @@ export default function BetDetail({ betId }: { betId: string }) {
       </div>
     </section>
   );
+}
+
+/**
+ * Compact status pill rendered above the round-score chart — the
+ * player's current "thru X · to-par" so a bettor watching the chart
+ * has the live state in their eyeline without needing to bounce to
+ * the leaderboard.
+ */
+function LiveRoundStatus({
+  state,
+  round,
+}: {
+  state: PlayerRoundState | undefined;
+  round: number | null;
+}) {
+  if (!state) return null;
+  const r = round ?? state.currentRound;
+  let primary: string;
+  let secondary: string | null = null;
+  if (state.status === "not-started") {
+    primary = "Yet to tee off";
+  } else if (state.status === "complete") {
+    primary = "Round complete";
+    secondary = formatToPar(state.toPar);
+  } else {
+    primary = `Thru ${state.holesPlayed}`;
+    secondary = formatToPar(state.toPar);
+  }
+  const tone =
+    secondary == null
+      ? "neutral"
+      : state.toPar < 0
+        ? "down"
+        : state.toPar > 0
+          ? "up"
+          : "neutral";
+  return (
+    <div className="bd-live-status-row">
+      <div className={`bd-live-status bd-live-status-${tone}`}>
+        <span className="bd-live-status-eyebrow">R{r} live</span>
+        <span className="bd-live-status-primary">{primary}</span>
+        {secondary && (
+          <span className="bd-live-status-secondary">{secondary}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function formatToPar(n: number): string {
+  if (n === 0) return "E";
+  if (n > 0) return `+${n}`;
+  return `${n}`;
 }
 
 // ── Hole-by-hole / odds-shift detail tables ─────────────────────────
