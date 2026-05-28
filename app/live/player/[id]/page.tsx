@@ -247,6 +247,7 @@ export default async function PlayerPage({ params }: PageProps) {
 
           <PlayerStats
             tournamentId={liveTournament!.id}
+            playerId={id}
             playerName={playerName}
             playedRounds={stats!.rounds.map((r) => r.round)}
           />

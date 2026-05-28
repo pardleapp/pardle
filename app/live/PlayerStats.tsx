@@ -3,10 +3,17 @@ import {
   findStatsByName,
   getLiveStatsCached,
 } from "@/lib/feed/live-stats-cache";
+import {
+  computeFieldStats,
+  getCachedTournamentPars,
+  getSnapshot,
+} from "@/lib/feed/store";
+import { computeInternalSg, rankInternalSg } from "@/lib/feed/internal-sg";
 import type { FullLiveStats } from "@/lib/golf-api/datagolf";
 
 interface Props {
   tournamentId: string;
+  playerId: string;
   playerName: string;
   /** Which rounds have started — drives which per-round mini cards we render. */
   playedRounds: number[];
@@ -21,12 +28,32 @@ interface Props {
  */
 export default async function PlayerStats({
   tournamentId,
+  playerId,
   playerName,
   playedRounds,
 }: Props) {
-  const tournament = await getLiveStatsCached(tournamentId, "event_avg");
+  // Fetch DataGolf stats + the snapshot needed for our internal SG
+  // in parallel — they're independent.
+  const [tournament, snapshot, pars] = await Promise.all([
+    getLiveStatsCached(tournamentId, "event_avg"),
+    getSnapshot(tournamentId),
+    getCachedTournamentPars(tournamentId),
+  ]);
   const me = findStatsByName(tournament, playerName);
-  if (!me) {
+
+  // Internal "vs field today" SG — independent of DataGolf, updates
+  // every poll. Computed from data already in Redis (snapshot + pars
+  // + field stats) so it costs nothing extra on the request path.
+  const fieldStats = computeFieldStats(snapshot, pars);
+  const internalSg = computeInternalSg(snapshot, pars, fieldStats, playerId);
+  const internalRank = rankInternalSg(
+    snapshot,
+    pars,
+    fieldStats,
+    playerId,
+  );
+
+  if (!me && !internalSg) {
     return null;
   }
 
@@ -53,6 +80,58 @@ export default async function PlayerStats({
 
   return (
     <section className="pcard-section">
+      {internalSg && internalSg.holesPlayed > 0 && (
+        <>
+          <h3 className="fantasy-section-title">
+            Live SG · vs field
+            <span className="ps-internal-sg-tag">live</span>
+          </h3>
+          <div className="ps-internal-sg">
+            <div className="ps-internal-sg-row">
+              <span
+                className={`ps-internal-sg-num ${sgToneClass(internalSg.sgTotal)}`}
+              >
+                {formatSgValue(internalSg.sgTotal)}
+              </span>
+              <span className="ps-internal-sg-meta">
+                across {internalSg.holesPlayed}{" "}
+                {internalSg.holesPlayed === 1 ? "hole" : "holes"}
+                {internalRank && (
+                  <>
+                    {" · "}
+                    <span className={rankToneClass(internalRank)}>
+                      {ordinal(internalRank.rank)} of {internalRank.outOf}
+                    </span>
+                  </>
+                )}
+              </span>
+            </div>
+            {internalSg.rounds.length > 1 && (
+              <ul className="ps-internal-sg-rounds">
+                {internalSg.rounds.map((r) => (
+                  <li key={r.round}>
+                    <span className="ps-internal-sg-round-lbl">R{r.round}</span>
+                    <strong className={sgToneClass(r.sgTotal)}>
+                      {formatSgValue(r.sgTotal)}
+                    </strong>
+                    <span className="ps-internal-sg-round-holes">
+                      {r.holesPlayed}h
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <p className="ps-internal-sg-hint">
+            Strokes gained vs the field&apos;s average on each hole this
+            tournament. Updates each poll, independent of any third-party
+            feed.
+          </p>
+        </>
+      )}
+
+      {me && (
+        <>
       <h3 className="fantasy-section-title">Strokes gained · tournament</h3>
       <div className="ps-sg-card">
         <SgHeadline
@@ -192,6 +271,8 @@ export default async function PlayerStats({
           }
         />
       </div>
+        </>
+      )}
     </section>
   );
 }
