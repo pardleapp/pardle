@@ -22,7 +22,7 @@ import { formatBetCurrency, type BetCurrency } from "@/lib/format/bet-currency";
 
 export default function BetChartFull({ bet, history }: Props) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  const [mode, setMode] = useState<Mode>("pnl");
+  const [mode, setMode] = useState<Mode>("prob");
 
   const isRound = bet.kind === "round-score";
   const winningValue = bet.stake * bet.oddsTaken;
