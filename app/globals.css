@@ -14070,7 +14070,9 @@ body:has(.v4-theme) {
      mobile — uses the empty space to the right of the four 44 px
      reactions to carry the event's flavour ("First eagle of the
      season", "5 birdies in a row"). Hidden on desktop where the
-     same tag still shows in the body's chip list above the meta. */
+     same tag still shows in the body's chip list above the meta.
+     Tapping the truncated pill expands it to wrap and show the
+     full text — see .feed-actions-tag-open below. */
   .feed-actions-tag {
     margin-left: auto;
     padding: 5px 10px;
@@ -14085,6 +14087,26 @@ body:has(.v4-theme) {
     text-overflow: ellipsis;
     max-width: 60%;
     line-height: 1.2;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: right;
+  }
+  .feed-actions-tag:active {
+    background: rgba(255, 255, 255, 0.12);
+  }
+  /* Expanded state — user tapped the pill, wants to read the
+     rest. Drop nowrap + max-width so the chip wraps onto a
+     second / third line in place. Border-radius softens since
+     the pill shape no longer makes sense once it's multi-line. */
+  .feed-actions-tag-open {
+    white-space: normal;
+    overflow: visible;
+    max-width: none;
+    border-radius: 10px;
+    text-align: left;
+    line-height: 1.35;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.16);
   }
   /* On mobile, suppress the same chip in the body's tags row —
      it now lives next to the reactions instead. Other tags in

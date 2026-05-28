@@ -430,6 +430,13 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     Record<string, { myVote: string | null; counts: PredictionPollCounts }>
   >({});
   const [expanded, setExpanded] = useState<string | null>(null);
+  // Per-event flag for "user tapped the truncated context tag and
+  // wants to read the full text" — toggles the .feed-actions-tag
+  // from a nowrap+ellipsis pill into a wrapping multi-line chip.
+  const [expandedTags, setExpandedTags] = useState<Record<string, boolean>>({});
+  const toggleTag = useCallback((eventId: string) => {
+    setExpandedTags((m) => ({ ...m, [eventId]: !m[eventId] }));
+  }, []);
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>(
     {},
   );
@@ -1304,9 +1311,19 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                       variant="icon"
                     />
                     {primaryContextTag && (
-                      <span className="feed-actions-tag">
+                      <button
+                        type="button"
+                        className={`feed-actions-tag${
+                          expandedTags[event.id]
+                            ? " feed-actions-tag-open"
+                            : ""
+                        }`}
+                        onClick={() => toggleTag(event.id)}
+                        aria-expanded={!!expandedTags[event.id]}
+                        title={primaryContextTag}
+                      >
                         {primaryContextTag}
-                      </span>
+                      </button>
                     )}
                   </div>
                 </div>
