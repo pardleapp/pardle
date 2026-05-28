@@ -182,13 +182,19 @@ export default function CourseMapSvg({ course, players }: Props) {
     [course.bbox],
   );
 
-  // Group players by hole so we can fan-cluster them.
+  // Group players by hole so we can fan-cluster them. Sort within
+  // each hole by playerId so the fan-cluster index `i` is stable
+  // across polls — otherwise dots reshuffle every 6 s as the
+  // leaderboard order shifts, which reads as flicker.
   const byHole = useMemo(() => {
     const m = new Map<number, CourseMapPlayer[]>();
     for (const p of players) {
       if (p.currentHole == null) continue;
       if (!m.has(p.currentHole)) m.set(p.currentHole, []);
       m.get(p.currentHole)!.push(p);
+    }
+    for (const arr of m.values()) {
+      arr.sort((a, b) => a.playerId.localeCompare(b.playerId));
     }
     return m;
   }, [players]);
@@ -388,58 +394,10 @@ export default function CourseMapSvg({ course, players }: Props) {
           })}
         </g>
 
-        {/* Player dots — topmost. Tap a dot or its hole to open the
-            slide-up panel listing every player on that hole. */}
-        <g className="cmap-players">
-          {Array.from(byHole.entries()).map(([holeNum, ps]) => {
-            const hole = holeByNum.get(holeNum);
-            if (!hole) return null;
-            const oriented = orientedHoles.get(holeNum);
-            return ps.map((p, i) => {
-              const pos = positionOnHole(
-                oriented?.tee ?? hole.tee,
-                oriented?.green ?? hole.green,
-                i,
-                ps.length,
-              );
-              if (!pos) return null;
-              const [x, y] = project(pos[0], pos[1]);
-              return (
-                <g
-                  key={`p-${p.playerId}-${i}`}
-                  className="cmap-player"
-                  onClick={() => setSelectedHole(holeNum)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <circle
-                    cx={x}
-                    cy={y}
-                    r={9}
-                    fill={holeDotColour(p.toPar, p.state)}
-                    stroke="#0a0d12"
-                    strokeWidth={2.5}
-                  />
-                  {p.isFollowed && (
-                    <circle
-                      cx={x}
-                      cy={y}
-                      r={13}
-                      fill="none"
-                      stroke="#00d96e"
-                      strokeWidth={1.6}
-                      strokeDasharray="2 3"
-                    />
-                  )}
-                </g>
-              );
-            });
-          })}
-        </g>
-
-        {/* Invisible tap-anywhere zones for each hole. Sized to the
-            full hole region so phones tap reliably even between
-            dots. The label circles + dots also handle taps but
-            these zones make empty-hole taps work too. */}
+        {/* Invisible tap-anywhere zones for each hole. Rendered
+            BEFORE the player dots so dots win pointer events when
+            they overlap — otherwise hovering a dot flickers as the
+            cursor crosses the hit-zone boundary. */}
         <g className="cmap-hitzones">
           {course.holes.map((h) => {
             const o = orientedHoles.get(h.number);
@@ -463,6 +421,58 @@ export default function CourseMapSvg({ course, players }: Props) {
                 <title>{`Hole ${h.number}${h.par ? ` · Par ${h.par}` : ""}`}</title>
               </circle>
             );
+          })}
+        </g>
+
+        {/* Player dots — topmost. Tap a dot or its hole to open the
+            slide-up panel listing every player on that hole. */}
+        <g className="cmap-players">
+          {Array.from(byHole.entries()).map(([holeNum, ps]) => {
+            const hole = holeByNum.get(holeNum);
+            if (!hole) return null;
+            const oriented = orientedHoles.get(holeNum);
+            return ps.map((p, i) => {
+              const pos = positionOnHole(
+                oriented?.tee ?? hole.tee,
+                oriented?.green ?? hole.green,
+                i,
+                ps.length,
+              );
+              if (!pos) return null;
+              const [x, y] = project(pos[0], pos[1]);
+              return (
+                <g
+                  key={`p-${p.playerId}`}
+                  className="cmap-player"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedHole(holeNum);
+                  }}
+                  style={{ cursor: "pointer" }}
+                >
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={9}
+                    fill={holeDotColour(p.toPar, p.state)}
+                    stroke="#0a0d12"
+                    strokeWidth={2.5}
+                  />
+                  {p.isFollowed && (
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={13}
+                      fill="none"
+                      stroke="#00d96e"
+                      strokeWidth={1.6}
+                      strokeDasharray="2 3"
+                      pointerEvents="none"
+                    />
+                  )}
+                </g>
+              );
+            });
           })}
         </g>
       </svg>

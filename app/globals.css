@@ -9158,14 +9158,14 @@ footer {
   touch-action: manipulation;
 }
 
-.cmap-player {
-  transition: transform 0.12s;
+.cmap-player > circle:first-of-type {
+  transition: stroke-width 0.12s, stroke 0.12s;
 }
 
-.cmap-player:hover,
-.cmap-player:focus-visible {
-  transform: scale(1.15);
-  transform-origin: center;
+.cmap-player:hover > circle:first-of-type,
+.cmap-player:focus-visible > circle:first-of-type {
+  stroke: #ffffff;
+  stroke-width: 4;
 }
 
 .cmap-skeleton {
