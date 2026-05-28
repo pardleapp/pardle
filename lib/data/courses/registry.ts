@@ -78,6 +78,70 @@ export const COURSE_REGISTRY: CourseRegistryEntry[] = [
     name: "Royal Liverpool Golf Club",
     matchers: ["Royal Liverpool", "Hoylake"],
   },
+  {
+    id: "colonial-cc",
+    name: "Colonial Country Club",
+    matchers: ["Charles Schwab Challenge", "Colonial Country Club"],
+  },
+  {
+    id: "tpc-craig-ranch",
+    name: "TPC Craig Ranch",
+    matchers: ["CJ Cup Byron Nelson", "Byron Nelson", "TPC Craig Ranch"],
+  },
+  {
+    id: "detroit-golf-club",
+    name: "Detroit Golf Club",
+    matchers: ["Rocket Mortgage Classic", "Rocket Classic", "Detroit Golf"],
+  },
+  {
+    id: "memorial-park-houston",
+    name: "Memorial Park Golf Course",
+    matchers: [
+      "Texas Children's Houston Open",
+      "Houston Open",
+      "Memorial Park",
+    ],
+  },
+  {
+    id: "sedgefield-country-club",
+    name: "Sedgefield Country Club",
+    matchers: ["Wyndham Championship", "Sedgefield"],
+  },
+  {
+    id: "east-lake",
+    name: "East Lake Golf Club",
+    matchers: ["Tour Championship", "East Lake"],
+  },
+  {
+    id: "bay-hill",
+    name: "Bay Hill Club",
+    matchers: ["Arnold Palmer Invitational", "Bay Hill"],
+  },
+  {
+    id: "waialae-country-club",
+    name: "Waialae Country Club",
+    matchers: ["Sony Open", "Waialae"],
+  },
+  {
+    id: "tpc-scottsdale",
+    name: "TPC Scottsdale Stadium Course",
+    matchers: ["Phoenix Open", "WM Phoenix Open", "TPC Scottsdale"],
+  },
+  {
+    id: "tpc-summerlin",
+    name: "TPC Summerlin",
+    matchers: ["Shriners Children's Open", "Shriners Open", "TPC Summerlin"],
+  },
+  {
+    id: "harbour-town",
+    name: "Harbour Town Golf Links",
+    matchers: ["RBC Heritage", "Harbour Town", "Hilton Head"],
+  },
+  {
+    id: "trinity-forest",
+    name: "Trinity Forest Golf Club",
+    matchers: ["Trinity Forest"],
+  },
 ];
 
 /** The Open Championship's host rotates each year. When a

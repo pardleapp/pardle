@@ -70,5 +70,77 @@
     "city": "Hoylake",
     "country": "UK",
     "bbox": [-3.205, 53.378, -3.170, 53.395]
+  },
+  "colonial-cc": {
+    "name": "Colonial Country Club",
+    "city": "Fort Worth, TX",
+    "country": "USA",
+    "bbox": [-97.3776, 32.7149, -97.3637, 32.7233]
+  },
+  "tpc-craig-ranch": {
+    "name": "TPC Craig Ranch",
+    "city": "McKinney, TX",
+    "country": "USA",
+    "bbox": [-96.7277, 33.1301, -96.7181, 33.1520]
+  },
+  "detroit-golf-club": {
+    "name": "Detroit Golf Club",
+    "city": "Detroit, MI",
+    "country": "USA",
+    "bbox": [-83.1307, 42.4180, -83.1182, 42.4312]
+  },
+  "memorial-park-houston": {
+    "name": "Memorial Park Golf Course",
+    "city": "Houston, TX",
+    "country": "USA",
+    "bbox": [-95.4424, 29.7655, -95.4319, 29.7772]
+  },
+  "sedgefield-country-club": {
+    "name": "Sedgefield Country Club",
+    "city": "Greensboro, NC",
+    "country": "USA",
+    "bbox": [-79.9245, 36.1281, -79.9106, 36.1396]
+  },
+  "east-lake": {
+    "name": "East Lake Golf Club",
+    "city": "Atlanta, GA",
+    "country": "USA",
+    "bbox": [-84.3097, 33.7395, -84.2952, 33.7453]
+  },
+  "bay-hill": {
+    "name": "Bay Hill Club",
+    "city": "Orlando, FL",
+    "country": "USA",
+    "bbox": [-81.5153, 28.4523, -81.5022, 28.4722]
+  },
+  "waialae-country-club": {
+    "name": "Waialae Country Club",
+    "city": "Honolulu, HI",
+    "country": "USA",
+    "bbox": [-157.7839, 21.2711, -157.7668, 21.2781]
+  },
+  "tpc-scottsdale": {
+    "name": "TPC Scottsdale Stadium Course",
+    "city": "Scottsdale, AZ",
+    "country": "USA",
+    "bbox": [-111.9240, 33.6359, -111.9077, 33.6444]
+  },
+  "tpc-summerlin": {
+    "name": "TPC Summerlin",
+    "city": "Las Vegas, NV",
+    "country": "USA",
+    "bbox": [-115.3023, 36.1785, -115.2876, 36.1977]
+  },
+  "harbour-town": {
+    "name": "Harbour Town Golf Links",
+    "city": "Hilton Head Island, SC",
+    "country": "USA",
+    "bbox": [-80.8165, 32.1236, -80.8020, 32.1378]
+  },
+  "trinity-forest": {
+    "name": "Trinity Forest Golf Club",
+    "city": "Dallas, TX",
+    "country": "USA",
+    "bbox": [-96.7248, 32.7044, -96.7089, 32.7122]
   }
 }
