@@ -122,11 +122,6 @@ export default async function PlayerStats({
               </ul>
             )}
           </div>
-          <p className="ps-internal-sg-hint">
-            Strokes gained vs the field&apos;s average on each hole this
-            tournament. Updates each poll, independent of any third-party
-            feed.
-          </p>
         </>
       )}
 

@@ -7038,13 +7038,6 @@ footer {
   vertical-align: middle;
 }
 
-.ps-internal-sg-hint {
-  margin: 0 0 18px;
-  font-size: 11.5px;
-  color: var(--muted);
-  line-height: 1.45;
-}
-
 /* PlayerStats — DataGolf SG breakdown + advanced stats */
 .ps-sg-card {
   border: 1px solid var(--border);
