@@ -103,6 +103,35 @@ function centroidOf(coords: LngLat[]): LngLat | null {
   return [lng / coords.length, lat / coords.length];
 }
 
+/** Squared planar distance — good enough for comparing two points
+ *  on the same course; we never need real metres here. */
+function sqDist(a: LngLat, b: LngLat): number {
+  const dx = a[0] - b[0];
+  const dy = a[1] - b[1];
+  return dx * dx + dy * dy;
+}
+
+/** OSM hole-paths aren't always stored tee→green; some are
+ *  reversed. When the extractor's tee/green inference picked the
+ *  wrong end, the player dot would land the wrong way down the
+ *  fairway. Auto-correct here by comparing the supposed tee +
+ *  green points to the actual green polygon centroid — whichever
+ *  is closer to a green is the green end. */
+function orientedTeeGreen(
+  hole: CourseHole,
+  greenCentroidByHole: Map<number, LngLat>,
+): { tee: LngLat | null; green: LngLat | null } {
+  const tee = hole.tee;
+  const green = hole.green;
+  if (!tee || !green) return { tee, green };
+  const trueGreen = greenCentroidByHole.get(hole.number);
+  if (!trueGreen) return { tee, green };
+  if (sqDist(tee, trueGreen) < sqDist(green, trueGreen)) {
+    return { tee: green, green: tee };
+  }
+  return { tee, green };
+}
+
 function holeDotColour(toPar: number, hot?: "hot" | "cold" | null): string {
   if (hot === "hot") return "#ff9d2e"; // amber
   if (hot === "cold") return "#9aa0a8"; // muted
@@ -117,27 +146,25 @@ function holeDotColour(toPar: number, hot?: "hot" | "cold" | null): string {
  *  shot count per hole, so default to ~75% along (where most
  *  approach shots land). Cluster offsets handle multi-player. */
 function positionOnHole(
-  hole: CourseHole,
+  tee: LngLat | null,
+  green: LngLat | null,
   index: number,
   total: number,
 ): LngLat | null {
-  if (!hole.tee || !hole.green) {
-    return hole.green ?? hole.tee ?? null;
+  if (!tee || !green) {
+    return green ?? tee ?? null;
   }
   // Centre point along the hole, biased toward the green.
   const t = 0.7;
   const mid: LngLat = [
-    hole.tee[0] + (hole.green[0] - hole.tee[0]) * t,
-    hole.tee[1] + (hole.green[1] - hole.tee[1]) * t,
+    tee[0] + (green[0] - tee[0]) * t,
+    tee[1] + (green[1] - tee[1]) * t,
   ];
   if (total <= 1) return mid;
   // Fan multiple players around the mid-point. Offset is in
   // degrees — tiny, scaled to roughly the hole's length so it
   // looks like a cluster on the green rather than a starburst.
-  const span = Math.hypot(
-    hole.green[0] - hole.tee[0],
-    hole.green[1] - hole.tee[1],
-  );
+  const span = Math.hypot(green[0] - tee[0], green[1] - tee[1]);
   const radius = span * 0.15;
   const angle = (index / total) * Math.PI * 2;
   return [mid[0] + radius * Math.cos(angle), mid[1] + radius * Math.sin(angle)];
@@ -145,6 +172,10 @@ function positionOnHole(
 
 export default function CourseMapSvg({ course, players }: Props) {
   const [selectedHole, setSelectedHole] = useState<number | null>(null);
+  // Discrete zoom level — 1 = fit, 2 = 2× zoom, 3 = 3× zoom. Three
+  // steps is enough to inspect any tight cluster of dots without
+  // adding pan complexity. Native pinch still works on top.
+  const [zoom, setZoom] = useState(1);
 
   const project = useMemo(
     () => makeProject(course.bbox, SVG_W, SVG_H),
@@ -168,8 +199,9 @@ export default function CourseMapSvg({ course, players }: Props) {
     return m;
   }, [course.holes]);
 
-  // Hole-label positions — prefer the green centroid; fall back to
-  // the green polygon's centroid or the hole.green field.
+  // Hole-label positions — prefer the green polygon centroid; fall
+  // back to the hole.green field. Also used downstream to orient
+  // hole-path direction (which end is the real green).
   const labelPositions = useMemo(() => {
     const m = new Map<number, LngLat>();
     for (const g of course.greens) {
@@ -185,14 +217,49 @@ export default function CourseMapSvg({ course, players }: Props) {
     return m;
   }, [course.greens, course.holes]);
 
+  // Per-hole tee/green points with auto-corrected orientation. If
+  // the extractor inferred the wrong end of the hole-path as the
+  // tee, this swaps it so player dots land on the right side of
+  // the fairway.
+  const orientedHoles = useMemo(() => {
+    const m = new Map<number, { tee: LngLat | null; green: LngLat | null }>();
+    for (const h of course.holes) {
+      m.set(h.number, orientedTeeGreen(h, labelPositions));
+    }
+    return m;
+  }, [course.holes, labelPositions]);
+
   const selectedPlayers = selectedHole != null ? byHole.get(selectedHole) ?? [] : [];
   const selectedHoleMeta = selectedHole != null ? holeByNum.get(selectedHole) : null;
+
+  // Centre the zoomed viewBox on the selected hole when one is
+  // active; otherwise centre the whole course. Each zoom step
+  // halves the viewBox extent.
+  const focusPoint = useMemo(() => {
+    if (selectedHole != null) {
+      const o = orientedHoles.get(selectedHole);
+      const mid =
+        o?.tee && o?.green
+          ? [(o.tee[0] + o.green[0]) / 2, (o.tee[1] + o.green[1]) / 2]
+          : null;
+      if (mid) return project(mid[0], mid[1]);
+    }
+    return [SVG_W / 2, SVG_H / 2] as [number, number];
+  }, [selectedHole, orientedHoles, project]);
+
+  const viewSize = SVG_W / zoom;
+  const viewX = focusPoint[0] - viewSize / 2;
+  const viewY = focusPoint[1] - viewSize / 2;
+  // Clamp the viewBox inside the full extent so zoomed-in views
+  // don't drift off the edge.
+  const clampedX = Math.max(0, Math.min(SVG_W - viewSize, viewX));
+  const clampedY = Math.max(0, Math.min(SVG_H - viewSize, viewY));
 
   return (
     <div className="cmap-wrap">
       <svg
         className="cmap-svg"
-        viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+        viewBox={`${clampedX} ${clampedY} ${viewSize} ${viewSize}`}
         preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label={`Course map of ${course.name}`}
@@ -280,15 +347,28 @@ export default function CourseMapSvg({ course, players }: Props) {
         <g className="cmap-holelabels">
           {Array.from(labelPositions.entries()).map(([n, ll]) => {
             const [x, y] = project(ll[0], ll[1]);
+            const isSel = n === selectedHole;
             return (
               <g key={`hl-${n}`}>
+                {isSel && (
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={22}
+                    fill="none"
+                    stroke="#ff9d2e"
+                    strokeWidth={2.4}
+                    strokeDasharray="3 3"
+                    style={{ animation: "cmap-sel-spin 12s linear infinite" }}
+                  />
+                )}
                 <circle
                   cx={x}
                   cy={y}
                   r={14}
-                  fill="rgba(10,13,18,0.78)"
-                  stroke="#5fc97a"
-                  strokeWidth={1.5}
+                  fill={isSel ? "#1a0f02" : "rgba(10,13,18,0.78)"}
+                  stroke={isSel ? "#ff9d2e" : "#5fc97a"}
+                  strokeWidth={isSel ? 2 : 1.5}
                 />
                 <text
                   x={x}
@@ -297,7 +377,7 @@ export default function CourseMapSvg({ course, players }: Props) {
                   dominantBaseline="central"
                   fontSize={14}
                   fontWeight={900}
-                  fill="#ffffff"
+                  fill={isSel ? "#ff9d2e" : "#ffffff"}
                   fontFamily="-apple-system, BlinkMacSystemFont, system-ui, sans-serif"
                   pointerEvents="none"
                 >
@@ -314,8 +394,14 @@ export default function CourseMapSvg({ course, players }: Props) {
           {Array.from(byHole.entries()).map(([holeNum, ps]) => {
             const hole = holeByNum.get(holeNum);
             if (!hole) return null;
+            const oriented = orientedHoles.get(holeNum);
             return ps.map((p, i) => {
-              const pos = positionOnHole(hole, i, ps.length);
+              const pos = positionOnHole(
+                oriented?.tee ?? hole.tee,
+                oriented?.green ?? hole.green,
+                i,
+                ps.length,
+              );
               if (!pos) return null;
               const [x, y] = project(pos[0], pos[1]);
               return (
@@ -356,9 +442,12 @@ export default function CourseMapSvg({ course, players }: Props) {
             these zones make empty-hole taps work too. */}
         <g className="cmap-hitzones">
           {course.holes.map((h) => {
-            if (!h.tee || !h.green) return null;
-            const [tx, ty] = project(h.tee[0], h.tee[1]);
-            const [gx, gy] = project(h.green[0], h.green[1]);
+            const o = orientedHoles.get(h.number);
+            const teePt = o?.tee ?? h.tee;
+            const greenPt = o?.green ?? h.green;
+            if (!teePt || !greenPt) return null;
+            const [tx, ty] = project(teePt[0], teePt[1]);
+            const [gx, gy] = project(greenPt[0], greenPt[1]);
             const mx = (tx + gx) / 2;
             const my = (ty + gy) / 2;
             return (
@@ -377,6 +466,41 @@ export default function CourseMapSvg({ course, players }: Props) {
           })}
         </g>
       </svg>
+
+      <div className="cmap-zoom" role="group" aria-label="Zoom">
+        <button
+          type="button"
+          className="cmap-zoom-btn"
+          onClick={() => setZoom((z) => Math.min(3, z + 1))}
+          aria-label="Zoom in"
+          disabled={zoom >= 3}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          className="cmap-zoom-btn"
+          onClick={() => setZoom((z) => Math.max(1, z - 1))}
+          aria-label="Zoom out"
+          disabled={zoom <= 1}
+        >
+          −
+        </button>
+        {zoom > 1 && (
+          <button
+            type="button"
+            className="cmap-zoom-btn cmap-zoom-reset"
+            onClick={() => {
+              setZoom(1);
+              setSelectedHole(null);
+            }}
+            aria-label="Reset view"
+            title="Reset view"
+          >
+            ⤢
+          </button>
+        )}
+      </div>
 
       {selectedHole != null && selectedHoleMeta && (
         <div className="cmap-sheet" role="dialog" aria-modal="true">

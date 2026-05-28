@@ -48,7 +48,48 @@ export const COURSE_REGISTRY: CourseRegistryEntry[] = [
     name: "Quail Hollow Club",
     matchers: ["Wells Fargo", "Truist Championship", "Quail Hollow", "PGA Championship"],
   },
+  {
+    id: "pebble-beach",
+    name: "Pebble Beach Golf Links",
+    matchers: ["Pebble Beach", "AT&T Pro-Am"],
+  },
+  {
+    id: "royal-birkdale",
+    name: "Royal Birkdale Golf Club",
+    matchers: ["Royal Birkdale", "Birkdale"],
+  },
+  {
+    id: "royal-portrush",
+    name: "Royal Portrush Golf Club",
+    matchers: ["Royal Portrush", "Portrush"],
+  },
+  {
+    id: "st-andrews-old",
+    name: "St Andrews Old Course",
+    matchers: ["St Andrews", "Old Course"],
+  },
+  {
+    id: "royal-troon",
+    name: "Royal Troon Golf Club",
+    matchers: ["Royal Troon", "Troon"],
+  },
+  {
+    id: "royal-liverpool",
+    name: "Royal Liverpool Golf Club",
+    matchers: ["Royal Liverpool", "Hoylake"],
+  },
 ];
+
+/** The Open Championship's host rotates each year. When a
+ *  tournament name is just "The Open Championship" without an
+ *  explicit venue, this gives us the per-year route. Update
+ *  annually. */
+export const OPEN_VENUE_BY_YEAR: Record<number, string> = {
+  2026: "royal-birkdale",
+  2025: "royal-portrush",
+  2024: "royal-troon",
+  2023: "royal-liverpool",
+};
 
 export function lookupCourseForTournament(
   tournamentName: string | null,

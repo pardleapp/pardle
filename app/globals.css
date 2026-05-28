@@ -9188,6 +9188,63 @@ footer {
   letter-spacing: 0.02em;
 }
 
+/* Floating zoom controls — bottom-right of the map. Discrete
+   1/2/3× steps; pan emerges naturally from the selected-hole
+   focus point (we re-centre the viewBox around the selected hole
+   when zoomed). */
+.cmap-zoom {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2;
+}
+
+.cmap-zoom-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(10, 13, 18, 0.85);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background-color 0.12s;
+  backdrop-filter: blur(4px);
+}
+
+.cmap-zoom-btn:hover:not(:disabled) {
+  background: rgba(30, 35, 42, 0.95);
+}
+
+.cmap-zoom-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cmap-zoom-reset {
+  font-size: 14px;
+}
+
+@keyframes cmap-sel-spin {
+  from {
+    transform: rotate(0deg);
+    transform-origin: center;
+  }
+  to {
+    transform: rotate(360deg);
+    transform-origin: center;
+  }
+}
+
 /* Slide-up sheet showing the players on a tapped hole. Inline
    under the map (not absolutely positioned) on mobile so the map
    doesn't shift behind it. */

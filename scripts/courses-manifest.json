@@ -34,5 +34,41 @@
     "city": "Charlotte, NC",
     "country": "USA",
     "bbox": [-80.8494741, 35.1084292, -80.8352114, 35.1196997]
+  },
+  "royal-birkdale": {
+    "name": "Royal Birkdale Golf Club",
+    "city": "Southport",
+    "country": "UK",
+    "bbox": [-3.0494, 53.6165, -3.0300, 53.6318]
+  },
+  "royal-portrush": {
+    "name": "Royal Portrush Golf Club",
+    "city": "Portrush",
+    "country": "UK",
+    "bbox": [-6.658, 55.190, -6.627, 55.213]
+  },
+  "st-andrews-old": {
+    "name": "St Andrews Old Course",
+    "city": "St Andrews",
+    "country": "UK",
+    "bbox": [-2.825, 56.340, -2.790, 56.357]
+  },
+  "pebble-beach": {
+    "name": "Pebble Beach Golf Links",
+    "city": "Pebble Beach, CA",
+    "country": "USA",
+    "bbox": [-121.962, 36.560, -121.938, 36.578]
+  },
+  "royal-troon": {
+    "name": "Royal Troon Golf Club",
+    "city": "Troon",
+    "country": "UK",
+    "bbox": [-4.665, 55.526, -4.640, 55.542]
+  },
+  "royal-liverpool": {
+    "name": "Royal Liverpool Golf Club",
+    "city": "Hoylake",
+    "country": "UK",
+    "bbox": [-3.205, 53.378, -3.170, 53.395]
   }
 }
