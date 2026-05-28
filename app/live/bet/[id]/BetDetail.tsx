@@ -572,6 +572,7 @@ export default function BetDetail({ betId }: { betId: string }) {
             <OutrightDetailTable
               bet={bet}
               history={history}
+              feedEvents={data.rows ?? []}
               oddsFormat={oddsFormat}
             />
           )}
@@ -801,52 +802,164 @@ function RoundDetailTable({
 function OutrightDetailTable({
   bet,
   history,
+  feedEvents,
   oddsFormat,
 }: {
   bet: TrackedBet;
   history: PnlSample[];
+  feedEvents: FeedRowLike[];
   oddsFormat: OddsFormat;
 }) {
-  // Pick a handful of meaningful samples — biggest swings between consecutive
-  // history points — to show as a short event log.
-  const items: { t: number; v: number; swing: number }[] = [];
-  for (let i = 1; i < history.length; i++) {
-    items.push({
-      t: history[i].t,
-      v: history[i].v,
-      swing: history[i].v - history[i - 1].v,
-    });
+  const playerId = "playerId" in bet ? (bet as { playerId: string }).playerId : null;
+
+  // Player's hole completions in chronological order. Score-typed
+  // events carry par + strokes + hole + round + ts. Pars don't
+  // produce feed events, but the table is still honest about the
+  // bet's value at every NON-par hole — the bet only moves
+  // materially on those anyway.
+  const holeEvents = (
+    playerId
+      ? feedEvents.filter(
+          (r) =>
+            r.event.type === "score" &&
+            r.event.playerId === playerId &&
+            typeof r.event.hole === "number" &&
+            typeof r.event.round === "number" &&
+            typeof r.event.ts === "number",
+        )
+      : []
+  )
+    .map((r) => ({
+      ts: r.event.ts,
+      hole: r.event.hole as number,
+      round: r.event.round,
+      strokes: r.event.strokes,
+      par: r.event.par,
+    }))
+    .sort((a, b) => a.ts - b.ts);
+
+  // Interpolate the bet's value at a given timestamp from the
+  // history series — gives us the bet value AT each hole completion
+  // rather than at history sample boundaries.
+  const valueAt = (ts: number): number => {
+    if (history.length === 0) return bet.stake;
+    if (ts <= history[0].t) return history[0].v;
+    if (ts >= history[history.length - 1].t) {
+      return history[history.length - 1].v;
+    }
+    for (let i = 1; i < history.length; i++) {
+      if (history[i].t >= ts) {
+        const a = history[i - 1];
+        const b = history[i];
+        const span = b.t - a.t || 1;
+        const t = (ts - a.t) / span;
+        return a.v + (b.v - a.v) * t;
+      }
+    }
+    return history[history.length - 1].v;
+  };
+
+  if (holeEvents.length === 0) {
+    return (
+      <div className="bd-table">
+        <p className="bd-table-title">Hole by hole</p>
+        <p className="bd-table-foot" style={{ marginTop: 0 }}>
+          Fills in once {bet.kind === "outright" || bet.kind === "top-finish"
+            ? `${(bet as { playerName: string }).playerName} plays a hole`
+            : "the round starts"}
+          .
+        </p>
+      </div>
+    );
   }
-  items.sort((a, b) => Math.abs(b.swing) - Math.abs(a.swing));
-  const top = items.slice(0, 10).sort((a, b) => a.t - b.t);
-  if (top.length === 0) return null;
+
+  type Row =
+    | { kind: "hole"; key: string; ts: number; label: string; value: number }
+    | { kind: "gap"; key: string; ts: number; label: string; value: number };
+
+  // Build the row list — each player hole, plus optional "between"
+  // rows when odds moved materially while the player wasn't playing
+  // (other contenders' actions, market re-pricing, etc.).
+  const SIGNIFICANT_GAP_PCT = 0.05; // 5% of stake
+  const rows: Row[] = [];
+  let prevTs = bet.placedAt;
+  let prevValue = bet.stake;
+  for (let i = 0; i < holeEvents.length; i++) {
+    const ev = holeEvents[i];
+    // Look for a "peak" sample in the gap between prev player-event
+    // and this one. If its swing from prevValue is significant AND
+    // the post-hole valuation differs from the peak by at least half
+    // that swing, render the peak as its own row — otherwise it'll
+    // get absorbed into this hole's swing anyway.
+    let peak: { t: number; v: number } | null = null;
+    for (const s of history) {
+      if (s.t <= prevTs || s.t >= ev.ts) continue;
+      if (!peak || Math.abs(s.v - prevValue) > Math.abs(peak.v - prevValue)) {
+        peak = { t: s.t, v: s.v };
+      }
+    }
+    const evValue = valueAt(ev.ts);
+    if (peak) {
+      const peakSwing = peak.v - prevValue;
+      const postPeakDelta = peak.v - evValue;
+      if (
+        Math.abs(peakSwing) / bet.stake >= SIGNIFICANT_GAP_PCT &&
+        Math.abs(postPeakDelta) / bet.stake >= SIGNIFICANT_GAP_PCT * 0.5
+      ) {
+        rows.push({
+          kind: "gap",
+          key: `gap-${peak.t}`,
+          ts: peak.t,
+          label: gapLabel(prevTs, ev.ts, peak.t),
+          value: peak.v,
+        });
+      }
+    }
+    rows.push({
+      kind: "hole",
+      key: `h-${ev.ts}`,
+      ts: ev.ts,
+      label: `R${ev.round} · Hole ${ev.hole}${
+        typeof ev.strokes === "number" && typeof ev.par === "number"
+          ? ` (${ev.strokes > ev.par ? "+" : ""}${ev.strokes - ev.par})`
+          : ""
+      }`,
+      value: evValue,
+    });
+    prevTs = ev.ts;
+    prevValue = evValue;
+  }
+
   return (
     <div className="bd-table">
-      <p className="bd-table-title">Biggest swings</p>
+      <p className="bd-table-title">Hole by hole</p>
       <ul>
-        {top.map((it) => {
-          const pct = ((it.v - bet.stake) / bet.stake) * 100;
+        {rows.map((r, i) => {
+          const prev = i > 0 ? rows[i - 1].value : bet.stake;
+          const swing = r.value - prev;
+          const pct = ((r.value - bet.stake) / bet.stake) * 100;
           const cls =
-            it.swing > 0
+            swing > 0
               ? "bets-profit-up"
-              : it.swing < 0
-              ? "bets-profit-down"
-              : "";
+              : swing < 0
+                ? "bets-profit-down"
+                : "";
           return (
-            <li key={it.t} className="bd-table-row">
-              <span className="bd-table-hole">
-                {new Date(it.t).toLocaleTimeString(undefined, {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+            <li
+              key={r.key}
+              className={`bd-table-row${r.kind === "gap" ? " bd-table-row-gap" : ""}`}
+            >
+              <span className="bd-table-hole">{r.label}</span>
+              <span className="bd-table-val">
+                {formatBetCurrency(r.value, bet.currency)}
               </span>
-              <span className="bd-table-val">{formatBetCurrency(it.v, bet.currency)}</span>
               <span className={`bd-table-pct ${cls}`}>
                 {pct > 0 ? "+" : ""}
                 {pct.toFixed(1)}%
               </span>
               <span className={`bd-table-swing ${cls}`}>
-                {it.swing >= 0 ? "▲" : "▼"} {formatBetCurrency(Math.abs(it.swing), bet.currency)}
+                {swing >= 0 ? "▲" : "▼"}{" "}
+                {formatBetCurrency(Math.abs(swing), bet.currency)}
               </span>
             </li>
           );
@@ -855,6 +968,18 @@ function OutrightDetailTable({
       <p className="bd-table-foot">Odds format: {oddsFormat}</p>
     </div>
   );
+}
+
+/** Label a significant odds move that happened between two of the
+ *  player's hole completions — usually overnight / between rounds /
+ *  while they were off the course. */
+function gapLabel(prevTs: number, nextTs: number, peakTs: number): string {
+  const gapHours = (nextTs - prevTs) / (60 * 60 * 1000);
+  if (gapHours > 6) return "Between rounds";
+  return new Date(peakTs).toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function WinningScoreDetail({

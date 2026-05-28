@@ -8362,6 +8362,21 @@ footer {
   border-top: 1px dashed var(--border);
 }
 
+/* "Between rounds" / overnight rows — softer to mark them as
+   context rather than player action. */
+.bd-table-row-gap {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.bd-table-row-gap .bd-table-hole {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .bd-table-hole {
   font-weight: 800;
   color: var(--text);
