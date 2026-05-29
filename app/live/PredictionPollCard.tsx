@@ -120,7 +120,7 @@ export default function PredictionPollCard({
       {hasVoted && (
         <>
           <p className="predpoll-eyebrow predpoll-eyebrow-voted">
-            ✓ You called it · {myOption?.label}
+            Your call · {myOption?.label}
           </p>
           <h3 className="predpoll-question predpoll-question-voted">
             {poll.question}
