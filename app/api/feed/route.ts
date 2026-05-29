@@ -201,10 +201,14 @@ async function handle(req: Request) {
     // own self-expiring locks (90 s each) so the buffers populate
     // without needing external cron. First viewer in each window
     // pays the upstream-fetch latency; the rest skip both polls.
-    // Awaited (not fire-and-forget) so the freshly-written samples
-    // land in THIS response's getFeedBundle below — the bet detail
-    // page gets a populated chart on the same hit that triggered
-    // the poll.
+    //
+    // Hard timeout the await so /api/feed never blocks more than
+    // POLL_BUDGET_MS on these — slow Polymarket / DataGolf calls
+    // were adding 3–5 s to the bets-tab first paint. The polls
+    // continue in the background after the timeout (the lock
+    // prevents duplicate work), so the buffers still populate for
+    // the next /api/feed tick a few seconds later.
+    const POLL_BUDGET_MS = 600;
     const pollOddsPromise = (async () => {
       try {
         const gotOdds = await acquireSubsystemLock(
@@ -233,7 +237,12 @@ async function handle(req: Request) {
         console.error("[feed] inline datagolf poll failed", err);
       }
     })();
-    await Promise.allSettled([pollOddsPromise, pollDgPromise]);
+    await Promise.race([
+      Promise.allSettled([pollOddsPromise, pollDgPromise]),
+      new Promise<void>((resolve) =>
+        setTimeout(resolve, POLL_BUDGET_MS),
+      ),
+    ]);
   }
 
   // Pipelined single-HTTP-request fetch of every read this endpoint
@@ -374,7 +383,12 @@ async function handle(req: Request) {
       ? await getMyPredictionVotes(predictionPollIds, visitorId)
       : ({} as Record<string, string | null>);
 
-  const predictionPolls = predictionPollsRaw.map(({ poll, counts }) => ({
+  // Built as `let` because we filter again further down once
+  // playerRoundStates is available — drop polls whose subject
+  // player(s) have already finished the round the call is about.
+  // The server cron settles them but only when it ticks; until
+  // then they shouldn't surface as "open" to users.
+  let predictionPolls = predictionPollsRaw.map(({ poll, counts }) => ({
     poll,
     counts,
     myVote: myPredictionVotes[poll.id] ?? null,
@@ -615,6 +629,34 @@ async function handle(req: Request) {
       leaderboard,
       null,
     );
+
+  // Drop any open prediction poll whose subject player(s) have
+  // already finished the round the call is about. The notify-poll
+  // cron settles these eventually, but until it ticks they sit in
+  // the "open" set and would otherwise surface as a Sunday call
+  // for a player who can't move the needle any more.
+  predictionPolls = predictionPolls.filter((entry) => {
+    const { poll } = entry;
+    const round = poll.settle.round;
+    if (round == null) return true; // hold-the-lead is tournament-wide
+    const isComplete = (pid: string | undefined) => {
+      if (!pid) return false;
+      return playerRoundStates[pid]?.rounds?.[round]?.status === "complete";
+    };
+    if (poll.type === "round-over-under") {
+      return !isComplete(poll.settle.player?.id);
+    }
+    if (poll.type === "head-to-head") {
+      // Once EITHER player has finished, the question loses its
+      // tension (the other player's hours of play can't reach a
+      // verdict the user is voting on right now).
+      return (
+        !isComplete(poll.settle.playerA?.id) &&
+        !isComplete(poll.settle.playerB?.id)
+      );
+    }
+    return true;
+  });
 
   // Maintain a rolling history of the winning-score CDF for the bet
   // detail chart. Append at most one snapshot per minute regardless
