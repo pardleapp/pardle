@@ -14,7 +14,6 @@ import dynamic from "next/dynamic";
 import CatchMeUp from "./CatchMeUp";
 import FeedSkeleton from "./FeedSkeleton";
 import PredictionPollDeck from "./PredictionPollDeck";
-import TopCarousel from "@/app/_components/TopCarousel";
 import type {
   PredictionPoll,
   PredictionPollCounts,
@@ -892,53 +891,49 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         </h2>
       </div>
 
-      {/* Top-of-feed engagement carousel. Replaces the vertical
-          stack of first-bet / sharp-onboard / prediction-poll /
-          catch-me-up cards. One station visible at a time, swipe
-          between, dot strip below. Each station decides whether
-          it applies for this user; the carousel itself hides
-          when none of them do. */}
-      <TopCarousel>
-        {data.predictionPolls && data.predictionPolls.length > 0 && (
-          <PredictionPollDeck
-            polls={data.predictionPolls}
-            myVotes={myPredictionVotes}
-            onVote={sendPredictionVote}
-          />
-        )}
-        {trackedBets.length === 0 && !firstBetDismissed && (
-          <div className="feed-first-bet-cta-wrap">
-            <Link href="/bets" className="feed-first-bet-cta">
-              <span className="feed-first-bet-cta-icon" aria-hidden="true">
-                📌
+      {/* Plain stacked cards above the feed — carousel removed.
+          Sunday call is one-and-done per visit (auto-collapses
+          after the user votes/dismisses). First-bet CTA is gated
+          to brand-new visitors and self-dismisses on the first
+          tracked bet. CatchMeUp gates itself on whether there's
+          actually catch-up to do. Worst case = 2 cards (call +
+          catchup), which doesn't need carousel chrome. */}
+      {data.predictionPolls && data.predictionPolls.length > 0 && (
+        <PredictionPollDeck
+          polls={data.predictionPolls}
+          myVotes={myPredictionVotes}
+          onVote={sendPredictionVote}
+        />
+      )}
+      {trackedBets.length === 0 && !firstBetDismissed && (
+        <div className="feed-first-bet-cta-wrap">
+          <Link href="/bets" className="feed-first-bet-cta">
+            <span className="feed-first-bet-cta-icon" aria-hidden="true">
+              📌
+            </span>
+            <span className="feed-first-bet-cta-body">
+              <span className="feed-first-bet-cta-title">
+                Track your first bet
               </span>
-              <span className="feed-first-bet-cta-body">
-                <span className="feed-first-bet-cta-title">
-                  Track your first bet
-                </span>
-                <span className="feed-first-bet-cta-blurb">
-                  See the swing on every shot, live
-                </span>
+              <span className="feed-first-bet-cta-blurb">
+                See the swing on every shot, live
               </span>
-              <span className="feed-first-bet-cta-arrow" aria-hidden="true">
-                →
-              </span>
-            </Link>
-            <button
-              type="button"
-              className="feed-first-bet-cta-dismiss"
-              onClick={dismissFirstBet}
-              aria-label="Dismiss"
-            >
-              ×
-            </button>
-          </div>
-        )}
-        {trackedBets.length > 0 && (data.mySharp?.total ?? 0) === 0 && (
-          <SharpScoreOnboard />
-        )}
-        <CatchMeUp rows={data.rows ?? []} />
-      </TopCarousel>
+            </span>
+            <span className="feed-first-bet-cta-arrow" aria-hidden="true">
+              →
+            </span>
+          </Link>
+          <button
+            type="button"
+            className="feed-first-bet-cta-dismiss"
+            onClick={dismissFirstBet}
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
+      <CatchMeUp rows={data.rows ?? []} />
 
       <ReelGroup
         panes={[
@@ -1676,77 +1671,6 @@ function HandBadge({ status }: { status: "hot" | "cold" }) {
     >
       {status === "hot" ? "🔥" : "🥶"}
     </span>
-  );
-}
-
-// ── Sharp Score onboarding card ─────────────────────────────────────
-
-const SHARP_ONBOARD_DISMISS_KEY = "pardle_sharp_onboard_dismissed_v1";
-
-function SharpScoreOnboard() {
-  // Persistent local dismissal — once the user has seen + tapped
-  // the X, this card never reappears (until they clear storage).
-  // The server-side "show only when total === 0" gate handles the
-  // common case once they vote on anything; this covers the user
-  // who keeps coming back to the feed without yet voting.
-  const [dismissed, setDismissed] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.localStorage.getItem(SHARP_ONBOARD_DISMISS_KEY) === "1") {
-      setDismissed(true);
-    }
-  }, []);
-  if (dismissed) return null;
-  const dismiss = () => {
-    setDismissed(true);
-    try {
-      window.localStorage.setItem(SHARP_ONBOARD_DISMISS_KEY, "1");
-    } catch {
-      // silent
-    }
-  };
-  return (
-    <section className="sharp-onboard" aria-label="Build your Sharp Score">
-      <button
-        type="button"
-        className="sharp-onboard-dismiss"
-        onClick={dismiss}
-        aria-label="Dismiss"
-      >
-        ×
-      </button>
-      <div className="sharp-onboard-head">
-        <span className="sharp-onboard-pill">⚡ Sharp Score</span>
-        <h3 className="sharp-onboard-title">
-          How sharp are you?
-        </h3>
-      </div>
-      <p className="sharp-onboard-blurb">
-        Every putt-poll vote and tracked bet builds your accuracy
-        record. The chip sits next to your name across Pardle —
-        so when you call it right, everyone sees.
-      </p>
-      <ul className="sharp-onboard-steps">
-        <li>
-          <span className="sharp-onboard-step-num">1</span>
-          Vote &apos;in&apos; or &apos;out&apos; when a putt poll
-          drops in the feed
-        </li>
-        <li>
-          <span className="sharp-onboard-step-num">2</span>
-          Log a bet you&apos;ve placed — settles credit your score too
-        </li>
-        <li>
-          <span className="sharp-onboard-step-num">3</span>
-          Hit 10 calls and your accuracy unlocks publicly
-        </li>
-      </ul>
-      <div className="sharp-onboard-ctas">
-        <Link href="/sharp" className="sharp-onboard-cta">
-          See the leaderboard →
-        </Link>
-      </div>
-    </section>
   );
 }
 
