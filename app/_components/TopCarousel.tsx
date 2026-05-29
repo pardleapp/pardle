@@ -132,7 +132,9 @@ export default function TopCarousel({ children }: Props) {
 
   // ── Render gates ────────────────────────────────────────────────
   if (stations.length === 0) return null;
-  // Treat 0- or 1-visible-station the same — solo render, no dots.
+  // Single visible station — render as a plain block so the
+  // user doesn't see a carousel with no swipe affordance (looks
+  // broken). Two or more stations → real carousel chrome.
   if (visibleStationIndices.length <= 1) {
     return <div className="top-carousel-solo">{stations}</div>;
   }

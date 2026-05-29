@@ -890,10 +890,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           />
           {data.tournament.name}
         </h2>
-        <div className="feed-header-chips">
-          <SharpScoreChip stats={data.mySharp ?? null} />
-          <PuttIqChip stats={data.myPuttIq ?? null} />
-        </div>
       </div>
 
       {/* Top-of-feed engagement carousel. Replaces the vertical

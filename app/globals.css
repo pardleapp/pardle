@@ -6725,8 +6725,8 @@ footer {
 }
 
 .feed-filter-on {
-  background: rgba(123, 174, 63, 0.15);
-  border-color: var(--green);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.4);
   color: var(--text);
 }
 
@@ -7060,7 +7060,7 @@ footer {
 }
 
 .top-carousel-dot-on {
-  background: #00d96e;
+  background: #ffffff;
   transform: scale(1.2);
 }
 
@@ -8847,26 +8847,17 @@ footer {
   text-align: left;
   cursor: pointer;
   min-height: 44px;
-  animation: catchup-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Slide-in animation removed — catch-up is a passive notice,
+     not an arrival event. Animating it pulled the eye towards
+     secondary nav chrome above the actual feed. */
 }
 
 .catchup-banner:hover {
   border-color: rgba(232, 197, 71, 0.9);
 }
 
-@keyframes catchup-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 .catchup-banner-emoji {
-  font-size: 22px;
+  font-size: 14px;
   line-height: 1;
 }
 
@@ -14251,18 +14242,16 @@ body:has(.v4-theme) {
 
 .v4-theme .feed-tournament-name {
   flex: 1;
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--text);
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   margin: 0;
   display: flex;
   align-items: center;
   gap: 10px;
+  line-height: 1.2;
 }
 
 .v4-theme .feed-live-pulse {
@@ -16299,9 +16288,13 @@ body:has(.v4-theme) {
     display: none;
   }
   .v4-theme .brand.brand-split {
-    padding: 8px 14px;
+    /* Pull the nav rail up against the Safari URL bar so the two
+       chrome bands read as a continuous header. Was 8 px top
+       padding which left an awkward black gulf between them. */
+    padding: 4px 14px 8px;
     border-bottom-width: 1px;
     margin-bottom: 6px;
+    background: var(--bg-card);
   }
 
   /* Primary nav rail — 32px pills */
@@ -16333,13 +16326,13 @@ body:has(.v4-theme) {
     mask-image: linear-gradient(
       to right,
       black 0%,
-      black 88%,
+      black 92%,
       transparent 100%
     );
     -webkit-mask-image: linear-gradient(
       to right,
       black 0%,
-      black 88%,
+      black 92%,
       transparent 100%
     );
   }
@@ -16359,17 +16352,20 @@ body:has(.v4-theme) {
   /* Tournament header card: stack name + putt-IQ chip vertically
      so a long tournament name doesn't get squeezed by the chip. */
   .v4-theme .feed-header-row {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 8px 14px;
-    margin-bottom: 6px;
-    gap: 6px;
+    /* Chips were removed — header is just the tournament name +
+       LIVE pulse now. Drop the column-stack rule and tighten
+       padding so the header sits flush under the nav rail. */
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 14px 12px;
+    margin-bottom: 8px;
+    gap: 10px;
   }
   .v4-theme .feed-tournament-name {
-    /* Page H1 on mobile — was 15 px which lost to the onboarding
-       cards two sections down. Bump to 18 px so the tournament
-       name actually anchors the page. */
-    font-size: 18px;
+    /* Page H1 on mobile — Real-app pattern: tournament name owns
+       the hero band, nothing competes in the same row. Allow up
+       to 2 lines for "Travelers Championship presented by …". */
+    font-size: 20px;
     font-weight: 900;
     letter-spacing: -0.01em;
     width: 100%;
