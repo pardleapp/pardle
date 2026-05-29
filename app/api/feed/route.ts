@@ -349,6 +349,13 @@ async function handle(req: Request) {
     if (e.type === "putt-poll" && e.pollId) pollIds.push(e.pollId);
   }
 
+  // Slim mode for the bet detail page (set when playerId is given):
+  // skip every Redis lookup BetDetail doesn't render. Cuts the
+  // Promise.all from 9 round-trips down to 1 (just topFinishHistory).
+  // Big chunk of the 2-3 s cold open on mobile — we were spending
+  // most of the server time gathering reactions, comments, putt
+  // poll state, sharp/iq stats, etc. for a page that uses none of
+  // it.
   const [
     reactions,
     commentCounts,
@@ -360,8 +367,12 @@ async function handle(req: Request) {
     mySharp,
     predictionPollsRaw,
   ] = await Promise.all([
-    getReactionsBulk(ids),
-    getCommentCountsBulk(ids),
+    slimPlayerId
+      ? Promise.resolve({} as Record<string, { up: number; down: number }>)
+      : getReactionsBulk(ids),
+    slimPlayerId
+      ? Promise.resolve({} as Record<string, number>)
+      : getCommentCountsBulk(ids),
     // Read here (early) so the top-10 shift attachment has the recent
     // snapshot list ready by the time toRow runs. Full list is also
     // what we'll conditionally include in the response further down.
@@ -369,33 +380,37 @@ async function handle(req: Request) {
     // "X% of Pardle bettors back him this week" — aggregated from
     // the bets table for this tournament window. Returns {} when
     // the population's too small to be meaningful.
-    computeCommunityBacking(tournament.startDate),
+    slimPlayerId
+      ? Promise.resolve({ byPlayer: {}, totalBettors: 0 })
+      : computeCommunityBacking(tournament.startDate),
     // Putt poll state for the rows in this response — counts + close
     // status + outcome. Skipped when there are no putt-poll events.
-    pollIds.length > 0
-      ? getPuttPollBulk(pollIds)
-      : Promise.resolve(
+    slimPlayerId || pollIds.length === 0
+      ? Promise.resolve(
           {} as Record<string, { poll: PuttPoll; counts: PuttPollCounts }>,
-        ),
+        )
+      : getPuttPollBulk(pollIds),
     // The caller's own vote on each poll (null if they haven't voted).
-    pollIds.length > 0 && visitorId
-      ? getMyVotesBulk(pollIds, visitorId)
-      : Promise.resolve({} as Record<string, "yes" | "no" | null>),
+    slimPlayerId || pollIds.length === 0 || !visitorId
+      ? Promise.resolve({} as Record<string, "yes" | "no" | null>)
+      : getMyVotesBulk(pollIds, visitorId),
     // Caller's putt-prediction accuracy + streak + tournament rank.
-    visitorId
-      ? getUserStats(visitorId, tournament.id)
-      : Promise.resolve(null as PuttIqStats | null),
+    slimPlayerId || !visitorId
+      ? Promise.resolve(null as PuttIqStats | null)
+      : getUserStats(visitorId, tournament.id),
     // Caller's Sharp Score — accuracy across every prediction
     // category (putt-polls + bet outcomes). Drives the home-feed
     // credibility chip that's the user's own slice of the /sharp
     // leaderboard. Returns the empty-stats shape when authorKey is
     // missing so the client always sees consistent fields.
-    visitorId
-      ? getSharpScore(visitorId)
-      : Promise.resolve(null as SharpScoreStats | null),
+    slimPlayerId || !visitorId
+      ? Promise.resolve(null as SharpScoreStats | null)
+      : getSharpScore(visitorId),
     // Open prediction polls for this tournament (head-to-head,
     // hold-the-lead). Empty array when none are open.
-    getOpenPredictionPolls(tournament.id),
+    slimPlayerId
+      ? Promise.resolve([] as Awaited<ReturnType<typeof getOpenPredictionPolls>>)
+      : getOpenPredictionPolls(tournament.id),
   ]);
 
   // Caller's own pick on each open prediction poll.
