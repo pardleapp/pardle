@@ -149,6 +149,30 @@ export default function BetDetail({ betId }: { betId: string }) {
     if (raw === "american" || raw === "fractional" || raw === "decimal") {
       setOddsFormat(raw);
     }
+    // Cached-first paint — show the last response instantly while
+    // the live fetch runs in the background. Same trick as
+    // BetsClient: tapping into a bet feels instant instead of a
+    // 2-3 s "no data yet, here's a skeleton" hold.
+    try {
+      const cacheRaw = window.localStorage.getItem(
+        "pardle_bet_detail_cache_v1",
+      );
+      if (cacheRaw) {
+        const env = JSON.parse(cacheRaw) as {
+          ts: number;
+          data: FeedResponse;
+        };
+        if (
+          env?.ts &&
+          env.data &&
+          Date.now() - env.ts < 30 * 60 * 1000
+        ) {
+          setData(env.data);
+        }
+      }
+    } catch {
+      // silent
+    }
   }, [betId]);
 
   // For settled bets from past tournaments, fetch that tournament's
@@ -192,6 +216,19 @@ export default function BetDetail({ betId }: { betId: string }) {
       const json = (await res.json()) as FeedResponse;
       setData(json);
       setError(false);
+      // Persist for next bet-detail open. Only cache the live-
+      // tournament view — past replays vary per bet so caching
+      // would point the wrong tournament at the next bet open.
+      if (!pastTournamentId && typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(
+            "pardle_bet_detail_cache_v1",
+            JSON.stringify({ ts: Date.now(), data: json }),
+          );
+        } catch {
+          // localStorage full / disabled — silent
+        }
+      }
     } catch {
       setError(true);
     }
