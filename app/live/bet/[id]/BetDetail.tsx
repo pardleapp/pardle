@@ -243,13 +243,19 @@ export default function BetDetail({ betId }: { betId: string }) {
   }, [pastTournamentId, bet]);
 
   useEffect(() => {
+    // Wait for `bet` to load from localStorage before the first
+    // fetch — otherwise we fire a no-playerId request (full 1.5 MB
+    // field payload) and ONLY THEN fire the slim playerId fetch
+    // when bet arrives. The first request is what users wait for,
+    // so the slow path was always being picked on mount.
+    if (!bet) return;
     load();
     // Live bets keep refreshing; past-tournament replays don't need
     // periodic re-fetches.
     if (pastTournamentId) return;
     const t = setInterval(load, REFRESH_MS);
     return () => clearInterval(t);
-  }, [load, pastTournamentId]);
+  }, [load, pastTournamentId, bet]);
 
   // Pull the orchestrator scorecard alongside each feed refresh —
   // the events list on /api/feed is capped at 1000 entries, which a
