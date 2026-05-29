@@ -149,11 +149,29 @@ export default function BetDetail({ betId }: { betId: string }) {
     if (raw === "american" || raw === "fractional" || raw === "decimal") {
       setOddsFormat(raw);
     }
-    // Cached-first paint — read last bet-detail response and show
-    // immediately while the live fetch runs in background. The
-    // /bets cache fallback we briefly added was crashing because
-    // it lacked oddsHistories — reconstructHistory threw on
-    // `undefined[playerId]`. Detail-cache only, for now.
+    // Cached-first paint — TWO layers, defensive:
+    //   1. Bet-detail cache (full include=charts payload, 30 min
+    //      TTL) — best possible initial state; chart renders
+    //      immediately with real history.
+    //   2. /bets cache (slim payload, 5 min TTL) — lacks
+    //      oddsHistories / dgWinProbs / bookOdds / snapshotHoles
+    //      etc. so we default those to safe empty shapes before
+    //      handing the data off to BetDetail's consumers. Hero
+    //      block + currentValue paint instantly; chart shows a
+    //      placeholder until the live fetch lands the histories.
+    // Without this fallback, a brand-new bet just placed from /bets
+    // pays the full 1-2s server roundtrip on first open.
+    const fillDefaults = (d: FeedResponse): FeedResponse => ({
+      ...d,
+      oddsHistories: d.oddsHistories ?? {},
+      dgWinProbs: d.dgWinProbs ?? {},
+      bookOdds: d.bookOdds ?? { draftkings: {}, fanduel: {} },
+      winningScoreHistory: d.winningScoreHistory ?? [],
+      topFinishHistory: d.topFinishHistory ?? [],
+      tournamentPars: d.tournamentPars ?? {},
+      snapshotHoles: d.snapshotHoles ?? {},
+      playerSgBreakdown: d.playerSgBreakdown ?? {},
+    });
     try {
       const detailRaw = window.localStorage.getItem(
         "pardle_bet_detail_cache_v1",
@@ -168,7 +186,24 @@ export default function BetDetail({ betId }: { betId: string }) {
           env.data &&
           Date.now() - env.ts < 30 * 60 * 1000
         ) {
-          setData(env.data);
+          setData(fillDefaults(env.data));
+          return;
+        }
+      }
+      const betsRaw = window.localStorage.getItem(
+        "pardle_bets_cache_v1",
+      );
+      if (betsRaw) {
+        const env = JSON.parse(betsRaw) as {
+          ts: number;
+          data: FeedResponse;
+        };
+        if (
+          env?.ts &&
+          env.data &&
+          Date.now() - env.ts < 5 * 60 * 1000
+        ) {
+          setData(fillDefaults(env.data));
         }
       }
     } catch {

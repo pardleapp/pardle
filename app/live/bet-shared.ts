@@ -979,7 +979,7 @@ export function reconstructHistory(
     // as fallback when Polymarket is thin (illiquid longshot market,
     // late-starting tracking, dedup collapsed everything). "Thin"
     // means < 3 distinct buffer samples for this player.
-    const pmSamples = oddsHistories[bet.playerId] ?? [];
+    const pmSamples = oddsHistories?.[bet.playerId] ?? [];
     const dgSamples = dgWinProbs?.[bet.playerId] ?? [];
     const POLYMARKET_LIQUIDITY_THRESHOLD = 3;
     const usePolymarket =
