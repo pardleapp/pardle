@@ -1,35 +1,26 @@
 "use client";
 
 /**
- * Single-card deck for prediction polls. One poll visible at a
- * time; vote → see community % → auto-advance to the next unvoted
- * poll. Once every open poll has a vote, the deck hides.
+ * Single-call surfacer for prediction polls. Shows ONE open poll
+ * at a time per session — the most-recently opened call the user
+ * hasn't voted on or dismissed. After they vote / dismiss, the
+ * card disappears entirely from this page.
  *
- * Key design: track the currently-displayed poll by **pollId**, not
- * by index into the sorted list. Voting on a poll moves it to the
- * "voted" bucket in the sort, but the displayed card stays put for
- * the reveal window — without this, the just-voted card slides out
- * from under the user the instant the optimistic overlay lands.
+ * Dismissed poll ids persist to localStorage so the same call
+ * doesn't reappear on the next visit. Server-side "myVote" is
+ * the authority for the voted state; dismissed is purely a
+ * client preference.
  *
- * State machine:
- *
- *   browsing  ─── vote ───▶  revealing  ── 1.8s ──▶ browsing
- *      ▲                                                │
- *      └────── advance to next unvoted ────────────────┘
- *
- * - browsing: data refresh / new poll arriving can move the deck
- *   to the first unvoted call.
- * - revealing: the just-voted poll stays on screen so the
- *   community-% reveal is visible. Auto-jumps are suppressed.
+ * Design choices vs. the old multi-poll deck:
+ *   - No navigation chrome (no prev/next, no per-poll dots).
+ *     Real / Threads pattern: see one, act, move on.
+ *   - Pre-vote state HIDES the community % bars so "100%" doesn't
+ *     read as the user's selection before they've tapped anything.
+ *   - Dismiss × so a user who doesn't care about this question
+ *     can clear it without a stake-y feeling vote.
  */
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PredictionPollCard from "./PredictionPollCard";
 import type {
   PredictionPoll,
@@ -51,172 +42,120 @@ interface Props {
   onVote: (pollId: string, optionKey: string) => void;
 }
 
-const REVEAL_MS = 2000;
+const DISMISSED_KEY = "pardle_predpoll_dismissed_v1";
+const POST_VOTE_HOLD_MS = 1800;
 
-type Phase = "browsing" | "revealing";
+function readDismissed(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(DISMISSED_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw) as unknown;
+    if (!Array.isArray(arr)) return new Set();
+    return new Set(arr.filter((x): x is string => typeof x === "string"));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeDismissed(set: Set<string>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(DISMISSED_KEY, JSON.stringify([...set]));
+  } catch {
+    // silent
+  }
+}
 
 export default function PredictionPollDeck({ polls, myVotes, onVote }: Props) {
-  // Overlay optimistic votes onto the server snapshot, then sort
-  // unvoted-first so the dot strip reads left-to-right as progress.
-  const ordered = useMemo(() => {
-    const enriched = polls.map((p) => {
-      const overlay = myVotes[p.poll.id];
-      return {
-        poll: p.poll,
-        counts: overlay?.counts ?? p.counts,
-        myVote: overlay?.myVote ?? p.myVote,
-      };
-    });
-    enriched.sort((a, b) => {
-      const aV = a.myVote != null ? 1 : 0;
-      const bV = b.myVote != null ? 1 : 0;
-      if (aV !== bV) return aV - bV;
-      return b.poll.openedAt - a.poll.openedAt;
-    });
-    return enriched;
-  }, [polls, myVotes]);
+  const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
+  // Hold-open id — when set, we're showing the just-voted card's
+  // community-% reveal for POST_VOTE_HOLD_MS before hiding it.
+  const [revealingPollId, setRevealingPollId] = useState<string | null>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Ref to the freshest ordered list so timers fired later can
-  // make decisions against the LATEST data, not a stale closure.
-  const orderedRef = useRef(ordered);
-  orderedRef.current = ordered;
-
-  // Currently displayed poll, tracked by id so the sort can shuffle
-  // the underlying list without yanking the card out from under the
-  // user. Null = "deck hasn't picked anything yet" (initial mount).
-  const [currentPollId, setCurrentPollId] = useState<string | null>(null);
-  const [phase, setPhase] = useState<Phase>("browsing");
-  const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Initial mount + data-refresh landing rule: when we're in browsing
-  // mode and either the currently-pinned poll has vanished from the
-  // list OR we're sitting on a voted poll while unvoted ones exist,
-  // jump to the first unvoted. Suppressed during the reveal window
-  // so a vote can't be yanked off-screen mid-reveal.
   useEffect(() => {
-    if (phase === "revealing") return;
-    if (ordered.length === 0) {
-      if (currentPollId != null) setCurrentPollId(null);
-      return;
-    }
-    const currentEntry = currentPollId
-      ? ordered.find((e) => e.poll.id === currentPollId)
-      : null;
-    // If the pinned poll is still in the list and still unvoted, keep it.
-    if (currentEntry && currentEntry.myVote == null) return;
-    // Otherwise, land on the first unvoted poll if one exists.
-    const firstUnvoted = ordered.find((e) => e.myVote == null);
-    if (firstUnvoted) {
-      if (firstUnvoted.poll.id !== currentPollId) {
-        setCurrentPollId(firstUnvoted.poll.id);
-      }
-      return;
-    }
-    // No unvoted polls left — sit on the most-recent voted poll
-    // (the deck will hide via the all-voted check below unless
-    // we're actively revealing).
-    if (currentPollId == null) setCurrentPollId(ordered[0].poll.id);
-  }, [phase, ordered, currentPollId]);
+    setDismissed(readDismissed());
+  }, []);
 
-  // Clean up any in-flight timer on unmount.
   useEffect(() => {
     return () => {
-      if (revealTimer.current) clearTimeout(revealTimer.current);
+      if (holdTimer.current) clearTimeout(holdTimer.current);
     };
   }, []);
 
+  // Choose the one poll to show: latest open, unvoted, not dismissed.
+  const pickedPoll = useMemo(() => {
+    const candidates = polls.filter((p) => {
+      const myVote = myVotes[p.poll.id]?.myVote ?? p.myVote;
+      if (myVote != null) return false;
+      if (dismissed.has(p.poll.id)) return false;
+      return true;
+    });
+    candidates.sort((a, b) => b.poll.openedAt - a.poll.openedAt);
+    return candidates[0] ?? null;
+  }, [polls, myVotes, dismissed]);
+
+  // While the just-voted reveal is on screen, keep showing THAT
+  // poll instead of jumping to the next one. After the hold timer
+  // expires we go back to the natural picked poll (which will be
+  // the next unvoted call, since the voted one no longer qualifies).
+  const visibleEntry = useMemo(() => {
+    if (revealingPollId) {
+      const overlay = polls.find((p) => p.poll.id === revealingPollId);
+      if (overlay) {
+        return {
+          poll: overlay.poll,
+          counts: myVotes[revealingPollId]?.counts ?? overlay.counts,
+          myVote: myVotes[revealingPollId]?.myVote ?? overlay.myVote,
+        };
+      }
+    }
+    return pickedPoll
+      ? {
+          poll: pickedPoll.poll,
+          counts:
+            myVotes[pickedPoll.poll.id]?.counts ?? pickedPoll.counts,
+          myVote: myVotes[pickedPoll.poll.id]?.myVote ?? pickedPoll.myVote,
+        }
+      : null;
+  }, [revealingPollId, pickedPoll, polls, myVotes]);
+
   const handleVote = useCallback(
     (opt: string) => {
-      if (!currentPollId) return;
-      const justVotedId = currentPollId;
-      onVote(justVotedId, opt);
-      // Enter the reveal phase — locks the deck onto the just-
-      // voted poll so the community % is visible.
-      setPhase("revealing");
-      if (revealTimer.current) clearTimeout(revealTimer.current);
-      revealTimer.current = setTimeout(() => {
-        // Use the LATEST ordered (not closure'd) to pick what to
-        // show next. Find any still-unvoted poll; otherwise stay
-        // on the just-voted one and let the all-voted hide kick in.
-        const latest = orderedRef.current;
-        const nextUnvoted = latest.find((e) => e.myVote == null);
-        if (nextUnvoted && nextUnvoted.poll.id !== justVotedId) {
-          setCurrentPollId(nextUnvoted.poll.id);
-        }
-        setPhase("browsing");
-      }, REVEAL_MS);
+      if (!visibleEntry) return;
+      const pollId = visibleEntry.poll.id;
+      onVote(pollId, opt);
+      setRevealingPollId(pollId);
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+      holdTimer.current = setTimeout(() => {
+        setRevealingPollId(null);
+      }, POST_VOTE_HOLD_MS);
     },
-    [currentPollId, onVote],
+    [visibleEntry, onVote],
   );
 
-  // ── Render gates ────────────────────────────────────────────────
-  if (ordered.length === 0) return null;
-  const allVoted = ordered.every((e) => e.myVote != null);
-  if (allVoted && phase !== "revealing") return null;
+  const handleDismiss = useCallback(() => {
+    if (!visibleEntry) return;
+    const pollId = visibleEntry.poll.id;
+    setDismissed((prev) => {
+      const next = new Set(prev);
+      next.add(pollId);
+      writeDismissed(next);
+      return next;
+    });
+  }, [visibleEntry]);
 
-  const current =
-    (currentPollId && ordered.find((e) => e.poll.id === currentPollId)) ||
-    ordered[0];
-  if (!current) return null;
-  const currentIndex = ordered.findIndex(
-    (e) => e.poll.id === current.poll.id,
-  );
-
-  const goPrev = () => {
-    const target = ordered[Math.max(0, currentIndex - 1)];
-    if (target) setCurrentPollId(target.poll.id);
-  };
-  const goNext = () => {
-    const target = ordered[Math.min(ordered.length - 1, currentIndex + 1)];
-    if (target) setCurrentPollId(target.poll.id);
-  };
+  if (!visibleEntry) return null;
 
   return (
-    <div className="predpoll-deck">
-      <PredictionPollCard
-        key={current.poll.id}
-        poll={current.poll}
-        counts={current.counts}
-        myVote={current.myVote}
-        onVote={handleVote}
-      />
-      {ordered.length > 1 && (
-        <div className="predpoll-deck-nav">
-          <button
-            type="button"
-            className="predpoll-deck-nav-btn"
-            onClick={goPrev}
-            disabled={currentIndex <= 0}
-            aria-label="Previous call"
-          >
-            ‹
-          </button>
-          <div className="predpoll-deck-dots">
-            {ordered.map((e, i) => (
-              <button
-                type="button"
-                key={e.poll.id}
-                className={`predpoll-deck-dot ${
-                  i === currentIndex ? "predpoll-deck-dot-on" : ""
-                } ${e.myVote != null ? "predpoll-deck-dot-voted" : ""}`}
-                onClick={() => setCurrentPollId(e.poll.id)}
-                aria-label={`Call ${i + 1} of ${ordered.length}${
-                  e.myVote != null ? ", voted" : ""
-                }`}
-              />
-            ))}
-          </div>
-          <button
-            type="button"
-            className="predpoll-deck-nav-btn"
-            onClick={goNext}
-            disabled={currentIndex >= ordered.length - 1}
-            aria-label="Next call"
-          >
-            ›
-          </button>
-        </div>
-      )}
-    </div>
+    <PredictionPollCard
+      poll={visibleEntry.poll}
+      counts={visibleEntry.counts}
+      myVote={visibleEntry.myVote}
+      onVote={handleVote}
+      onDismiss={handleDismiss}
+      hideResultsUntilVote
+    />
   );
 }

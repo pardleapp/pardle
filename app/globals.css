@@ -9457,60 +9457,37 @@ footer {
 }
 
 .predpoll {
-  padding: 16px 18px 14px;
-  border-radius: 14px;
-  background: #0e0f12;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 14px 12px;
+  border-radius: 12px;
+  background: var(--bg-card, #0e0f12);
+  border: 1px solid var(--border);
   position: relative;
   overflow: hidden;
 }
 
-.predpoll-h2h {
-  border-color: rgba(160, 112, 255, 0.5);
-  background:
-    radial-gradient(
-      circle at 0% 0%,
-      rgba(160, 112, 255, 0.16) 0%,
-      rgba(160, 112, 255, 0.04) 60%,
-      transparent 100%
-    ),
-    #0e0f12;
-}
-
+/* No type-specific tint backgrounds — the colour parade above the
+   fold was a key audit finding. The eyebrow accent + dismissed
+   state colour now carry any per-type signal. */
+.predpoll-h2h,
 .predpoll-lead {
-  border-color: rgba(0, 217, 110, 0.45);
-  background:
-    radial-gradient(
-      circle at 0% 0%,
-      rgba(0, 217, 110, 0.14) 0%,
-      rgba(0, 217, 110, 0.04) 60%,
-      transparent 100%
-    ),
-    #0e0f12;
+  border-color: var(--border);
+  background: var(--bg-card, #0e0f12);
 }
 
 .predpoll-eyebrow {
-  margin: 0 0 6px;
-  font-size: 11px;
+  margin: 0 0 4px;
+  font-size: 10.5px;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(245, 245, 247, 0.7);
-}
-
-.predpoll-h2h .predpoll-eyebrow {
-  color: #c5a8ff;
-}
-
-.predpoll-lead .predpoll-eyebrow {
-  color: #00d96e;
+  color: var(--muted, rgba(245, 245, 247, 0.6));
 }
 
 .predpoll-question {
-  margin: 0 0 12px;
-  font-size: 17px;
-  font-weight: 900;
-  color: #f5f5f7;
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text, #f5f5f7);
   line-height: 1.3;
 }
 
@@ -9518,7 +9495,52 @@ footer {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 0;
+}
+
+.predpoll-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 999px;
+  z-index: 2;
+}
+
+.predpoll-dismiss:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.predpoll-eyebrow {
+  /* Leave room for the absolute dismiss × so the eyebrow text
+     doesn't bleed under it. */
+  padding-right: 32px;
+}
+
+/* Pre-vote state — plain buttons, no community-% bars. The bars
+   used to render even before voting, so "100%" read as the user's
+   own selection rather than the community split. */
+.predpoll-option-before {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.predpoll-option-before:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.predpoll-option-after {
+  cursor: default;
 }
 
 .predpoll-option {
