@@ -69,9 +69,17 @@ function writeDismissed(set: Set<string>) {
 
 export default function PredictionPollDeck({ polls, myVotes, onVote }: Props) {
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
-  // Hold-open id — when set, we're showing the just-voted card's
-  // community-% reveal for POST_VOTE_HOLD_MS before hiding it.
-  const [revealingPollId, setRevealingPollId] = useState<string | null>(null);
+  // Snapshot of the just-voted card — taken at the moment the
+  // user taps an option and locked in until the hold timer
+  // expires. We render this directly instead of recomputing
+  // from props each render. Without this, a data refresh hitting
+  // during the reveal window could briefly flip the card back to
+  // pre-vote state before it disappeared (the bug the user saw).
+  const [revealed, setRevealed] = useState<{
+    poll: PredictionPoll;
+    counts: PredictionPollCounts;
+    myVote: string;
+  } | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // One-and-done per page visit: once the user has voted or
   // dismissed the call surfaced on this mount, we don't pick
@@ -105,21 +113,11 @@ export default function PredictionPollDeck({ polls, myVotes, onVote }: Props) {
     return candidates[0] ?? null;
   }, [polls, myVotes, dismissed, interactedThisMount]);
 
-  // While the just-voted reveal is on screen, keep showing THAT
-  // poll instead of jumping to the next one. After the hold timer
-  // expires we go back to the natural picked poll (which will be
-  // the next unvoted call, since the voted one no longer qualifies).
+  // While the reveal snapshot exists, render IT directly — bypass
+  // the prop chain. Falls through to the natural picked poll only
+  // when no reveal is on screen (initial render, post-hold-expiry).
   const visibleEntry = useMemo(() => {
-    if (revealingPollId) {
-      const overlay = polls.find((p) => p.poll.id === revealingPollId);
-      if (overlay) {
-        return {
-          poll: overlay.poll,
-          counts: myVotes[revealingPollId]?.counts ?? overlay.counts,
-          myVote: myVotes[revealingPollId]?.myVote ?? overlay.myVote,
-        };
-      }
-    }
+    if (revealed) return revealed;
     return pickedPoll
       ? {
           poll: pickedPoll.poll,
@@ -128,18 +126,30 @@ export default function PredictionPollDeck({ polls, myVotes, onVote }: Props) {
           myVote: myVotes[pickedPoll.poll.id]?.myVote ?? pickedPoll.myVote,
         }
       : null;
-  }, [revealingPollId, pickedPoll, polls, myVotes]);
+  }, [revealed, pickedPoll, myVotes]);
 
   const handleVote = useCallback(
     (opt: string) => {
       if (!visibleEntry) return;
       const pollId = visibleEntry.poll.id;
+      // Build the "voted state" snapshot from what we know right
+      // now: bump the chosen option's count by 1 so the community-
+      // % bar reflects the optimistic vote we're about to send.
+      // This is what the card renders for the entire hold window.
+      const optimisticCounts: PredictionPollCounts = {
+        ...visibleEntry.counts,
+      };
+      optimisticCounts[opt] = (optimisticCounts[opt] ?? 0) + 1;
       onVote(pollId, opt);
       setInteractedThisMount(true);
-      setRevealingPollId(pollId);
+      setRevealed({
+        poll: visibleEntry.poll,
+        counts: optimisticCounts,
+        myVote: opt,
+      });
       if (holdTimer.current) clearTimeout(holdTimer.current);
       holdTimer.current = setTimeout(() => {
-        setRevealingPollId(null);
+        setRevealed(null);
       }, POST_VOTE_HOLD_MS);
     },
     [visibleEntry, onVote],
