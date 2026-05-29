@@ -1263,13 +1263,24 @@ function AddBetForm({
       { round: roundN, line, side, oddsTaken: odds.decimal },
       playerRoundStates[pickedPlayer.id],
     );
+    // Always lock the bet to a concrete round at placement time.
+    // Falling back to "current round at evaluation time" caused
+    // bets placed for R1 to silently retarget at R2 once R1 ended
+    // — the bet would appear back in Live with an unrelated score.
+    // Preference order: explicit pick → placement snapshot → the
+    // player's current round → tournament's R1 fallback.
+    const lockedRound =
+      roundN ??
+      placement?.round ??
+      playerRoundStates[pickedPlayer.id]?.currentRound ??
+      1;
     onAdd({
       kind: "round-score",
       id,
       placedAt,
       playerId: pickedPlayer.id,
       playerName: pickedPlayer.name,
-      round: roundN,
+      round: lockedRound,
       line,
       side,
       oddsTaken: odds.decimal,
@@ -1510,7 +1521,14 @@ function AddBetForm({
                     value={roundText}
                     onChange={(e) => setRoundText(e.target.value)}
                   >
-                    <option value="">Auto (current/next)</option>
+                    <option value="">
+                      {pickedPlayer
+                        ? `Current — R${
+                            playerRoundStates[pickedPlayer.id]?.currentRound ??
+                            1
+                          }`
+                        : "Current round"}
+                    </option>
                     <option value="1">R1</option>
                     <option value="2">R2</option>
                     <option value="3">R3</option>

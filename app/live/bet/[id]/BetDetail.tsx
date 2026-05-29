@@ -484,6 +484,9 @@ export default function BetDetail({ betId }: { betId: string }) {
 
   return (
     <section className="bd-wrap">
+      <Link href="/bets" className="bd-back" aria-label="Back to bets">
+        ← Bets
+      </Link>
       <header className="bd-head bd-head-hero">
         <div className={`bd-hero ${profitClass}`}>
           <span className="bd-hero-amt">

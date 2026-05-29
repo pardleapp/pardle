@@ -8184,6 +8184,28 @@ footer {
   margin-top: 8px;
 }
 
+.bd-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px 8px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 36px;
+  transition: background-color 0.12s;
+  margin-bottom: -8px;
+}
+
+.bd-back:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .bd-head {
   display: flex;
   justify-content: space-between;
