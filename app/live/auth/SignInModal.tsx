@@ -9,20 +9,24 @@ interface Props {
 }
 
 /**
- * Magic-link sign-in modal. User enters email; Supabase sends them a
- * link; clicking the link drops them on /auth/callback which
- * exchanges the code for a session and redirects back here.
+ * Email sign-in modal. After requesting the magic link the user gets
+ * BOTH a one-tap link AND a 6-digit code in the same email. The
+ * link works on desktop / when the email opens in the same browser
+ * that requested it; the code is the cross-device fallback for the
+ * common case of "tapped the link from Gmail's in-app browser and
+ * the PKCE verifier isn't there."
  */
 export default function SignInModal({ open, onClose }: Props) {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "err">(
-    "idle",
-  );
+  const [code, setCode] = useState("");
+  const [status, setStatus] = useState<
+    "idle" | "sending" | "sent" | "verifying" | "err"
+  >("idle");
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
   if (!open) return null;
 
-  async function submit(e: React.FormEvent) {
+  async function submitEmail(e: React.FormEvent) {
     e.preventDefault();
     setStatus("sending");
     setErrMsg(null);
@@ -45,6 +49,31 @@ export default function SignInModal({ open, onClose }: Props) {
     setStatus("sent");
   }
 
+  async function submitCode(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = code.trim();
+    if (trimmed.length < 6) {
+      setErrMsg("Code is 6 digits.");
+      return;
+    }
+    setStatus("verifying");
+    setErrMsg(null);
+    const supabase = getSupabaseBrowser();
+    const { error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: trimmed,
+      type: "email",
+    });
+    if (error) {
+      setStatus("sent"); // back to the sent screen so they can retype
+      setErrMsg(error.message);
+      return;
+    }
+    // Success — close, the auth state listener will pick up the
+    // new session and re-render.
+    onClose();
+  }
+
   return (
     <div className="auth-overlay" role="dialog" aria-modal="true">
       <div className="auth-modal">
@@ -59,22 +88,53 @@ export default function SignInModal({ open, onClose }: Props) {
         <h2 className="auth-modal-title">
           Save your bets across devices
         </h2>
-        {status === "sent" ? (
+        {status === "sent" || status === "verifying" ? (
           <div className="auth-modal-sent">
             <p>
-              Check <strong>{email}</strong> for a sign-in link. Click it on
-              this device to come back in.
+              We sent a link <strong>and</strong> a 6-digit code to{" "}
+              <strong>{email}</strong>. Tap the link, or enter the
+              code below if the link doesn&apos;t sign you in.
             </p>
+            <form onSubmit={submitCode} className="auth-modal-form">
+              <label className="auth-modal-label">
+                <span>6-digit code</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="\d{6}"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={code}
+                  onChange={(e) =>
+                    setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                  autoFocus
+                  autoComplete="one-time-code"
+                />
+              </label>
+              {errMsg && <p className="auth-modal-err">{errMsg}</p>}
+              <button
+                type="submit"
+                className="auth-modal-btn"
+                disabled={status === "verifying" || code.length < 6}
+              >
+                {status === "verifying" ? "Signing in…" : "Sign in with code"}
+              </button>
+            </form>
             <button
               type="button"
               className="auth-modal-btn-secondary"
-              onClick={onClose}
+              onClick={() => {
+                setStatus("idle");
+                setCode("");
+                setErrMsg(null);
+              }}
             >
-              Done
+              Use a different email
             </button>
           </div>
         ) : (
-          <form onSubmit={submit} className="auth-modal-form">
+          <form onSubmit={submitEmail} className="auth-modal-form">
             <ul className="auth-modal-benefits">
               <li>
                 <strong>Save your bets across devices</strong> — phone, laptop,
@@ -107,7 +167,7 @@ export default function SignInModal({ open, onClose }: Props) {
               />
             </label>
             <p className="auth-modal-blurb">
-              We&apos;ll send you a magic link. No password.
+              We&apos;ll send a link AND a code. No password.
             </p>
             {errMsg && <p className="auth-modal-err">{errMsg}</p>}
             <button
