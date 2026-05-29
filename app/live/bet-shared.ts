@@ -1041,14 +1041,22 @@ export function reconstructHistory(
       const last = series[series.length - 1];
       if (last && Math.abs(v - last.v) < 0.05 && pt.t - last.t < 60_000)
         continue;
-      series.push({ t: pt.t, v });
+      // Carry prob on every sample so the chart footer can read the
+      // current model win % without falling back to "—".
+      series.push({ t: pt.t, v, prob: pt.prob });
     }
     // Always append the current value as the rightmost sample so a
     // thin buffer (e.g. a market we just started tracking) still
     // gives the chart two points to draw a line between. For settled
     // bets the tip lands at settledAt instead of "now".
     if (nowValue != null) {
-      series.push({ t: chartNow, v: nowValue });
+      const last = series[series.length - 1];
+      const maxPayout = bet.stake * bet.oddsTaken;
+      const nowProb =
+        maxPayout > 0
+          ? Math.max(0, Math.min(1, nowValue / maxPayout))
+          : last?.prob;
+      series.push({ t: chartNow, v: nowValue, prob: nowProb });
     }
     return trimTrailingFlat(series);
   }
@@ -1073,7 +1081,12 @@ export function reconstructHistory(
     if (nowValue != null) {
       const last = series[series.length - 1];
       if (!last || Math.abs(nowValue - last.v) > 0.01) {
-        series.push({ t: chartNow, v: nowValue });
+        const maxPayout = bet.stake * bet.oddsTaken;
+        const nowProb =
+          maxPayout > 0
+            ? Math.max(0, Math.min(1, nowValue / maxPayout))
+            : last?.prob;
+        series.push({ t: chartNow, v: nowValue, prob: nowProb });
       }
     }
     return trimTrailingFlat(series);
@@ -1101,7 +1114,12 @@ export function reconstructHistory(
     if (nowValue != null) {
       const last = series[series.length - 1];
       if (!last || Math.abs(nowValue - last.v) > 0.01) {
-        series.push({ t: chartNow, v: nowValue });
+        const maxPayout = bet.stake * bet.oddsTaken;
+        const nowProb =
+          maxPayout > 0
+            ? Math.max(0, Math.min(1, nowValue / maxPayout))
+            : last?.prob;
+        series.push({ t: chartNow, v: nowValue, prob: nowProb });
       }
     }
     return trimTrailingFlat(series);
@@ -1118,7 +1136,14 @@ export function reconstructHistory(
       holesPlayed: 0,
       prob: probAtP,
     });
-    if (nowValue != null) series.push({ t: chartNow, v: nowValue });
+    if (nowValue != null) {
+      const maxPayout = bet.stake * bet.oddsTaken;
+      const nowProb =
+        maxPayout > 0
+          ? Math.max(0, Math.min(1, nowValue / maxPayout))
+          : probAtP;
+      series.push({ t: chartNow, v: nowValue, prob: nowProb });
+    }
     return series;
   }
   const roundSnap = state?.rounds?.[round];
