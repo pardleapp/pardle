@@ -11,7 +11,6 @@ import {
   type OddsFormat,
 } from "@/lib/odds-format";
 import dynamic from "next/dynamic";
-import CatchMeUp from "./CatchMeUp";
 import FeedSkeleton from "./FeedSkeleton";
 import PredictionPollDeck from "./PredictionPollDeck";
 import type {
@@ -341,8 +340,6 @@ interface FeedClientProps {
   forcedTournamentId?: string;
 }
 
-const FIRST_BET_DISMISSED_KEY = "pardle_first_bet_dismissed_v1";
-
 /** Resolve a poll ID's matching event ID. Used by the deep-link
  *  handler — the bridge card on /pros / /faces sends users here
  *  with ?poll=<id> after they finish a puzzle, and we need to
@@ -363,7 +360,6 @@ function findEventIdForPoll(
 
 export default function FeedClient({ forcedTournamentId }: FeedClientProps = {}) {
   const [data, setData] = useState<FeedResponse | null>(null);
-  const [firstBetDismissed, setFirstBetDismissed] = useState(false);
   /** Pulled from ?poll=<id> on first mount. When set, the matching
    *  feed row scrolls into view + flashes a highlight ring once
    *  the data resolves. */
@@ -372,9 +368,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setFirstBetDismissed(
-      !!window.localStorage.getItem(FIRST_BET_DISMISSED_KEY),
-    );
     const params = new URLSearchParams(window.location.search);
     const p = params.get("poll");
     if (p) setDeepLinkPollId(p);
@@ -406,12 +399,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     window.history.replaceState({}, "", url.toString());
   }, [data, deepLinkPollId, deepLinkFired]);
 
-  const dismissFirstBet = useCallback(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(FIRST_BET_DISMISSED_KEY, "1");
-    }
-    setFirstBetDismissed(true);
-  }, []);
   const [error, setError] = useState(false);
   const [myReactions, setMyReactions] = useState<
     Record<string, "up" | "down">
@@ -891,13 +878,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         </h2>
       </div>
 
-      {/* Plain stacked cards above the feed — carousel removed.
-          Sunday call is one-and-done per visit (auto-collapses
-          after the user votes/dismisses). First-bet CTA is gated
-          to brand-new visitors and self-dismisses on the first
-          tracked bet. CatchMeUp gates itself on whether there's
-          actually catch-up to do. Worst case = 2 cards (call +
-          catchup), which doesn't need carousel chrome. */}
+      {/* Only the Sunday call survives above the feed — first-bet
+          CTA + CatchMeUp banner removed for clutter. Call is one-
+          and-done per visit; once the user votes / dismisses it,
+          the entire pre-feed area is empty and the live feed sits
+          directly under the tournament header. */}
       {data.predictionPolls && data.predictionPolls.length > 0 && (
         <PredictionPollDeck
           polls={data.predictionPolls}
@@ -905,35 +890,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           onVote={sendPredictionVote}
         />
       )}
-      {trackedBets.length === 0 && !firstBetDismissed && (
-        <div className="feed-first-bet-cta-wrap">
-          <Link href="/bets" className="feed-first-bet-cta">
-            <span className="feed-first-bet-cta-icon" aria-hidden="true">
-              📌
-            </span>
-            <span className="feed-first-bet-cta-body">
-              <span className="feed-first-bet-cta-title">
-                Track your first bet
-              </span>
-              <span className="feed-first-bet-cta-blurb">
-                See the swing on every shot, live
-              </span>
-            </span>
-            <span className="feed-first-bet-cta-arrow" aria-hidden="true">
-              →
-            </span>
-          </Link>
-          <button
-            type="button"
-            className="feed-first-bet-cta-dismiss"
-            onClick={dismissFirstBet}
-            aria-label="Dismiss"
-          >
-            ×
-          </button>
-        </div>
-      )}
-      <CatchMeUp rows={data.rows ?? []} />
 
       <ReelGroup
         panes={[
