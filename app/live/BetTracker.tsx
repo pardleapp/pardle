@@ -275,7 +275,19 @@ export default function BetTracker({
         m.set(b.id, { won: b.settledWon });
         continue;
       }
-      // 2) Fall back to client-side detection against the active
+      // 2) Round-score bets settle per-round — detectBetSettlement
+      //    doesn't handle them (it's only outright / top-finish /
+      //    winning-score). Use evaluateRoundScore directly so a bet
+      //    whose round has completed moves into the Settled tab
+      //    even before the server cron has stamped settled_at.
+      if (b.kind === "round-score") {
+        const ev = evaluateRoundScore(b, playerRoundStates[b.playerId]);
+        if (ev?.kind === "settled") {
+          m.set(b.id, { won: ev.won });
+        }
+        continue;
+      }
+      // 3) Fall back to client-side detection against the active
       //    tournament's leaderboard (covers bets that just settled
       //    this minute, before notify-poll caught up).
       const s = detectBetSettlement(
