@@ -856,6 +856,11 @@ async function handle(req: Request) {
           playerSkill,
           tournamentPars: bundle.pars,
           playerSgBreakdown,
+          /** Per-player hole scores — playerId → round → hole → score.
+           *  Needed by the bet detail hole-by-hole table so we can
+           *  show EVERY hole the player has played (including pars,
+           *  which never produce feed events). */
+          snapshotHoles: bundle.snapshot?.holes ?? {},
         }
       : {}),
   }, { headers });

@@ -99,6 +99,10 @@ interface FeedResponse {
   >;
   /** Per-(round,hole) par values for this tournament. */
   tournamentPars?: Record<number, Record<number, number>>;
+  /** Per-player hole scores from the live snapshot. Used by the
+   *  hole-by-hole table to surface EVERY hole the bet's player has
+   *  played, not just non-par feed events. */
+  snapshotHoles?: Record<string, Record<number, Record<number, string>>>;
 }
 
 /** Build the friendly WhatsApp-style message we drop into the share
@@ -581,6 +585,17 @@ export default function BetDetail({ betId }: { betId: string }) {
               bet={bet}
               history={history}
               feedEvents={data.rows ?? []}
+              snapshotHoles={data.snapshotHoles}
+              tournamentPars={data.tournamentPars}
+              playerThru={
+                bet.kind === "outright" || bet.kind === "top-finish"
+                  ? data.playerIndex?.find(
+                      (r) =>
+                        r.playerId ===
+                        (bet as { playerId: string }).playerId,
+                    )?.thru ?? null
+                  : null
+              }
               oddsFormat={oddsFormat}
             />
           )}
@@ -826,21 +841,141 @@ function OutrightDetailTable({
   bet,
   history,
   feedEvents,
+  snapshotHoles,
+  tournamentPars,
+  playerThru,
   oddsFormat,
 }: {
   bet: TrackedBet;
   history: PnlSample[];
   feedEvents: FeedRowLike[];
+  snapshotHoles?: Record<string, Record<number, Record<number, string>>>;
+  tournamentPars?: Record<number, Record<number, number>>;
+  playerThru?: string | null;
   oddsFormat: OddsFormat;
 }) {
   const playerId = "playerId" in bet ? (bet as { playerId: string }).playerId : null;
 
-  // Player's hole completions in chronological order. Score-typed
-  // events carry par + strokes + hole + round + ts. Pars don't
-  // produce feed events, but the table is still honest about the
-  // bet's value at every NON-par hole — the bet only moves
-  // materially on those anyway.
-  const holeEvents = (
+  // Walk the full scorecard from snapshot if we have it — gives us
+  // EVERY hole the player played (including pars, which never
+  // produce feed events). Order them by play sequence: front-9
+  // starters play 1→18; back-9 starters play 10→18 then 1→9.
+  // Detect start side from `thru` ending with "*".
+  const startedBackNine = (playerThru ?? "").trim().endsWith("*");
+  const playOrder: number[] = startedBackNine
+    ? [10, 11, 12, 13, 14, 15, 16, 17, 18, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+
+  // Map (round, hole) → ts from feed events so pars use the
+  // surrounding non-par events' timestamps as anchors.
+  const eventTsByHole = new Map<string, number>();
+  if (playerId) {
+    for (const r of feedEvents) {
+      if (
+        r.event.type === "score" &&
+        r.event.playerId === playerId &&
+        typeof r.event.hole === "number" &&
+        typeof r.event.round === "number" &&
+        typeof r.event.ts === "number"
+      ) {
+        eventTsByHole.set(`${r.event.round}:${r.event.hole}`, r.event.ts);
+      }
+    }
+  }
+
+  // Player's hole completions from the snapshot — pars and all.
+  // Falls back to feed-event-only mode when snapshot data isn't
+  // present (e.g., a page open before include=charts ships).
+  const holeRows: {
+    ts: number;
+    round: number;
+    hole: number;
+    strokes: number;
+    par: number | undefined;
+  }[] = [];
+  const snapshot = playerId ? snapshotHoles?.[playerId] : null;
+  if (snapshot) {
+    const roundKeys = Object.keys(snapshot)
+      .map((k) => Number(k))
+      .filter((n) => Number.isFinite(n))
+      .sort((a, b) => a - b);
+    for (const round of roundKeys) {
+      const holes = snapshot[round] ?? {};
+      const parsForRound = tournamentPars?.[round] ?? {};
+      // First pass: collect all played holes with whatever timestamp
+      // we can derive. Use feed event ts when present; mark others
+      // for interpolation in pass 2.
+      const playedInOrder: {
+        hole: number;
+        strokes: number;
+        par: number | undefined;
+        ts: number | null;
+      }[] = [];
+      for (const hole of playOrder) {
+        const scoreStr = holes[hole];
+        const strokes = Number(scoreStr);
+        if (!Number.isFinite(strokes) || strokes <= 0) continue;
+        const ts = eventTsByHole.get(`${round}:${hole}`) ?? null;
+        playedInOrder.push({
+          hole,
+          strokes,
+          par: parsForRound[hole],
+          ts,
+        });
+      }
+      // Interpolate missing timestamps from neighbors. Anchor:
+      // first known ts within the round (or fall back to bet.placedAt).
+      for (let i = 0; i < playedInOrder.length; i++) {
+        if (playedInOrder[i].ts != null) continue;
+        // Find previous and next known ts
+        let prevIdx = i - 1;
+        while (prevIdx >= 0 && playedInOrder[prevIdx].ts == null) prevIdx--;
+        let nextIdx = i + 1;
+        while (
+          nextIdx < playedInOrder.length &&
+          playedInOrder[nextIdx].ts == null
+        ) {
+          nextIdx++;
+        }
+        const prevTs = prevIdx >= 0 ? playedInOrder[prevIdx].ts! : null;
+        const nextTs =
+          nextIdx < playedInOrder.length ? playedInOrder[nextIdx].ts! : null;
+        if (prevTs != null && nextTs != null) {
+          const span = nextIdx - prevIdx;
+          const offset = i - prevIdx;
+          playedInOrder[i].ts = prevTs + ((nextTs - prevTs) * offset) / span;
+        } else if (prevTs != null) {
+          // Linear ~15 min/hole pace after the last known.
+          playedInOrder[i].ts = prevTs + (i - prevIdx) * 15 * 60 * 1000;
+        } else if (nextTs != null) {
+          playedInOrder[i].ts = nextTs - (nextIdx - i) * 15 * 60 * 1000;
+        } else {
+          // No anchor in the round — distribute evenly between
+          // bet placement and now.
+          const span = Date.now() - bet.placedAt;
+          const denom = playedInOrder.length;
+          playedInOrder[i].ts =
+            bet.placedAt + ((i + 1) / denom) * span;
+        }
+      }
+      for (const p of playedInOrder) {
+        holeRows.push({
+          ts: p.ts!,
+          round,
+          hole: p.hole,
+          strokes: p.strokes,
+          par: p.par,
+        });
+      }
+    }
+  }
+  // Sort by ts to get chronological order even if rounds went
+  // out-of-sequence somehow.
+  holeRows.sort((a, b) => a.ts - b.ts);
+
+  // Fallback to legacy feed-event-only behaviour when snapshot is
+  // missing (older payload shapes).
+  const holeEventsFallback = (
     playerId
       ? feedEvents.filter(
           (r) =>
@@ -913,7 +1048,13 @@ function OutrightDetailTable({
     return pick(history[history.length - 1]);
   };
 
-  if (holeEvents.length === 0) {
+  // Prefer the snapshot-derived rows (every hole the player has
+  // completed) — fall back to feed-event-only rows when the
+  // snapshot wasn't included in the response.
+  const eventStream =
+    holeRows.length > 0 ? holeRows : holeEventsFallback;
+
+  if (eventStream.length === 0) {
     return (
       <div className="bd-table">
         <p className="bd-table-title">Hole by hole</p>
@@ -952,8 +1093,8 @@ function OutrightDetailTable({
   const rows: Row[] = [];
   let prevTs = bet.placedAt;
   let prevValue = bet.stake;
-  for (let i = 0; i < holeEvents.length; i++) {
-    const ev = holeEvents[i];
+  for (let i = 0; i < eventStream.length; i++) {
+    const ev = eventStream[i];
     // Look for a "peak" sample in the gap between prev player-event
     // and this one. If its swing from prevValue is significant AND
     // the post-hole valuation differs from the peak by at least half
