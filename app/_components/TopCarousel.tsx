@@ -56,6 +56,40 @@ export default function TopCarousel({ children }: Props) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const stationRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [activeIdx, setActiveIdx] = useState(0);
+  // Some station components render null based on their own
+  // internal state (e.g. SharpScoreOnboard reads its dismissed
+  // flag from localStorage; CatchMeUp returns null when there's
+  // nothing to catch up on). The parent JSX passes them
+  // unconditionally so we measure each station's height after
+  // render — any station that ended up empty gets excluded from
+  // the dot strip and the swipe sequence. ResizeObserver keeps
+  // this in sync if a station goes empty after the user interacts
+  // (vote on last poll, etc.).
+  const [stationHeights, setStationHeights] = useState<number[]>([]);
+  useEffect(() => {
+    const observers: ResizeObserver[] = [];
+    const heights = stationRefs.current.map((el) => el?.offsetHeight ?? 0);
+    setStationHeights(heights);
+    stationRefs.current.forEach((el, i) => {
+      if (!el) return;
+      const ro = new ResizeObserver((entries) => {
+        const h = entries[0]?.contentRect.height ?? 0;
+        setStationHeights((prev) => {
+          if (prev[i] === h) return prev;
+          const next = prev.slice();
+          next[i] = h;
+          return next;
+        });
+      });
+      ro.observe(el);
+      observers.push(ro);
+    });
+    return () => observers.forEach((o) => o.disconnect());
+  }, [stations]);
+  const visibleStationIndices = useMemo(
+    () => stations.map((_, i) => i).filter((i) => (stationHeights[i] ?? 1) > 0),
+    [stations, stationHeights],
+  );
 
   // Track which station is in view via IntersectionObserver so
   // the dot strip stays in sync with the actual scroll position
@@ -98,9 +132,9 @@ export default function TopCarousel({ children }: Props) {
 
   // ── Render gates ────────────────────────────────────────────────
   if (stations.length === 0) return null;
-  if (stations.length === 1) {
-    // Single station — render as a plain block, no carousel chrome.
-    return <div className="top-carousel-solo">{stations[0]}</div>;
+  // Treat 0- or 1-visible-station the same — solo render, no dots.
+  if (visibleStationIndices.length <= 1) {
+    return <div className="top-carousel-solo">{stations}</div>;
   }
 
   return (
@@ -117,7 +151,11 @@ export default function TopCarousel({ children }: Props) {
             ref={(el) => {
               stationRefs.current[i] = el;
             }}
-            className="top-carousel-station"
+            className={`top-carousel-station${
+              (stationHeights[i] ?? 1) === 0
+                ? " top-carousel-station-empty"
+                : ""
+            }`}
             aria-roledescription="slide"
             aria-label={`${i + 1} of ${stations.length}`}
           >
@@ -126,17 +164,17 @@ export default function TopCarousel({ children }: Props) {
         ))}
       </div>
       <div className="top-carousel-dots" role="tablist" aria-label="Slide">
-        {stations.map((_, i) => (
+        {visibleStationIndices.map((stationIdx, dotIdx) => (
           <button
             type="button"
-            key={i}
+            key={stationIdx}
             role="tab"
-            aria-selected={i === activeIdx}
-            aria-label={`Slide ${i + 1} of ${stations.length}`}
+            aria-selected={stationIdx === activeIdx}
+            aria-label={`Slide ${dotIdx + 1} of ${visibleStationIndices.length}`}
             className={`top-carousel-dot${
-              i === activeIdx ? " top-carousel-dot-on" : ""
+              stationIdx === activeIdx ? " top-carousel-dot-on" : ""
             }`}
-            onClick={() => goTo(i)}
+            onClick={() => goTo(stationIdx)}
           />
         ))}
       </div>

@@ -6980,18 +6980,14 @@ footer {
 .top-carousel-track {
   display: flex;
   gap: 12px;
+  width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   -ms-overflow-style: none;
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
-  /* Negative margin + padding pulls the snap track flush with
-     viewport edges on mobile, so a station's left edge lines up
-     with the rest of the feed list. */
-  margin: 0 -14px;
-  padding: 0 14px;
-  scroll-padding-left: 14px;
 }
 
 .top-carousel-track::-webkit-scrollbar {
@@ -7000,9 +6996,23 @@ footer {
 
 .top-carousel-station {
   flex: 0 0 100%;
+  width: 100%;
+  max-width: 100%;
+  min-width: 100%;
   scroll-snap-align: start;
   scroll-snap-stop: always;
+  box-sizing: border-box;
+}
+
+/* Station whose child component returned null. Collapse to zero
+   width so it doesn't take a slot in the swipe sequence — the
+   measurement effect also drops its dot. */
+.top-carousel-station-empty {
+  flex: 0 0 0;
+  width: 0;
   min-width: 0;
+  max-width: 0;
+  overflow: hidden;
 }
 
 /* Stations control their own height — strip any margin children
