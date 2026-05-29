@@ -14,6 +14,7 @@ import dynamic from "next/dynamic";
 import CatchMeUp from "./CatchMeUp";
 import FeedSkeleton from "./FeedSkeleton";
 import PredictionPollDeck from "./PredictionPollDeck";
+import TopCarousel from "@/app/_components/TopCarousel";
 import type {
   PredictionPoll,
   PredictionPollCounts,
@@ -895,24 +896,21 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         </div>
       </div>
 
-      {/* First-bet CTA — self-dismisses the moment the user adds
-          their first tracked bet (trackedBets.length goes 0 → 1).
-          Without this, a cold visitor sees PnL chips ("🚀 +£42")
-          on other players' rows but has no signal those chips
-          would personalise to their stake. */}
-      {/* Onboarding cards — show only ONE at a time so a brand-new
-          visitor doesn't see three large promo blocks stacked above
-          the feed. Priority order:
-            1. Zero bets → first-bet CTA (most direct value prop)
-            2. Has bets, zero Sharp calls → Sharp Score onboard
-                (the identity / credibility layer kicks in once the
-                user is already invested in tracking)
-            3. Has calls → nothing (header chip handles their state)
-          First-bet CTA is permanently dismissable via the × so
-          returning visitors who deliberately don't track bets don't
-          get re-nagged forever. */}
-      {trackedBets.length === 0 ? (
-        !firstBetDismissed && (
+      {/* Top-of-feed engagement carousel. Replaces the vertical
+          stack of first-bet / sharp-onboard / prediction-poll /
+          catch-me-up cards. One station visible at a time, swipe
+          between, dot strip below. Each station decides whether
+          it applies for this user; the carousel itself hides
+          when none of them do. */}
+      <TopCarousel>
+        {data.predictionPolls && data.predictionPolls.length > 0 && (
+          <PredictionPollDeck
+            polls={data.predictionPolls}
+            myVotes={myPredictionVotes}
+            onVote={sendPredictionVote}
+          />
+        )}
+        {trackedBets.length === 0 && !firstBetDismissed && (
           <div className="feed-first-bet-cta-wrap">
             <Link href="/bets" className="feed-first-bet-cta">
               <span className="feed-first-bet-cta-icon" aria-hidden="true">
@@ -939,25 +937,12 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
               ×
             </button>
           </div>
-        )
-      ) : (data.mySharp?.total ?? 0) === 0 ? (
-        <SharpScoreOnboard />
-      ) : null}
-
-      {/* Open prediction polls — head-to-head, marquee h2h, round
-          O/U, hold-the-lead. Shown one at a time as a deck: vote,
-          see community %, auto-advance to the next unvoted call.
-          Keeps the feed viewport from being eaten when several
-          calls are live at once. */}
-      {data.predictionPolls && data.predictionPolls.length > 0 && (
-        <PredictionPollDeck
-          polls={data.predictionPolls}
-          myVotes={myPredictionVotes}
-          onVote={sendPredictionVote}
-        />
-      )}
-
-      <CatchMeUp rows={data.rows ?? []} />
+        )}
+        {trackedBets.length > 0 && (data.mySharp?.total ?? 0) === 0 && (
+          <SharpScoreOnboard />
+        )}
+        <CatchMeUp rows={data.rows ?? []} />
+      </TopCarousel>
 
       <ReelGroup
         panes={[

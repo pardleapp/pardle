@@ -6965,6 +6965,95 @@ footer {
   }
 }
 
+/* Top-of-feed horizontal carousel — replaces the vertical stack
+   of first-bet / sharp / prediction-poll / catch-me-up cards.
+   One station visible at a time, swipe between, dots below. */
+.top-carousel {
+  margin: 0 0 14px;
+  position: relative;
+}
+
+.top-carousel-solo {
+  margin: 0 0 14px;
+}
+
+.top-carousel-track {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  /* Negative margin + padding pulls the snap track flush with
+     viewport edges on mobile, so a station's left edge lines up
+     with the rest of the feed list. */
+  margin: 0 -14px;
+  padding: 0 14px;
+  scroll-padding-left: 14px;
+}
+
+.top-carousel-track::-webkit-scrollbar {
+  display: none;
+}
+
+.top-carousel-station {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  min-width: 0;
+}
+
+/* Stations control their own height — strip any margin children
+   would otherwise add (since the carousel itself owns the bottom
+   gap to the next section). */
+.top-carousel-station > * {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.top-carousel-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 0;
+}
+
+.top-carousel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: none;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: background-color 0.15s, transform 0.15s;
+  position: relative;
+}
+
+/* Bigger invisible hit area around each dot — 44 px tap target
+   without changing the 8 px visual. */
+.top-carousel-dot::before {
+  content: "";
+  position: absolute;
+  top: -18px;
+  left: -18px;
+  right: -18px;
+  bottom: -18px;
+}
+
+.top-carousel-dot:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.top-carousel-dot-on {
+  background: #00d96e;
+  transform: scale(1.2);
+}
+
 /* "Play another" end-of-game CTA strip — drops into each game's
    finish screen so a completed daily funnels into another play
    instead of stopping dead. */
