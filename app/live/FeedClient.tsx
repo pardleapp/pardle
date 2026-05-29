@@ -878,8 +878,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         </div>
       </div>
 
-      <PlayerSearch players={data.playerIndex ?? []} />
-
       {/* First-bet CTA — self-dismisses the moment the user adds
           their first tracked bet (trackedBets.length goes 0 → 1).
           Without this, a cold visitor sees PnL chips ("🚀 +£42")
@@ -942,8 +940,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         />
       )}
 
-      <MomentumStrip momentum={data.fieldMomentum} />
-
       <CatchMeUp rows={data.rows ?? []} />
 
       <ReelGroup
@@ -963,6 +959,8 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         onReact={sendReaction}
         storageKey="homefeed"
       />
+
+      <PlayerSearch players={data.playerIndex ?? []} />
 
       {/* Following toggle — bet relevance now surfaces inline as a
           per-row £ impact chip rather than a whole separate feed. */}
