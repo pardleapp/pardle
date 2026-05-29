@@ -156,9 +156,15 @@ function impactForRoundScore(
   if (typeof event.strokes !== "number" || typeof event.par !== "number") {
     return null;
   }
-  // Only score the event for the round this bet covers. A birdie in
-  // R2 doesn't matter for an R3 bet.
-  if (bet.round != null && event.round !== bet.round) return null;
+  // Only score the event for the round this bet covers. Resolve the
+  // bet's round from bet.round → placement.round; if neither is
+  // set (very old legacy bet), don't apply impact at all rather
+  // than letting events from any round bleed in. Previously this
+  // check was skipped when bet.round was null, so a Novak R2 birdie
+  // would fire a chip on a settled Novak R1 bet from 2 days ago.
+  const targetRound = bet.round ?? bet.placement?.round ?? null;
+  if (targetRound == null) return null;
+  if (event.round !== targetRound) return null;
   const diff = event.strokes - event.par;
   if (diff === 0) return null; // routine par — no swing
   const sideMult = bet.side === "under" ? 1 : -1;
@@ -216,6 +222,10 @@ export function headlineImpactForEvent(
 ): EventBetImpact | null {
   let best: EventBetImpact | null = null;
   for (const bet of bets) {
+    // Skip settled bets — they no longer move with the leaderboard,
+    // and surfacing "+$600 on your bet" for a settled R1 round-score
+    // when the player birdies R2 was both wrong and confusing.
+    if (bet.settledAt != null) continue;
     const imp = computeBetImpact(event, bet, data);
     if (!imp) continue;
     if (!isMaterialImpact(bet, imp.deltaValue)) continue;
