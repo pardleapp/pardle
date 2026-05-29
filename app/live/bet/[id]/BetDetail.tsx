@@ -895,10 +895,15 @@ function OutrightDetailTable({
   }[] = [];
   const snapshot = playerId ? snapshotHoles?.[playerId] : null;
   if (snapshot) {
-    const roundKeys = Object.keys(snapshot)
+    // Only show the player's latest round — earlier rounds are
+    // historical and the bet's trajectory through them is in the
+    // chart. The hole-by-hole table is for "what's happening right
+    // now" context, so just the latest round keeps it focused.
+    const latestRound = Object.keys(snapshot)
       .map((k) => Number(k))
-      .filter((n) => Number.isFinite(n))
-      .sort((a, b) => a - b);
+      .filter((n) => Number.isFinite(n) && (snapshot[n] ?? null) !== null)
+      .sort((a, b) => b - a)[0];
+    const roundKeys = latestRound != null ? [latestRound] : [];
     for (const round of roundKeys) {
       const holes = snapshot[round] ?? {};
       const parsForRound = tournamentPars?.[round] ?? {};
