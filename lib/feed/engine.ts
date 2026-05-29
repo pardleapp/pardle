@@ -755,9 +755,11 @@ function sameTeePoint(a: string | null, b: string | null): boolean {
   const aa = norm(a);
   const bb = norm(b);
   if (!aa || !bb) return false;
-  if (aa.back !== bb.back) return false;
-  if (aa.holes !== bb.holes) return false;
-  return aa.holes <= 2;
+  // Both players must have NOT YET teed off. Once either has played
+  // a hole the question loses its pre-game tension — we don't want
+  // a Sunday call to ask "who shoots lower" when one of them is
+  // already 1-2 strokes into the round.
+  return aa.holes === 0 && bb.holes === 0;
 }
 
 /** Parse `thru` field ("9", "9*", "F", "-", "") into a count of
@@ -974,9 +976,13 @@ async function maybeOpenPredictionPolls(
         if (!row || row.currentRound == null) continue;
         const round = row.currentRound;
         const holesPlayed = parseThruHoles(row.thru);
-        // Need them on the course but not done. 1..17 only (skip "F"
-        // — too late to vote — and 0 — not teed off yet).
-        if (holesPlayed < 1 || holesPlayed >= 18) continue;
+        // Pre-tee-off only: voting on "will X shoot under 67.5?"
+        // makes sense BEFORE they hit their first shot, not after.
+        // Once thru ≥ 1 we already know the first hole's score and
+        // the question is no longer a pure prediction. The /api/feed
+        // filter also drops these on read; this stops the engine
+        // from opening polls that would immediately be filtered.
+        if (holesPlayed !== 0) continue;
         const parsForRound = pars?.[round];
         if (!parsForRound) continue;
         const roundPar = sumRoundPars(parsForRound);

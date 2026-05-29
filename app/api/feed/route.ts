@@ -631,28 +631,30 @@ async function handle(req: Request) {
     );
 
   // Drop any open prediction poll whose subject player(s) have
-  // already finished the round the call is about. The notify-poll
-  // cron settles these eventually, but until it ticks they sit in
-  // the "open" set and would otherwise surface as a Sunday call
-  // for a player who can't move the needle any more.
+  // ALREADY TEED OFF for the round the call is about. Voting on
+  // "will X shoot under 67.5?" only makes sense before they've
+  // played a single hole — once they're mid-round we already know
+  // some of the answer. Only `not-started` qualifies (the server
+  // cron settles completed rounds separately).
   predictionPolls = predictionPolls.filter((entry) => {
     const { poll } = entry;
     const round = poll.settle.round;
     if (round == null) return true; // hold-the-lead is tournament-wide
-    const isComplete = (pid: string | undefined) => {
+    const teedOff = (pid: string | undefined) => {
       if (!pid) return false;
-      return playerRoundStates[pid]?.rounds?.[round]?.status === "complete";
+      const status = playerRoundStates[pid]?.rounds?.[round]?.status;
+      // Anything other than not-started means they're on the
+      // course OR done. Either way the question is no longer
+      // "what will they shoot" — it's a partial result.
+      return status === "in-progress" || status === "complete";
     };
     if (poll.type === "round-over-under") {
-      return !isComplete(poll.settle.player?.id);
+      return !teedOff(poll.settle.player?.id);
     }
     if (poll.type === "head-to-head") {
-      // Once EITHER player has finished, the question loses its
-      // tension (the other player's hours of play can't reach a
-      // verdict the user is voting on right now).
       return (
-        !isComplete(poll.settle.playerA?.id) &&
-        !isComplete(poll.settle.playerB?.id)
+        !teedOff(poll.settle.playerA?.id) &&
+        !teedOff(poll.settle.playerB?.id)
       );
     }
     return true;
