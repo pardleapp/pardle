@@ -73,6 +73,11 @@ export default function PredictionPollDeck({ polls, myVotes, onVote }: Props) {
   // community-% reveal for POST_VOTE_HOLD_MS before hiding it.
   const [revealingPollId, setRevealingPollId] = useState<string | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // One-and-done per page visit: once the user has voted or
+  // dismissed the call surfaced on this mount, we don't pick
+  // another one. They get a fresh question next time they
+  // navigate to /live (component remounts → flag resets).
+  const [interactedThisMount, setInteractedThisMount] = useState(false);
 
   useEffect(() => {
     setDismissed(readDismissed());
@@ -85,7 +90,11 @@ export default function PredictionPollDeck({ polls, myVotes, onVote }: Props) {
   }, []);
 
   // Choose the one poll to show: latest open, unvoted, not dismissed.
+  // Once the user has voted or dismissed during this mount, we stop
+  // picking new ones — the deck stays empty for the rest of this
+  // page visit so the feed gets the screen real estate back.
   const pickedPoll = useMemo(() => {
+    if (interactedThisMount) return null;
     const candidates = polls.filter((p) => {
       const myVote = myVotes[p.poll.id]?.myVote ?? p.myVote;
       if (myVote != null) return false;
@@ -94,7 +103,7 @@ export default function PredictionPollDeck({ polls, myVotes, onVote }: Props) {
     });
     candidates.sort((a, b) => b.poll.openedAt - a.poll.openedAt);
     return candidates[0] ?? null;
-  }, [polls, myVotes, dismissed]);
+  }, [polls, myVotes, dismissed, interactedThisMount]);
 
   // While the just-voted reveal is on screen, keep showing THAT
   // poll instead of jumping to the next one. After the hold timer
@@ -126,6 +135,7 @@ export default function PredictionPollDeck({ polls, myVotes, onVote }: Props) {
       if (!visibleEntry) return;
       const pollId = visibleEntry.poll.id;
       onVote(pollId, opt);
+      setInteractedThisMount(true);
       setRevealingPollId(pollId);
       if (holdTimer.current) clearTimeout(holdTimer.current);
       holdTimer.current = setTimeout(() => {
@@ -144,6 +154,7 @@ export default function PredictionPollDeck({ polls, myVotes, onVote }: Props) {
       writeDismissed(next);
       return next;
     });
+    setInteractedThisMount(true);
   }, [visibleEntry]);
 
   if (!visibleEntry) return null;
