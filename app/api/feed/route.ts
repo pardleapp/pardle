@@ -90,6 +90,18 @@ export async function GET(req: Request) {
   }
 }
 
+/** Slim a "playerId → X" map down to a single-entry map for the
+ *  bet detail's player. Cheap O(1) lookup; returns an object
+ *  shape the wire format already expects (just with one key). */
+function pickPlayer<T>(
+  map: Record<string, T> | null | undefined,
+  playerId: string,
+): Record<string, T> {
+  if (!map) return {};
+  const v = map[playerId];
+  return v === undefined ? {} : { [playerId]: v };
+}
+
 async function handle(req: Request) {
   const url = new URL(req.url);
   const visitorId = url.searchParams.get("v") ?? "";
@@ -108,6 +120,16 @@ async function handle(req: Request) {
   // page does, and it opts in with ?include=charts. This drops the
   // /api/feed payload from ~150 KB to ~20 KB per poll.
   const includeChartData = url.searchParams.get("include") === "charts";
+  // When set, the heavy per-player buffers (oddsHistories,
+  // dgWinProbs, bookOdds, playerSgBreakdown, snapshotHoles) are
+  // filtered to JUST this playerId. The bet detail page passes
+  // its bet's playerId so the chart payload drops from ~1.5 MB
+  // (whole field) to a few KB. Top-finish and winning-score still
+  // need field-wide history shapes so those aren't filtered.
+  const slimPlayerId =
+    includeChartData && url.searchParams.get("playerId")
+      ? String(url.searchParams.get("playerId"))
+      : null;
   // Leaderboard fallback: when no tournament is currently live, the
   // /leaderboard page wants the most recent completed event's data
   // (otherwise the page reads "this week's tournament hasn't started"
@@ -847,20 +869,39 @@ async function handle(req: Request) {
     // them drops the response by an order of magnitude per poll.
     ...(includeChartData
       ? {
-          oddsHistories: oddsBuffers,
-          dgWinProbs: bundle.dgWinProbs,
-          bookOdds: bundle.bookOdds,
+          oddsHistories: slimPlayerId
+            ? pickPlayer(oddsBuffers, slimPlayerId)
+            : oddsBuffers,
+          dgWinProbs: slimPlayerId
+            ? pickPlayer(bundle.dgWinProbs, slimPlayerId)
+            : bundle.dgWinProbs,
+          bookOdds: slimPlayerId
+            ? {
+                draftkings: pickPlayer(
+                  bundle.bookOdds.draftkings,
+                  slimPlayerId,
+                ),
+                fanduel: pickPlayer(
+                  bundle.bookOdds.fanduel,
+                  slimPlayerId,
+                ),
+              }
+            : bundle.bookOdds,
           winningScoreHistory,
           topFinishHistory,
           fieldStats,
           playerSkill,
           tournamentPars: bundle.pars,
-          playerSgBreakdown,
+          playerSgBreakdown: slimPlayerId
+            ? pickPlayer(playerSgBreakdown, slimPlayerId)
+            : playerSgBreakdown,
           /** Per-player hole scores — playerId → round → hole → score.
            *  Needed by the bet detail hole-by-hole table so we can
            *  show EVERY hole the player has played (including pars,
            *  which never produce feed events). */
-          snapshotHoles: bundle.snapshot?.holes ?? {},
+          snapshotHoles: slimPlayerId
+            ? pickPlayer(bundle.snapshot?.holes ?? {}, slimPlayerId)
+            : bundle.snapshot?.holes ?? {},
         }
       : {}),
   }, { headers });

@@ -208,9 +208,17 @@ export default function BetDetail({ betId }: { betId: string }) {
       // (Polymarket odds, top-finish history, winning-score CDF) the
       // chart reconstruction needs. The home feed doesn't ask for
       // these — keeps the per-poll payload small for non-detail views.
+      // playerId=X slims the per-player buffers (oddsHistories,
+      // dgWinProbs, bookOdds, playerSgBreakdown, snapshotHoles) to
+      // just this bet's player — drops the chart payload from
+      // ~1.5 MB whole-field to a few KB.
+      const playerParam =
+        bet && "playerId" in bet
+          ? `&playerId=${encodeURIComponent((bet as { playerId: string }).playerId)}`
+          : "";
       const url = pastTournamentId
-        ? `/api/feed?v=detail&tournamentId=${encodeURIComponent(pastTournamentId)}&include=charts`
-        : `/api/feed?v=detail&include=charts`;
+        ? `/api/feed?v=detail&tournamentId=${encodeURIComponent(pastTournamentId)}&include=charts${playerParam}`
+        : `/api/feed?v=detail&include=charts${playerParam}`;
       const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
       const json = (await res.json()) as FeedResponse;
@@ -232,7 +240,7 @@ export default function BetDetail({ betId }: { betId: string }) {
     } catch {
       setError(true);
     }
-  }, [pastTournamentId]);
+  }, [pastTournamentId, bet]);
 
   useEffect(() => {
     load();
