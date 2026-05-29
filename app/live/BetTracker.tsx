@@ -165,6 +165,10 @@ export default function BetTracker({
   const [open, setOpen] = useState(false);
   const [presetKind, setPresetKind] = useState<BetKind | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  // Live / settled split — tabs above the list so the user can
+  // glance at either category without scrolling through the
+  // accordion that used to bury settled bets. Defaults to Live.
+  const [activeListTab, setActiveListTab] = useState<"live" | "settled">("live");
   const [betCurrency, setBetCurrency] = useState<BetCurrency>(
     DEFAULT_BET_CURRENCY,
   );
@@ -486,21 +490,72 @@ export default function BetTracker({
 
       {bets.length > 0 && (
         <>
-          {activeBets.length > 0 && (
-            <ul className="bets-list">{activeBets.map(renderRow)}</ul>
-          )}
-          {settledBets.length > 0 && (
-            <details
-              className="bets-past"
-              open={activeBets.length === 0}
+          {(activeBets.length > 0 || settledBets.length > 0) && (
+            <div
+              className="bets-tabs"
+              role="tablist"
+              aria-label="Bet list filter"
             >
-              <summary>
-                Past tournament bets · {settledBets.length}
-              </summary>
-              <ul className="bets-list bets-list-past">
-                {settledBets.map(renderRow)}
-              </ul>
-            </details>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeListTab === "live"}
+                className={`bets-tab${
+                  activeListTab === "live" ? " bets-tab-on" : ""
+                }`}
+                onClick={() => setActiveListTab("live")}
+              >
+                Live
+                {activeBets.length > 0 && (
+                  <span className="bets-tab-count">
+                    {activeBets.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeListTab === "settled"}
+                className={`bets-tab${
+                  activeListTab === "settled" ? " bets-tab-on" : ""
+                }`}
+                onClick={() => setActiveListTab("settled")}
+              >
+                Settled
+                {settledBets.length > 0 && (
+                  <span className="bets-tab-count">
+                    {settledBets.length}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+          {activeListTab === "live" ? (
+            activeBets.length > 0 ? (
+              <ul className="bets-list">{activeBets.map(renderRow)}</ul>
+            ) : (
+              <p className="bets-empty-tab">
+                No live bets right now.
+                {settledBets.length > 0 && (
+                  <>
+                    {" "}
+                    <button
+                      type="button"
+                      className="bets-empty-link"
+                      onClick={() => setActiveListTab("settled")}
+                    >
+                      See settled →
+                    </button>
+                  </>
+                )}
+              </p>
+            )
+          ) : settledBets.length > 0 ? (
+            <ul className="bets-list bets-list-past">
+              {settledBets.map(renderRow)}
+            </ul>
+          ) : (
+            <p className="bets-empty-tab">No settled bets yet.</p>
           )}
         </>
       )}

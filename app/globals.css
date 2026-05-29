@@ -13764,6 +13764,92 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Live / Settled tabs above the bet list ──────────────────── */
+.bets-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 4px;
+  background: rgba(127, 127, 127, 0.08);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.bets-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  min-height: 36px;
+  transition: background-color 0.12s, color 0.12s;
+}
+
+.bets-tab:hover {
+  color: var(--text);
+}
+
+.bets-tab-on {
+  background: var(--bg, white);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+
+.bets-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.18);
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.bets-tab-on .bets-tab-count {
+  background: rgba(0, 217, 110, 0.18);
+  color: #00d96e;
+}
+
+.bets-empty-tab {
+  margin: 8px 0 0;
+  padding: 18px 14px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+
+.bets-empty-link {
+  background: transparent;
+  border: none;
+  color: var(--green, #00d96e);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 4px;
+}
+
+.bets-empty-link:hover {
+  text-decoration: underline;
+}
+
 /* ── Past tournament bets (collapsed inside the bet tracker) ──── */
 .bets-past {
   margin-top: 14px;
