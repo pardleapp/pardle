@@ -11268,25 +11268,13 @@ footer {
   }
 }
 
-@media (max-width: 420px) {
-  .feed-row {
-    grid-template-columns: auto 1fr;
-    grid-template-areas:
-      "emoji body"
-      "actions actions";
-    row-gap: 8px;
-  }
-  .feed-emoji {
-    grid-area: emoji;
-  }
-  .feed-body {
-    grid-area: body;
-  }
-  .feed-actions {
-    grid-area: actions;
-    justify-content: flex-end;
-  }
-}
+/* Legacy ≤420 px feed-row override removed. The v4 theme's
+   ≤540 px block (search for "grid-template-areas:" near
+   .v4-theme .feed-row) now owns the entire small-viewport
+   layout — the old rule's `grid-template-columns: auto 1fr` +
+   `auto auto` template clashed with the v4 ≤480 px rule that
+   sets `32px 1fr` columns, leaving grid-area: actions
+   unresolvable on narrow phones. */
 
 .feed-row-wrap {
   display: flex;
@@ -16171,19 +16159,23 @@ body:has(.v4-theme) {
   color: var(--text);
 }
 
+/* Active reel tab — tonal background, NOT inverted text colour.
+   The previous white-on-black variant was the loudest element on
+   the whole page and falsely read as the primary nav (it's just a
+   sub-section toggle). */
 .v4-theme .reel-group-tab-on {
-  background: var(--text);
-  color: #000;
+  background: var(--bg-card-hi);
+  color: var(--text);
 }
 
 .v4-theme .reel-group-tab-count {
-  background: var(--bg-card-hi);
+  background: rgba(255, 255, 255, 0.06);
   color: var(--muted);
 }
 
 .v4-theme .reel-group-tab-on .reel-group-tab-count {
-  background: rgba(0, 0, 0, 0.12);
-  color: #000;
+  background: rgba(0, 217, 110, 0.18);
+  color: #00d96e;
 }
 
 /* Catch-me-up banner */
@@ -16275,7 +16267,12 @@ body:has(.v4-theme) {
     gap: 6px;
   }
   .v4-theme .feed-tournament-name {
-    font-size: 15px;
+    /* Page H1 on mobile — was 15 px which lost to the onboarding
+       cards two sections down. Bump to 18 px so the tournament
+       name actually anchors the page. */
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: -0.01em;
     width: 100%;
   }
   .v4-theme .feed-status-card {
@@ -16434,7 +16431,9 @@ body:has(.v4-theme) {
     font-size: 12.5px;
   }
   .v4-theme .feed-meta {
-    font-size: 10px;
+    /* Freshness signal is the product's whole pitch — keep it
+       readable on mid-tier displays. 10 px disappeared. */
+    font-size: 11px;
   }
   /* Bet tracker rows */
   .v4-theme .bets-row {
@@ -17450,12 +17449,8 @@ body:has(.v4-theme) {
   gap: 12px;
   padding: 10px 14px;
   margin: 0 0 12px;
-  border: 1px solid rgba(255, 157, 46, 0.28);
-  background: linear-gradient(
-    135deg,
-    rgba(255, 157, 46, 0.10) 0%,
-    rgba(255, 157, 46, 0.02) 100%
-  );
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
   border-radius: 12px;
 }
 
@@ -17519,18 +17514,23 @@ body:has(.v4-theme) {
 
 .v4-theme .feed-first-bet-cta-dismiss {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 4px;
+  right: 4px;
   background: transparent;
   border: none;
   color: var(--muted);
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 0;
   border-radius: 999px;
-  min-width: 32px;
-  min-height: 32px;
+  /* 44 px touch target — was 32 × 32 which fell short of the
+     project's own ≥44 px rule for dismiss buttons. */
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .v4-theme .feed-first-bet-cta-dismiss:hover {

@@ -441,6 +441,23 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     {},
   );
   const [floaters, setFloaters] = useState<Floater[]>([]);
+  // Burst bar visibility — hidden on cold landing so a brand-new
+  // visitor doesn't see a permanent strip of unexplained emoji
+  // chrome before they've scrolled into the actual feed. Flips on
+  // as soon as they scroll past ~200 px.
+  const [scrolledIntoFeed, setScrolledIntoFeed] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (scrolledIntoFeed) return;
+    const onScroll = () => {
+      if (window.scrollY > 200) {
+        setScrolledIntoFeed(true);
+      }
+    };
+    onScroll(); // catch the case where the page restored a scroll position
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [scrolledIntoFeed]);
   const [filterMode, setFilterMode] = useState<"all" | "following">("all");
   const [follows, setFollowsState] = useState<string[]>([]);
   // Tracked bets loaded from localStorage on mount + whenever they
@@ -1357,7 +1374,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         ))}
       </div>
 
-      {/* Burst reaction bar — sticky at the bottom */}
+      {/* Burst reaction bar — sticky at the bottom. Hidden until
+          the user has actively scrolled into the feed so a cold
+          visitor doesn't see unexplained emoji chrome before they
+          have any context for what they'd react to. */}
+      {scrolledIntoFeed && (
       <div className="feed-burst-bar">
         {BURST_EMOJIS.map((e) => (
           <button
@@ -1371,6 +1392,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           </button>
         ))}
       </div>
+      )}
     </section>
   );
 }
