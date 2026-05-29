@@ -149,16 +149,11 @@ export default function BetDetail({ betId }: { betId: string }) {
     if (raw === "american" || raw === "fractional" || raw === "decimal") {
       setOddsFormat(raw);
     }
-    // Cached-first paint — try TWO cache layers in priority order:
-    //   1. Bet-detail cache (full include=charts payload — best
-    //      possible initial paint since it has odds histories)
-    //   2. /bets cache (slim payload, no chart history but it
-    //      DOES have currentOdds + playerRoundStates which are
-    //      enough to render the bet hero, current value, and PnL
-    //      immediately while the full fetch lands)
-    // Without this fallback, a brand-new bet just added from /bets
-    // would always pay the full server roundtrip cost on first
-    // open — the user's most common path through the app.
+    // Cached-first paint — read last bet-detail response and show
+    // immediately while the live fetch runs in background. The
+    // /bets cache fallback we briefly added was crashing because
+    // it lacked oddsHistories — reconstructHistory threw on
+    // `undefined[playerId]`. Detail-cache only, for now.
     try {
       const detailRaw = window.localStorage.getItem(
         "pardle_bet_detail_cache_v1",
@@ -172,23 +167,6 @@ export default function BetDetail({ betId }: { betId: string }) {
           env?.ts &&
           env.data &&
           Date.now() - env.ts < 30 * 60 * 1000
-        ) {
-          setData(env.data);
-          return;
-        }
-      }
-      const betsRaw = window.localStorage.getItem(
-        "pardle_bets_cache_v1",
-      );
-      if (betsRaw) {
-        const env = JSON.parse(betsRaw) as {
-          ts: number;
-          data: FeedResponse;
-        };
-        if (
-          env?.ts &&
-          env.data &&
-          Date.now() - env.ts < 5 * 60 * 1000
         ) {
           setData(env.data);
         }
