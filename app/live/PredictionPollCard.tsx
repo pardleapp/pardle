@@ -68,6 +68,12 @@ export default function PredictionPollCard({
   const variant =
     poll.type === "head-to-head" ? "predpoll-h2h" : "predpoll-lead";
 
+  const myOption = hasVoted
+    ? poll.options.find((o) => o.key === myVote)
+    : null;
+  const myCount = myOption ? counts[myOption.key] ?? 0 : 0;
+  const myPct = total > 0 ? (myCount / total) * 100 : 0;
+
   return (
     <article
       className={`predpoll ${variant} ${
@@ -75,7 +81,7 @@ export default function PredictionPollCard({
       }`}
       aria-live="polite"
     >
-      {onDismiss && (
+      {onDismiss && !hasVoted && (
         <button
           type="button"
           className="predpoll-dismiss"
@@ -85,50 +91,71 @@ export default function PredictionPollCard({
           ×
         </button>
       )}
-      <p className="predpoll-eyebrow">{eyebrow}</p>
-      <h3 className="predpoll-question">{poll.question}</h3>
-      <div className="predpoll-options">
-        {poll.options.map((opt) => {
-          const c = counts[opt.key] ?? 0;
-          const pct = total > 0 ? (c / total) * 100 : 0;
-          const isMine = myVote === opt.key;
-          const isPending = pending === opt.key;
-          return (
-            <button
-              type="button"
-              key={opt.key}
-              className={`predpoll-option ${
-                isMine ? "predpoll-option-mine" : ""
-              } ${isPending ? "predpoll-option-pending" : ""} ${
-                hasVoted ? "predpoll-option-after" : "predpoll-option-before"
-              }`}
-              onClick={() => handleVote(opt.key)}
-              disabled={isPending || hasVoted}
-              aria-pressed={isMine}
-            >
-              {showCommunityBars && (
-                <span
-                  className="predpoll-option-bar"
-                  style={{ width: `${pct}%` }}
-                  aria-hidden="true"
-                />
-              )}
-              <span className="predpoll-option-label">{opt.label}</span>
-              {showCommunityBars && (
-                <span className="predpoll-option-count">
-                  {total === 0 ? "—" : `${Math.round(pct)}%`}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+
+      {!hasVoted && (
+        <>
+          <p className="predpoll-eyebrow">{eyebrow}</p>
+          <h3 className="predpoll-question">{poll.question}</h3>
+          <div className="predpoll-options">
+            {poll.options.map((opt) => {
+              const isPending = pending === opt.key;
+              return (
+                <button
+                  type="button"
+                  key={opt.key}
+                  className={`predpoll-option predpoll-option-before ${
+                    isPending ? "predpoll-option-pending" : ""
+                  }`}
+                  onClick={() => handleVote(opt.key)}
+                  disabled={isPending}
+                >
+                  <span className="predpoll-option-label">{opt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
       {hasVoted && (
-        <p className="predpoll-meta">
-          {total === 0
-            ? "First call — counts toward your Sharp Score"
-            : `${total} ${total === 1 ? "call" : "calls"} so far · counts toward your Sharp Score`}
-        </p>
+        <>
+          <p className="predpoll-eyebrow predpoll-eyebrow-voted">
+            ✓ You called it · {myOption?.label}
+          </p>
+          <h3 className="predpoll-question predpoll-question-voted">
+            {poll.question}
+          </h3>
+          <div className="predpoll-results">
+            {poll.options.map((opt) => {
+              const c = counts[opt.key] ?? 0;
+              const pct = total > 0 ? (c / total) * 100 : 0;
+              const isMine = myVote === opt.key;
+              return (
+                <div
+                  key={opt.key}
+                  className={`predpoll-result-row${
+                    isMine ? " predpoll-result-row-mine" : ""
+                  }`}
+                >
+                  <span
+                    className="predpoll-result-bar"
+                    style={{ width: `${pct}%` }}
+                    aria-hidden="true"
+                  />
+                  <span className="predpoll-result-label">{opt.label}</span>
+                  <span className="predpoll-result-pct">
+                    {total === 0 ? "—" : `${Math.round(pct)}%`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="predpoll-meta predpoll-meta-voted">
+            {total <= 1
+              ? "First call — counts toward your Sharp Score"
+              : `${myPct >= 50 ? "You're with the crowd" : "You're calling against the crowd"} · ${total} calls in`}
+          </p>
+        </>
       )}
     </article>
   );

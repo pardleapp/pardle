@@ -43,7 +43,7 @@ interface Props {
 }
 
 const DISMISSED_KEY = "pardle_predpoll_dismissed_v1";
-const POST_VOTE_HOLD_MS = 1800;
+const POST_VOTE_HOLD_MS = 3200;
 
 function readDismissed(): Set<string> {
   if (typeof window === "undefined") return new Set();

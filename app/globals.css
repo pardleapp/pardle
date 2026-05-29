@@ -9539,8 +9539,118 @@ footer {
   background: rgba(255, 255, 255, 0.09);
 }
 
-.predpoll-option-after {
-  cursor: default;
+/* ── Post-vote results state ─────────────────────────────────────
+   After the user votes the card transforms into a results panel:
+   a green "✓ You called it · Yes" eyebrow, the question (slightly
+   muted now), and two prominent bar rows showing community %.
+   Visually distinct enough that the user can't miss what happened
+   between tapping the button and the card disappearing. */
+.predpoll-voted {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0, 217, 110, 0.08) 0%,
+      rgba(0, 217, 110, 0) 100%
+    ),
+    var(--bg-card, #0e0f12);
+  border-color: rgba(0, 217, 110, 0.3);
+}
+
+.predpoll-eyebrow-voted {
+  color: #00d96e;
+  margin-bottom: 6px;
+}
+
+.predpoll-question-voted {
+  color: rgba(245, 245, 247, 0.7);
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.predpoll-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.predpoll-result-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+  min-height: 44px;
+  /* Subtle slide-in so the transition from buttons → results
+     is visually motion-tracked. Fast enough not to delay reading. */
+  animation: predpoll-result-in 0.22s ease-out;
+}
+
+@keyframes predpoll-result-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.predpoll-result-row-mine {
+  border-color: rgba(0, 217, 110, 0.55);
+  background: rgba(0, 217, 110, 0.05);
+}
+
+.predpoll-result-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(255, 255, 255, 0.06);
+  z-index: 0;
+  transition: width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.predpoll-result-row-mine .predpoll-result-bar {
+  background: rgba(0, 217, 110, 0.18);
+}
+
+.predpoll-result-label {
+  position: relative;
+  z-index: 1;
+  font-weight: 800;
+  font-size: 14.5px;
+  color: var(--text, #f5f5f7);
+  flex: 1;
+  min-width: 0;
+}
+
+.predpoll-result-pct {
+  position: relative;
+  z-index: 1;
+  font-weight: 900;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text, #f5f5f7);
+  flex-shrink: 0;
+}
+
+.predpoll-result-row-mine .predpoll-result-pct {
+  color: #00d96e;
+}
+
+.predpoll-meta-voted {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
 }
 
 .predpoll-option {
