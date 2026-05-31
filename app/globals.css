@@ -135,35 +135,33 @@ body {
   }
 }
 
-/* Two-column feed layout on desktop. Mobile keeps display:contents
-   so the wrapper is layout-invisible and children participate in
-   the parent's natural block flow — DOM order identical to before
-   the wrapper existed. Goal: change desktop only, never mobile. */
-.feed-layout {
-  display: contents;
-}
-
+/* Two-column feed layout. Mobile: plain block — .feed-layout has
+   no styling at all, children (aside then main) stack as natural
+   block elements, identical order to before the wrapper existed.
+   Desktop ≥1024 px: explicit two-column grid via grid-template-
+   areas so placement can't be miscomputed by auto-flow.
+   Goal: change desktop only, never mobile. */
 @media (min-width: 1024px) {
   .feed-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 380px;
+    grid-template-rows: auto;
+    grid-template-areas: "main side";
     column-gap: 40px;
     align-items: start;
   }
   .feed-layout > .feed-main {
-    grid-column: 1;
+    grid-area: main;
     min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 14px;
   }
   .feed-layout > .feed-side {
-    grid-column: 2;
+    grid-area: side;
     display: flex;
     flex-direction: column;
     gap: 14px;
-    position: sticky;
-    top: 14px;
   }
 }
 
