@@ -135,28 +135,27 @@ export default function MySharpCard({ minCalls }: { minCalls: number }) {
       : acc >= 50
         ? "ok"
         : "poor";
+  const callsToGo = Math.max(0, minCalls - stats.total);
 
   return (
     <div className={`my-sharp-card my-sharp-card-${tone}`}>
       <div className="my-sharp-card-row">
         <div className="my-sharp-card-left">
           <p className="my-sharp-card-eyebrow">Your Sharp Score</p>
-          {stats.qualified ? (
-            <p className="my-sharp-card-headline">
-              <span className="my-sharp-card-acc">{acc}%</span>
-              <span className="my-sharp-card-acc-lbl">accuracy</span>
-            </p>
-          ) : (
-            <p className="my-sharp-card-headline">
-              <span className="my-sharp-card-acc">
-                {stats.total}/{minCalls}
-              </span>
-              <span className="my-sharp-card-acc-lbl">calls to qualify</span>
-            </p>
-          )}
+          <p className="my-sharp-card-headline">
+            <span className="my-sharp-card-acc">{acc}%</span>
+            <span className="my-sharp-card-acc-lbl">
+              {stats.correct} of {stats.total} calls right
+            </span>
+          </p>
           <p className="my-sharp-card-sub">
-            {stats.correct} correct · {stats.total} calls
-            {stats.qualified && stats.rank != null && ` · #${stats.rank}`}
+            {stats.qualified
+              ? `On the leaderboard${
+                  stats.rank != null ? ` at #${stats.rank}` : ""
+                }`
+              : `${callsToGo} more ${
+                  callsToGo === 1 ? "call" : "calls"
+                } to land on the public leaderboard`}
             {stats.currentStreak >= 2 && ` · 🔥 ${stats.currentStreak} in a row`}
           </p>
         </div>
