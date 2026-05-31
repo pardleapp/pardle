@@ -13271,6 +13271,282 @@ html, body {
   padding: 4px 4px 14px;
 }
 
+/* ── My Sharp Score card (top of /sharp) ─────────────────────── */
+.my-sharp-card {
+  margin: 0 0 18px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-card, #0e0f12);
+}
+
+.my-sharp-card-good {
+  border-color: rgba(0, 217, 110, 0.45);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0, 217, 110, 0.08) 0%,
+      rgba(0, 217, 110, 0) 100%
+    ),
+    var(--bg-card, #0e0f12);
+}
+
+.my-sharp-card-poor {
+  border-color: rgba(255, 75, 107, 0.4);
+}
+
+.my-sharp-card-loading,
+.my-sharp-card-empty {
+  text-align: center;
+}
+
+.my-sharp-skeleton {
+  height: 60px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  animation: my-sharp-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes my-sharp-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.my-sharp-empty-line {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.my-sharp-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.my-sharp-card-left {
+  min-width: 0;
+  flex: 1;
+}
+
+.my-sharp-card-eyebrow {
+  margin: 0 0 4px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.my-sharp-card-headline {
+  margin: 0 0 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.my-sharp-card-acc {
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.my-sharp-card-good .my-sharp-card-acc {
+  color: #00d96e;
+}
+
+.my-sharp-card-poor .my-sharp-card-acc {
+  color: #ff4b6b;
+}
+
+.my-sharp-card-acc-lbl {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.my-sharp-card-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.my-sharp-card-name {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--text-faint, rgba(245, 245, 247, 0.5));
+}
+
+.my-sharp-share-btn {
+  flex-shrink: 0;
+  background: #00d96e;
+  color: #001b0a;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  min-height: 40px;
+  letter-spacing: 0.01em;
+}
+
+.my-sharp-share-btn:hover:not(:disabled) {
+  background: #1ee27d;
+}
+
+.my-sharp-share-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+/* ── Public share landing (/share/sharp/[token]) ─────────────── */
+.sharp-share {
+  max-width: 560px;
+  margin: 12px auto;
+  padding: 8px 4px 80px;
+  text-align: center;
+}
+
+.sharp-share-eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sharp-share-name {
+  margin: 0 0 24px;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.sharp-share-hero {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  border: 4px solid var(--border);
+  background: var(--bg-card);
+  margin: 0 0 18px;
+}
+
+.sharp-share-hero-good {
+  border-color: rgba(0, 217, 110, 0.7);
+  box-shadow: 0 0 60px rgba(0, 217, 110, 0.25);
+}
+
+.sharp-share-hero-poor {
+  border-color: rgba(255, 75, 107, 0.6);
+}
+
+.sharp-share-hero-acc {
+  font-size: 56px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.sharp-share-hero-good .sharp-share-hero-acc {
+  color: #00d96e;
+}
+
+.sharp-share-hero-poor .sharp-share-hero-acc {
+  color: #ff4b6b;
+}
+
+.sharp-share-hero-lbl {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.sharp-share-stats {
+  list-style: none;
+  margin: 0 0 28px;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+
+.sharp-share-stats li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 70px;
+}
+
+.sharp-share-stat-num {
+  font-size: 18px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.sharp-share-stat-lbl {
+  font-size: 10.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+.sharp-share-ctas {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 28px;
+}
+
+.sharp-share-cta {
+  display: inline-block;
+  padding: 12px 22px;
+  border-radius: 999px;
+  background: #00d96e;
+  color: #001b0a;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 800;
+  min-height: 44px;
+}
+
+.sharp-share-cta-quiet {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.sharp-share-cta-quiet:hover {
+  color: var(--text);
+}
+
+.sharp-share-footnote {
+  margin: 0 auto;
+  max-width: 440px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .v4-theme .sharp-page-title {
   margin: 0;
   font-size: 22px;

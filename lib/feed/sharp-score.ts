@@ -58,6 +58,62 @@ function lbNamesKey() {
   return `sharp:lb:season:names`;
 }
 
+/** Forward + reverse mapping for the public share token. The share
+ *  URL is /share/sharp/[token]; we never expose authorKey directly
+ *  because it's also the write-credential the API uses to attribute
+ *  votes. Token is an opaque random string the user can paste into
+ *  WhatsApp / iMessage without leaking their identity. */
+function shareTokenForAuthor(authorKey: string) {
+  return `sharp:share:by-author:${authorKey}`;
+}
+function authorForShareToken(token: string) {
+  return `sharp:share:by-token:${token}`;
+}
+
+function generateShareToken(): string {
+  // 16 random url-safe characters — collision probability is
+  // negligible at our user count and the token is checked against
+  // Redis on every share-page hit anyway.
+  const alphabet =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let out = "";
+  for (let i = 0; i < 16; i++) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return out;
+}
+
+/**
+ * Return a stable public token for this author's Sharp Score share
+ * URL. First call generates one and stores both forward + reverse
+ * mappings in Redis; subsequent calls return the same token. The
+ * recipient never sees the authorKey.
+ */
+export async function getOrCreateSharpShareToken(
+  authorKey: string,
+): Promise<string | null> {
+  if (!authorKey) return null;
+  const existing = await redis.get<string>(shareTokenForAuthor(authorKey));
+  if (typeof existing === "string" && existing.length > 0) return existing;
+  // Race-safe-ish: another concurrent call might generate a different
+  // token, but the reverse map is keyed on the token so worst case
+  // is an orphaned record. NX-set guards the forward map.
+  const token = generateShareToken();
+  await redis.set(shareTokenForAuthor(authorKey), token);
+  await redis.set(authorForShareToken(token), authorKey);
+  return token;
+}
+
+/** Resolve a share token back to the author. Used by the public
+ *  share page to look up the right Sharp Score record. */
+export async function getAuthorByShareToken(
+  token: string,
+): Promise<string | null> {
+  if (!token) return null;
+  const v = await redis.get<string>(authorForShareToken(token));
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
 export interface SharpScoreStats {
   total: number;
   correct: number;

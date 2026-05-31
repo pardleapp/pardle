@@ -17,6 +17,7 @@ import {
 } from "@/lib/feed/sharp-score";
 import AuthChip from "../live/auth/AuthChip";
 import MainNav from "../MainNav";
+import MySharpCard from "./MySharpCard";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,8 @@ export default async function SharpLeaderboardPage() {
             qualify.
           </p>
         </div>
+
+        <MySharpCard minCalls={SHARP_MIN_CALLS} />
 
         {qualified.length === 0 ? (
           <div className="sharp-empty">
