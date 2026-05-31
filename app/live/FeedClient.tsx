@@ -878,38 +878,45 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         </h2>
       </div>
 
-      {/* Only the Sunday call survives above the feed — first-bet
-          CTA + CatchMeUp banner removed for clutter. Call is one-
-          and-done per visit; once the user votes / dismisses it,
-          the entire pre-feed area is empty and the live feed sits
-          directly under the tournament header. */}
-      {data.predictionPolls && data.predictionPolls.length > 0 && (
-        <PredictionPollDeck
-          polls={data.predictionPolls}
-          myVotes={myPredictionVotes}
-          onVote={sendPredictionVote}
-        />
-      )}
+      {/* Desktop ≥1024 px: split into two columns via CSS grid on
+          the .feed-layout wrapper. Sidebar (Sunday call + reels +
+          search) goes right; feed list goes left.
 
-      <ReelGroup
-        panes={[
-          {
-            key: "best",
-            title: "⛳ Shots of the day",
-            rows: data.bestReel ?? [],
-          },
-          {
-            key: "worst",
-            title: "💀 Worst of the day",
-            rows: data.worstReel ?? [],
-          },
-        ]}
-        myReactions={myReactions}
-        onReact={sendReaction}
-        storageKey="homefeed"
-      />
+          Mobile: .feed-layout uses display:contents so this div
+          becomes layout-invisible and its children participate in
+          the parent's natural block flow — DOM order is the same
+          as before the wrapper existed. */}
+      <div className="feed-layout">
+        <aside className="feed-side">
+          {data.predictionPolls && data.predictionPolls.length > 0 && (
+            <PredictionPollDeck
+              polls={data.predictionPolls}
+              myVotes={myPredictionVotes}
+              onVote={sendPredictionVote}
+            />
+          )}
 
-      <PlayerSearch players={data.playerIndex ?? []} />
+          <ReelGroup
+            panes={[
+              {
+                key: "best",
+                title: "⛳ Shots of the day",
+                rows: data.bestReel ?? [],
+              },
+              {
+                key: "worst",
+                title: "💀 Worst of the day",
+                rows: data.worstReel ?? [],
+              },
+            ]}
+            myReactions={myReactions}
+            onReact={sendReaction}
+            storageKey="homefeed"
+          />
+
+          <PlayerSearch players={data.playerIndex ?? []} />
+        </aside>
+        <main className="feed-main">
 
       {/* Following toggle — bet relevance now surfaces inline as a
           per-row £ impact chip rather than a whole separate feed. */}
@@ -1292,6 +1299,8 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       <p className="feed-footnote">
         Live PGA Tour scoring
       </p>
+        </main>
+      </div>
 
       {/* Floating-emoji overlay — fixed so bursts rise over the whole feed */}
       <div className="feed-floater-layer" aria-hidden="true">
