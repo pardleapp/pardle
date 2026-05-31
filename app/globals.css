@@ -8184,6 +8184,112 @@ footer {
   margin-top: 8px;
 }
 
+/* "You cashed" celebration card — shown above the chart for 24 h
+   after a bet settles won, dismissible. Bright green so it reads
+   as a celebration, not chrome. */
+.bd-win-card {
+  position: relative;
+  padding: 20px 22px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 217, 110, 0.5);
+  background:
+    radial-gradient(
+      circle at 100% 0%,
+      rgba(0, 217, 110, 0.22) 0%,
+      rgba(0, 217, 110, 0.06) 50%,
+      transparent 100%
+    ),
+    rgba(0, 217, 110, 0.05);
+  text-align: left;
+  animation: bd-win-card-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes bd-win-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.bd-win-card-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  color: rgba(0, 217, 110, 0.65);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bd-win-card-dismiss:hover {
+  background: rgba(0, 217, 110, 0.1);
+  color: #00d96e;
+}
+
+.bd-win-card-eyebrow {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #00d96e;
+}
+
+.bd-win-card-amount {
+  margin: 0 0 6px;
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: #00d96e;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 24px rgba(0, 217, 110, 0.4);
+}
+
+.bd-win-card-sub {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.bd-win-card-share {
+  background: #00d96e;
+  color: #001b0a;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 22px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  min-height: 44px;
+  letter-spacing: 0.01em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bd-win-card-share:hover:not(:disabled) {
+  background: #1ee27d;
+}
+
+.bd-win-card-share:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
 .bd-back {
   align-self: flex-start;
   display: inline-flex;

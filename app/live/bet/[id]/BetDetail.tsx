@@ -117,6 +117,25 @@ function buildShareText(
 ): string {
   const stake = formatBetCurrency(bet.stake, bet.currency);
   const odds = formatOdds(bet.oddsTaken, oddsFormat);
+  // Settled-won variant: lead with the WIN amount + bet structure,
+  // close with "tracked live on pardle.app". Phrasing keeps it
+  // clear that Pardle is the tracker, not the sportsbook — "tracked"
+  // not "won at", since the bet was placed elsewhere.
+  if (bet.settledAt != null && bet.settledWon === true) {
+    const payout = formatBetCurrency(bet.stake * bet.oddsTaken, bet.currency);
+    let line: string;
+    if (bet.kind === "outright") {
+      line = `${bet.playerName} to win @ ${odds}`;
+    } else if (bet.kind === "round-score") {
+      const r = bet.round != null ? ` R${bet.round}` : "";
+      line = `${bet.playerName}${r} ${bet.side} ${bet.line} @ ${odds}`;
+    } else if (bet.kind === "winning-score") {
+      line = `winning score ${bet.side} ${bet.line} @ ${odds}`;
+    } else {
+      line = `${bet.playerName} top ${bet.cutoff} @ ${odds}`;
+    }
+    return `Cashed ${payout} — ${line}.\n\nTracking my bets on ${url}`;
+  }
   let line: string;
   if (bet.kind === "outright") {
     line = `${stake} on ${bet.playerName} to win @ ${odds}`;
@@ -128,7 +147,7 @@ function buildShareText(
   } else {
     line = `${stake} on ${bet.playerName} top ${bet.cutoff} @ ${odds}`;
   }
-  return `I've got ${line}.\n\nFollow it live → ${url}`;
+  return `Got ${line}.\n\nTracking live on ${url}`;
 }
 
 export default function BetDetail({ betId }: { betId: string }) {
@@ -360,6 +379,34 @@ export default function BetDetail({ betId }: { betId: string }) {
     "idle" | "sending" | "sent" | "err"
   >("idle");
 
+  // Celebration card: shown above the chart when a bet has just
+  // settled WON within the last 24 h AND the user hasn't already
+  // dismissed it. localStorage flag keyed by bet id so the same
+  // win doesn't re-nag across page revisits.
+  const [winCardDismissed, setWinCardDismissed] = useState(false);
+  useEffect(() => {
+    if (!bet || typeof window === "undefined") return;
+    const key = `pardle_win_card_dismissed_${bet.id}`;
+    if (window.localStorage.getItem(key) === "1") {
+      setWinCardDismissed(true);
+    }
+  }, [bet]);
+  const dismissWinCard = useCallback(() => {
+    if (!bet || typeof window === "undefined") return;
+    const key = `pardle_win_card_dismissed_${bet.id}`;
+    try {
+      window.localStorage.setItem(key, "1");
+    } catch {
+      // silent
+    }
+    setWinCardDismissed(true);
+  }, [bet]);
+  const showWinCard =
+    bet?.settledAt != null &&
+    bet?.settledWon === true &&
+    Date.now() - bet.settledAt < 24 * 60 * 60 * 1000 &&
+    !winCardDismissed;
+
   // Owned tipster channels for the "Post as tip" button. Fetched
   // once when the page loads + bet is hydrated; null until loaded,
   // empty array = no channels (button hidden).
@@ -578,6 +625,39 @@ export default function BetDetail({ betId }: { betId: string }) {
       <Link href="/bets" className="bd-back" aria-label="Back to bets">
         ← Bets
       </Link>
+      {showWinCard && bet && (
+        <div className="bd-win-card" role="status">
+          <button
+            type="button"
+            className="bd-win-card-dismiss"
+            onClick={dismissWinCard}
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+          <p className="bd-win-card-eyebrow">🎉 Cashed</p>
+          <p className="bd-win-card-amount">
+            +{formatBetCurrency(bet.stake * bet.oddsTaken - bet.stake, bet.currency)}
+          </p>
+          <p className="bd-win-card-sub">
+            {"playerName" in bet
+              ? `${(bet as { playerName: string }).playerName} settled green. Want to brag?`
+              : "Bet settled green. Want to brag?"}
+          </p>
+          <button
+            type="button"
+            className="bd-win-card-share"
+            onClick={shareThis}
+            disabled={shareStatus === "sending"}
+          >
+            {shareStatus === "sent"
+              ? "Shared ✓"
+              : shareStatus === "sending"
+                ? "…"
+                : "Share the win"}
+          </button>
+        </div>
+      )}
       <header className="bd-head bd-head-hero">
         <div className={`bd-hero ${profitClass}`}>
           <span className="bd-hero-amt">
