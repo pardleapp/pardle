@@ -71,13 +71,23 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
     };
   }, []);
 
-  // Pick the mock data slot for this player. Real wiring replaces
-  // this lookup with a server-fetched DataGolf + orchestrator merge.
-  const key = resolvePlayerKey(initialName ?? "");
+  // Pick the mock data slot for this player. We try the URL id
+  // first (crew-post links encode the player name there), then
+  // initialName (server-resolved when wired), and finally fall
+  // back to Henley so the page never blanks. Real wiring replaces
+  // this with a server-fetched DataGolf + orchestrator merge.
+  const decodedId = (() => {
+    try {
+      return decodeURIComponent(playerId);
+    } catch {
+      return playerId;
+    }
+  })();
+  const key = resolvePlayerKey(decodedId in PLAYER_DATA ? decodedId : initialName ?? "");
   const data = PLAYER_DATA[key];
   const season = SEASON[key];
   const seasonSg = SEASON_SG[key];
-  const displayName = initialName ?? key;
+  const displayName = decodedId in PLAYER_DATA ? decodedId : initialName ?? key;
 
   const [tab, setTab] = useState<"week" | "season">("week");
   const [following, setFollowing] = useState(true);

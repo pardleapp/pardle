@@ -19668,6 +19668,17 @@ html.pv-theme-body .auth-chip-btn {
   min-width: 0;
   color: var(--pv-ink);
 }
+.pv-theme .bp-bet-player-link {
+  text-decoration: none;
+}
+@media (hover: hover) {
+  .pv-theme .bp-bet-player-link:hover {
+    color: var(--pv-emerald-d);
+    text-decoration: underline;
+    text-decoration-color: var(--pv-emerald);
+    text-underline-offset: 3px;
+  }
+}
 .pv-theme .bp-bet-mkt {
   font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
   font-size: 10px;

@@ -11,6 +11,7 @@
  * social layer.
  */
 
+import Link from "next/link";
 import type {
   MockBetPost,
   MockResultPost,
@@ -137,7 +138,12 @@ export function CrewBetPost({ post }: { post: MockBetPost }) {
         </div>
       </div>
       <div className="bp-bet">
-        <span className="bp-bet-player">{post.playerName}</span>
+        <Link
+          href={`/live/player/${encodeURIComponent(post.playerName)}`}
+          className="bp-bet-player bp-bet-player-link"
+        >
+          {post.playerName}
+        </Link>
         <span className="bp-bet-mkt">{post.marketLabel}</span>
         <span className="bp-bet-stake">
           {post.currency}
