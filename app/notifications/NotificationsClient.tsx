@@ -43,6 +43,8 @@ import { useRouter } from "next/navigation";
 import { MOCK_NOTIFS, type NotifRow } from "./mock-notifications";
 import { useNotifications } from "../live/notifications/useNotifications";
 import { getFollows } from "../live/FollowButton";
+import { useAuth } from "../live/auth/useAuth";
+import SignInModal from "../live/auth/SignInModal";
 
 /** iOS Safari detection — must be iOS, must NOT be in an in-app
  *  browser, must NOT already be installed as a PWA. Identical
@@ -63,9 +65,11 @@ function isIosSafariNeedsInstall(): boolean {
 export default function NotificationsClient() {
   const router = useRouter();
   const { state, enable, disable } = useNotifications();
+  const auth = useAuth();
   const [rows, setRows] = useState<NotifRow[]>(MOCK_NOTIFS);
   const [iosInstall, setIosInstall] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [signInOpen, setSignInOpen] = useState(false);
 
   // Apply pv-theme-body on mount so the brand bar / nav re-skin paper.
   useEffect(() => {
@@ -117,8 +121,13 @@ export default function NotificationsClient() {
   };
 
   // What permission card to show.
-  // Priority: iOS-needs-install > unsupported > subscribed >
-  // denied > default (Enable).
+  // Priority: iOS-needs-install > unsupported > signed-out >
+  // subscribed > denied > default (Enable). The signed-out gate
+  // sits ABOVE the regular Enable card because /api/push/subscribe
+  // requires Supabase auth — if we let an anon user tap Enable
+  // the OS prompt would appear, the browser would subscribe
+  // locally, but the server POST would 401 silently and the card
+  // would never flip to "Alerts on". Cleaner to gate first.
   const subscribed = state.subscribed && state.permission === "granted";
   const card = (() => {
     if (iosInstall) {
@@ -154,6 +163,32 @@ export default function NotificationsClient() {
               installed home-screen app.
             </div>
           </div>
+        </div>
+      );
+    }
+    // Signed-out gate — show before Enable so the user can't fall
+    // through into a silent 401 on the subscribe POST.
+    if (!auth.loading && !auth.user) {
+      return (
+        <div className="np-card">
+          <div className="np-ic" aria-hidden="true">
+            🔔
+          </div>
+          <div className="np-bd">
+            <div className="np-h">Sign in to enable alerts</div>
+            <div className="np-s">
+              Notifications follow you across devices, so we need a
+              way to remember you. Sign in with email — takes 10
+              seconds.
+            </div>
+          </div>
+          <button
+            type="button"
+            className="np-btn"
+            onClick={() => setSignInOpen(true)}
+          >
+            Sign in
+          </button>
         </div>
       );
     }
@@ -250,6 +285,7 @@ export default function NotificationsClient() {
           ))}
         </ul>
       </div>
+      <SignInModal open={signInOpen} onClose={() => setSignInOpen(false)} />
     </div>
   );
 }
