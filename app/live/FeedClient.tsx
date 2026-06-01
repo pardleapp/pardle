@@ -51,6 +51,7 @@ import { useNotifications } from "./notifications/useNotifications";
 import PlayerAvatar from "./PlayerAvatar";
 import PlayerSearch from "./PlayerSearch";
 import PuttPollWidget from "./PuttPollWidget";
+import BetPost from "./BetPost";
 const ReelGroup = dynamic(() => import("./ReelGroup"), {
   ssr: false,
   loading: () => null,
@@ -949,6 +950,58 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           </button>
         </div>
       )}
+
+      {/* Tracked bets rendered as feed posts (Pass 2 of broadcast theme).
+          Sits above the shot feed so the user's open positions are the
+          first thing they see when the page paints. Each card shows
+          current live prob + direction + sparkline + threaded shot
+          updates for the bet's player.
+
+          Active bets only — settled bets currently render via the
+          shot-feed's per-row impact chip + the dedicated bet-detail
+          surface. ResultPost in the timeline lands in a later pass. */}
+      {(() => {
+        const activeBets = trackedBets.filter(
+          (b) =>
+            b.settledAt == null &&
+            (b.kind === "outright" || b.kind === "top-finish" || b.kind === "round-score"),
+        );
+        if (activeBets.length === 0) return null;
+        // Newest-first so the most recently placed sweat is on top.
+        const ordered = [...activeBets].sort(
+          (a, b) => b.placedAt - a.placedAt,
+        );
+        return (
+          <div className="pv-bet-strip">
+            <div className="pv-section-label">Your bets · live</div>
+            <div className="pv-bet-strip-list">
+              {ordered.map((bet) => {
+                const playerId =
+                  "playerId" in bet ? (bet.playerId as string) : "";
+                const rowsForPlayer = playerId
+                  ? data.rows
+                      .filter((r) => r.event.playerId === playerId)
+                      .slice(0, 3)
+                  : [];
+                return (
+                  <BetPost
+                    key={bet.id}
+                    bet={bet}
+                    currentOdds={data.currentOdds}
+                    topFinishCurrent={data.topFinishCurrent}
+                    recentRowsForPlayer={rowsForPlayer}
+                    oddsHistory={
+                      playerId
+                        ? data.oddsHistories[playerId] ?? null
+                        : null
+                    }
+                  />
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {data.rows.length === 0 ? (
         <FeedWarmingUp leaderboard={data.leaderboard} />
