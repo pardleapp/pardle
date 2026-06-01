@@ -14,13 +14,6 @@ export const dynamic = "force-dynamic";
 export default function HomeLive() {
   return (
     <main className="container container-wide v4-theme pv-theme">
-      <header className="brand brand-split">
-        <h1>{BRAND.name}</h1>
-        <div className="brand-nav">
-          <MainNav active="live" />
-          <AuthChip />
-        </div>
-      </header>
       <FeedClient />
     </main>
   );

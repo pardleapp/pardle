@@ -53,6 +53,9 @@ import PlayerSearch from "./PlayerSearch";
 import PuttPollWidget from "./PuttPollWidget";
 import BetPost from "./BetPost";
 import BetPostErrorBoundary from "./BetPostErrorBoundary";
+import SweatHeader from "./SweatHeader";
+import PnLTicker from "./PnLTicker";
+import ShotPost from "./ShotPost";
 const ReelGroup = dynamic(() => import("./ReelGroup"), {
   ssr: false,
   loading: () => null,
@@ -920,66 +923,37 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
   return (
     <section className="feed-wrap v4-theme pv-theme">
-      <HeroIntro />
-      <NotificationPrompt
-        betCount={trackedBets.length}
-        followCount={follows.length}
-        follows={follows}
+      <SweatHeader />
+      <PnLTicker
+        trackedBets={trackedBets}
+        displayName={
+          typeof window !== "undefined"
+            ? window.localStorage.getItem("pardle_display_name")
+            : null
+        }
       />
-      <IosInstallHint
-        betCount={trackedBets.length}
-        followCount={follows.length}
-      />
-      <div className="feed-header-row">
-        <h2 className="feed-tournament-name">
-          <span
-            className="feed-live-pulse feed-live-pulse-inline"
-            aria-label="Live"
-            title="Live"
-          />
+      <div className="pv-tournament-strip">
+        <span
+          className="feed-live-pulse feed-live-pulse-inline"
+          aria-label="Live"
+          title="Live"
+        />
+        <span className="pv-tournament-strip-name">
           {data.tournament.name}
-        </h2>
+        </span>
       </div>
 
-      {/* Desktop ≥1024 px: split into two columns via CSS grid on
-          the .feed-layout wrapper. Sidebar (Sunday call + reels +
-          search) goes right; feed list goes left.
-
-          Mobile: .feed-layout uses display:contents so this div
-          becomes layout-invisible and its children participate in
-          the parent's natural block flow — DOM order is the same
-          as before the wrapper existed. */}
-      <div className="feed-layout">
-        <aside className="feed-side">
-          {data.predictionPolls && data.predictionPolls.length > 0 && (
-            <PredictionPollDeck
-              polls={data.predictionPolls}
-              myVotes={myPredictionVotes}
-              onVote={sendPredictionVote}
-            />
-          )}
-
-          <ReelGroup
-            panes={[
-              {
-                key: "best",
-                title: "⛳ Shots of the day",
-                rows: data.bestReel ?? [],
-              },
-              {
-                key: "worst",
-                title: "💀 Worst of the day",
-                rows: data.worstReel ?? [],
-              },
-            ]}
-            myReactions={myReactions}
-            onReact={sendReaction}
-            storageKey="homefeed"
+      {data.predictionPolls && data.predictionPolls.length > 0 && (
+        <div className="pv-poll-deck-host">
+          <PredictionPollDeck
+            polls={data.predictionPolls}
+            myVotes={myPredictionVotes}
+            onVote={sendPredictionVote}
           />
+        </div>
+      )}
 
-          <PlayerSearch players={data.playerIndex ?? []} />
-        </aside>
-        <main className="feed-main">
+      <main className="feed-main">
 
       {/* Filter row — All shots vs Smart feed.
           Smart feed shows only shots that touch a player the user
@@ -1047,15 +1021,9 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
               );
             }
             const { event, reactions, commentCount } = __item.row;
-            const mine = myReactions[event.id];
-            const isOpen = expanded === event.id;
+            const myReaction = myReactions[event.id];
             const count = commentCounts[event.id] ?? commentCount;
-            // First context tag that isn't already shown in a
-            // dedicated slot (hot, deprecated chip strings). Gets a
-            // mobile-only mirror in the actions row so the empty
-            // space to the right of the reactions carries the
-            // event's flavour ("First eagle of the season", "5
-            // birdies in a row", etc.) instead of being dead.
+            // First non-deprecated context tag worth surfacing.
             const primaryContextTag = (event.tags ?? []).find((t) => {
               if (/^\d+ of last \d+ in red$/.test(t)) return false;
               if (/^top \d+ in field today$/.test(t)) return false;
@@ -1067,323 +1035,17 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
               <li
                 key={event.id}
                 data-event-id={event.id}
-                className={`feed-row-wrap ${isOpen ? "feed-row-wrap-open" : ""}`}
+                className="feed-row-wrap"
               >
-                <div
-                  className={`feed-row ${
-                    event.type === "shot"
-                      ? `feed-row-shot${event.highlight ? " feed-row-shot-good" : ""}${event.lowlight ? " feed-row-shot-bad" : ""}`
-                      : `feed-row-${event.result ?? "other"}`
-                  }`}
-                >
-                  <span className="feed-emoji" aria-hidden="true">
-                    {event.emoji}
-                  </span>
-                  <PlayerAvatar
-                    playerId={event.playerId}
-                    playerName={event.playerName}
-                    size="md"
-                    state={data.handStatus?.[event.playerId] ?? null}
-                  />
-                  <div className="feed-body">
-                    <Link
-                      href={`/live/player/${event.playerId}`}
-                      className="feed-body-link"
-                    >
-                      <div className="feed-row-head">
-                        <span className="feed-row-name">
-                          {abbreviateName(event.playerName)}
-                          {data.handStatus?.[event.playerId] && (
-                            <HandBadge
-                              status={data.handStatus[event.playerId]}
-                            />
-                          )}
-                        </span>
-                        <ScoreChip event={event} />
-                      </div>
-                      {/* Action sentence only on events whose score chip
-                          can't carry the full identity — shots and polls.
-                          Score events (birdie/eagle/bogey/etc.) get the
-                          result label baked into the chip itself, so a
-                          duplicate "Birdies the 14th" line would be noise. */}
-                      {event.type !== "score" && (
-                        <p className="feed-row-action">
-                          {stripPlayerName(event.headline, event.playerName)}
-                        </p>
-                      )}
-                    </Link>
-                    {(() => {
-                      const backingPct =
-                        data.communityBackingPct?.[event.playerId];
-                      const showBacking =
-                        typeof backingPct === "number" &&
-                        (data.communityTotalBettors ?? 0) >= 5;
-                      // Build a single chip list, then cap at 2 — keeps
-                      // mobile rows from wrapping to 3-4 chip lines.
-                      // Priority order (top wins the 2 visible slots):
-                      //   1. PnL impact (your money is moving)
-                      //   2. 🔥 hot chip (community attention is here)
-                      //   3. odds shift
-                      //   4. top-10 shift
-                      //   5. context tags
-                      //   6. community backing
-                      // The hot chip is pulled out of event.tags to
-                      // jump it to slot 2 — otherwise impact + odds
-                      // shifts push it off the visible cap and waste
-                      // the pulsing-amber "look at me" treatment on
-                      // a row no-one can see it on.
-                      const chips: Array<JSX.Element> = [];
-                      // PnL impact chip — fires only when this event
-                      // materially moved one of the user's tracked
-                      // bets. Computed per row from the engine-baked
-                      // oddsBefore/After + top10Before/After deltas
-                      // (precise for outright + top-10) or a per-stroke
-                      // heuristic for round-score. Direct: event player
-                      // is the bet player; indirect: a top-of-leaderboard
-                      // competitor moved your guy's prob via market
-                      // redistribution. Chip carries the actual £ swing.
-                      const impact =
-                        trackedBets.length > 0
-                          ? headlineImpactForEvent(event, trackedBets, {
-                              currentOdds: data.currentOdds,
-                              leaderboard: data.leaderboard,
-                            })
-                          : null;
-                      if (impact) {
-                        const positive = impact.deltaValue >= 0;
-                        const indirect = impact.source === "indirect";
-                        const emoji = positive
-                          ? indirect
-                            ? "🎯"
-                            : "🚀"
-                          : "💀";
-                        const kindLabel = betKindShortLabel(impact.bet);
-                        const verb = indirect
-                          ? positive
-                            ? "lifts"
-                            : "hurts"
-                          : "on";
-                        // Now a real Link — the feed-tags paragraph is
-                        // a sibling of the player Link, not nested
-                        // inside it, so anchors are valid here.
-                        const betHref = `/live/bet/${impact.bet.id}`;
-                        chips.push(
-                          <Link
-                            key="impact"
-                            href={betHref}
-                            className={`feed-tag feed-tag-impact ${
-                              positive
-                                ? "feed-tag-impact-up"
-                                : "feed-tag-impact-down"
-                            }`}
-                            title={
-                              indirect
-                                ? `Competitor moved the market — estimated ${formatImpactCurrency(impact.deltaValue, impact.bet.currency)} on your ${kindLabel}`
-                                : `${formatImpactCurrency(impact.deltaValue, impact.bet.currency)} change to your ${kindLabel}`
-                            }
-                          >
-                            {emoji}{" "}
-                            {formatImpactCurrency(
-                              impact.deltaValue,
-                              impact.bet.currency,
-                            )}{" "}
-                            {verb} your {kindLabel}
-                          </Link>,
-                        );
-                      }
-                      // Hot chip jumps the queue before odds/top-10/
-                      // context tags. Found by scanning event.tags for
-                      // the "🔥 going off" prefix the cron injects at
-                      // render time.
-                      const hotTag = (event.tags ?? []).find((t) =>
-                        t.startsWith("🔥 going off"),
-                      );
-                      if (hotTag) {
-                        chips.push(
-                          <span
-                            key="hot"
-                            className="feed-tag feed-tag-hot"
-                          >
-                            {hotTag}
-                          </span>,
-                        );
-                      }
-                      if (event.oddsBefore && event.oddsAfter) {
-                        chips.push(
-                          <span
-                            key="odds"
-                            className={`feed-tag feed-tag-odds ${
-                              event.oddsAfter < event.oddsBefore
-                                ? "feed-tag-odds-shorten"
-                                : "feed-tag-odds-drift"
-                            }`}
-                            title="Win-market odds shift"
-                          >
-                            odds {formatOdds(event.oddsBefore, oddsFormat)} →{" "}
-                            {formatOdds(event.oddsAfter, oddsFormat)}
-                          </span>,
-                        );
-                      }
-                      if (
-                        event.top10Before != null &&
-                        event.top10After != null
-                      ) {
-                        chips.push(
-                          <span
-                            key="top10"
-                            className={`feed-tag feed-tag-odds ${
-                              event.top10After > event.top10Before
-                                ? "feed-tag-odds-shorten"
-                                : "feed-tag-odds-drift"
-                            }`}
-                            title="Top-10 finish probability shift"
-                          >
-                            top 10 {Math.round(event.top10Before * 100)}% →{" "}
-                            {Math.round(event.top10After * 100)}%
-                          </span>,
-                        );
-                      }
-                      for (const t of event.tags ?? []) {
-                        // Deprecated chip strings — old events in the
-                        // Redis-cached feed list still carry these in
-                        // their baked-in tags array. Filter them at
-                        // render time so they don't show until those
-                        // events naturally scroll off (~24h).
-                        if (
-                          /^\d+ of last \d+ in red$/.test(t) ||
-                          /^top \d+ in field today$/.test(t) ||
-                          /^among most /.test(t)
-                        ) {
-                          continue;
-                        }
-                        // Hot chip was already pushed above with its
-                        // own priority slot — skip the dup here.
-                        if (t.startsWith("🔥 going off")) continue;
-                        // First context tag also gets a slot inside
-                        // the actions row on mobile (see CSS), so
-                        // mark it for hiding on phones to avoid
-                        // duplication.
-                        const isPrimary = t === primaryContextTag;
-                        chips.push(
-                          <span
-                            key={`tag-${t}`}
-                            className={`feed-tag${
-                              isPrimary ? " feed-tag-primary" : ""
-                            }`}
-                          >
-                            {t}
-                          </span>,
-                        );
-                      }
-                      if (showBacking) {
-                        chips.push(
-                          <span
-                            key="backing"
-                            className="feed-tag feed-tag-community"
-                            title={`Backed by ${backingPct}% of Pardle bettors this week`}
-                          >
-                            {backingPct}% of Pardle backs him
-                          </span>,
-                        );
-                      }
-                      if (chips.length === 0) return null;
-                      // Render all chips and let CSS wrap them; the
-                      // feed-tags container uses flex-wrap with a
-                      // mobile-only line-clamp so phones still get 2
-                      // visible while tablet+ shows everything.
-                      return <p className="feed-tags">{chips}</p>;
-                    })()}
-                    <Link
-                      href={`/live/player/${event.playerId}`}
-                      className="feed-body-link feed-meta-link"
-                    >
-                      <p className="feed-meta">
-                        R{event.round} · {timeAgo(event.ts)}
-                      </p>
-                    </Link>
-                  </div>
-                  {event.type === "putt-poll" &&
-                    event.pollId &&
-                    // Latest open poll → render widget for live voting.
-                    // Closed poll → render widget showing the result.
-                    // Older open poll (putt already struck offscreen) → skip.
-                    (event.pollId === latestOpenPollId ||
-                      data.puttPolls?.[event.pollId]?.closedAt != null) && (
-                      <PuttPollWidget
-                        pollId={event.pollId}
-                        puttDistanceFt={event.puttDistanceFt}
-                        playerName={event.playerName}
-                        serverState={data.puttPolls?.[event.pollId]}
-                        optimisticVote={myPollVotes[event.pollId]}
-                        optimisticCounts={pollCounts[event.pollId]}
-                        onVote={(v) => sendPollVote(event.pollId!, v)}
-                      />
-                    )}
-                  <div className="feed-actions">
-                    <button
-                      type="button"
-                      className={`feed-react ${mine === "up" ? "feed-react-on" : ""} ${reactions.up === 0 && mine !== "up" ? "feed-react-zero" : ""}`}
-                      onClick={() => sendReaction(event.id, "up")}
-                      aria-label="Like"
-                    >
-                      <IconThumbUp />
-                      {reactions.up > 0 && (
-                        <span className="feed-react-count">{reactions.up}</span>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      className={`feed-react ${mine === "down" ? "feed-react-on" : ""} ${reactions.down === 0 && mine !== "down" ? "feed-react-zero" : ""}`}
-                      onClick={() => sendReaction(event.id, "down")}
-                      aria-label="Dislike"
-                    >
-                      <IconThumbDown />
-                      {reactions.down > 0 && (
-                        <span className="feed-react-count">{reactions.down}</span>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      className={`feed-react ${isOpen ? "feed-react-on" : ""} ${count === 0 && !isOpen ? "feed-react-zero" : ""}`}
-                      onClick={() => setExpanded(isOpen ? null : event.id)}
-                      aria-label="Comments"
-                    >
-                      <IconComment />
-                      {count > 0 && (
-                        <span className="feed-react-count">{count}</span>
-                      )}
-                    </button>
-                    <FollowButton
-                      playerId={event.playerId}
-                      playerName={event.playerName}
-                      variant="icon"
-                    />
-                    {primaryContextTag && (
-                      <button
-                        type="button"
-                        className={`feed-actions-tag${
-                          expandedTags[event.id]
-                            ? " feed-actions-tag-open"
-                            : ""
-                        }`}
-                        onClick={() => toggleTag(event.id)}
-                        aria-expanded={!!expandedTags[event.id]}
-                        title={primaryContextTag}
-                      >
-                        {primaryContextTag}
-                      </button>
-                    )}
-                  </div>
-                </div>
-                {isOpen && (
-                  <CommentThread
-                    eventId={event.id}
-                    authorKey={authorKey.current}
-                    onCountChange={(c) =>
-                      setCommentCounts((m) => ({ ...m, [event.id]: c }))
-                    }
-                  />
-                )}
+                <ShotPost
+                  event={event}
+                  reactions={reactions}
+                  commentCount={count}
+                  myReaction={myReaction}
+                  onReact={sendReaction}
+                  contextTag={primaryContextTag}
+                  handStatus={data.handStatus?.[event.playerId] ?? null}
+                />
               </li>
             );
           })}
@@ -1394,7 +1056,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         Live PGA Tour scoring
       </p>
         </main>
-      </div>
 
       {/* + FAB — opens the add-bet flow. Routes to /bets which hosts
           the existing add-bet sheet. Fixed bottom-right, mobile-first;

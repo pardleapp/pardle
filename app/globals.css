@@ -20162,6 +20162,340 @@ html.pv-theme-body .auth-chip-btn {
    prototype: + FAB, mobile bottom nav, groups-soon route.
    ============================================================= */
 
+/* =============================================================
+   Sweat Feed top header (.pv-head) — Pardle wordmark on the left,
+   bell + Space-switcher chip on the right. Replaces the old brand
+   bar + MainNav on pv-theme'd surfaces.
+   ============================================================= */
+.pv-head {
+  flex-shrink: 0;
+  padding: 12px 16px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--pv-line);
+  background: var(--pv-bg);
+  position: relative;
+  z-index: 30;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+.pv-head-wordmark {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--pv-emerald-d);
+  text-decoration: none;
+}
+.pv-head-wordmark b {
+  color: var(--pv-tang);
+  font-weight: 900;
+}
+.pv-head-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pv-head-bell {
+  position: relative;
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--pv-ink);
+  flex-shrink: 0;
+}
+.pv-space-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 999px;
+  padding: 5px 11px 5px 6px;
+  cursor: pointer;
+  color: var(--pv-ink);
+  font-family: inherit;
+}
+.pv-space-ic {
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  background: var(--pv-soft);
+  flex-shrink: 0;
+}
+.pv-space-nm {
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+.pv-space-nm small {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--pv-muted);
+}
+.pv-space-cv {
+  color: var(--pv-muted);
+  font-size: 11px;
+}
+
+/* =============================================================
+   P&L ticker bar — sticky emerald-dark slab under header.
+   Prototype shape: [LABEL] [member chip] [member chip] [your chip]
+   ============================================================= */
+.pv-ticker {
+  flex-shrink: 0;
+  background: var(--pv-emerald-d);
+  color: #fff;
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  overflow-x: auto;
+  position: relative;
+  z-index: 20;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+.pv-ticker::-webkit-scrollbar {
+  height: 0;
+}
+.pv-ticker-lbl {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: oklch(0.85 0.06 155);
+  flex-shrink: 0;
+  line-height: 1.1;
+}
+.pv-ticker-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: oklch(0.46 0.12 156);
+  border-radius: 999px;
+  padding: 4px 11px 4px 4px;
+  flex-shrink: 0;
+}
+.pv-ticker-item-you {
+  background: var(--pv-tang);
+}
+.pv-ticker-av {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: oklch(0.46 0.12 156);
+  color: #fff;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  font-size: 9px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.pv-ticker-item-you .pv-ticker-av {
+  background: oklch(0.55 0.16 50);
+}
+.pv-ticker-nm {
+  font-size: 12px;
+  font-weight: 800;
+}
+.pv-ticker-pl {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+.pv-ticker-pl.up {
+  color: oklch(0.92 0.14 150);
+}
+.pv-ticker-pl.down {
+  color: oklch(0.85 0.12 30);
+}
+.pv-ticker-item-you .pv-ticker-pl {
+  color: #fff;
+}
+.pv-ticker-stake {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: oklch(0.85 0.06 155);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Tournament strip under the ticker — just LIVE pulse + name. */
+.pv-tournament-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 16px 10px;
+  background: var(--pv-bg);
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+.pv-tournament-strip .feed-live-pulse-inline {
+  background: var(--pv-emerald) !important;
+}
+.pv-tournament-strip-name {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--pv-emerald-d);
+  letter-spacing: -0.01em;
+}
+
+.pv-poll-deck-host {
+  padding: 0 13px;
+  margin-bottom: 4px;
+}
+
+/* =============================================================
+   ShotPost — primary shot row in the Sweat Feed. Matches
+   social-v2.css .spost shape: avatar | body, body has top
+   (name+tag+hole+score), text, react row.
+   ============================================================= */
+.spost {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 17px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.16s ease, transform 0.16s ease;
+}
+@media (hover: hover) {
+  .spost:hover {
+    box-shadow: 0 10px 26px oklch(0.4 0.06 145 / 0.14);
+    transform: translateY(-2px);
+  }
+}
+.spost-avatar {
+  flex-shrink: 0;
+  text-decoration: none;
+  color: inherit;
+}
+.spost-body {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.spost-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+.spost-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--pv-ink);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.spost-hand {
+  font-weight: 400;
+}
+.spost-tag {
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+  border-radius: 5px;
+  margin-left: auto;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+.spost-tag.tag-birdie,
+.spost-tag.tag-eagle {
+  background: oklch(0.92 0.06 155);
+  color: var(--pv-emerald-d);
+}
+.spost-tag.tag-bogey {
+  background: oklch(0.93 0.05 28);
+  color: var(--pv-down);
+}
+.spost-hole {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pv-muted);
+  flex-shrink: 0;
+}
+.spost-score {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--pv-up);
+  flex-shrink: 0;
+}
+.spost-score.over {
+  color: var(--pv-down);
+}
+.spost-text {
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--pv-ink);
+  margin: 6px 0 9px;
+}
+.spost-react {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.spost-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--pv-line);
+  background: var(--pv-card);
+  color: var(--pv-muted);
+  border-radius: 999px;
+  padding: 6px 11px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.1s;
+}
+.spost-act:active {
+  transform: scale(0.92);
+}
+.spost-act-on {
+  background: var(--pv-soft);
+  color: var(--pv-ink);
+  border-color: var(--pv-emerald);
+}
+.spost-act svg {
+  width: 15px;
+  height: 15px;
+}
+.spost-ctx {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pv-muted);
+  background: var(--pv-soft);
+  border-radius: 999px;
+  padding: 5px 10px;
+}
+
 /* + FAB — fixed bottom-right, opens add-bet flow on /bets. */
 .pv-fab {
   position: fixed;
@@ -20271,10 +20605,12 @@ html.pv-theme-body .auth-chip-btn {
   html:has(.pv-theme) .brand-nav {
     gap: 8px;
   }
-  /* Push page content above the bottom nav so the last item isn't
-     hidden behind the strip. */
+  /* Push page content above the bottom nav AND the FAB so the last
+     item isn't hidden behind either. Bottom nav ~70 px, FAB sits at
+     140 px from viewport bottom + 54 px tall, so we need ~210 px of
+     clearance — round up to 220 to give the burst bar room to breathe. */
   body:has(.pv-theme) {
-    padding-bottom: 76px;
+    padding-bottom: 220px;
   }
   /* The sticky burst-emoji bar normally pins to bottom:0 of its
      scroll container — on a pv-theme'd page that would overlap with
