@@ -22103,10 +22103,12 @@ html.pv-theme-body .auth-chip-btn {
   border-color: var(--pv-ink);
 }
 
+/* Header row mirrors the row grid exactly so columns line up. */
 .lb-cols {
-  display: flex;
+  display: grid;
+  grid-template-columns: 28px 34px 1fr 44px 44px 28px;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   padding: 8px 14px 7px;
   font-size: 9.5px;
   font-weight: 800;
@@ -22115,12 +22117,7 @@ html.pv-theme-body .auth-chip-btn {
   color: var(--pv-dim);
   border-bottom: 1px solid var(--pv-line);
 }
-.lb-col-pos { width: 30px; flex-shrink: 0; }
-.lb-col-av { width: 30px; flex-shrink: 0; }
-.lb-col-nm { flex: 1 1 0; min-width: 0; }
-.lb-col-td { width: 42px; flex-shrink: 0; text-align: right; }
-.lb-col-tot { width: 42px; flex-shrink: 0; text-align: right; }
-.lb-col-thru { width: 24px; flex-shrink: 0; text-align: right; }
+.lb-col-num { text-align: right; }
 
 .lb-list {
   list-style: none;
@@ -22133,11 +22130,16 @@ html.pv-theme-body .auth-chip-btn {
 .lb-row-mine {
   background: oklch(0.97 0.02 145);
 }
+/* Row is a true CSS grid — every column has a hard width except
+   the name-block (1fr). The market-tag pill lives in a second line
+   under the name *inside* the name-block, so it can never reach
+   the Today / Total / Thru columns no matter how long it is. */
 .lb-row-btn {
-  display: flex;
-  width: 100%;
+  display: grid;
+  grid-template-columns: 28px 34px 1fr 44px 44px 28px;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
+  width: 100%;
   padding: 11px 14px;
   background: none;
   border: none;
@@ -22155,25 +22157,26 @@ html.pv-theme-body .auth-chip-btn {
    The name cell itself is a nested flex container with overflow:
    hidden + min-width:0 so .lb-nm-text truncates with ellipsis when
    there isn't room for both name and bet-tag. */
+/* Grid cell — width comes from the grid template; flex-shrink is
+   no longer needed (grid cells don't shrink unless flagged). */
 .lb-pos {
-  width: 30px;
-  flex-shrink: 0;
   font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
   font-size: 13px;
   font-weight: 700;
   color: var(--pv-muted);
+  text-align: left;
 }
 .lb-av {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   overflow: hidden;
-  flex-shrink: 0;
-  background: linear-gradient(135deg, #56b0e8, #3a4f9b);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: #fff;
+  background: linear-gradient(135deg, #56b0e8, #3a4f9b);
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
 }
 .lb-av img {
   width: 100%;
@@ -22181,28 +22184,36 @@ html.pv-theme-body .auth-chip-btn {
   object-fit: cover;
 }
 .lb-av-init {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
+  letter-spacing: 0.02em;
 }
-/* Name cell is the only thing that flexes. Keeping it WITHOUT
-   overflow:hidden so the bet-tag chip is never clipped — only the
-   .lb-nm-text inside is the truncation point. */
-.lb-nm {
-  flex: 1 1 0;
+/* Name-block grid cell — owns line 1 (name + follow-dot) and
+   line 2 (bet-tag pill). Both lines are bounded by min-width:0 +
+   overflow:hidden so the tag can never spill into the numeric
+   columns. */
+.lb-name-block {
   min-width: 0;
+  overflow: hidden;
+}
+.lb-name-line {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14.5px;
-  font-weight: 700;
-  color: var(--pv-ink);
+  min-width: 0;
 }
 .lb-nm-text {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--pv-ink);
+}
+.lb-tag-line {
+  margin-top: 3px;
 }
 .fdot {
   width: 7px;
@@ -22224,8 +22235,6 @@ html.pv-theme-body .auth-chip-btn {
   flex-shrink: 0;
 }
 .lb-td {
-  width: 42px;
-  flex-shrink: 0;
   text-align: right;
   font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
   font-size: 13px;
@@ -22235,8 +22244,6 @@ html.pv-theme-body .auth-chip-btn {
 .lb-td-down { color: var(--pv-down); }
 .lb-td-flat { color: var(--pv-muted); }
 .lb-tot {
-  width: 42px;
-  flex-shrink: 0;
   text-align: right;
   font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
   font-size: 15px;
@@ -22245,8 +22252,6 @@ html.pv-theme-body .auth-chip-btn {
 }
 .lb-tot-over { color: var(--pv-down); }
 .lb-thru {
-  width: 24px;
-  flex-shrink: 0;
   text-align: right;
   font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
   font-size: 11px;

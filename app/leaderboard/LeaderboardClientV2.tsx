@@ -28,7 +28,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { pgaTourHeadshotUrlById } from "@/lib/data/pga-tour-ids";
 import {
   LEADERBOARD,
   EVENT_LINE,
@@ -37,26 +36,52 @@ import {
 
 type Filter = "all" | "following" | "bets";
 
+/** Two-letter initials from the player's last name —
+ *  "R. Henley" → "HE", "B. Griffin" → "GR", "M. Meissner" → "ME".
+ *  Always derives from the name so the leaderboard never falls back
+ *  to a "?" placeholder image while we're still on mock data. */
+function lastNameInitials(name: string): string {
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "??";
+  const last = parts[parts.length - 1];
+  return last.slice(0, 2).toUpperCase();
+}
+
+/** Gradient based on the initials so each player's avatar is
+ *  distinct + stable across renders. */
+const PALETTE: Array<[string, string]> = [
+  ["#6b7df2", "#c659d8"],
+  ["#f29a4f", "#d44a4a"],
+  ["#56b0e8", "#3a4f9b"],
+  ["#5cd7c1", "#1f8b6e"],
+  ["#e87f9e", "#a23676"],
+  ["#a070ff", "#3b1f8a"],
+  ["#ffb35a", "#c4691a"],
+  ["#85d4f7", "#1f6b9e"],
+  ["#ed7a99", "#7a274d"],
+  ["#7be0ad", "#26795a"],
+];
+function gradientFor(seed: string): [string, string] {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return PALETTE[Math.abs(h) % PALETTE.length];
+}
+
 function Headshot({ name }: { name: string }) {
-  const [failed, setFailed] = useState(false);
-  // Mock data is keyed by name, not by PGA id — try the headshot
-  // lookup with the name-derived initials as a best-effort URL slot
-  // and fall back to a gradient + initials. Real wiring threads
-  // playerId through here.
-  const initials = name
-    .split(" ")
-    .pop()
-    ?.slice(0, 2)
-    .toUpperCase() ?? "PP";
-  const headshot = pgaTourHeadshotUrlById(name, 60);
+  // Mock-only mode — always render the gradient + initials avatar
+  // so no row ever shows a "?" placeholder from a failed remote
+  // headshot. When real wiring lands the playerId-keyed Cloudinary
+  // URL gets layered on top with an onError fallback to this same
+  // gradient.
+  const initials = lastNameInitials(name);
+  const [from, to] = gradientFor(initials);
   return (
-    <span className="lb-av" aria-hidden="true">
-      {!failed ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={headshot} alt="" onError={() => setFailed(true)} />
-      ) : (
-        <span className="lb-av-init">{initials}</span>
-      )}
+    <span
+      className="lb-av"
+      aria-hidden="true"
+      style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
+    >
+      <span className="lb-av-init">{initials}</span>
     </span>
   );
 }
@@ -116,12 +141,12 @@ export default function LeaderboardClientV2() {
       </div>
 
       <div className="lb-cols">
-        <span className="lb-col-pos">Pos</span>
-        <span className="lb-col-av" />
-        <span className="lb-col-nm">Player</span>
-        <span className="lb-col-td">Today</span>
-        <span className="lb-col-tot">Total</span>
-        <span className="lb-col-thru">Thru</span>
+        <span>Pos</span>
+        <span />
+        <span>Player</span>
+        <span className="lb-col-num">Today</span>
+        <span className="lb-col-num">Total</span>
+        <span className="lb-col-num">Thru</span>
       </div>
 
       <ul className="lb-list">
@@ -147,11 +172,19 @@ export default function LeaderboardClientV2() {
                 >
                   <span className="lb-pos">{r.pos}</span>
                   <Headshot name={r.name} />
-                  <span className="lb-nm">
-                    <span className="lb-nm-text">{r.name}</span>
-                    {r.following && <span className="fdot" aria-label="Following" />}
-                    {r.bet && <span className="bettag">{r.bet}</span>}
-                  </span>
+                  <div className="lb-name-block">
+                    <div className="lb-name-line">
+                      <span className="lb-nm-text">{r.name}</span>
+                      {r.following && (
+                        <span className="fdot" aria-label="Following" />
+                      )}
+                    </div>
+                    {r.bet && (
+                      <div className="lb-tag-line">
+                        <span className="bettag">{r.bet}</span>
+                      </div>
+                    )}
+                  </div>
                   <span className={`lb-td lb-td-${r.dir}`}>{r.today}</span>
                   <span className={`lb-tot${totalIsOver ? " lb-tot-over" : ""}`}>
                     {r.total}
