@@ -21677,6 +21677,370 @@ html.pv-theme-body .auth-chip-btn {
   margin-top: 12px;
 }
 
+/* =============================================================
+   Settlement moment — light/paper modal that fires when a tracked
+   bet resolves. Wins get an emerald hero + confetti; losses get a
+   red hero, no confetti.
+   ============================================================= */
+.settle-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.settle-scrim {
+  position: absolute;
+  inset: 0;
+  background: oklch(0.2 0.04 150 / 0.5);
+}
+.settle-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 322px;
+  border-radius: 20px;
+  padding: 26px 22px 20px;
+  text-align: center;
+  background: var(--pv-card);
+  border: 1px solid oklch(0.86 0.08 150);
+  box-shadow: 0 30px 70px oklch(0.4 0.05 150 / 0.3);
+  overflow: hidden;
+  color: var(--pv-ink);
+  animation: settle-popin 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+@keyframes settle-popin {
+  0% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+.settle-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    125% 80% at 50% -12%,
+    oklch(0.85 0.16 150 / 0.24),
+    transparent 62%
+  );
+  pointer-events: none;
+}
+.settle-card-loss {
+  border-color: oklch(0.88 0.07 28);
+}
+.settle-card-loss::before {
+  background: radial-gradient(
+    125% 80% at 50% -12%,
+    oklch(0.78 0.15 28 / 0.18),
+    transparent 62%
+  );
+}
+.settle-grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+      oklch(0.5 0.05 150 / 0.1) 1px,
+      transparent 1px
+    ),
+    linear-gradient(90deg, oklch(0.5 0.05 150 / 0.1) 1px, transparent 1px);
+  background-size: 24px 24px;
+  -webkit-mask-image: radial-gradient(
+    circle at 50% 22%,
+    black,
+    transparent 70%
+  );
+  mask-image: radial-gradient(circle at 50% 22%, black, transparent 70%);
+  pointer-events: none;
+}
+.settle-status {
+  position: relative;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--pv-emerald-d);
+}
+.settle-card-loss .settle-status {
+  color: var(--pv-down);
+}
+.settle-amt {
+  position: relative;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 50px;
+  font-weight: 700;
+  line-height: 1;
+  margin: 12px 0 7px;
+  font-variant-numeric: tabular-nums;
+  color: var(--pv-emerald-d);
+  text-shadow: 0 0 22px oklch(0.7 0.18 150 / 0.25);
+}
+.settle-card-loss .settle-amt {
+  color: var(--pv-down);
+  text-shadow: none;
+}
+.settle-sub {
+  position: relative;
+  font-size: 12.5px;
+  color: var(--pv-muted);
+  font-weight: 600;
+  line-height: 1.45;
+}
+.settle-book {
+  position: relative;
+  margin: 16px 0;
+  padding: 11px 12px;
+  border-radius: 11px;
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pv-ink);
+}
+.settle-book b {
+  color: var(--pv-emerald-d);
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+}
+.settle-btns {
+  position: relative;
+  display: flex;
+  gap: 9px;
+}
+.settle-btns button {
+  flex: 1;
+  padding: 13px;
+  border-radius: 11px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  border: none;
+}
+.settle-share {
+  background: var(--pv-emerald);
+  color: #fff;
+}
+.settle-done {
+  background: var(--pv-soft);
+  color: var(--pv-ink);
+  border: 1px solid var(--pv-line);
+}
+
+/* Confetti — 22 little geometric squares falling top → bottom. */
+.confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+.confetti span {
+  position: absolute;
+  top: -8%;
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+  animation: confetti-fall linear forwards;
+}
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0);
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(560px) rotate(560deg);
+    opacity: 0;
+  }
+}
+
+/* =============================================================
+   Share card — screenshot-ready light Pardle-branded card with
+   Save image / Share to group actions below.
+   ============================================================= */
+.share-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  gap: 16px;
+}
+.share-scrim {
+  position: absolute;
+  inset: 0;
+  background: oklch(0.2 0.04 150 / 0.5);
+}
+.share-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  background: rgba(0, 0, 0, 0.1);
+  border: none;
+  color: var(--pv-ink);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 15px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.share-card {
+  position: relative;
+  z-index: 1;
+  width: 286px;
+  border-radius: 20px;
+  padding: 24px 22px;
+  background: var(--pv-card);
+  border: 1px solid oklch(0.86 0.08 150);
+  box-shadow: 0 30px 70px oklch(0.4 0.05 150 / 0.32);
+  color: var(--pv-ink);
+  overflow: hidden;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+.share-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    130% 70% at 50% 0%,
+    oklch(0.85 0.16 150 / 0.24),
+    transparent 62%
+  );
+  pointer-events: none;
+}
+.share-top {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.share-logo {
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--pv-emerald-d);
+}
+.share-logo b {
+  color: var(--pv-tang);
+}
+.share-live {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--pv-muted);
+  text-transform: uppercase;
+}
+.share-won {
+  position: relative;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--pv-emerald-d);
+  text-transform: uppercase;
+  margin-top: 24px;
+}
+.share-amt {
+  position: relative;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1;
+  margin-top: 6px;
+  color: var(--pv-emerald-d);
+  text-shadow: 0 0 22px oklch(0.7 0.18 150 / 0.22);
+}
+.share-bet {
+  position: relative;
+  font-size: 13px;
+  color: var(--pv-muted);
+  font-weight: 600;
+  margin-top: 11px;
+}
+.share-meta {
+  position: relative;
+  display: flex;
+  gap: 7px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.share-chip {
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: var(--pv-ink);
+}
+.share-foot {
+  position: relative;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--pv-dim);
+  margin-top: 20px;
+  letter-spacing: 0.12em;
+}
+.share-actions {
+  position: relative;
+  display: flex;
+  gap: 9px;
+  z-index: 1;
+}
+.share-actions button {
+  background: var(--pv-card);
+  color: var(--pv-ink);
+  border: 1px solid var(--pv-line);
+  border-radius: 11px;
+  padding: 12px 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.share-actions .share-actions-pri {
+  background: var(--pv-emerald);
+  color: #fff;
+  border-color: var(--pv-emerald);
+}
+
+/* Make the .bets-settled row clickable — pass through button reset
+   so the existing visual stays unchanged. */
+.pv-theme .bets-settled {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 13px;
+  padding: 14px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  color: var(--pv-ink);
+}
+.pv-theme .bets-settled:hover {
+  box-shadow: 0 10px 26px oklch(0.4 0.06 145 / 0.14);
+}
+
 /* "Your bets" section heading above the bet posts */
 .pv-theme .pv-section-label {
   font-size: 10.5px;

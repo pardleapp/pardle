@@ -18,13 +18,41 @@
  */
 
 import { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   MOCK_BETS_LIVE,
   MOCK_BETS_SETTLED,
   ODDS_FORMAT_OPTIONS,
   type OddsFormatKey,
+  type MockBetSettled,
 } from "./mock-bets";
 import BetRow from "./BetRow";
+import SettlementModal, { type SettlementData } from "./SettlementModal";
+import ShareCard from "./ShareCard";
+
+/** Build the settlement-modal data from a MockBetSettled — derives
+ *  returnedLabel for wins (stake × odds), books a mock daily P&L
+ *  + group rank string. Will swap to real settlement engine output
+ *  when that wires in. */
+function buildSettlementData(b: MockBetSettled): SettlementData {
+  const decOdds = parseFloat(b.odds) || 0;
+  const returnedAmount = b.result === "WON" ? Math.round(b.stake * decOdds) : 0;
+  const returnedLabel = returnedAmount
+    ? `${b.cur}${returnedAmount.toLocaleString("en-US")}`
+    : undefined;
+  return {
+    win: b.result === "WON",
+    profitLabel: b.pl,
+    returnedLabel,
+    player: b.who,
+    market: b.mkt,
+    currency: b.cur,
+    stake: b.stake,
+    oddsLabel: b.odds,
+    bookedDailyPnl: b.result === "WON" ? "+£226" : "−£40",
+    groupRank: b.result === "WON" ? "2nd in The Lads" : "3rd in The Lads",
+  };
+}
 
 const ODDS_FORMAT_STORAGE = "pardle_bets_oddsfmt_v2";
 
@@ -38,6 +66,32 @@ function readPersistedFormat(): OddsFormatKey {
 export default function BetsClient() {
   const [oddsFmt, setOddsFmt] = useState<OddsFormatKey>("am");
   const [tab, setTab] = useState<"live" | "settled">("live");
+  const [settle, setSettle] = useState<SettlementData | null>(null);
+  const [shareData, setShareData] = useState<SettlementData | null>(null);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Deep-link support: /bets?settle=s1 opens the settlement moment
+  // for a given settled bet id. Used by the feed's compact settled-
+  // bet card so tapping it reopens the modal.
+  useEffect(() => {
+    const id = searchParams.get("settle");
+    if (!id) return;
+    const bet = MOCK_BETS_SETTLED.find((b) => b.id === id);
+    if (!bet) return;
+    setSettle(buildSettlementData(bet));
+    // Strip the query param so a refresh doesn't reopen.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("settle");
+    router.replace(`${url.pathname}${url.search}${url.hash}`);
+  }, [searchParams, router]);
+
+  // When the user dismisses the share card, also clear settle so we
+  // don't bounce them back to the modal.
+  const closeShare = () => {
+    setShareData(null);
+    setSettle(null);
+  };
 
   // Stamp html.pv-theme-body while /bets is mounted so the body bg
   // goes warm paper and the brand bar re-skins paper.
@@ -178,7 +232,12 @@ export default function BetsClient() {
               </div>
             </div>
             {MOCK_BETS_SETTLED.map((b) => (
-              <div className="bets-settled" key={b.id}>
+              <button
+                type="button"
+                className="bets-settled"
+                key={b.id}
+                onClick={() => setSettle(buildSettlementData(b))}
+              >
                 <div>
                   <div className="bets-settled-nm">{b.who}</div>
                   <div className="bets-settled-sub">
@@ -203,7 +262,7 @@ export default function BetsClient() {
                     {b.result}
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </>
         )}
@@ -212,6 +271,15 @@ export default function BetsClient() {
           bets. 18+ only.
         </p>
       </div>
+
+      {settle && !shareData && (
+        <SettlementModal
+          data={settle}
+          onClose={() => setSettle(null)}
+          onShare={(d) => setShareData(d)}
+        />
+      )}
+      {shareData && <ShareCard data={shareData} onClose={closeShare} />}
     </section>
   );
 }
