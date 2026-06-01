@@ -1,7 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
-import { Inter } from "next/font/google";
+import { Inter, Archivo, IBM_Plex_Mono } from "next/font/google";
 import { BRAND } from "@/lib/brand";
 import SiteFooter from "./SiteFooter";
 import { ToastProvider } from "./live/Toast";
@@ -14,6 +14,24 @@ const inter = Inter({
   variable: "--font-sans",
   display: "swap",
   weight: ["400", "500", "600", "700", "800", "900"],
+});
+
+// Archivo + IBM Plex Mono — the broadcast-theme typography for the
+// new Sweat Feed surface. Archivo carries UI text, Plex Mono carries
+// every odds/score/probability number so digits sit on a tabular
+// rhythm.
+const archivo = Archivo({
+  subsets: ["latin"],
+  variable: "--font-archivo",
+  display: "swap",
+  weight: ["500", "600", "700", "800", "900"],
+});
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
 });
 
 const description =
@@ -60,7 +78,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html
+      lang="en"
+      className={`${inter.variable} ${archivo.variable} ${plexMono.variable}`}
+    >
       <body>
         <ToastProvider>
           {children}

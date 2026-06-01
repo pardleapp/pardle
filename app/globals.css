@@ -19044,3 +19044,440 @@ body:has(.v4-theme) {
   outline: 2px solid var(--green);
   outline-offset: 2px;
 }
+
+/* =============================================================
+   Sweat Feed — "broadcast" theme (light, warm paper + emerald
+   + tangerine). Scoped under .pv-theme so the rest of the app
+   keeps its dark v4 styling until we migrate each surface in turn.
+   Design tokens + class definitions cribbed from the design-handoff
+   prototype (design-handoff/social-v2.css). Wins on specificity vs
+   the unscoped feed rules above and ties+wins (last declaration)
+   vs the .v4-theme rules.
+   ============================================================= */
+.pv-theme {
+  /* surfaces */
+  --pv-bg: oklch(0.972 0.009 95);
+  --pv-card: oklch(0.995 0.004 95);
+  --pv-soft: oklch(0.945 0.012 95);
+  --pv-line: oklch(0.90 0.013 95);
+  /* ink/text */
+  --pv-ink: oklch(0.26 0.04 155);
+  --pv-muted: oklch(0.50 0.02 150);
+  --pv-dim: oklch(0.62 0.018 150);
+  /* brand */
+  --pv-emerald: oklch(0.50 0.13 155);
+  --pv-emerald-d: oklch(0.40 0.12 156);
+  --pv-tang: oklch(0.66 0.18 45);
+  --pv-blue: oklch(0.55 0.14 245);
+  /* market direction */
+  --pv-up: oklch(0.52 0.14 150);
+  --pv-down: oklch(0.57 0.19 28);
+  --pv-follow: oklch(0.66 0.16 60);
+
+  background: var(--pv-bg);
+  color: var(--pv-ink);
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+.pv-theme,
+.pv-theme * {
+  -webkit-tap-highlight-color: transparent;
+}
+.pv-theme .mono,
+.pv-theme [class*="mono"] {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+}
+
+/* Make the body itself paper-light when the feed page is mounted.
+   Targets the body via the html.pv-theme-body class which FeedClient
+   stamps on mount + clears on unmount. Avoids a global body color
+   that would leak into /bets, /sharp etc. */
+html.pv-theme-body,
+html.pv-theme-body body {
+  background: oklch(0.972 0.009 95);
+}
+
+/* page header — drop the dark slab + glow, use a warm hairline */
+.pv-theme.feed-wrap {
+  background: var(--pv-bg);
+  color: var(--pv-ink);
+}
+.pv-theme .feed-header-row {
+  background: var(--pv-bg);
+  border-bottom: 1px solid var(--pv-line);
+  padding: 14px 16px 12px;
+}
+.pv-theme .feed-tournament-name {
+  color: var(--pv-emerald-d);
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  text-shadow: none;
+  filter: none;
+}
+.pv-theme .feed-live-pulse,
+.pv-theme .feed-live-pulse-inline {
+  background: var(--pv-emerald);
+}
+.pv-theme .feed-live-pulse::before,
+.pv-theme .feed-live-pulse::after {
+  background: var(--pv-emerald);
+}
+
+/* feed list — cards on paper, separated by gap not borders */
+.pv-theme .feed-list {
+  background: transparent;
+  padding: 13px 13px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  list-style: none;
+}
+.pv-theme .feed-row-wrap {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+.pv-theme .feed-row-wrap-open .feed-row,
+.pv-theme .feed-row {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 17px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  box-shadow: none;
+  transition: box-shadow 0.16s ease, transform 0.16s ease;
+}
+@media (hover: hover) {
+  .pv-theme .feed-row:hover {
+    box-shadow: 0 10px 26px oklch(0.4 0.06 145 / 0.14);
+    transform: translateY(-2px);
+  }
+}
+.pv-theme .feed-row::before {
+  display: none !important;
+}
+.pv-theme .feed-row-shot {
+  background: var(--pv-card);
+}
+.pv-theme .feed-row-shot-good {
+  border-left: 4px solid var(--pv-up);
+}
+.pv-theme .feed-row-shot-bad {
+  border-left: 4px solid var(--pv-down);
+}
+.pv-theme .feed-row-birdie,
+.pv-theme .feed-row-eagle,
+.pv-theme .feed-row-albatross {
+  border-left: 4px solid var(--pv-up);
+  background: var(--pv-card);
+}
+.pv-theme .feed-row-bogey {
+  border-left: 4px solid oklch(0.78 0.13 60);
+  background: var(--pv-card);
+}
+.pv-theme .feed-row-double,
+.pv-theme .feed-row-triple-plus {
+  border-left: 4px solid var(--pv-down);
+  background: var(--pv-card);
+}
+.pv-theme .feed-row-deep-linked,
+.pv-theme .feed-row-wrap.feed-row-deep-linked .feed-row {
+  box-shadow: 0 0 0 3px var(--pv-emerald);
+}
+
+/* row internals — avatar | body | score chip */
+.pv-theme .feed-row > .avatar,
+.pv-theme .feed-row .player-avatar {
+  flex-shrink: 0;
+}
+.pv-theme .feed-emoji {
+  display: none;
+}
+.pv-theme .feed-body {
+  flex: 1;
+  min-width: 0;
+}
+.pv-theme .feed-body-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+.pv-theme .feed-row-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.pv-theme .feed-row-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--pv-ink);
+  letter-spacing: 0;
+  text-shadow: none;
+}
+.pv-theme .feed-row-action {
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--pv-ink);
+  margin: 6px 0 9px;
+  font-weight: 500;
+}
+
+/* score chip — the right-side BIRDIE / EAGLE / BOGEY pill + hole + total */
+.pv-theme .feed-row-score {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+}
+.pv-theme .feed-row-score-label {
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: oklch(0.92 0.06 155);
+  color: var(--pv-emerald-d);
+  text-transform: uppercase;
+}
+.pv-theme .feed-row-bogey .feed-row-score-label,
+.pv-theme .feed-row-double .feed-row-score-label,
+.pv-theme .feed-row-triple-plus .feed-row-score-label {
+  background: oklch(0.93 0.05 28);
+  color: var(--pv-down);
+}
+.pv-theme .feed-row-score-hole {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pv-muted);
+}
+.pv-theme .feed-row-score-num {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--pv-up);
+}
+.pv-theme .feed-row-score-bad .feed-row-score-num,
+.pv-theme .feed-row-bogey .feed-row-score-num,
+.pv-theme .feed-row-double .feed-row-score-num,
+.pv-theme .feed-row-triple-plus .feed-row-score-num {
+  color: var(--pv-down);
+}
+
+/* actions row — outline pill buttons in place of the dark chips */
+.pv-theme .feed-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.pv-theme .feed-action-btn,
+.pv-theme .feed-actions-btn,
+.pv-theme .feed-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--pv-line);
+  background: var(--pv-card);
+  color: var(--pv-muted);
+  border-radius: 999px;
+  padding: 6px 11px;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.1s;
+}
+.pv-theme .feed-action-btn-active,
+.pv-theme .feed-actions button.on {
+  background: var(--pv-soft);
+  color: var(--pv-ink);
+  border-color: var(--pv-emerald);
+}
+.pv-theme .feed-action-btn:active,
+.pv-theme .feed-actions button:active {
+  transform: scale(0.92);
+}
+
+/* tag chips — context, impact, hot, odds */
+.pv-theme .feed-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pv-muted);
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+.pv-theme .feed-tag-impact {
+  font-weight: 700;
+  border-color: oklch(0.86 0.08 150);
+  color: var(--pv-emerald-d);
+  background: oklch(0.96 0.04 150);
+  text-decoration: none;
+}
+.pv-theme .feed-tag-impact-down {
+  border-color: oklch(0.88 0.07 28);
+  color: var(--pv-down);
+  background: oklch(0.96 0.04 28);
+}
+.pv-theme .feed-tag-hot {
+  background: oklch(0.94 0.08 60);
+  color: oklch(0.45 0.13 50);
+  border-color: oklch(0.88 0.09 60);
+  font-weight: 700;
+}
+.pv-theme .feed-tag-odds {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+}
+.pv-theme .feed-tag-odds-shorten {
+  color: var(--pv-emerald-d);
+  border-color: oklch(0.86 0.08 150);
+}
+.pv-theme .feed-tag-odds-drift {
+  color: var(--pv-down);
+  border-color: oklch(0.88 0.07 28);
+}
+
+/* filter row — pill tabs above the feed */
+.pv-theme .feed-filter-row {
+  display: flex;
+  gap: 8px;
+  padding: 12px 13px 2px;
+  background: transparent;
+  border: none;
+}
+.pv-theme .feed-filter-btn {
+  flex: 1;
+  border: 1px solid var(--pv-line);
+  background: var(--pv-card);
+  color: var(--pv-muted);
+  border-radius: 999px;
+  padding: 9px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.pv-theme .feed-filter-on {
+  background: var(--pv-ink);
+  color: #fff;
+  border-color: var(--pv-ink);
+}
+
+/* the sidebar pane (Sunday call deck + reels + search) on desktop */
+.pv-theme .feed-side {
+  background: transparent;
+}
+.pv-theme .feed-side > * {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 17px;
+}
+
+/* prediction poll card (PollPost) — re-skin from dark to light blue accent */
+.pv-theme .predpoll-card,
+.pv-theme .predpoll-wrap,
+.pv-theme .predpoll-stack {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-left: 4px solid var(--pv-blue);
+  border-radius: 17px;
+  color: var(--pv-ink);
+}
+.pv-theme .predpoll-eyebrow,
+.pv-theme .predpoll-tag {
+  color: var(--pv-blue);
+  background: oklch(0.93 0.05 245);
+  border: none;
+}
+.pv-theme .predpoll-question,
+.pv-theme .predpoll-q {
+  color: var(--pv-ink);
+  font-weight: 800;
+}
+.pv-theme .predpoll-option,
+.pv-theme .predpoll-opt {
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  color: var(--pv-ink);
+}
+.pv-theme .predpoll-option.mine,
+.pv-theme .predpoll-opt.mine {
+  border-color: var(--pv-blue);
+}
+
+/* burst bar — bottom emoji row */
+.pv-theme .feed-burst-bar,
+.pv-theme .burst-bar {
+  background: var(--pv-card);
+  border-top: 1px solid var(--pv-line);
+  color: var(--pv-dim);
+}
+.pv-theme .burst-bar-btn,
+.pv-theme .feed-burst-btn {
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  color: var(--pv-ink);
+  border-radius: 11px;
+}
+
+/* compliance / footnote */
+.pv-theme .feed-footnote,
+.pv-theme .compliance {
+  color: var(--pv-dim);
+}
+
+/* tournament-name + nav header containers on the feed page */
+.pv-theme .brand {
+  background: var(--pv-bg);
+  color: var(--pv-ink);
+  border-bottom: 1px solid var(--pv-line);
+}
+.pv-theme .brand h1 {
+  color: var(--pv-emerald-d);
+  text-shadow: none;
+}
+.pv-theme .hub-nav,
+.pv-theme .hub-nav-tabs {
+  background: var(--pv-bg);
+}
+.pv-theme .hub-nav-tab {
+  color: var(--pv-muted);
+}
+.pv-theme .hub-nav-tab-active {
+  color: var(--pv-emerald-d);
+  background: var(--pv-soft);
+}
+.pv-theme .auth-chip,
+.pv-theme .auth-chip-btn {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  color: var(--pv-ink);
+}
+
+/* container — let the feed breathe on light bg */
+.pv-theme.container,
+.pv-theme .container,
+.pv-theme.container-wide,
+.pv-theme .container-wide {
+  background: var(--pv-bg);
+  color: var(--pv-ink);
+}
+
+/* the inner two-column desktop layout uses transparent rails so the
+   warm-paper bg shows through */
+.pv-theme .feed-layout {
+  background: transparent;
+}
+.pv-theme .feed-main {
+  background: transparent;
+}
+

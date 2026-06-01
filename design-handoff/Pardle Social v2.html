@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pardle · Social v2 (Sweat Feed)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="pardle/social-v2.css">
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel">
+const {useState,useEffect,useRef} = React;
+function pf(s){return parseFloat(String(s).replace(/[−–]/g,'-'));}
+const Ico=({d})=> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{d}</svg>;
+const icoFeed=<Ico d={<><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/></>}/>;
+const icoBets=<Ico d={<><path d="M5 4h11l3 3v13H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></>}/>;
+const icoGroup=<Ico d={<><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M16 6a3 3 0 0 1 0 6"/><path d="M18 13.5a5.5 5.5 0 0 1 2.5 4.5"/></>}/>;
+const icoSharp=<Ico d={<><path d="M12 3v18"/><path d="M4 9h16M4 15h16"/></>}/>;
+const icoBoard=<Ico d={<><path d="M4 20h16"/><rect x="6" y="11" width="3.4" height="7"/><rect x="14.6" y="7" width="3.4" height="11"/><rect x="10.3" y="13" width="3.4" height="5"/></>}/>;
+const thumbUp=<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v11"/><path d="M7 10l4-7a2 2 0 0 1 3 1.7V9h4.5a2 2 0 0 1 2 2.4l-1.4 7A2 2 0 0 1 17 20H7"/></svg>;
+const cmtIcon=<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></svg>;
+
+const COLORS={H:'oklch(0.6 0.16 20)',C:'oklch(0.55 0.13 240)',G:'oklch(0.58 0.15 150)',S:'oklch(0.58 0.12 200)',M:'oklch(0.55 0.14 300)',W:'oklch(0.62 0.16 55)',E:'oklch(0.56 0.13 170)',N:'oklch(0.58 0.15 330)',J:'oklch(0.54 0.15 260)',I:'oklch(0.6 0.16 350)',T:'oklch(0.62 0.14 45)',Y:'oklch(0.6 0.15 140)',P:'oklch(0.56 0.14 320)'};
+function Avatar({initials,size=38,ring=false,pro=false,photo}){const c=COLORS[initials[0]]||'oklch(0.6 0.05 150)';return <div className="av" style={{width:size,height:size,fontSize:size*0.34,background:c,backgroundImage:photo?'url('+photo+')':undefined,backgroundSize:'cover',backgroundPosition:'center top'}}>{ring&&<span className="rg"/>}{!photo&&(pro?<svg viewBox="0 0 24 24" width={size*0.64} height={size*0.64} fill="rgba(255,255,255,0.92)"><circle cx="12" cy="8.4" r="3.9"/><path d="M4.5 21c0-4.3 3.4-6.8 7.5-6.8s7.5 2.5 7.5 6.8z"/></svg>:initials)}</div>;}
+
+const SPACES=[
+  {id:'lads',icon:'🏌️',name:'The Lads',sub:'Private group · 9',kind:'group'},
+  {id:'edge',icon:'📈',name:'@golf-edge',sub:'Channel · 2.4k',kind:'channel'},
+  {id:'global',icon:'🌍',name:'Global',sub:'Everyone on Pardle',kind:'global'},
+];
+const RACE={today:[['JO','Jordan','+£312','up'],['YO','You','+£186','up'],['TH','Theo','+£54','up'],['SA','Sam','−£20','down'],['MI','Mia','−£40','down']],
+  season:[['YO','You','+£1,940','up'],['JO','Jordan','+£1,610','up'],['MI','Mia','+£880','up'],['TH','Theo','+£40','up'],['SA','Sam','−£210','down']],
+  alltime:[['YO','You','+£6,120','up',4],['JO','Jordan','+£5,400','up',3],['MI','Mia','+£3,210','up',2],['TH','Theo','+£1,090','up',1],['SA','Sam','+£420','up',0]]};
+function Spark({hist,dir}){
+  const w=300,h=32,max=Math.max(...hist),min=Math.min(...hist),rng=Math.max(1,max-min);
+  const pts=hist.map((v,i)=>`${(i/(hist.length-1))*w},${h-((v-min)/rng)*(h-5)-3}`).join(' ');
+  const col=dir==='down'?'var(--down)':'var(--up)';
+  return <div className="bp-spark"><svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none"><polyline points={pts} fill="none" stroke={col} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/><circle cx={w} cy={h-((hist[hist.length-1]-min)/rng)*(h-5)-3} r="3.5" fill={col}/></svg></div>;
+}
+
+function AreaChart({hist,dir}){
+  const w=320,h=148,max=Math.max(...hist),min=Math.min(...hist),rng=Math.max(1,max-min);
+  const xy=hist.map((v,i)=>[(i/(hist.length-1))*w,h-((v-min)/rng)*(h-26)-14]);
+  const line=xy.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const area='0,'+h+' '+line+' '+w+','+h;const col=dir==='down'?'var(--down)':'var(--up)';
+  return <div className="chart"><svg viewBox={'0 0 '+w+' '+h} preserveAspectRatio="none">
+    <defs><linearGradient id="bgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={col} stopOpacity="0.22"/><stop offset="1" stopColor={col} stopOpacity="0"/></linearGradient></defs>
+    <polygon points={area} fill="url(#bgrad)"/>
+    <polyline points={line} fill="none" stroke={col} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke"/>
+    <line x1={xy[0][0]} y1="0" x2={xy[0][0]} y2={h} stroke="var(--muted)" strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke"/>
+  </svg></div>;
+}
+const BET_COMMENTS={
+  p1:[{au:'Theo',init:'TH',sharp:'71%',text:'called it — henley closes this out 🔒'},{au:'Mia',init:'MI',sharp:'·',text:'my tail is printing rn'}],
+  p3:[{au:'Jordan',init:'JO',sharp:'64%',text:'steadiest player all week, easy top 5'}],
+  p5:[{au:'Sam',init:'SA',sharp:'·',text:'why did i back the under on a bomber 😮‍💨'},{au:'Theo',init:'TH',sharp:'71%',text:'hold strong lad'}],
+  b1:[{au:'Mia',init:'MI',sharp:'·',text:'tailed this, ty'}],b2:[{au:'Jordan',init:'JO',sharp:'64%',text:'easy lock'}],
+};
+function BetDetail({bet,onClose,onOpenPlayer}){
+  const [list,setList]=useState(BET_COMMENTS[bet.id]||[]);const [txt,setTxt]=useState('');const [tailed,setTailed]=useState(false);const [shared,setShared]=useState(false);
+  const send=()=>{if(txt.trim()){setList(l=>[...l,{au:'You',init:'YO',sharp:'·',text:txt.trim()}]);setTxt('');}};
+  const updates=bet.updates||bet.tl||[];const tailers=bet.on||[];
+  return <div className="detail">
+    <div className="detail-head"><button className="detail-back" onClick={onClose}>←</button><div className="detail-title"><div className="nm">{bet.mine?'Your bet':(bet.name||bet.who)+"'s bet"}</div><div className="mk"><span className="tap-player" onClick={()=>onOpenPlayer&&onOpenPlayer(bet.player||bet.who)} style={{textDecoration:'underline',textDecorationColor:'var(--line)'}}>{bet.player||bet.who}</span> · {bet.mkt} · {bet.cur}{bet.stake}</div></div></div>
+    <div className="detail-body">
+      <div className="detail-hero"><div className="big" style={{color:bet.dir==='down'?'var(--down)':'var(--up)'}}>{bet.prob}%</div><div className="dd" style={{color:bet.dir==='down'?'var(--down)':'var(--up)'}}>{bet.dir==='up'?'▲':'▼'} live win probability</div></div>
+      <AreaChart hist={bet.hist} dir={bet.dir}/>
+      <div className="chart-x"><span>entry</span><span>now</span></div>
+      <div className="chart-note">Today's trajectory · dashed line marks where you entered</div>
+      <div className="detail-sec"><h4>Shot by shot</h4><div className="bp-thread" style={{borderTop:'none',paddingTop:0}}>{updates.map((u,i)=><div className="bp-upd" key={i}><span className={'ud '+u[2]}/><span className="ut">{u[0]}</span><span className={'uv '+u[2]}>{u[1]==='0'?'—':u[1]}</span></div>)}</div></div>
+      <div className="detail-sec"><h4>On this bet · {tailers.length} tailing</h4>
+        <div className="who-on" style={{marginLeft:0}}>{tailers.map(w=><Avatar key={w} initials={w} size={28}/>)}{tailers.length>0&&<span className="lbl">{tailers.length} from your crew tailed this</span>}</div>
+        <div style={{marginTop:12}}>{list.map((c,i)=><div className="cmt-row" key={i}><Avatar initials={c.init} size={26}/><div className="cmt-bd"><span className="cmt-au">{c.au}</span>{c.sharp!=='·'&&<span className="cmt-sharp">{c.sharp}</span>}{c.text}</div></div>)}</div>
+        <div className="cmt-form"><input value={txt} onChange={e=>setTxt(e.target.value)} onKeyDown={e=>e.key==='Enter'&&send()} placeholder="Comment on this bet…"/><button className="send" onClick={send}>↑</button></div>
+      </div>
+    </div>
+    <div className="detail-foot"><button className={'df-share'+(shared?' done':'')} onClick={()=>setShared(true)}>{shared?'Shared ✓':'Share to group'}</button>{!bet.mine&&<button className="df-tail" onClick={()=>setTailed(true)}>{tailed?'Tailed ✓':'Tail this bet'}</button>}</div>
+  </div>;
+}
+const PLAYERS=['R. Henley','E. Cole','B. Griffin','A. Smalley','L. Åberg','N. Echavarria','C. Morikawa'];
+const MARKETS=[['Outright win','12/1'],['Top 5','7/4'],['Top 10','5/6'],['R4 under 69.5','9/10'],['Winning score under','5/4']];
+function AddBet({onClose,onAdd,prefill}){
+  const [player,setPlayer]=useState(prefill||null);const [mkt,setMkt]=useState(1);const [stake,setStake]=useState('');const [cur,setCur]=useState('£');
+  const PLIST=prefill&&!PLAYERS.includes(prefill)?[prefill,...PLAYERS]:PLAYERS;
+  const [odds,setOdds]=useState(MARKETS[1][1]);
+  const ok=player&&stake&&pf(stake)>0&&odds.trim();
+  return <><div className="sheet-scrim" onClick={onClose}/><div className="sheet">
+    <div className="sheet-grip"/><h3>Track a bet</h3>
+    <div className="field"><div className="fl">Player</div><div className="chiprow">{PLIST.map(p=><button key={p} className={'bchip'+(player===p?' on':'')} onClick={()=>setPlayer(p)}>{p}</button>)}</div></div>
+    <div className="field"><div className="fl">Market</div><div className="chiprow">{MARKETS.map((m,i)=><button key={i} className={'bchip'+(mkt===i?' on':'')} onClick={()=>{setMkt(i);setOdds(MARKETS[i][1]);}}>{m[0]}</button>)}</div></div>
+    <div className="field"><div className="fl">Odds taken</div><input className="odds-input" type="text" value={odds} onChange={e=>setOdds(e.target.value)} placeholder="e.g. 7/4 · 2.75 · +175"/></div>
+    <div className="field"><div className="fl">Stake</div><div className="stakerow"><div className="curtog">{['£','$'].map(c=><button key={c} className={cur===c?'on':''} onClick={()=>setCur(c)}>{c}</button>)}</div><input type="number" inputMode="decimal" value={stake} onChange={e=>setStake(e.target.value)} placeholder="0"/></div></div>
+    <button className="sheet-confirm" disabled={!ok} onClick={()=>onAdd({player,mkt:MARKETS[mkt][0].toUpperCase(),cur,stake:pf(stake),odds})}>Track bet @ {odds||'—'}</button>
+    <div className="preview-line">{ok?<>Posts to your feed as <b>{player} · {MARKETS[mkt][0]}</b> — your crew sees it live.</>:'Pick a player and a stake to track.'}</div>
+  </div></>;
+}
+
+const PLAYER_DATA={
+ 'R. Henley':{init:'RH',pos:'1',total:'−12',thru:'F',today:'−4',hand:'hot',backing:62,
+   holes:[['13','Bo'],['14','P'],['15','B'],['16','P'],['17','B'],['18','B']],
+   liveSg:{num:'+3.1',meta:'across 18 holes · 2nd of 71',rounds:[['R1','+0.4'],['R2','+1.2'],['R3','+0.7'],['R4','+0.8']]},
+   sg:[['Off the tee','+0.9','12th','good'],['Approach','+1.8','2nd','elite'],['Around green','+0.4','24th','mid'],['Putting','+1.1','6th','good']],
+   advanced:[['Driving dist','305 yds','8th','good'],['Driving acc','64%','22nd','mid'],['GIR','78%','5th','good'],['Scrambling','61%','15th','good'],['Prox · fairway','33 ft','9th','good'],['Prox · rough','48 ft','19th','mid']],
+   form:[{t:'Travelers',season:2025,fin:'T4',pos:4,rds:[66,68,67,69],sgTotal:'+6.2',keystat:'Approach +3.1 · Putting +1.8',note:'In the mix all week; a closing 69 left him a shot outside the playoff.'},
+     {t:'the Memorial',season:2025,fin:'1',pos:1,rds:[67,66,70,68],sgTotal:'+9.4',keystat:'Tee-to-green +7.0',note:'Elite ball-striking carried him to a one-shot win.'},
+     {t:'PGA Championship',season:2025,fin:'T12',pos:12,rds:[71,70,72,69],sgTotal:'+3.1',keystat:'Putting −0.6',note:'Solid, but the putter never warmed up on slow major greens.'},
+     {t:'Wells Fargo',season:2025,fin:'T8',pos:8,rds:[69,71,68,70],sgTotal:'+4.0',keystat:'Off the tee +2.2',note:'Drove it beautifully; a Sunday three-putt stretch cost a top 5.'},
+     {t:'Masters',season:2025,fin:'MC',pos:0,rds:[75,74],sgTotal:'−2.3',keystat:'Around green −1.9',note:'Short game let him down at Augusta — missed the cut by two.'},
+     {t:'Houston Open',season:2025,fin:'2',pos:2,rds:[65,68,67,66],sgTotal:'+8.1',keystat:'Putting +3.4',note:'Hot putter all week; lost in a playoff.'}],
+   groupBets:[['JO','Jordan','Outright · £50'],['MI','Mia','—']]},
+ 'A. Smalley':{init:'AS',pos:'T3',total:'−11',thru:'F',today:'−6',hand:'hot',backing:41,
+   holes:[['13','P'],['14','B'],['15','P'],['16','P'],['17','B'],['18','B']],
+   liveSg:{num:'+2.6',meta:'across 18 holes · 5th of 71',rounds:[['R1','+0.2'],['R2','+0.5'],['R3','+0.7'],['R4','+1.2']]},
+   sg:[['Off the tee','+0.5','28th','mid'],['Approach','+1.2','9th','good'],['Around green','+0.7','11th','good'],['Putting','+0.6','17th','mid']],
+   advanced:[['Driving dist','292 yds','40th','mid'],['Driving acc','71%','6th','good'],['GIR','74%','12th','good'],['Scrambling','66%','7th','good'],['Prox · fairway','34 ft','14th','mid'],['Prox · rough','50 ft','24th','mid']],
+   form:[{t:'Travelers',season:2025,fin:'T22',pos:22,rds:[70,71,69,72],sgTotal:'+1.1',keystat:'Approach +1.4',note:'Steady but never threatened the lead.'},
+     {t:'the Memorial',season:2025,fin:'MC',pos:0,rds:[74,73],sgTotal:'−1.8',keystat:'Off the tee −1.2',note:'Wayward driving cost him the weekend.'},
+     {t:'PGA Championship',season:2025,fin:'T40',pos:40,rds:[72,71,74,71],sgTotal:'+0.3',keystat:'Putting +0.9',note:'Quietly made the cut on the number.'},
+     {t:'Wells Fargo',season:2025,fin:'T15',pos:15,rds:[69,70,70,68],sgTotal:'+2.4',keystat:'Around green +1.1',note:'Strong scrambling week kept him in it.'},
+     {t:'Masters',season:2025,fin:'MC',pos:0,rds:[76,73],sgTotal:'−2.6',keystat:'Putting −1.7',note:'Putter ice-cold at Augusta.'},
+     {t:'Houston Open',season:2025,fin:'T8',pos:8,rds:[68,69,70,67],sgTotal:'+4.3',keystat:'Tee-to-green +3.2',note:'Best ball-striking week of his season.'}],
+   groupBets:[['YO','You','Top 5 · £40'],['MI','Mia','Top 5 (tail)']]},
+ 'N. Echavarria':{init:'NE',pos:'T8',total:'−10',thru:'F',today:'−5',hand:'hot',backing:18,
+   holes:[['13','P'],['14','B'],['15','P'],['16','B'],['17','E'],['18','P']],
+   liveSg:{num:'+2.2',meta:'across 18 holes · 9th of 71',rounds:[['R1','+0.6'],['R2','+0.3'],['R3','+0.5'],['R4','+0.8']]},
+   sg:[['Off the tee','+1.1','7th','good'],['Approach','+0.9','14th','good'],['Around green','+0.2','33rd','mid'],['Putting','+0.8','13th','good']],
+   advanced:[['Driving dist','310 yds','4th','good'],['Driving acc','58%','38th','mid'],['GIR','70%','20th','mid'],['Scrambling','55%','29th','mid'],['Prox · fairway','35 ft','22nd','mid'],['Prox · rough','46 ft','11th','good']],
+   form:[{t:'Travelers',season:2025,fin:'T18',pos:18,rds:[70,69,71,70],sgTotal:'+1.6',keystat:'Off the tee +1.8',note:'Bombed it but scrambling was streaky.'},
+     {t:'the Memorial',season:2025,fin:'T9',pos:9,rds:[68,70,69,69],sgTotal:'+4.1',keystat:'Approach +2.0',note:'Clean week, climbed the board on Sunday.'},
+     {t:'PGA Championship',season:2025,fin:'T25',pos:25,rds:[71,72,70,71],sgTotal:'+1.2',keystat:'Putting +0.4',note:'Made the cut comfortably, faded late.'},
+     {t:'Wells Fargo',season:2025,fin:'5',pos:5,rds:[68,67,70,68],sgTotal:'+5.6',keystat:'Tee-to-green +4.4',note:'Career-best ball-striking; near a maiden win.'},
+     {t:'Masters',season:2025,fin:'T33',pos:33,rds:[73,72,73,71],sgTotal:'+0.4',keystat:'Around green −0.6',note:'Grinded out a quiet top 35.'},
+     {t:'Phoenix Open',season:2025,fin:'1',pos:1,rds:[64,67,66,68],sgTotal:'+10.2',keystat:'Putting +4.1',note:'Breakthrough maiden win — putter on fire.'}],
+   groupBets:[['JO','Jordan','Top 10 · £20']]},
+ 'M. Brennan':{init:'MB',pos:'T6',total:'−10',thru:'F',today:'−1',hand:'cold',backing:9,
+   holes:[['13','B'],['14','P'],['15','P'],['16','Bo'],['17','Bo'],['18','P']],
+   liveSg:{num:'−0.4',meta:'across 18 holes · 48th of 71',rounds:[['R1','+1.1'],['R2','+0.6'],['R3','+0.9'],['R4','−0.4']]},
+   sg:[['Off the tee','+1.4','3rd','elite'],['Approach','−0.3','46th','poor'],['Around green','+0.1','38th','mid'],['Putting','−0.6','55th','poor']],
+   advanced:[['Driving dist','318 yds','1st','elite'],['Driving acc','52%','58th','poor'],['GIR','68%','27th','mid'],['Scrambling','49%','51st','poor'],['Prox · fairway','36 ft','31st','mid'],['Prox · rough','55 ft','44th','poor']],
+   form:[{t:'Travelers',season:2025,fin:'T12',pos:12,rds:[69,70,71,69],sgTotal:'+2.8',keystat:'Off the tee +3.0',note:'Led the field off the tee, putter held him back.'},
+     {t:'the Memorial',season:2025,fin:'T20',pos:20,rds:[71,70,72,70],sgTotal:'+1.0',keystat:'Putting −1.1',note:'Ball-striking fine, putting cost shots.'},
+     {t:'PGA Championship',season:2025,fin:'MC',pos:0,rds:[74,73],sgTotal:'−1.4',keystat:'Around green −1.3',note:'Short game betrayed him under pressure.'},
+     {t:'Wells Fargo',season:2025,fin:'T28',pos:28,rds:[70,72,69,71],sgTotal:'+0.7',keystat:'Off the tee +2.1',note:'Long but wild; scrambling streaky.'},
+     {t:'Masters',season:2025,fin:'T40',pos:40,rds:[73,73,72,72],sgTotal:'−0.2',keystat:'Putting −1.6',note:'Putter cold on Augusta greens again.'},
+     {t:'Houston Open',season:2025,fin:'T9',pos:9,rds:[67,69,68,70],sgTotal:'+4.0',keystat:'Off the tee +3.3',note:'Driver carried him to a rare top 10.'}],
+   groupBets:[['SA','Sam','Under 69.5 · $100'],['JO','Jordan','Under (tail)']]},
+};
+const SEASON={'R. Henley':{events:24,wins:1,top10:7,cuts:'83%',avg:'69.7',sg:'+1.6'},'A. Smalley':{events:26,wins:0,top10:3,cuts:'69%',avg:'70.6',sg:'+0.7'},'N. Echavarria':{events:25,wins:1,top10:5,cuts:'76%',avg:'70.1',sg:'+1.1'},'M. Brennan':{events:23,wins:0,top10:4,cuts:'65%',avg:'70.9',sg:'+0.9'}};
+const PAR=[4,4,3,5,4,4,3,4,5,4,3,4,4,5,4,4,3,4];
+const HOLE_AVG=[4.05,4.18,3.08,4.62,4.22,3.95,3.12,4.30,4.71,4.10,3.05,4.15,4.25,4.55,4.08,4.34,3.10,4.02];
+const SC_DELTAS=['0 -1 0 0 1 0 0 -1 0 -1 0 0 0 0 -1 0 1 -1','-1 0 0 -1 0 1 0 0 -1 0 0 0 1 -1 0 0 0 -1','0 0 -1 0 0 -1 0 0 0 1 0 -1 0 0 -1 0 0 0','-1 -1 0 -1 0 0 0 -1 0 0 0 0 -1 0 0 1 0 -1'];
+const SC_ROUNDS=SC_DELTAS.map(d=>d.split(' ').map((x,i)=>PAR[i]+parseInt(x,10)));
+const SEASON_SG={'R. Henley':[['SG total','+1.6'],['Off the tee','+0.4'],['Approach','+0.7'],['Around green','+0.1'],['Putting','+0.4']],'A. Smalley':[['SG total','+0.7'],['Off the tee','−0.1'],['Approach','+0.5'],['Around green','+0.2'],['Putting','+0.1']],'N. Echavarria':[['SG total','+1.1'],['Off the tee','+0.6'],['Approach','+0.3'],['Around green','−0.1'],['Putting','+0.3']],'M. Brennan':[['SG total','+0.9'],['Off the tee','+0.8'],['Approach','+0.2'],['Around green','+0.0'],['Putting','−0.1']]};
+function sgBarStyle(v){const w=Math.min(Math.abs(v)/3,1)*50;return v<0?{left:(50-w)+'%',width:w+'%'}:{left:'50%',width:w+'%'};}
+function splitSg(total,seed){const t=pf(total);const w=[[0.30,0.40,0.10,0.20],[0.22,0.30,0.18,0.30],[0.35,0.22,0.18,0.25]][seed%3];return w.map(x=>t*x);}
+function Scorecard(){
+  const [rd,setRd]=useState(3);
+  const F=[0,1,2,3,4,5,6,7,8],B=[9,10,11,12,13,14,15,16,17];
+  const s9=(a,idx)=>idx.reduce((x,i)=>x+a[i],0);
+  const parColor=p=>p===3?'pc3':p===5?'pc5':'pc4';
+  const sg=SC_ROUNDS[rd].map((s,i)=>HOLE_AVG[i]-s);
+  const sgBg=v=>{const t=Math.max(-1,Math.min(1,v/1.3));if(Math.abs(t)<0.04)return undefined;return t>0?'oklch(0.62 0.16 150 / '+(t*0.5).toFixed(2)+')':'oklch(0.6 0.2 28 / '+(Math.abs(t)*0.5).toFixed(2)+')';};
+  const fmtTp=t=>t===0?'E':t>0?'+'+t:''+t;
+  const fmtSg=v=>(v>0?'+':'')+v.toFixed(2);
+  const parF=s9(PAR,F),parB=s9(PAR,B);
+  const sgF=s9(sg,F),sgB=s9(sg,B);
+  const tpO=s9(SC_ROUNDS[rd],F)-parF,tpI=s9(SC_ROUNDS[rd],B)-parB;
+  const scell=(i)=>{const s=SC_ROUNDS[rd][i],d=s-PAR[i];const c=d<=-2?'under eagle':d===-1?'under':d===1?'over':d>=2?'over dbl':'';return <td key={i} className={c}><span className="v">{s}</span></td>;};
+  const Row=({label,cells,out,inn,tot,cls})=> <tr className={cls}><td className="lbl">{label}</td>{F.map(cells)}<td className="tot">{out}</td>{B.map(cells)}<td className="tot">{inn}</td><td className="tot grand">{tot}</td></tr>;
+  return <>
+    <div className="vavg-pills" style={{marginBottom:11}}>{[0,1,2,3].map(i=><button key={i} className={rd===i?'on':''} onClick={()=>setRd(i)}>R{i+1}</button>)}</div>
+    <div className="scard"><table className="sctable">
+      <thead><tr><th className="lbl">Hole</th>{F.map(i=><th key={i} className={parColor(PAR[i])}>{i+1}</th>)}<th className="tot">OUT</th>{B.map(i=><th key={i} className={parColor(PAR[i])}>{i+1}</th>)}<th className="tot">IN</th><th className="tot grand">TOT</th></tr></thead>
+      <tbody>
+        <Row label="Par" cells={(i)=><td key={i} className="parrowcell">{PAR[i]}</td>} out={parF} inn={parB} tot={parF+parB}/>
+        <Row cls="rdsel" label={'R'+(rd+1)} cells={scell} out={fmtTp(tpO)} inn={fmtTp(tpI)} tot={fmtTp(tpO+tpI)}/>
+        <Row cls="sgline" label="SG" cells={(i)=><td key={i} style={sgBg(sg[i])?{background:sgBg(sg[i])}:undefined}>{fmtSg(sg[i])}</td>} out={fmtSg(sgF)} inn={fmtSg(sgB)} tot={fmtSg(sgF+sgB)}/>
+      </tbody></table></div>
+    <div className="sc-legend"><span>○ under par&nbsp;&nbsp;□ over par</span><span><i style={{background:'oklch(0.62 0.16 150 / .5)'}}/>SG gained</span><span><i style={{background:'oklch(0.6 0.2 28 / .5)'}}/>SG lost</span></div>
+  </>;
+}
+function PlayerPage({name,onClose,onBet}){
+  const fb={init:(name[0]||'?'),pos:'—',total:'—',thru:'',today:'—',hand:null,backing:null,holes:[],form:[],sg:[],advanced:[],liveSg:null,groupBets:[]};
+  const d=PLAYER_DATA[name]||fb;
+  const [follow,setFollow]=useState(name==='R. Henley');
+  const [ev,setEv]=useState(null);const [ptab,setPtab]=useState('week');const [notified,setNotified]=useState(false);const sea=SEASON[name];
+  const htp=c=>c==='B'?'−1':c==='E'?'−2':c==='Bo'?'+1':'E';
+  const sgBar=(v)=>{const w=Math.min(Math.abs(v)/3,1)*50;return v<0?{left:(50-w)+'%',width:w+'%'}:{left:'50%',width:w+'%'};};
+  return <div className="detail" style={{zIndex:64}}>
+    <div className="detail-head"><button className="detail-back" onClick={onClose}>←</button><div className="detail-title"><div className="nm">{name}</div><div className="mk">Charles Schwab Challenge · R4</div></div></div>
+    <div className="detail-body">
+      <div className="pl-hero"><Avatar initials={d.init} size={56} pro/><div><div className="nm">{name}{d.hand&&<span>{d.hand==='hot'?'🔥':'🥶'}</span>}</div><div className="pos">{d.pos==='1'?'Leader':'Pos '+d.pos} · <b>{d.total}</b> · thru {d.thru} · today {d.today}</div></div><button className={'pl-follow'+(follow?' on':'')} onClick={()=>setFollow(f=>!f)}>{follow?'Following ★':'Follow'}</button></div>
+      <div className="pl-tabs"><button className={ptab==='week'?'on':''} onClick={()=>setPtab('week')}>This week</button><button className={ptab==='season'?'on':''} onClick={()=>setPtab('season')}>Season</button></div>
+      {ptab==='week'&&d.liveSg&&<div className="detail-sec"><h4>Strokes gained · today <span className="rankpill good">LIVE</span></h4>
+        <div className="pl-livesg"><div className="top"><span className="num" style={{color:pf(d.liveSg.num)<0?'var(--down)':'var(--up)'}}>{d.liveSg.num}</span><span className="meta">{d.liveSg.meta}</span></div>
+          <div className="rounds">{d.liveSg.rounds.map((r,i)=><div className="rd" key={i}><div className="rl">{r[0]}</div><div className="rv" style={{color:pf(r[1])<0?'var(--down)':'var(--up)'}}>{r[1]}</div></div>)}</div></div>
+        {d.sg.length>0&&<div className="sg-cats">{d.sg.map((s,i)=>{const v=pf(s[1]);return <div className="sgrow" key={i}><span className="sl">{s[0]}</span><span className="st"><i className={v<0?'neg':''} style={sgBar(v)}/></span><span className="sv" style={{color:v<0?'var(--down)':'var(--up)'}}>{s[1]}</span><span className={'rankpill '+(s[3]||'mid')}>{s[2]}</span></div>;})}</div>}
+      </div>}
+      {ptab==='week'&&<div className="detail-sec"><h4>Scorecard · this week</h4><Scorecard/></div>}
+      {ptab==='week'&&d.advanced&&d.advanced.length>0&&<div className="detail-sec"><h4>Advanced</h4><div className="advgrid">{d.advanced.map((a,i)=><div className="advbox" key={i}><div className="av">{a[1]}</div><div className="al">{a[0]}</div><div className={'ar '+(a[3]||'mid')}>{a[2]} in field</div></div>)}</div></div>}
+      {ptab==='season'&&sea&&<div className="detail-sec" style={{borderTop:'none'}}><h4>Season at a glance · 2025</h4><div className="seasongrid"><div className="advbox"><div className="av">{sea.events}</div><div className="al">Events</div></div><div className="advbox"><div className="av">{sea.wins}</div><div className="al">Wins</div></div><div className="advbox"><div className="av">{sea.top10}</div><div className="al">Top 10s</div></div><div className="advbox"><div className="av">{sea.cuts}</div><div className="al">Made cut</div></div><div className="advbox"><div className="av">{sea.avg}</div><div className="al">Scoring avg</div></div><div className="advbox"><div className="av">{sea.sg}</div><div className="al">SG / round</div></div></div></div>}
+      {ptab==='season'&&SEASON_SG[name]&&<div className="detail-sec"><h4>Strokes gained · season avg</h4>{SEASON_SG[name].map((s,i)=>{const v=pf(s[1]);return <div className="sgrow" key={i} style={i===0?{marginBottom:14,paddingBottom:11,borderBottom:'1px solid var(--line)'}:{}}><span className="sl" style={i===0?{fontWeight:800}:{}}>{s[0]}</span><span className="st"><i className={v<0?'neg':''} style={sgBarStyle(v)}/></span><span className="sv" style={{color:v<0?'var(--down)':'var(--up)'}}>{s[1]}</span></div>;})}</div>}
+      {ptab==='season'&&d.form.length>0&&<div className="detail-sec"><h4>Recent form · last 6 starts <span style={{fontWeight:600,letterSpacing:0,textTransform:'none',color:'var(--dim)',marginLeft:'auto'}}>tap to drill in</span></h4>
+        <div className="formrow">{d.form.map((f,i)=><div key={i} className={'formbar'+(f.pos===0?' mc':'')} onClick={()=>setEv(f)} style={{cursor:'pointer'}}><div className="bar" style={{height:(f.pos===0?16:Math.max(24,100-(f.pos-1)*2.4))+'%'}}/><span className="fl">{f.fin}</span></div>)}</div>
+        <div className="formlist">{d.form.map((f,i)=><div className="formitem" key={i} onClick={()=>setEv(f)}><span className={'ff'+(f.pos===0?' mc':'')}>{f.fin}</span><span className="ft">{f.t}</span><span className="fy">{f.season}</span><span className="fc">›</span></div>)}</div></div>}
+      {ptab==='week'&&<div className="detail-sec"><h4>In your group{d.backing?' · '+d.backing+'% of Pardle backs him':''}</h4>{d.groupBets.length>0?d.groupBets.map((g,i)=><div className="gbet-row" key={i}><Avatar initials={g[0]} size={28}/><span className="gn">{g[1]==='You'?'You':g[1]}</span><span className="gb">{g[2]}</span></div>):<div style={{fontSize:13,color:'var(--muted)'}}>No one in your group is on him yet.</div>}</div>}
+    </div>
+    <div className="detail-foot"><button className={'df-share'+(notified?' done':'')} onClick={()=>setNotified(n=>!n)}>{notified?'🔔 Notifying':'🔔 Notify on his shots'}</button><button className="df-tail" onClick={()=>onBet&&onBet(name)}>＋ Bet on {name.split(' ').pop()}</button></div>
+    {ev&&<EventDetail ev={ev} name={name} onClose={()=>setEv(null)}/>}
+  </div>;
+}
+function EventDetail({ev,name,onClose}){
+  const neg=pf(ev.sgTotal)<0;
+  return <div className="detail" style={{zIndex:66}}>
+    <div className="detail-head"><button className="detail-back" onClick={onClose}>←</button><div className="detail-title"><div className="nm">{ev.t}</div><div className="mk">{name} · {ev.season} · finished {ev.fin}</div></div></div>
+    <div className="detail-body">
+      <div className="detail-sec" style={{borderTop:'none'}}><h4>Rounds</h4><div className="ev-rounds">{ev.rds.map((r,i)=><div className="ev-rd" key={i}><div className="rl">R{i+1}</div><div className="rv">{r}</div></div>)}{ev.rds.length<4&&<div className="ev-rd" style={{opacity:.45}}><div className="rl">CUT</div><div className="rv">—</div></div>}</div></div>
+      <div className="detail-sec"><h4>Strokes gained · event</h4><div className="pl-livesg"><div className="top"><span className="num" style={{color:neg?'var(--down)':'var(--up)'}}>{ev.sgTotal}</span><span className="meta">SG total · {ev.keystat}</span></div></div><div style={{marginTop:13}}>{splitSg(ev.sgTotal,ev.t.length).map((v,i)=>{const lbl=['Off the tee','Approach','Around green','Putting'][i];return <div className="sgrow" key={i}><span className="sl">{lbl}</span><span className="st"><i className={v<0?'neg':''} style={sgBarStyle(v)}/></span><span className="sv" style={{color:v<0?'var(--down)':'var(--up)'}}>{(v>=0?'+':'')+v.toFixed(1)}</span></div>;})}</div></div>
+      <div className="detail-sec"><h4>What happened</h4><p className="ev-note">{ev.note}</p></div>
+    </div>
+  </div>;
+}
+
+// initial timeline: bets-as-posts interleaved with shots/tips
+const initPosts=[
+  {type:'bet',id:'p1',init:'JO',name:'Jordan',mine:false,player:'R. Henley',mkt:'OUTRIGHT WIN',cur:'£',stake:50,prob:54,dir:'up',hist:[34,40,46,50,54],tm:'2m',react:14,on:['MI','TH'],tail:false,cmt:3,rel:true,relWhy:"You're on Henley to win too",
+   updates:[['Stiffs approach on 17 to 3ft','+5','up'],['Two-putt par on 16','+1','up'],['Birdie on 15 to reach −10','+4','up']]},
+  {type:'shot',id:'p2',init:'NE',name:'N. Echavarria',hole:17,tag:'EAGLE',score:'−10',over:false,tm:'3m',text:'Holes out from 150 yards — the shot of the tournament.',ctx:'first eagle',react:210,rel:true,relWhy:'Eagle pushes a rival into your Smalley Top-5 picture'},
+  {type:'poll',id:'pq1',tag:'⛳ Putt-IQ',q:'R. Henley — 12ft for birdie on 18. Make or miss?',opts:[['Make',58],['Miss',42]],crew:'🔒 Locked · 6 of The Lads say make',rel:true,relWhy:'A call on your Henley bet'},
+  {type:'poll',id:'pq2',tag:'Head-to-head',q:'Lower round today — Smalley or Echavarria?',opts:[['Smalley',54],['Echavarria',46]],crew:'🔒 Locked · 4 of The Lads on Smalley',rel:true,relWhy:'A call on your Smalley bet'},
+  {type:'bet',id:'p3',init:'YO',name:'You',mine:true,player:'A. Smalley',mkt:'TOP 5',cur:'£',stake:40,prob:71,dir:'up',hist:[58,64,66,68,71],tm:'5m',react:8,on:['MI'],tail:false,cmt:1,rel:true,relWhy:'Your bet · Smalley Top 5',
+   updates:[['Safe par on 18','+1','up'],['Birdie on 17','+4','up'],['16 holes bogey-free','+2','up']]},
+  {type:'tip',id:'p4',by:'@golf-edge',player:'L. Åberg',mkt:'OUTRIGHT',cur:'£',odds:'12/1',rat:'Value at the number after an R3 wobble priced him out.'},
+  {type:'bet',id:'p5',init:'SA',name:'Sam',mine:false,player:'M. Brennan',mkt:'UNDER 69.5 · R4',cur:'$',stake:100,prob:46,dir:'down',hist:[62,58,53,53,46],tm:'8m',react:5,on:['JO','TH'],tail:false,cmt:2,
+   updates:[['Bogey on 16 from the bunker','−7','down'],['Par on 15','0','flat'],['Birdie on 13 — under pace','+3','up']]},
+];
+// scripted live events: either update a bet-post (bubbles to top) or insert a standalone post
+let PK=100;
+const EVENTS=[
+  {kind:'update',target:'p1',upd:['Birdie on 18 → grabs the outright lead','+6','up'],prob:60},
+  {kind:'insert',post:()=>({type:'result',id:'r'+PK++,init:'MI',name:'Mia',win:true,text:'Top 5 (tailed your Smalley) just CASHED',pl:'+£80',rel:true,relWhy:'Your Smalley Top-5 market — just settled'})},
+  {kind:'update',target:'p5',upd:['Another bogey on 17 — under all but dead','−9','down'],prob:31},
+  {kind:'insert',post:()=>({type:'shot',id:'s'+PK++,init:'BG',name:'B. Griffin',hole:18,tag:'BIRDIE',score:'−12',over:false,tm:'now',text:'Pours in a 20-footer to join the lead at −12.',ctx:'5th birdie',react:64,rel:true,relWhy:'Griffin to −12 — tightening your Smalley Top-5 cut'})},
+  {kind:'update',target:'p3',upd:['Taps in for birdie on 18 → Top 5 near locked','+6','up'],prob:83},
+  {kind:'settle',target:'p3',win:true},
+];
+
+function SpaceSwitcher({space,setSpace,open,setOpen}){
+  return <>
+    <button className="space-btn" onClick={()=>setOpen(o=>!o)}><span className="ic">{space.icon}</span><span className="nm">{space.name}<small>{space.sub}</small></span><span className="cv">▾</span></button>
+    {open&&<><div className="scrim" onClick={()=>setOpen(false)}/><div className="space-sheet"><div className="sh-lbl">Your spaces</div>
+      {SPACES.map(s=><div key={s.id} className={'space-opt'+(s.id===space.id?' on':'')} onClick={()=>{setSpace(s);setOpen(false);}}><span className="ic">{s.icon}</span><span className="nm">{s.name}<small>{s.sub}</small></span>{s.id===space.id&&<span className="chk">✓</span>}</div>)}
+      <div className="space-new"><span className="ic">+</span>New private group</div></div></>}
+  </>;
+}
+function Ticker({onExpand,race}){
+  return <div className="ticker" onClick={onExpand}>
+    <span className="tk-lbl">Lads<br/>P&L</span>
+    {(race||RACE.today).map((r,i)=><div key={i} className={'tk-item'+(r[1]==='You'?' you':'')}><Avatar initials={r[0]} size={20}/><span className="nm">{r[1]}</span><span className={'pl '+r[3]}>{r[2]}</span></div>)}
+    <span className="tk-exp">▾</span>
+  </div>;
+}
+function RaceSheet({onClose,race}){
+  const [range,setRange]=useState('today');
+  return <div className="race-sheet" onClick={onClose}><div className="race-card" onClick={e=>e.stopPropagation()}>
+    <h3>The Lads · P&L race</h3><div className="sub">9 members · live from your tracked bets</div>
+    <div className="race-range">{[['today','Today'],['season','Season'],['alltime','All-time']].map(r=><button key={r[0]} className={range===r[0]?'on':''} onClick={()=>setRange(r[0])}>{r[1]}</button>)}</div>
+    {(range==='today'?(race||RACE.today):RACE[range]).map((r,i)=><div key={i} className={'racerow'+(r[1]==='You'?' you':'')}><span className="rk">{i+1}</span><Avatar initials={r[0]} size={32}/><span className="nm">{r[1]==='You'?<b>You</b>:r[1]}{i===0&&' 👑'}{range==='alltime'&&r[4]>0&&<span className="trophy">{'🏆'.repeat(r[4])}</span>}</span><span className={'pl '+r[3]}>{r[2]}</span></div>)}
+    <div style={{fontSize:11,color:'var(--dim)',textAlign:'center',marginTop:12}}>{range==='alltime'?'🏆 = weekly group wins · all-time net':'Tap a member to see their open bets'}</div>
+  </div></div>;
+}
+
+function BetPost({p,fresh,onOpen,onOpenPlayer,onSettle}){
+  const [r,setR]=useState(p.react);const [liked,setLiked]=useState(false);const [tailed,setTailed]=useState(false);
+  if(p.settled){return <div className={'post bpost bp-settled'+(p.win?'':' down')} style={{cursor:'pointer'}} onClick={()=>onSettle&&onSettle(p)}>
+    <div className="bp-head"><Avatar initials={p.init} size={38} ring={p.mine}/>
+      <div className="bp-who"><div className="nm">{p.mine?'You':p.name}{p.mine&&<span className="fdot"/>}</div><div className="tm">Settled · tap to view</div></div>
+      <div className="bp-prob"><div className="v" style={{color:p.win?'var(--up)':'var(--down)'}}>{p.win?p.result.profit:'−'+p.cur+p.stake}</div><div className="d" style={{color:p.win?'var(--up)':'var(--down)',fontWeight:800}}>{p.win?'WON':'LOST'}</div></div>
+    </div>
+    <div className="bp-bet"><span className="player">{p.player}</span><span className="mktchip">{p.mkt}</span><span className="stake">{p.cur}{p.stake}{p.odds?' @ '+p.odds:''}</span></div>
+    <div className="bp-foot"><button className={'act'+(liked?' on':'')} onClick={(e)=>{e.stopPropagation();setLiked(l=>!l);setR(v=>v+(liked?-1:1));}}>{thumbUp}<span>{r}</span></button><button className="act" onClick={(e)=>e.stopPropagation()}>{cmtIcon}<span>{p.cmt}</span></button><span style={{marginLeft:'auto',fontSize:12.5,fontWeight:800,color:'var(--emerald)'}}>View result ›</span></div>
+  </div>;}
+  return <div className={'post bpost'+(p.dir==='down'?' down':'')+(fresh?' fresh':'')} style={{cursor:'pointer'}} onClick={()=>onOpen&&onOpen(p)}>
+    <div className="bp-head"><Avatar initials={p.init} size={38} ring={p.mine}/>
+      <div className="bp-who"><div className="nm">{p.mine?'You':p.name}{p.mine&&<span className="fdot"/>}<span className="verb">is sweating</span></div><div className="tm">{p.tm} ago · live</div></div>
+      <div className="bp-prob"><div className="v" style={{color:p.dir==='down'?'var(--down)':'var(--up)'}}>{p.prob}%</div><div className={'d '+p.dir}>{p.dir==='up'?'▲':'▼'} live</div></div>
+    </div>
+    <div className="bp-bet"><span className="player tap-player" onClick={(e)=>{e.stopPropagation();onOpenPlayer&&onOpenPlayer(p.player);}}>{p.player}</span><span className="mktchip">{p.mkt}</span><span className="stake">{p.cur}{p.stake}{p.odds?' @ '+p.odds:''}</span></div>
+    <Spark hist={p.hist} dir={p.dir}/>
+    <div className="bp-thread">{p.updates.map((u,i)=><div className={'bp-upd'+(fresh&&i===0?' new':'')} key={i}><span className={'ud '+u[2]}/><span className="ut">{u[0]}</span><span className={'uv '+u[2]}>{u[1]==='0'?'—':u[1]}</span></div>)}</div>
+    <div className="bp-foot">
+      <button className={'act'+(liked?' on':'')} onClick={(e)=>{e.stopPropagation();setLiked(l=>!l);setR(v=>v+(liked?-1:1));}}>{thumbUp}<span>{r}</span></button>
+      <button className="act" onClick={(e)=>{e.stopPropagation();onOpen&&onOpen(p);}}>{cmtIcon}<span>{p.cmt}</span></button>
+      {!p.mine&&<button className={'tailbtn'+(tailed?' done':'')} onClick={(e)=>{e.stopPropagation();setTailed(true);}}>{tailed?'Tailed ✓':'Tail'}</button>}
+      <span className="who-on">{p.on.map(w=><Avatar key={w} initials={w} size={22}/>)}<span className="lbl">{p.on.length} on it</span></span>
+    </div>
+  </div>;
+}
+function ShotPost({p,fresh,onOpenPlayer}){
+  const [r,setR]=useState(p.react);const [liked,setLiked]=useState(false);
+  return <div className={'post spost'+(fresh?' fresh':'')}>
+    <div className="tap-player" onClick={()=>onOpenPlayer&&onOpenPlayer(p.name)}><Avatar initials={p.init} size={38} pro/></div>
+    <div className="sp-bd">
+      <div className="sp-top tap-player" onClick={()=>onOpenPlayer&&onOpenPlayer(p.name)}><span className="sp-who">{p.name}</span><span className={'tag '+p.tag.toLowerCase()}>{p.tag}</span><span className="holeno mono">H{p.hole}</span><span className={'scv'+(p.over?' over':'')}>{p.score}</span></div>
+      <div className="sp-text">{p.text}</div>
+      <div className="sp-react"><button className={'act'+(liked?' on':'')} onClick={()=>{setLiked(l=>!l);setR(v=>v+(liked?-1:1));}}>{thumbUp}<span>{r}</span></button><button className="act">{cmtIcon}<span>0</span></button><span className="ctxchip">{p.ctx}</span></div>
+    </div>
+  </div>;
+}
+function ResultPost({p,fresh}){
+  return <div className={'post rpost'+(p.win?'':' loss')+(fresh?' fresh':'')}><div className="rp-top"><Avatar initials={p.init} size={38}/><div className="rp-txt">{p.win?'🎉 ':'💀 '}<b>{p.name}</b>{p.win?' — ':' — '}{p.text}</div><div className={'rp-pl '+(p.win?'win':'loss')}>{p.pl}</div></div></div>;
+}
+function TipPost({p,fresh}){
+  const [t,setT]=useState(false);
+  return <div className={'post tpost'+(fresh?' fresh':'')}><div className="tp-head"><Avatar initials="GE" size={34}/><span className="tp-by">{p.by} <span style={{color:'var(--blue)',fontWeight:800}}>tipped</span></span><span className="tp-odds mono">{p.mkt} · {p.odds}</span></div>
+    <div className="tp-body"><div className="tp-player">{p.player}</div><div className="tp-rat">“{p.rat}”</div></div>
+    <button className={'trackbtn'+(t?' done':'')} onClick={()=>setT(true)}>{t?'Tracked to your bets ✓':'＋ Track this tip'}</button>
+  </div>;
+}
+function PollPost({p,fresh}){
+  const [v,setV]=useState(null);
+  return <div className={'post pollpost'+(fresh?' fresh':'')}>
+    <span className="poll-tag">{p.tag}</span><div className="poll-q">{p.q}</div>
+    <div className="poll-opts">{p.opts.map((o,i)=><button key={i} className={'poll-opt'+(v!==null?' voted':'')+(v===i?' mine':'')} style={{'--pct':o[1]+'%'}} onClick={()=>setV(i)}><span className="po-fill"/><span className="po-l">{o[0]}</span><span className="po-p">{v!==null?o[1]+'%':''}</span></button>)}</div>
+    <div className="poll-foot">{v!==null?p.crew:'Free call · builds your Sharp Score · no stake'}</div>
+  </div>;
+}
+function Post({p,fresh,onOpenBet,onOpenPlayer,onSettle}){
+  if(p.type==='poll')return <PollPost p={p} fresh={fresh}/>;
+  if(p.type==='bet')return <BetPost p={p} fresh={fresh} onOpen={onOpenBet} onOpenPlayer={onOpenPlayer} onSettle={onSettle}/>;
+  if(p.type==='shot')return <ShotPost p={p} fresh={fresh} onOpenPlayer={onOpenPlayer}/>;
+  if(p.type==='result')return <ResultPost p={p} fresh={fresh}/>;
+  if(p.type==='tip')return <TipPost p={p} fresh={fresh}/>;
+  return null;
+}
+
+const BURSTS=['🔥','😱','⛳','👏','💀','🐐'];
+function Feed({posts,freshId,onOpenBet,onOpenPlayer,onSettle,initialMode}){
+  const [floaters,setFloaters]=useState([]);
+  const spawn=(emoji)=>{const key='f'+Math.random();const xPct=8+Math.random()*84;setFloaters(f=>[...f,{key,emoji,xPct}]);setTimeout(()=>setFloaters(f=>f.filter(x=>x.key!==key)),2400);};
+  const [mode,setMode]=useState(initialMode||'all');
+  const shown=mode==='smart'?posts.filter(p=>p.rel):posts;
+  return <>
+    <div className="pv-body">
+      <div className="feed-filter"><button className={mode==='all'?'on':''} onClick={()=>setMode('all')}>All shots</button><button className={mode==='smart'?'on':''} onClick={()=>setMode('smart')}>✦ Smart feed</button></div>
+      {mode==='smart'&&<div className="smart-note">Filtered to your bets — Smalley Top 5 &amp; Henley outright — plus shots that move them.</div>}
+      <div className="feed">{shown.map(p=>mode==='smart'?<div key={p.id} className="rel-wrap">{p.relWhy&&<div className="rel-why"><span className="dot">✦</span>{p.relWhy}</div>}<Post p={p} fresh={p.id===freshId} onOpenBet={onOpenBet} onOpenPlayer={onOpenPlayer} onSettle={onSettle}/></div>:<Post key={p.id} p={p} fresh={p.id===freshId} onOpenBet={onOpenBet} onOpenPlayer={onOpenPlayer} onSettle={onSettle}/>)}{mode==='smart'&&shown.length===0&&<div className="smart-empty">No bet-relevant updates right now.</div>}</div></div>
+    <div className="burstbar"><div className="floatlayer">{floaters.map(f=><span key={f.key} className="floater" style={{left:f.xPct+'%'}}>{f.emoji}</span>)}</div><span className="lbl">React</span>{BURSTS.map(e=><button key={e} className="burstbtn" onClick={()=>spawn(e)}>{e}</button>)}</div>
+  </>;
+}
+
+// lean Bets + Sharp (shot-by-shot tracker kept as the deep surface)
+const myBets=[
+  {id:'b1',who:'R. Henley',mine:true,on:['MI','TH'],mkt:'OUTRIGHT WIN',cur:'£',stake:50,odds:{dec:'3.50',frac:'5/2',am:'+250'},prob:54,dir:'up',hist:[34,40,46,50,54],tl:[['Birdie 15 → −10','+4','up'],['Par 16','+1','up'],['Approach 17 to 3ft','+5','up']]},
+  {id:'b2',who:'A. Smalley',mine:true,on:['MI'],mkt:'TOP 5',cur:'£',stake:40,odds:{dec:'2.00',frac:'1/1',am:'+100'},prob:71,dir:'up',hist:[58,64,66,68,71],tl:[['Bogey-free 16','+2','up'],['Birdie 17','+4','up'],['Par 18','+1','up']]},
+];
+const settled=[{who:'M. Brennan',mkt:'UNDER 69.5 · R3',odds:'2.00',cur:'£',stake:500,result:'WON',pl:'+£500'},{who:'A. Novak',mkt:'UNDER 69.5',odds:'100.00',cur:'$',stake:100,result:'WON',pl:'+$9,900'},{who:'R. Fowler',mkt:'UNDER 68.5',odds:'100.00',cur:'$',stake:20,result:'LOST',pl:'−$20'}];
+function BetRow({b,fmt,onOpen}){return <div className="post" style={{cursor:'pointer'}} onClick={()=>onOpen(b)}><div style={{padding:'15px 15px 13px'}}>
+  <div className="bp-head"><div className="bp-who"><div className="nm" style={{fontSize:16}}>{b.who}</div><div className="bp-bet" style={{marginTop:7,padding:'7px 10px'}}><span className="mktchip">{b.mkt}</span><span className="stake">{b.cur}{b.stake} @ {b.odds[fmt]}</span></div></div><div className="bp-prob"><div className="v" style={{color:b.dir==='down'?'var(--down)':'var(--up)'}}>{b.prob}%</div><div className={'d '+b.dir}>{b.dir==='up'?'▲':'▼'} live</div></div></div>
+  <Spark hist={b.hist} dir={b.dir}/>
+  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8}}><span style={{fontSize:11.5,color:'var(--dim)',fontWeight:700}}>{b.tl.length} shots tracked · tap for detail</span><span style={{color:'var(--muted)',fontWeight:800}}>›</span></div></div>
+</div>;}
+function Bets({fmt,setFmt,onOpenBet}){const [v,setV]=useState('live');return <div className="pv-body">
+  <div className="betshead"><div className="betsrow"><h2>My bets · {myBets.length+settled.length}</h2><div className="oddstog">{[['am','+250'],['frac','5/2'],['dec','3.5']].map(o=><button key={o[0]} className={fmt===o[0]?'on':''} onClick={()=>setFmt(o[0])}>{o[1]}</button>)}</div></div></div>
+  <div className="lstog"><button className={v==='live'?'on':''} onClick={()=>setV('live')}>Live <span className="cnt mono">{myBets.length}</span></button><button className={v==='settled'?'on':''} onClick={()=>setV('settled')}>Settled <span className="cnt mono">{settled.length}</span></button></div>
+  <div className="pad" style={{paddingTop:13,display:'flex',flexDirection:'column',gap:12}}>
+    {v==='live'?<><div className="summary"><div><div className="lab">Open stake</div><div className="big mono">£90·$100</div><div className="legs">all live</div></div><div className="r"><div className="lab">Group rank</div><div className="big mono">#2/9</div><div className="legs">Jordan leads</div></div></div>{myBets.map(b=><BetRow key={b.id} b={b} fmt={fmt} onOpen={onOpenBet}/>)}</>
+    :<><div className="summary"><div><div className="lab">Net · event</div><div className="big mono">+$9,380</div><div className="legs">9 settled</div></div><div className="r"><div className="lab">Hit rate</div><div className="big mono">56%</div><div className="legs">5 W · 4 L</div></div></div>{settled.map((b,i)=><div className="settled" key={i}><div><div className="nm">{b.who}</div><div className="sub"><span className="mktchip">{b.mkt}</span> @ {b.odds} · {b.cur}{b.stake}</div></div><div><div className={'pl '+(b.result==='WON'?'win':'loss')}>{b.pl}</div><div className={'stat '+(b.result==='WON'?'win':'loss')}>{b.result}</div></div></div>)}</>}
+    <div className="compliance">Pardle is a tracker, not a bookmaker — we don't accept bets. 18+ only.</div>
+  </div></div>;}
+const MEMBERS=[['JO','Jordan','+£312','up','Admin'],['YO','You','+£186','up','Admin'],['TH','Theo','+£54','up',''],['SA','Sam','−£20','down',''],['MI','Mia','−£40','down',''],['DA','Dave','+£18','up',''],['NI','Nia','−£8','down',''],['PA','Paul','+£5','up',''],['RO','Rory','−£60','down','']];
+const MOST_POPULAR=[['R. Henley','OUTRIGHT',4,['JO','YO','TH','DA']],['A. Smalley','TOP 5',3,['YO','MI','PA']],['M. Brennan','UNDER 69.5 · R4',2,['SA','JO']],['N. Echavarria','TOP 10',2,['MI','RO']]];
+function Groups({onExpand,openMember,openPlayer}){
+  const [copied,setCopied]=useState(false);const [memOpen,setMemOpen]=useState(false);
+  return <div className="pv-body"><div className="pad" style={{display:'flex',flexDirection:'column',gap:18}}>
+    <div className="card"><div style={{display:'flex',alignItems:'center',gap:12}}><div style={{width:48,height:48,borderRadius:'50%',background:'var(--soft)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24}}>🏌️</div><div style={{flex:1}}><div style={{fontSize:18,fontWeight:900}}>The Lads</div><div style={{fontSize:12,color:'var(--muted)'}}>9 members · private group</div></div><button className="tailbtn" onClick={onExpand}>P&L race</button></div>
+      <div className="invite-row"><div><div className="il-l">Invite link</div><div className="il-v">pardle.app/c/the-lads-7f3</div></div><button className={'il-copy'+(copied?' done':'')} onClick={()=>setCopied(true)}>{copied?'Copied ✓':'Copy'}</button></div></div>
+    <div><div className="slabel">Standings · today</div><div className="card" style={{padding:6}}>{RACE.today.map((r,i)=><div key={i} className={'racerow'+(r[1]==='You'?' you':'')} style={{cursor:'pointer'}} onClick={()=>openMember&&openMember(r[1])}><span className="rk">{i+1}</span><Avatar initials={r[0]} size={32}/><span className="nm">{r[1]==='You'?<b>You</b>:r[1]}{i===0&&' 👑'}</span><span className={'pl '+r[3]}>{r[2]}</span></div>)}</div></div>
+    <div><div className="slabel">Most backed in your group</div><div className="card" style={{padding:'4px 12px'}}>{MOST_POPULAR.map((b,i)=><div key={i} className="pop-row" onClick={()=>openPlayer&&openPlayer(b[0])}><div className="pop-nm">{b[0]}<span className="mktchip">{b[1]}</span></div><span className="pop-back">{b[3].map(a=><Avatar key={a} initials={a} size={24}/>)}<span className="pop-ct">{b[2]} on it</span></span></div>)}</div></div>
+    <div><div className="mem-toggle" onClick={()=>setMemOpen(o=>!o)}><span>Members · 9</span><span className={'mem-chv'+(memOpen?' open':'')}>▾</span></div>{memOpen&&<div className="card" style={{padding:'4px 6px'}}>{MEMBERS.map((m,i)=><div key={i} className="mem-row" style={{cursor:'pointer'}} onClick={()=>openMember&&openMember(m[1])}><Avatar initials={m[0]} size={32}/><div style={{flex:1,minWidth:0}}><div className="mem-nm">{m[1]}{m[4]&&<span className="role-tag">{m[4]}</span>}</div></div><span className={'pl '+m[3]} style={{fontFamily:"'IBM Plex Mono'",fontSize:13,fontWeight:700}}>{m[2]}</span></div>)}</div>}</div>
+    <div style={{display:'flex',flexDirection:'column',gap:9}}><button className="empty-sec">Mute notifications</button><button className="leave-btn">Leave group</button></div>
+  </div></div>;
+}
+function Sharp(){const [v,setV]=useState(null);const opts=[['Yes — Henley closes it out',61],['No — the field reels him in',39]];return <div className="pv-body"><div className="pad" style={{display:'flex',flexDirection:'column',gap:18}}>
+  <div className="card gauge"><div className="glab">Your Sharp Score</div><div className="gnum mono">72</div><div style={{fontSize:13,color:'var(--muted)',fontWeight:600}}>#3 in The Lads · top 9% on Pardle · ▲4</div></div>
+  <div><div className="slabel">Putt-IQ · The Lads vote</div><div className="card"><div style={{fontSize:17,fontWeight:800,marginBottom:14}}>Does Henley hold on for the win?</div><div className="poll">{opts.map((o,i)=><div key={i} className={'opt'+(v!==null?' voted':'')} style={{'--pct':o[1]+'%'}} onClick={()=>setV(i)}><div className="fill"/><span className="lab">{o[0]}</span><span className="pc mono">{o[1]}%</span></div>)}</div><div style={{fontSize:12,color:'var(--dim)',marginTop:4,textAlign:'center'}}>{v!==null?'6 of your crew voted Yes':'Tap to lock your read'}</div></div></div>
+</div></div>;}
+
+function Confetti(){
+  const cols=['oklch(0.60 0.15 145)','oklch(0.70 0.16 45)','oklch(0.55 0.14 245)','oklch(0.50 0.13 155)'];
+  const bits=React.useMemo(()=>Array.from({length:22},(_,i)=>({c:cols[i%4],l:Math.random()*94+1,d:(Math.random()*0.6).toFixed(2),dur:(1.4+Math.random()*1.1).toFixed(2)})),[]);
+  return <div className="confetti">{bits.map((b,i)=><span key={i} style={{left:b.l+'%',background:b.c,animationDuration:b.dur+'s',animationDelay:b.d+'s'}}/>)}</div>;
+}
+function SettlementModal({s,onClose,onShare}){
+  const win=s.win;
+  return <div className="settle-modal"><div className="settle-scrim" onClick={onClose}/>{win&&<Confetti/>}
+    <div className={'settle-card '+(win?'win':'loss')}>
+      <div className="settle-grid"/>
+      <div className="settle-status">{win?'▲ Bet won':'Just missed'}</div>
+      <div className="settle-amt">{win?s.profit:'−'+s.cur+s.stake}</div>
+      <div className="settle-sub">{s.player} · {s.mkt} · {s.cur}{s.stake} @ {s.odds}{win?' · returned '+s.ret:''}</div>
+      <div className="settle-book">{win?<>Booked to your day · <b>+£226</b> · 2nd in The Lads</>:<>Your day · <b>−£40</b> · 3rd in The Lads</>}</div>
+      <div className="settle-btns"><button className="settle-done" onClick={onClose}>Done</button><button className="settle-share" onClick={win?()=>onShare&&onShare(s):onClose}>{win?'Share the W':'Next one'}</button></div>
+    </div>
+  </div>;
+}
+function Onboarding({onClose}){
+  const [step,setStep]=useState(0);const [follows,setFollows]=useState([]);const [gname,setGname]=useState('');const [smart,setSmart]=useState(true);
+  const toggleF=p=>setFollows(f=>f.includes(p)?f.filter(x=>x!==p):[...f,p]);
+  const next=()=>step<2?setStep(step+1):onClose(smart);
+  return <div className="onb">
+    <div className="onb-hero"><div className="onb-logo">Par<b>dle</b></div><div className="onb-tag">Follow the action shot-by-shot, track every bet, and sweat it out with your crew.</div>
+      <div className="onb-steps">{[0,1,2].map(i=><span key={i} className={'onb-dot'+(i===step?' on':'')}/>)}</div></div>
+    <div className="onb-body">
+      {step===0&&<><div className="onb-h">Choose players to follow</div><div className="onb-sub">Their shots, bets and form stream into your feed. Pick a few to start.</div>
+        <div className="chiprow">{PLAYERS.map(p=><button key={p} className={'bchip'+(follows.includes(p)?' on':'')} onClick={()=>toggleF(p)}>{p}</button>)}</div>
+        <div className="onb-opt" onClick={()=>setSmart(s=>!s)}><div><div className="onb-opt-h">✦ Smart feed</div><div className="onb-opt-s">Only show updates that move your bets</div></div><div className={'onb-sw'+(smart?' on':'')}><span/></div></div></>}
+      {step===1&&<><div className="onb-h">Start or join a crew</div><div className="onb-sub">Pardle's better with mates — track a shared P&L race and sweat every bet together.</div>
+        <input className="odds-input" value={gname} onChange={e=>setGname(e.target.value)} placeholder="Name your group (e.g. The Lads)"/>
+        <div className="onb-sub" style={{margin:'14px 0 8px',textAlign:'center'}}>— or —</div>
+        <input className="odds-input" placeholder="Enter an invite code"/></>}
+      {step===2&&<><div className="onb-h">You're all set</div><div className="onb-sub">Track a bet to start sweating it shot-by-shot, or dive straight into the live feed.</div>
+        <div className="settle-book" style={{background:'var(--soft)',color:'var(--ink)',border:'1px solid var(--line)'}}>Following <b style={{color:'var(--emerald-d)'}}>{follows.length}</b> {follows.length===1?'player':'players'} · {gname?<>Crew: <b style={{color:'var(--emerald-d)'}}>{gname}</b></>:'No group yet'}</div></>}
+    </div>
+    <div className="onb-foot"><button className="onb-skip" onClick={()=>onClose(smart)}>Skip</button><button className="onb-next" onClick={next}>{step<2?'Continue':'Enter Pardle'}</button></div>
+  </div>;
+}
+function FeedEmpty({onFollow,onBet}){return <div className="pv-body"><div className="empty"><div className="empty-emoji">⛳</div><div className="empty-h">Your feed is quiet</div><div className="empty-sub">Follow players and track a bet — their shots and your sweat stream in live here.</div><div className="empty-btns"><button className="empty-pri" onClick={onBet}>Track your first bet</button><button className="empty-sec" onClick={onFollow}>Follow players</button></div></div></div>;}
+function BetsEmpty({onBet}){return <div className="pv-body"><div className="empty"><div className="empty-emoji">🎟️</div><div className="empty-h">No tracked bets yet</div><div className="empty-sub">Log a pick and watch its win probability move with every shot.</div><div className="empty-btns"><button className="empty-pri" onClick={onBet}>＋ Track a bet</button></div></div></div>;}
+function GroupsEmpty({onCreate}){return <div className="pv-body"><div className="empty"><div className="empty-emoji">🏌️</div><div className="empty-h">You're not in a crew</div><div className="empty-sub">Create a private group or join one with an invite code to start a shared P&L race.</div><div className="empty-btns"><button className="empty-pri" onClick={onCreate}>Create a group</button><button className="empty-sec">Join with a code</button></div></div></div>;}
+function SharpEmpty(){return <div className="pv-body"><div className="empty"><div className="empty-emoji">📊</div><div className="empty-h">No calls yet</div><div className="empty-sub">Vote on Putt-IQ polls and settle bets to build your Sharp Score.</div></div></div>;}
+function CreateGroup({onClose,onCreate}){const [n,setN]=useState('');return <><div className="sheet-scrim" onClick={onClose}/><div className="sheet"><div className="sheet-grip"/><h3>Create a private group</h3><div className="field"><div className="fl">Group name</div><input className="odds-input" value={n} onChange={e=>setN(e.target.value)} placeholder="The Lads"/></div><div className="field"><div className="fl">Invite link</div><div className="settle-book" style={{background:'var(--soft)',color:'var(--ink)',border:'1px solid var(--line)',fontFamily:"'IBM Plex Mono'"}}>pardle.app/c/{((n||'crew').toLowerCase().replace(/[^a-z]/g,'').slice(0,8)||'crew')}-7f3</div></div><button className="sheet-confirm" disabled={!n.trim()} onClick={()=>onCreate(n)}>Create &amp; invite your crew</button></div></>;}
+function ShareCard({s,onClose}){
+  const [copied,setCopied]=useState(false);
+  return <div className="share-modal"><div className="share-scrim" onClick={onClose}/>
+    <button className="share-close" onClick={onClose}>✕</button>
+    <div className="share-card">
+      <div className="share-top"><div className="share-logo">Par<b>dle</b></div><div className="share-live">Live · shot-by-shot</div></div>
+      <div className="share-won">▲ Bet won</div>
+      <div className="share-amt">{s.profit}</div>
+      <div className="share-bet">{s.player} · {s.mkt} · {s.cur}{s.stake} @ {s.odds}</div>
+      <div className="share-meta"><span className="share-chip">Tracked shot-by-shot</span><span className="share-chip">2nd in The Lads</span><span className="share-chip">+£226 today</span></div>
+      <div className="share-foot">PARDLE.APP</div>
+    </div>
+    <div className="share-actions"><button onClick={onClose}>Save image</button><button className="pri" onClick={()=>setCopied(true)}>{copied?'Copied ✓':'Share to group'}</button></div>
+  </div>;
+}
+const LEADERBOARD=[
+ ['1','R. Henley','−12','F','−4','up',true,'OUTRIGHT'],
+ ['2','E. Cole','−12','F','−6','up',false,''],
+ ['T3','B. Griffin','−11','17','−3','up',true,''],
+ ['T3','A. Smalley','−11','F','−6','up',false,'TOP 5'],
+ ['T3','M. Meissner','−11','F','−5','up',false,''],
+ ['T6','G. Woodland','−10','16','−2','up',true,''],
+ ['T6','M. Brennan','−10','F','−1','flat',false,''],
+ ['T6','N. Echavarria','−10','F','−5','up',false,''],
+ ['T9','L. Åberg','−9','15','+1','down',false,''],
+ ['T9','C. Morikawa','−9','F','−4','up',false,''],
+ ['11','A. Novak','−8','F','−2','up',false,''],
+ ['12','R. Fowler','−7','F','+2','down',false,''],
+ ['T13','M. Thorbjornsen','−6','F','E','flat',false,''],
+ ['T13','S. Burns','−6','14','−1','up',false,''],
+];
+function Leaderboard({onOpenPlayer}){
+  const [f,setF]=useState('all');
+  const rows=f==='following'?LEADERBOARD.filter(r=>r[6]):f==='bets'?LEADERBOARD.filter(r=>r[7]):LEADERBOARD;
+  return <div className="pv-body">
+    <div className="lb-head"><div className="ev"><i/>Live · Round 4 · Final</div><h2>Charles Schwab Challenge</h2></div>
+    <div className="lb-filter"><button className={f==='all'?'on':''} onClick={()=>setF('all')}>Full field</button><button className={f==='following'?'on':''} onClick={()=>setF('following')}>★ Following</button><button className={f==='bets'?'on':''} onClick={()=>setF('bets')}>Your bets</button></div>
+    <div className="lb-cols"><span className="c-pos">Pos</span><span className="c-av"/><span className="c-nm">Player</span><span className="c-td">Today</span><span className="c-tot">Total</span><span className="c-thru">Thru</span></div>
+    {rows.map((r,i)=><div key={i} className={'lb-row'+(r[7]?' mine':'')} onClick={()=>onOpenPlayer(r[1])}>
+      <span className="lb-pos">{r[0]}</span>
+      <Avatar initials={r[1].split(' ').pop().slice(0,2).toUpperCase()} size={30} pro/>
+      <span className="lb-nm">{r[1]}{r[6]&&<span className="fdot"/>}{r[7]&&<span className="bettag">{r[7]}</span>}</span>
+      <span className={'lb-td '+r[5]}>{r[4]}</span>
+      <span className={'lb-tot'+(r[2].startsWith('+')?' over':'')}>{r[2]}</span>
+      <span className="lb-thru">{r[3]}</span>
+    </div>)}
+    <div style={{height:20}}/>
+  </div>;
+}
+const MEMBER_INFO={
+ 'Jordan':{init:'JO',role:'Admin',today:'+£312',dir:'up',hist:[40,90,70,160,240,312],record:'this week · 12 bets · 8 W',bets:[['R. Henley','OUTRIGHT','£50','3.50',62,'up'],['C. Morikawa','TOP 10','£30','2.10',55,'up'],['M. Brennan','UNDER 69.5 · R4','$40','1.90',46,'down']]},
+ 'You':{init:'YO',role:'Admin',today:'+£186',dir:'up',hist:[20,40,60,120,150,186],record:'this week · 9 bets · 5 W',bets:[['R. Henley','OUTRIGHT','£50','5/2',54,'up'],['A. Smalley','TOP 5','£40','2.00',71,'up']]},
+ 'Theo':{init:'TH',role:'',today:'+£54',dir:'up',hist:[10,30,20,40,48,54],record:'this week · 7 bets · 4 W',bets:[['L. Åberg','TOP 10','£25','3.20',38,'down'],['E. Cole','TOP 20','£20','1.70',64,'up']]},
+ 'Sam':{init:'SA',role:'',today:'−£20',dir:'down',hist:[30,10,-5,-30,-10,-20],record:'this week · 6 bets · 2 W',bets:[['M. Brennan','UNDER 69.5 · R4','$100','1.90',46,'down']]},
+ 'Mia':{init:'MI',role:'',today:'−£40',dir:'down',hist:[20,0,-15,-35,-45,-40],record:'this week · 8 bets · 3 W',bets:[['A. Smalley','TOP 5','£30','2.00',71,'up'],['N. Echavarria','TOP 20','£20','1.60',58,'up']]},
+};
+function MemberProfile({name,onClose,onOpenPlayer}){
+  const d=MEMBER_INFO[name]||{init:name.slice(0,2).toUpperCase(),role:'',today:'+£0',dir:'up',hist:[0,0],record:'—',bets:[]};
+  const neg=d.dir==='down';
+  return <div className="detail" style={{zIndex:64}}>
+    <div className="detail-head"><button className="detail-back" onClick={onClose}>←</button><div className="detail-title"><div className="nm">{name}{d.role&&<span className="role-tag">{d.role}</span>}</div><div className="mk">In The Lads · {d.record}</div></div></div>
+    <div className="detail-body">
+      <div className="pl-hero"><Avatar initials={d.init} size={56}/><div><div className="nm">{name}</div><div className="pos">Today <b style={{color:neg?'var(--down)':'var(--up)'}}>{d.today}</b> · this tournament</div></div><button className="pl-follow">Nudge</button></div>
+      <div className="detail-sec"><h4>P&L · this tournament</h4><AreaChart hist={d.hist} dir={d.dir}/><div className="chart-x"><span>R1</span><span>now</span></div></div>
+      <div className="detail-sec"><h4>Open bets · {d.bets.length}</h4>{d.bets.length?d.bets.map((b,i)=><div className="mbet" key={i} onClick={()=>onOpenPlayer&&onOpenPlayer(b[0])}><div style={{flex:1,minWidth:0}}><div className="mbet-nm">{b[0]}<span className="mktchip">{b[1]}</span></div><div className="mbet-sub">{b[2]} @ {b[3]}</div></div><div className="mbet-prob" style={{color:b[5]==='down'?'var(--down)':'var(--up)'}}>{b[4]}%</div></div>):<div style={{fontSize:13,color:'var(--muted)'}}>No open bets right now.</div>}</div>
+    </div>
+    <div className="detail-foot"><button className="df-share">View full profile</button><button className="df-tail">Tail their slip</button></div>
+  </div>;
+}
+const NOTIFS=[
+ {ic:'🚀',tint:'up',t:'Your Henley outright jumped to 60%',s:'Birdie on 18 — he grabs the lead',tm:'now',unread:true},
+ {ic:'🎉',tint:'up',t:'Your Smalley Top 5 cashed · +£40',s:'Settled — booked to your day',tm:'2m',unread:true},
+ {ic:'📈',tint:'blue',t:'@golf-edge posted a new tip',s:'L. Åberg — Outright @ 12/1',tm:'8m',unread:true},
+ {ic:'👥',tint:'tang',t:'Jordan tailed your Smalley Top 5',s:'The Lads',tm:'12m',unread:false},
+ {ic:'⛳',tint:'up',t:'N. Echavarria — eagle on 17',s:'A player you follow',tm:'18m',unread:false},
+ {ic:'🏆',tint:'tang',t:'You moved to 2nd in The Lads',s:"Today's P&L race",tm:'25m',unread:false},
+];
+function Notifications({onClose}){
+  const [enabled,setEnabled]=useState(false);
+  return <div className="detail" style={{zIndex:78}}>
+    <div className="detail-head"><button className="detail-back" onClick={onClose}>←</button><div className="detail-title"><div className="nm">Notifications</div><div className="mk">The Lads · Charles Schwab Challenge</div></div></div>
+    <div className="detail-body">
+      {!enabled?<div className="np-card"><div className="np-ic">🔔</div><div className="np-bd"><div className="np-h">Turn on alerts</div><div className="np-s">Get pinged when your bets swing or settle, a tip drops, or your crew's on a heater.</div></div><button className="np-btn" onClick={()=>setEnabled(true)}>Enable</button></div>:<div className="np-on">🔔 Alerts on — bet swings, settles, tips &amp; group activity.<button onClick={()=>setEnabled(false)}>Manage</button></div>}
+      <div className="nf-list">{NOTIFS.map((n,i)=><div key={i} className={'nf-row'+(n.unread?' unread':'')}><div className={'nf-ic '+n.tint}>{n.ic}</div><div className="nf-bd"><div className="nf-t">{n.t}</div><div className="nf-s">{n.s}</div></div><div className="nf-tm">{n.tm}</div></div>)}</div>
+    </div>
+  </div>;
+}
+const GAMES=[{key:'pros',ic:'⛳',name:'Pros',desc:"Guess today's mystery pro in 6",state:'Solved 4/6',done:true},{key:'holes',ic:'🏌️',name:'Holes',desc:'Name the famous hole',state:'Play',done:false},{key:'clubs',ic:'🏟️',name:'Clubhouses',desc:'Spot the course',state:'Play',done:false},{key:'conn',ic:'🔗',name:'Connections',desc:'Find the four groups',state:'2 mistakes',done:true}];
+const GAME_CHALLENGE=[['JO','Jordan','3/6'],['MI','Mia','5/6'],['YO','You','4/6'],['TH','Theo','X']];
+function GamesHub({onClose}){
+  return <div className="detail" style={{zIndex:78}}>
+    <div className="detail-head"><button className="detail-back" onClick={onClose}>←</button><div className="detail-title"><div className="nm">Daily games</div><div className="mk">Free to play · challenge your crew</div></div></div>
+    <div className="detail-body">
+      <div className="gm-streak">🔥 <b>12-day</b> streak · play today's to keep it alive</div>
+      <div className="gm-grid">{GAMES.map(g=><div key={g.key} className="gm-card"><div className="gm-ic">{g.ic}</div><div className="gm-nm">{g.name}</div><div className="gm-desc">{g.desc}</div><div className={'gm-state'+(g.done?' done':'')}>{g.state}</div></div>)}</div>
+      <div className="detail-sec"><h4>Today's Pros · The Lads</h4><div className="card" style={{padding:6}}>{GAME_CHALLENGE.map((r,i)=><div key={i} className={'racerow'+(r[1]==='You'?' you':'')}><span className="rk">{i+1}</span><Avatar initials={r[0]} size={30}/><span className="nm">{r[1]==='You'?<b>You</b>:r[1]}</span><span style={{fontFamily:"'IBM Plex Mono'",fontSize:14,fontWeight:700,color:r[2]==='X'?'var(--down)':'var(--ink)'}}>{r[2]}</span></div>)}</div>
+        <button className="empty-pri" style={{marginTop:12,width:'100%'}}>Challenge your crew ↗</button></div>
+    </div>
+  </div>;
+}
+function App(){
+  const [tab,setTab]=useState('feed');const [fmt,setFmt]=useState('frac');
+  const [space,setSpace]=useState(SPACES[0]);const [sheetOpen,setSheetOpen]=useState(false);const [raceOpen,setRaceOpen]=useState(false);
+  const [posts,setPosts]=useState(initPosts);const [freshId,setFreshId]=useState(null);const ei=useRef(0);
+  const [detail,setDetail]=useState(null);const [addOpen,setAddOpen]=useState(false);const [player,setPlayer]=useState(null);const [prefill,setPrefill]=useState(null);const betOnPlayer=(p)=>{setPlayer(null);setPrefill(p);setAddOpen(true);};const [settle,setSettle]=useState(null);const [race,setRace]=useState(RACE.today);const openSettle=(p)=>setSettle({win:p.win,player:p.player,mkt:p.mkt,cur:p.cur,stake:p.stake,odds:p.odds||'2.00',profit:p.result?p.result.profit:'+£40',ret:p.result?p.result.ret:'£80'});const [newUser,setNewUser]=useState(false);const [onb,setOnb]=useState(false);const [groupSheet,setGroupSheet]=useState(false);const [smartDefault,setSmartDefault]=useState(false);const [share,setShare]=useState(null);const [member,setMember]=useState(null);const [notifOpen,setNotifOpen]=useState(false);const [gamesOpen,setGamesOpen]=useState(false);
+  useEffect(()=>{let t;t=setInterval(()=>{
+    if(ei.current>=EVENTS.length){clearInterval(t);return;} // single pass — no looping re-apply
+    const e=EVENTS[ei.current];ei.current++;
+    if(e.kind==='update'){
+      setPosts(prev=>{const idx=prev.findIndex(p=>p.id===e.target);if(idx<0)return prev;
+        const tgt=prev[idx];
+        // guard: don't re-prepend an identical leading update
+        if(tgt.updates[0] && tgt.updates[0][0]===e.upd[0])return prev;
+        const np={...tgt,prob:e.prob,dir:e.upd[2],updates:[e.upd,...tgt.updates].slice(0,8)};
+        const rest=prev.filter(p=>p.id!==e.target);return [np,...rest];});
+      setFreshId(e.target);
+    }else if(e.kind==='insert'){const np=e.post();setPosts(prev=>[np,...prev].slice(0,12));setFreshId(np.id);}else if(e.kind==='settle'){const res={profit:'+£40',ret:'£80'};setPosts(prev=>{const mp=prev.map(p=>p.id===e.target?{...p,settled:true,win:e.win,result:res}:p);const t=mp.find(p=>p.id===e.target);return t?[t,...mp.filter(p=>p.id!==e.target)]:mp;});setRace(r=>r.map(x=>x[1]==='You'?['YO','You','+£226','up']:x));setSettle(()=>{const t=initPosts.find(p=>p.id===e.target);return {win:e.win,player:t.player,mkt:t.mkt,cur:t.cur,stake:t.stake,odds:t.odds||'2.00',profit:res.profit,ret:res.ret};});setFreshId(e.target);}
+    setTimeout(()=>setFreshId(k=>k),700);
+  },4200);return ()=>clearInterval(t);},[]);
+  const addBet=(d)=>{const id='nb'+(PK++);const np={type:'bet',id,init:'YO',name:'You',mine:true,player:d.player,mkt:d.mkt,cur:d.cur,stake:d.stake,odds:d.odds,prob:50,dir:'up',hist:[50,50],tm:'now',react:0,on:[],cmt:0,updates:[['Bet tracked — now sweating this','·','flat']]};setPosts(prev=>[np,...prev].slice(0,12));setFreshId(id);setAddOpen(false);setPrefill(null);setNewUser(false);setTab('feed');};
+  return <div className="pv">
+    <div className="pv-status"><span>10:43</span><span className="dots">
+      <svg width="17" height="11" viewBox="0 0 17 11"><g fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></g></svg>
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="currentColor"><path d="M8 2.2c2 0 3.9.8 5.3 2.1l1.2-1.3A9.3 9.3 0 0 0 8 .4 9.3 9.3 0 0 0 1.5 3l1.2 1.3A7.5 7.5 0 0 1 8 2.2Z"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12"><rect x="0.5" y="0.5" width="21" height="11" rx="3" fill="none" stroke="currentColor" opacity="0.5"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><rect x="23" y="3.5" width="1.5" height="5" rx="0.75" fill="currentColor" opacity="0.5"/></svg>
+    </span></div>
+    <div className="pv-head"><div style={{display:'flex',alignItems:'center',gap:9}}><div className="wordmark">Par<b>dle</b></div><button className={'nu-toggle'+(newUser?' on':'')} onClick={()=>{const n=!newUser;setNewUser(n);setOnb(n);setTab('feed');}}>{newUser?'New user':'Demo'}</button></div><div style={{display:'flex',alignItems:'center',gap:8}}><button className="bell" onClick={()=>setGamesOpen(true)} aria-label="Games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2.5" y="7" width="19" height="10" rx="3.5"/><path d="M7 11v2.4M5.8 12.2h2.4"/><circle cx="15.5" cy="11.5" r=".6"/><circle cx="17.6" cy="13.6" r=".6"/></svg></button><button className="bell" onClick={()=>setNotifOpen(true)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span className="bell-dot"/></button><SpaceSwitcher space={space} setSpace={setSpace} open={sheetOpen} setOpen={setSheetOpen}/></div></div>
+    {tab==='feed'&&!newUser&&<Ticker onExpand={()=>setRaceOpen(true)} race={race}/>}
+    {tab==='feed'?(newUser?<FeedEmpty onFollow={()=>setOnb(true)} onBet={()=>setAddOpen(true)}/>:<Feed posts={posts} freshId={freshId} onOpenBet={setDetail} onOpenPlayer={setPlayer} onSettle={openSettle} initialMode={smartDefault?'smart':'all'}/>)
+      :tab==='bets'?(newUser?<BetsEmpty onBet={()=>setAddOpen(true)}/>:<Bets fmt={fmt} setFmt={setFmt} onOpenBet={setDetail}/>)
+      :tab==='board'?<Leaderboard onOpenPlayer={setPlayer}/>
+      :tab==='groups'?(newUser?<GroupsEmpty onCreate={()=>setGroupSheet(true)}/>:<Groups onExpand={()=>setRaceOpen(true)} openMember={setMember} openPlayer={setPlayer}/>)
+      :(newUser?<SharpEmpty/>:<Sharp/>)}
+    {(tab==='feed'||tab==='bets')&&!detail&&!addOpen&&!player&&!onb&&<button className="fab" onClick={()=>setAddOpen(true)}>＋</button>}
+    {onb&&<Onboarding onClose={(sm)=>{setOnb(false);if(typeof sm==='boolean')setSmartDefault(sm);}}/>}
+    {groupSheet&&<CreateGroup onClose={()=>setGroupSheet(false)} onCreate={()=>{setGroupSheet(false);setNewUser(false);setTab('groups');}}/>}
+    {raceOpen&&<RaceSheet onClose={()=>setRaceOpen(false)} race={race}/>}
+    {detail&&<BetDetail bet={detail} onClose={()=>setDetail(null)} onOpenPlayer={setPlayer}/>}
+    {addOpen&&<AddBet onClose={()=>{setAddOpen(false);setPrefill(null);}} onAdd={addBet} prefill={prefill}/>}
+    {settle&&<SettlementModal s={settle} onClose={()=>setSettle(null)} onShare={(x)=>{setSettle(null);setShare(x);}}/>}
+    {share&&<ShareCard s={share} onClose={()=>setShare(null)}/>}
+    {player&&<PlayerPage name={player} onClose={()=>setPlayer(null)} onBet={betOnPlayer}/>}
+    {member&&<MemberProfile name={member} onClose={()=>setMember(null)} onOpenPlayer={(n)=>{setMember(null);setPlayer(n);}}/>}
+    {notifOpen&&<Notifications onClose={()=>setNotifOpen(false)}/>}
+    {gamesOpen&&<GamesHub onClose={()=>setGamesOpen(false)}/>}
+    <div className="nav">{[['feed','Sweats',icoFeed],['bets','My bets',icoBets],['board','Leaders',icoBoard],['groups','Groups',icoGroup],['sharp','Sharp',icoSharp]].map(([k,l,ic])=>(<button key={k} className={tab===k?'on':''} onClick={()=>setTab(k)}><span className="ni">{ic}</span>{l}{k==='feed'&&tab!=='feed'&&<span className="badge">3</span>}</button>))}</div>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

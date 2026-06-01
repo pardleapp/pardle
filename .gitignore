@@ -58,3 +58,6 @@ __pycache__/
 
 # mediapipe model cached by scripts/extract_face_alignment.py (auto-downloaded)
 /scripts/.face_landmarker.task
+
+.vercel
+.env*

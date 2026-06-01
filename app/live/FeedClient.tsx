@@ -492,6 +492,17 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     setMedianLoadMs(medianMs(readLoadTimes()));
   }, []);
 
+  // Stamp the html element so body bg goes warm paper while the feed
+  // is mounted; clear on unmount so /bets, /sharp etc. keep their
+  // dark v4 background.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.classList.add("pv-theme-body");
+    return () => {
+      document.documentElement.classList.remove("pv-theme-body");
+    };
+  }, []);
+
   // Track followed players — re-read whenever a FollowButton fires the event.
   useEffect(() => {
     const sync = () => setFollowsState(getFollows());
@@ -795,7 +806,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   // ── Empty / loading / not-live states ───────────────────────────
   if (error && !data) {
     return (
-      <section className="feed-wrap v4-theme">
+      <section className="feed-wrap v4-theme pv-theme">
         <p className="feed-empty">
           Couldn&apos;t load the feed. It&apos;ll retry automatically.
         </p>
@@ -856,7 +867,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     })?.event.pollId ?? null;
 
   return (
-    <section className="feed-wrap v4-theme">
+    <section className="feed-wrap v4-theme pv-theme">
       <HeroIntro />
       <NotificationPrompt
         betCount={trackedBets.length}
