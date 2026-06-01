@@ -22265,6 +22265,184 @@ html.pv-theme-body .auth-chip-btn {
   color: var(--pv-muted);
 }
 
+/* =============================================================
+   Notifications surface (/notifications) — prototype's
+   <Notifications> rendered against the broadcast theme.
+   ============================================================= */
+.notif-pv {
+  background: var(--pv-bg);
+  color: var(--pv-ink);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.notif-pv-head {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--pv-bg);
+  border-bottom: 1px solid var(--pv-line);
+}
+.notif-pv-body {
+  flex: 1;
+  padding-bottom: 24px;
+}
+
+/* Permission-prompt card */
+.np-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 16px;
+  padding: 14px;
+  border-radius: 14px;
+  background: oklch(0.96 0.03 150);
+  border: 1px solid oklch(0.86 0.08 150);
+}
+.np-ic {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+.np-bd {
+  flex: 1;
+  min-width: 0;
+}
+.np-h {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--pv-ink);
+}
+.np-s {
+  font-size: 12px;
+  color: var(--pv-muted);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.np-btn {
+  background: var(--pv-emerald);
+  color: #fff;
+  border: none;
+  border-radius: 11px;
+  padding: 10px 16px;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.np-on {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--pv-soft);
+  font-size: 12.5px;
+  color: var(--pv-muted);
+  font-weight: 600;
+  line-height: 1.4;
+}
+.np-on button {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--pv-emerald-d);
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12.5px;
+  flex-shrink: 0;
+}
+
+/* Notification list rows */
+.nf-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--pv-line);
+}
+.nf-row {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 16px;
+  border: none;
+  border-bottom: 1px solid var(--pv-line);
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  color: var(--pv-ink);
+}
+.nf-row-unread {
+  background: oklch(0.97 0.012 145);
+}
+.nf-ic {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+  background: var(--pv-soft);
+}
+.nf-ic-up {
+  background: oklch(0.93 0.06 150);
+}
+.nf-ic-blue {
+  background: oklch(0.93 0.05 245);
+}
+.nf-ic-tang {
+  background: oklch(0.94 0.06 55);
+}
+.nf-bd {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.nf-t {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--pv-ink);
+}
+.nf-s {
+  font-size: 12px;
+  color: var(--pv-muted);
+  margin-top: 2px;
+}
+.nf-tm {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  color: var(--pv-dim);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* Unread indicator on the SweatHeader bell. */
+.pv-head-bell {
+  position: relative;
+}
+.pv-head-bell-dot {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pv-tang);
+  border: 1.5px solid var(--pv-bg);
+}
+
 /* "Your bets" section heading above the bet posts */
 .pv-theme .pv-section-label {
   font-size: 10.5px;

@@ -43,10 +43,11 @@ export default function SweatHeader() {
             <path d="M5 12h14" />
           </svg>
         </Link>
-        <button
-          type="button"
+        <Link
+          href="/notifications"
           className="pv-head-icon-btn pv-head-bell"
           aria-label="Notifications"
+          title="Notifications"
         >
           <svg
             width="18"
@@ -61,7 +62,10 @@ export default function SweatHeader() {
             <path d="M6 8a6 6 0 0 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9" />
             <path d="M10 21a2 2 0 0 0 4 0" />
           </svg>
-        </button>
+          {/* Unread indicator — mock dot for now, gates on the
+              real unread count when push fanout lands. */}
+          <span className="pv-head-bell-dot" aria-label="Unread alerts" />
+        </Link>
         <button
           type="button"
           className="pv-space-btn"
