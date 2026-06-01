@@ -22115,12 +22115,12 @@ html.pv-theme-body .auth-chip-btn {
   color: var(--pv-dim);
   border-bottom: 1px solid var(--pv-line);
 }
-.lb-col-pos { width: 30px; }
-.lb-col-av { width: 30px; }
-.lb-col-nm { flex: 1; }
-.lb-col-td { width: 42px; text-align: right; }
-.lb-col-tot { width: 42px; text-align: right; }
-.lb-col-thru { width: 24px; text-align: right; }
+.lb-col-pos { width: 30px; flex-shrink: 0; }
+.lb-col-av { width: 30px; flex-shrink: 0; }
+.lb-col-nm { flex: 1 1 0; min-width: 0; }
+.lb-col-td { width: 42px; flex-shrink: 0; text-align: right; }
+.lb-col-tot { width: 42px; flex-shrink: 0; text-align: right; }
+.lb-col-thru { width: 24px; flex-shrink: 0; text-align: right; }
 
 .lb-list {
   list-style: none;
@@ -22149,8 +22149,15 @@ html.pv-theme-body .auth-chip-btn {
 .lb-row-btn:active {
   background: var(--pv-soft);
 }
+/* Row layout: fixed-width columns flank a flexible name cell. Every
+   numeric column carries flex-shrink:0 + a hard width so they can
+   never be pushed or overlapped by a wide bet-tag in the name cell.
+   The name cell itself is a nested flex container with overflow:
+   hidden + min-width:0 so .lb-nm-text truncates with ellipsis when
+   there isn't room for both name and bet-tag. */
 .lb-pos {
   width: 30px;
+  flex-shrink: 0;
   font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
   font-size: 13px;
   font-weight: 700;
@@ -22178,7 +22185,7 @@ html.pv-theme-body .auth-chip-btn {
   font-weight: 800;
 }
 .lb-nm {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -22186,12 +22193,14 @@ html.pv-theme-body .auth-chip-btn {
   font-size: 14.5px;
   font-weight: 700;
   color: var(--pv-ink);
+  overflow: hidden;
 }
 .lb-nm-text {
+  flex: 0 1 auto;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
 }
 .fdot {
   width: 7px;
@@ -22214,6 +22223,7 @@ html.pv-theme-body .auth-chip-btn {
 }
 .lb-td {
   width: 42px;
+  flex-shrink: 0;
   text-align: right;
   font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
   font-size: 13px;
@@ -22224,6 +22234,7 @@ html.pv-theme-body .auth-chip-btn {
 .lb-td-flat { color: var(--pv-muted); }
 .lb-tot {
   width: 42px;
+  flex-shrink: 0;
   text-align: right;
   font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
   font-size: 15px;
@@ -22233,6 +22244,7 @@ html.pv-theme-body .auth-chip-btn {
 .lb-tot-over { color: var(--pv-down); }
 .lb-thru {
   width: 24px;
+  flex-shrink: 0;
   text-align: right;
   font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
   font-size: 11px;
