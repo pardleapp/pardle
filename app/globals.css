@@ -20129,3 +20129,185 @@ html.pv-theme-body .auth-chip-btn {
   border-color: var(--pv-emerald);
 }
 
+/* =============================================================
+   Pass 4 — structural changes to match the design-handoff
+   prototype: + FAB, mobile bottom nav, groups-soon route.
+   ============================================================= */
+
+/* + FAB — fixed bottom-right, opens add-bet flow on /bets. */
+.pv-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 92px;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: oklch(0.50 0.13 155);
+  color: #fff;
+  font-size: 28px;
+  font-weight: 300;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  box-shadow: 0 12px 26px oklch(0.5 0.13 155 / 0.5);
+  z-index: 25;
+}
+.pv-fab:hover {
+  filter: brightness(1.06);
+}
+.pv-fab:active {
+  transform: scale(0.93);
+}
+/* On wide screens park it inside the page gutter so it doesn't fly
+   off into the desert. */
+@media (min-width: 1024px) {
+  .pv-fab {
+    right: max(24px, calc((100vw - 1280px) / 2 + 24px));
+    bottom: 32px;
+  }
+}
+
+/* =============================================================
+   Bottom mobile nav — fixed bottom strip, 5 tabs.
+   Hidden on desktop (>=768px) since the top MainNav already covers
+   navigation there.
+   ============================================================= */
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  background: oklch(0.995 0.004 95);
+  border-top: 1px solid oklch(0.90 0.013 95);
+  padding: 9px 6px calc(9px + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+.bottom-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: oklch(0.62 0.018 150);
+  background: none;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+  text-decoration: none;
+}
+.bottom-nav-btn-on {
+  color: oklch(0.50 0.13 155);
+}
+.bottom-nav-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.bottom-nav-ic svg {
+  stroke: currentColor;
+}
+.bottom-nav-lbl {
+  font-size: 10px;
+  font-weight: 700;
+}
+/* Dark surfaces — bottom nav stays light on the v4-themed pages
+   that aren't migrated yet (it sits over a dark background) but
+   contrast holds because the nav itself is its own paper-light
+   surface. Keep the same visual treatment everywhere. */
+
+@media (min-width: 768px) {
+  /* Desktop: hide the mobile bottom nav. The top MainNav is the
+     primary navigation surface there. */
+  .bottom-nav {
+    display: none;
+  }
+}
+
+/* Mobile: hide the top desktop nav so the bottom nav is the only
+   primary nav. The brand wordmark stays in the header, and the
+   auth chip stays right-aligned, but the tab bar disappears.
+   Scoped to .pv-theme-body so v4-only pages (until migrated) keep
+   their existing nav. */
+@media (max-width: 767px) {
+  html.pv-theme-body .hub-nav-tabs {
+    display: none;
+  }
+  html.pv-theme-body .brand-nav {
+    gap: 8px;
+  }
+  /* Push page content above the bottom nav so the last item isn't
+     hidden behind the strip. */
+  html.pv-theme-body body {
+    padding-bottom: 76px;
+  }
+}
+
+/* =============================================================
+   Groups coming-soon page — paper-light single column. Sits at
+   /groups; reachable from the bottom-nav Groups tab.
+   ============================================================= */
+.pv-theme .groups-soon {
+  padding: 40px 22px 60px;
+  max-width: 520px;
+  margin: 0 auto;
+  text-align: center;
+}
+.pv-theme .groups-soon-eyebrow {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pv-emerald-d);
+}
+.pv-theme .groups-soon-title {
+  font-size: 30px;
+  font-weight: 900;
+  color: var(--pv-ink);
+  margin-top: 10px;
+  letter-spacing: -0.01em;
+}
+.pv-theme .groups-soon-blurb {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--pv-muted);
+  margin-top: 14px;
+}
+.pv-theme .groups-soon-cta-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+.pv-theme .groups-soon-cta {
+  background: var(--pv-emerald);
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 12px 22px;
+  border-radius: 999px;
+  text-decoration: none;
+}
+.pv-theme .groups-soon-cta:hover {
+  filter: brightness(1.06);
+}
+.pv-theme .groups-soon-cta-quiet {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  color: var(--pv-ink);
+  font-weight: 800;
+  font-size: 14px;
+  padding: 12px 22px;
+  border-radius: 999px;
+  text-decoration: none;
+}
+.pv-theme .groups-soon-cta-quiet:hover {
+  background: var(--pv-soft);
+}
+

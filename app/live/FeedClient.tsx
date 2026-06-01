@@ -51,7 +51,7 @@ import { useNotifications } from "./notifications/useNotifications";
 import PlayerAvatar from "./PlayerAvatar";
 import PlayerSearch from "./PlayerSearch";
 import PuttPollWidget from "./PuttPollWidget";
-import BetStrip from "./BetStrip";
+import BetPost from "./BetPost";
 import BetPostErrorBoundary from "./BetPostErrorBoundary";
 const ReelGroup = dynamic(() => import("./ReelGroup"), {
   ssr: false,
@@ -850,10 +850,60 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     if (ev.type !== "putt-poll") return true;
     return ev.pollId != null && ev.pollId === _latestOpenPollIdForFilter;
   });
+  // Bet-relevance set — player ids the user has an active tracked bet
+  // on. Drives the Smart-feed filter: when active, only show shots
+  // that touch one of these players, plus any bet posts themselves.
+  const trackedPlayerIds = new Set<string>();
+  for (const b of trackedBets) {
+    if (b.settledAt != null) continue;
+    if ("playerId" in b && b.playerId) trackedPlayerIds.add(b.playerId);
+  }
   const visibleRows =
     filterMode === "following"
-      ? rowsAfterPollFilter.filter((r) => followSet.has(r.event.playerId))
+      ? rowsAfterPollFilter.filter((r) =>
+          trackedPlayerIds.has(r.event.playerId),
+        )
       : rowsAfterPollFilter;
+
+  // Build interleaved timeline — tracked bets become first-class
+  // posts sorted alongside shot rows. Each bet's sort timestamp
+  // anchors to its most-recent player shot when one exists in the
+  // current row window (so an active bet bubbles up to the action),
+  // falling back to placedAt for bets whose player is quiet.
+  type TimelineItem =
+    | { kind: "shot"; ts: number; row: (typeof visibleRows)[number] }
+    | {
+        kind: "bet";
+        ts: number;
+        bet: TrackedBet;
+        playerId: string;
+      };
+  const timeline: TimelineItem[] = [];
+  for (const row of visibleRows) {
+    timeline.push({ kind: "shot", ts: row.event.ts, row });
+  }
+  for (const bet of trackedBets) {
+    if (bet.settledAt != null) continue;
+    if (
+      bet.kind !== "outright" &&
+      bet.kind !== "top-finish" &&
+      bet.kind !== "round-score"
+    ) {
+      continue;
+    }
+    const playerId = "playerId" in bet ? String(bet.playerId) : "";
+    if (!playerId) continue;
+    let ts = bet.placedAt ?? 0;
+    // visibleRows is newest-first; the first match is the most recent.
+    for (const row of visibleRows) {
+      if (row.event.playerId === playerId) {
+        ts = Math.max(ts, row.event.ts);
+        break;
+      }
+    }
+    timeline.push({ kind: "bet", ts, bet, playerId });
+  }
+  timeline.sort((a, b) => b.ts - a.ts);
 
   // Only show the vote widget on the LATEST open putt poll in the
   // feed. Older open polls (their putt was struck minutes ago) and
@@ -931,9 +981,12 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         </aside>
         <main className="feed-main">
 
-      {/* Following toggle — bet relevance now surfaces inline as a
-          per-row £ impact chip rather than a whole separate feed. */}
-      {follows.length > 0 && (
+      {/* Filter row — All shots vs Smart feed.
+          Smart feed shows only shots that touch a player the user
+          has an active tracked bet on, plus the bet posts themselves.
+          Hidden when the user has no active bets (no relevance set
+          to filter against). */}
+      {trackedPlayerIds.size > 0 && (
         <div className="feed-filter-row">
           <button
             type="button"
@@ -947,40 +1000,53 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
             className={`feed-filter-btn ${filterMode === "following" ? "feed-filter-on" : ""}`}
             onClick={() => setFilterMode("following")}
           >
-            ★ Following ({follows.length})
+            ✦ Smart feed
           </button>
         </div>
       )}
 
-      {/* Bet strip — tracked bets rendered as feed posts above the
-          shot feed. Wrapped in error boundary so a render crash
-          inside the strip (or any single BetPost) is contained and
-          surfaces as an inline red stripe rather than blowing up the
-          page-level error.tsx boundary. */}
-      <BetPostErrorBoundary label="bet-strip">
-        <BetStrip
-          trackedBets={trackedBets}
-          rows={data.rows}
-          currentOdds={data.currentOdds}
-          topFinishCurrent={data.topFinishCurrent}
-          oddsHistories={data.oddsHistories}
-        />
-      </BetPostErrorBoundary>
-
       {data.rows.length === 0 ? (
         <FeedWarmingUp leaderboard={data.leaderboard} />
-      ) : filterMode === "following" && visibleRows.length === 0 ? (
-        // The Following filter is only mounted when follows.length > 0
-        // (see the feed-filter-row condition above) — so we can
-        // assume the user does follow someone but no recent shots
-        // matched. The 'no one followed yet' branch was dead code.
+      ) : filterMode === "following" && timeline.length === 0 ? (
+        // Smart-feed mode but neither shots nor bets to surface.
         <p className="feed-empty">
-          No shots from the players you follow yet — tap the ★ on
-          any player&apos;s row to follow them.
+          No bet-relevant updates yet — your players are quiet right
+          now. Tap All shots to see the whole feed.
         </p>
       ) : (
         <ul className="feed-list">
-          {visibleRows.map(({ event, reactions, commentCount }) => {
+          {timeline.map((__item) => {
+            // ── Bet post branch ────────────────────────────────────
+            // Tracked bets render inline among shot rows. Sort ts is
+            // either the player's most recent shot or placedAt — see
+            // timeline construction above.
+            if (__item.kind === "bet") {
+              const __bet = __item.bet;
+              const __playerId = __item.playerId;
+              const __rowsForPlayer = visibleRows
+                .filter((r) => r.event.playerId === __playerId)
+                .slice(0, 3);
+              return (
+                <li
+                  key={`bet:${__bet.id}`}
+                  data-bet-id={__bet.id}
+                  className="feed-row-wrap"
+                >
+                  <BetPostErrorBoundary label={__bet.id}>
+                    <BetPost
+                      bet={__bet}
+                      currentOdds={data.currentOdds}
+                      topFinishCurrent={data.topFinishCurrent}
+                      recentRowsForPlayer={__rowsForPlayer}
+                      oddsHistory={
+                        data.oddsHistories?.[__playerId] ?? null
+                      }
+                    />
+                  </BetPostErrorBoundary>
+                </li>
+              );
+            }
+            const { event, reactions, commentCount } = __item.row;
             const mine = myReactions[event.id];
             const isOpen = expanded === event.id;
             const count = commentCounts[event.id] ?? commentCount;
@@ -1329,6 +1395,14 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       </p>
         </main>
       </div>
+
+      {/* + FAB — opens the add-bet flow. Routes to /bets which hosts
+          the existing add-bet sheet. Fixed bottom-right, mobile-first;
+          desktop keeps it in the same corner so the affordance is
+          consistent. */}
+      <Link href="/bets" className="pv-fab" aria-label="Track a new bet">
+        +
+      </Link>
 
       {/* Floating-emoji overlay — fixed so bursts rise over the whole feed */}
       <div className="feed-floater-layer" aria-hidden="true">
