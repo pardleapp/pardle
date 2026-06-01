@@ -21107,6 +21107,562 @@ html.pv-theme-body .auth-chip-btn {
   color: var(--pv-ink);
 }
 
+/* =============================================================
+   Groups surface (/groups) — prototype's <Groups> / <MemberProfile>
+   / <RaceSheet> rendered against the broadcast paper theme. All
+   classes prefixed .grp- or use the existing prototype classes
+   (.racerow, .pop-row, .invite-row, etc.) so they don't collide
+   with anything earlier in this file.
+   ============================================================= */
+.groups-pv {
+  padding: 14px 16px 100px;
+  background: transparent;
+  color: var(--pv-ink);
+}
+.groups-pv-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Section labels (small caps grey) */
+.grp-slabel {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pv-dim);
+  margin: 0 0 11px;
+}
+
+/* Generic group "card" container */
+.grp-card {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 16px;
+  padding: 15px;
+}
+
+/* Group header card — emoji + name + sub + race button + invite */
+.grp-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.grp-card-emoji {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--pv-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+.grp-card-title {
+  flex: 1;
+  min-width: 0;
+}
+.grp-card-name {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--pv-ink);
+}
+.grp-card-sub {
+  font-size: 12px;
+  color: var(--pv-muted);
+  margin-top: 2px;
+}
+.grp-race-btn {
+  border: 1px solid var(--pv-emerald);
+  color: var(--pv-emerald);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.grp-race-btn:hover {
+  background: var(--pv-emerald);
+  color: #fff;
+}
+
+/* Invite link row */
+.invite-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--pv-line);
+}
+.il-l {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pv-dim);
+}
+.il-v {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12.5px;
+  color: var(--pv-ink);
+  margin-top: 3px;
+}
+.il-copy {
+  margin-left: auto;
+  border: 1px solid var(--pv-emerald);
+  color: var(--pv-emerald);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.il-copy-done {
+  background: var(--pv-emerald);
+  color: #fff;
+}
+
+/* Standings list — full-width buttons since the row is tappable */
+.grp-list {
+  padding: 6px;
+}
+.racerow {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 8px;
+  border-radius: 11px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  color: var(--pv-ink);
+}
+.racerow-you {
+  background: var(--pv-soft);
+}
+.racerow:hover {
+  background: var(--pv-soft);
+}
+.racerow-rk {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pv-dim);
+  width: 18px;
+}
+.racerow-nm {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--pv-ink);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.racerow-pl {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 15px;
+  font-weight: 700;
+}
+.racerow-pl.up {
+  color: var(--pv-up);
+}
+.racerow-pl.down {
+  color: var(--pv-down);
+}
+.race-trophy {
+  margin-left: 5px;
+  font-size: 11px;
+  letter-spacing: -2px;
+}
+
+/* Most-backed list */
+.grp-most {
+  padding: 4px 12px;
+}
+.pop-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 0;
+  border-top: 1px solid var(--pv-line);
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  color: var(--pv-ink);
+}
+.pop-row:first-of-type {
+  border-top: none;
+}
+.pop-nm {
+  flex: 1;
+  min-width: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.pop-back {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.pop-back-row {
+  display: inline-flex;
+}
+.pop-back-row .crew-mini-av {
+  margin-left: -7px;
+  border: 2px solid var(--pv-card);
+}
+.pop-back-row .crew-mini-av:first-child {
+  margin-left: 0;
+}
+.pop-ct {
+  font-size: 11px;
+  color: var(--pv-muted);
+  font-weight: 700;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+/* Members collapsible */
+.mem-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 2px 2px 10px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pv-dim);
+  background: none;
+  border: none;
+  font-family: inherit;
+}
+.mem-chv {
+  transition: transform 0.2s;
+  font-size: 12px;
+}
+.mem-chv-open {
+  transform: rotate(180deg);
+}
+.grp-mem-list {
+  padding: 4px 6px;
+}
+.mem-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  color: var(--pv-ink);
+  border-radius: 11px;
+}
+.mem-row:hover {
+  background: var(--pv-soft);
+}
+.mem-row-bd {
+  flex: 1;
+  min-width: 0;
+}
+.mem-row-nm {
+  font-size: 14.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.role-tag {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pv-muted);
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  border-radius: 5px;
+  padding: 2px 6px;
+}
+.mem-row-pl {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 700;
+}
+.mem-row-pl.up {
+  color: var(--pv-up);
+}
+.mem-row-pl.down {
+  color: var(--pv-down);
+}
+
+/* Footer actions */
+.grp-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.grp-mute {
+  background: var(--pv-card);
+  color: var(--pv-ink);
+  border: 1px solid var(--pv-line);
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 14px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+}
+.grp-leave {
+  background: var(--pv-card);
+  color: var(--pv-down);
+  border: 1px solid oklch(0.88 0.07 28);
+  border-radius: 12px;
+  padding: 13px;
+  font-size: 14px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+}
+.grp-leave:hover {
+  background: oklch(0.96 0.04 28);
+}
+
+/* =============================================================
+   MemberProfile + Race sheet — overlays.
+   ============================================================= */
+.grp-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--pv-bg);
+  z-index: 64;
+  display: flex;
+  flex-direction: column;
+  animation: grp-overlay-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes grp-overlay-in {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: none;
+  }
+}
+.grp-overlay-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--pv-line);
+  background: var(--pv-bg);
+}
+.grp-overlay-body {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 24px;
+}
+.grp-overlay-foot {
+  flex-shrink: 0;
+  display: flex;
+  gap: 9px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--pv-line);
+  background: var(--pv-card);
+}
+.grp-overlay-foot button {
+  flex: 1;
+  text-align: center;
+  padding: 13px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* Member-profile hero strip */
+.mp-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 16px 16px;
+  border-bottom: 1px solid var(--pv-line);
+}
+.mp-hero-body {
+  flex: 1;
+  min-width: 0;
+}
+.mp-hero-nm {
+  font-size: 21px;
+  font-weight: 900;
+  color: var(--pv-ink);
+}
+.mp-hero-sub {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--pv-muted);
+  font-weight: 700;
+  margin-top: 5px;
+}
+.mp-nudge {
+  border: 1px solid var(--pv-emerald);
+  color: var(--pv-emerald);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 9px 15px;
+  border-radius: 999px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* Member's open-bets list */
+.mp-bets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.mp-bet-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 0;
+  border-top: 1px solid var(--pv-line);
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  color: var(--pv-ink);
+}
+.mp-bets li:first-child .mp-bet-row {
+  border-top: none;
+}
+.mp-bet-row-l {
+  flex: 1;
+  min-width: 0;
+}
+.mp-bet-row-nm {
+  font-size: 14.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.mp-bet-row-sub {
+  font-size: 12px;
+  color: var(--pv-muted);
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  margin-top: 3px;
+}
+.mp-bet-row-prob {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 17px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Race sheet — drops down from the top of the page */
+.race-sheet {
+  position: fixed;
+  inset: 0;
+  background: oklch(0.2 0.04 150 / 0.4);
+  z-index: 70;
+  display: flex;
+  align-items: flex-start;
+}
+.race-card {
+  background: var(--pv-card);
+  width: 100%;
+  border-radius: 0 0 22px 22px;
+  padding: 16px 16px 22px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  animation: race-drop 0.3s cubic-bezier(0.2, 0.7, 0.2, 1);
+  color: var(--pv-ink);
+}
+@keyframes race-drop {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: none;
+  }
+}
+.race-card h3 {
+  font-size: 17px;
+  font-weight: 900;
+  margin: 0 0 3px;
+}
+.race-sub {
+  font-size: 12px;
+  color: var(--pv-muted);
+  margin-bottom: 14px;
+}
+.race-range {
+  display: flex;
+  background: var(--pv-soft);
+  border-radius: 999px;
+  padding: 3px;
+  margin: 4px 0 14px;
+}
+.race-range button {
+  flex: 1;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--pv-muted);
+  padding: 7px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.race-range button.on {
+  background: var(--pv-card);
+  color: var(--pv-emerald-d);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+.race-list {
+  display: flex;
+  flex-direction: column;
+}
+.race-foot {
+  font-size: 11px;
+  color: var(--pv-dim);
+  text-align: center;
+  margin-top: 12px;
+}
+
 /* "Your bets" section heading above the bet posts */
 .pv-theme .pv-section-label {
   font-size: 10.5px;
