@@ -19732,3 +19732,394 @@ html.pv-theme-body .auth-chip-btn {
   padding: 0 13px;
 }
 
+/* =============================================================
+   Bet tracker (Surface 3) — re-skin the existing .bets-* classes
+   to the broadcast-paper look. Doesn't restructure the DOM; only
+   the visuals flip. Cards become white-on-paper with hairline
+   borders + emerald/red accents; tabs + odds toggles become the
+   prototype's pill control style.
+   ============================================================= */
+.pv-theme.bets-page,
+.pv-theme .bets-page {
+  background: transparent;
+  color: var(--pv-ink);
+}
+.pv-theme .bets-page-tournament {
+  color: var(--pv-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 18px 16px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.pv-theme .bets {
+  background: transparent;
+  padding: 0 14px 16px;
+  color: var(--pv-ink);
+}
+.pv-theme .bets-head {
+  background: transparent;
+  border-bottom: none;
+  padding: 14px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pv-theme .bets-title {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--pv-ink);
+  text-shadow: none;
+  flex: 1;
+  letter-spacing: -0.01em;
+}
+.pv-theme .bets-head-actions {
+  display: flex;
+  background: var(--pv-soft);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 0;
+}
+.pv-theme .bets-head-actions button,
+.pv-theme .bets-toggle {
+  border: none;
+  background: none;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pv-muted);
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.pv-theme .bets-head-actions button:hover,
+.pv-theme .bets-toggle:hover {
+  color: var(--pv-ink);
+  background: transparent;
+}
+.pv-theme .bets-head-actions .bets-toggle-on,
+.pv-theme .bets-toggle.bets-toggle-on {
+  background: var(--pv-card);
+  color: var(--pv-emerald-d);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* Live / Settled tabs — pill-tab style, larger than odds toggle */
+.pv-theme .bets-tabs {
+  display: flex;
+  background: var(--pv-soft);
+  border-radius: 12px;
+  padding: 4px;
+  margin: 14px 0 8px;
+  gap: 0;
+}
+.pv-theme .bets-tab {
+  flex: 1;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--pv-muted);
+  padding: 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.pv-theme .bets-tab:hover {
+  color: var(--pv-ink);
+}
+.pv-theme .bets-tab-on {
+  background: var(--pv-card);
+  color: var(--pv-emerald-d);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+.pv-theme .bets-tab-count {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--pv-emerald);
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.pv-theme .bets-tab-on .bets-tab-count {
+  background: var(--pv-emerald-d);
+}
+
+/* The list itself + each row */
+.pv-theme .bets-list,
+.pv-theme .bets-list-past {
+  background: transparent;
+  padding: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  list-style: none;
+  margin: 0;
+}
+.pv-theme .bets-row-wrap {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.pv-theme .bets-row {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 15px;
+  padding: 14px 15px 13px;
+  box-shadow: none;
+  color: var(--pv-ink);
+  transition: box-shadow 0.16s ease, transform 0.16s ease;
+}
+@media (hover: hover) {
+  .pv-theme .bets-row:hover {
+    box-shadow: 0 10px 26px oklch(0.4 0.06 145 / 0.14);
+    transform: translateY(-2px);
+    background: var(--pv-card);
+  }
+}
+.pv-theme .bets-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pv-theme .bets-row-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--pv-ink);
+  text-shadow: none;
+  flex: 1;
+  min-width: 0;
+}
+.pv-theme .bets-row-kind {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--pv-muted);
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  padding: 2px 7px;
+  border-radius: 5px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.pv-theme .bets-row-meta {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  color: var(--pv-muted);
+}
+.pv-theme .bets-row-value {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  text-align: right;
+  flex-shrink: 0;
+}
+.pv-theme .bets-row-value strong {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--pv-ink);
+  font-variant-numeric: tabular-nums;
+}
+.pv-theme .bets-row-value span {
+  font-size: 10.5px;
+  color: var(--pv-dim);
+  font-weight: 700;
+}
+.pv-theme .bets-row-pending {
+  color: var(--pv-dim);
+  font-style: normal;
+}
+.pv-theme .bets-profit-up {
+  color: var(--pv-up);
+}
+.pv-theme .bets-profit-down {
+  color: var(--pv-down);
+}
+
+/* Per-row X / kebab / expand controls */
+.pv-theme .bets-row-x,
+.pv-theme .bets-row-x-detached {
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  color: var(--pv-muted);
+  border-radius: 999px;
+}
+.pv-theme .bets-row-x:hover,
+.pv-theme .bets-row-x-detached:hover {
+  color: var(--pv-ink);
+  background: var(--pv-line);
+}
+
+/* Totals card at top of live tab */
+.pv-theme .bets-totals {
+  background: var(--pv-emerald-d);
+  color: #fff;
+  border-radius: 15px;
+  padding: 16px;
+  border: none;
+  margin: 6px 0 4px;
+}
+.pv-theme .bets-totals strong,
+.pv-theme .bets-totals .bets-profit-up,
+.pv-theme .bets-totals .bets-profit-down {
+  color: #fff;
+}
+
+/* Empty states */
+.pv-theme .bets-empty,
+.pv-theme .bets-empty-state,
+.pv-theme .bets-empty-tab {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 16px;
+  padding: 28px 24px;
+  color: var(--pv-ink);
+  text-align: center;
+}
+.pv-theme .bets-empty-link {
+  color: var(--pv-emerald-d);
+}
+.pv-theme .bets-empty-link:hover {
+  color: var(--pv-emerald);
+}
+
+/* Settled disclosure ("past bets") */
+.pv-theme .bets-past {
+  background: transparent;
+  border: none;
+  margin-top: 10px;
+}
+.pv-theme .bets-past > summary {
+  color: var(--pv-muted);
+  background: transparent;
+  border-bottom: 1px solid var(--pv-line);
+  padding: 10px 6px;
+  font-weight: 800;
+}
+.pv-theme .bets-past > summary:hover {
+  color: var(--pv-ink);
+  background: transparent;
+}
+
+/* Add-bet form — bottom sheet style */
+.pv-theme .bets-form {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 16px;
+  padding: 16px;
+  color: var(--pv-ink);
+}
+.pv-theme .bets-form-kind button {
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  color: var(--pv-ink);
+  border-radius: 999px;
+}
+.pv-theme .bets-form-kind button:hover {
+  background: var(--pv-line);
+}
+.pv-theme .bets-form-kind .bets-kind-on {
+  background: var(--pv-emerald);
+  border-color: var(--pv-emerald);
+  color: #fff;
+}
+.pv-theme .bets-form-label {
+  color: var(--pv-muted);
+}
+.pv-theme .bets-form-label input,
+.pv-theme .bets-form-label select,
+.pv-theme .bets-form-input {
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  color: var(--pv-ink);
+  border-radius: 11px;
+}
+.pv-theme .bets-form-input:focus,
+.pv-theme .bets-form-label input:focus {
+  border-color: var(--pv-emerald);
+  outline: none;
+}
+.pv-theme .bets-form-suggest {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+}
+.pv-theme .bets-form-suggest button {
+  background: transparent;
+  color: var(--pv-ink);
+}
+.pv-theme .bets-form-suggest button:hover {
+  background: var(--pv-soft);
+}
+.pv-theme .bets-form-picked {
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  color: var(--pv-ink);
+}
+.pv-theme .bets-form-change {
+  color: var(--pv-emerald-d);
+}
+.pv-theme .bets-form-currency {
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  color: var(--pv-ink);
+}
+.pv-theme .bets-form-err {
+  color: var(--pv-down);
+}
+.pv-theme .bets-form-fair {
+  color: var(--pv-muted);
+}
+.pv-theme .bets-form-fair strong {
+  color: var(--pv-emerald-d);
+}
+.pv-theme .bets-form-submit {
+  background: var(--pv-emerald);
+  color: #fff;
+  border: none;
+  border-radius: 13px;
+  font-weight: 800;
+}
+.pv-theme .bets-form-cancel {
+  background: var(--pv-card);
+  color: var(--pv-ink);
+  border: 1px solid var(--pv-line);
+  border-radius: 13px;
+  font-weight: 700;
+}
+
+/* Per-bet expanded chart (when row is open) */
+.pv-theme .bets-row-expanded {
+  background: var(--pv-card);
+}
+.pv-theme .bets-chart {
+  background: transparent;
+  color: var(--pv-ink);
+}
+.pv-theme .bets-chart-summary {
+  color: var(--pv-ink);
+}
+.pv-theme .bets-chart-summary strong {
+  color: var(--pv-ink);
+}
+.pv-theme .bets-chart-meta {
+  color: var(--pv-muted);
+}
+.pv-theme .bets-chart-empty {
+  color: var(--pv-dim);
+}
+
+/* Add-bet "Track a bet" trigger */
+.pv-theme .bets-empty-grid button {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  color: var(--pv-ink);
+  border-radius: 13px;
+}
+.pv-theme .bets-empty-grid button:hover {
+  background: var(--pv-soft);
+  border-color: var(--pv-emerald);
+}
+

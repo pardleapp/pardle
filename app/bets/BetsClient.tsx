@@ -70,6 +70,18 @@ export default function BetsClient() {
     useState<OddsFormat>(DEFAULT_ODDS_FORMAT);
   const authorKey = useRef("");
 
+  // Stamp html.pv-theme-body while /bets is mounted so the body
+  // background goes warm paper and our .pv-theme overrides apply
+  // across the brand bar + nav. Mirrors what FeedClient does for
+  // /live. Cleans up on unmount.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.classList.add("pv-theme-body");
+    return () => {
+      document.documentElement.classList.remove("pv-theme-body");
+    };
+  }, []);
+
   useEffect(() => {
     authorKey.current = getAuthorKey();
     if (typeof window === "undefined") return;
@@ -144,7 +156,7 @@ export default function BetsClient() {
 
   if (error && !data) {
     return (
-      <section className="v4-theme" style={{ padding: 14 }}>
+      <section className="v4-theme pv-theme" style={{ padding: 14 }}>
         <p className="feed-empty">
           Couldn&apos;t load your bets. Retrying automatically.
         </p>
@@ -153,7 +165,7 @@ export default function BetsClient() {
   }
   if (!data) {
     return (
-      <section className="v4-theme bets-page" aria-busy="true">
+      <section className="v4-theme pv-theme bets-page" aria-busy="true">
         <div className="skeleton-line skeleton-line-title" />
         <ul className="lb-skeleton-list" aria-label="Loading bets">
           {[0, 1, 2].map((i) => (
@@ -170,7 +182,7 @@ export default function BetsClient() {
   }
 
   return (
-    <section className="v4-theme bets-page">
+    <section className="v4-theme pv-theme bets-page">
       {data.tournament && (
         <p className="bets-page-tournament">
           {data.tournament.isLive ? "Live · " : "Next up · "}
