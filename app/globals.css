@@ -20784,23 +20784,33 @@ html.pv-theme-body .auth-chip-btn {
   html:has(.pv-theme) .brand-nav {
     gap: 8px;
   }
-  /* Push page content above the bottom nav AND the FAB so the last
-     item isn't hidden behind either. Bottom nav ~70 px, FAB sits at
-     140 px from viewport bottom + 54 px tall, so we need ~210 px of
-     clearance — round up to 220 to give the burst bar room to breathe. */
+  /* Push page content above the bottom nav, burst bar and FAB so
+     the last item isn't hidden behind any of them. Stack from the
+     viewport bottom:
+       0 – 70 px   bottom nav
+       70 – 130 px burst bar
+       150 – 206 px FAB
+     220 px of body padding clears the lot with breathing room. */
   body:has(.pv-theme) {
     padding-bottom: 220px;
   }
-  /* The sticky burst-emoji bar normally pins to bottom:0 of its
-     scroll container — on a pv-theme'd page that would overlap with
-     the mobile BottomNav. Lift it above the nav (which is 70-ish px
-     tall including safe-area insets). */
+  /* The sticky burst-emoji bar pins above the bottom nav on
+     pv-theme'd surfaces. */
   body:has(.pv-theme) .feed-burst-bar {
     bottom: 70px;
   }
-  /* FAB sits above both the burst bar and the bottom nav. */
+  /* FAB sits above the burst bar so it never overlaps a card
+     (the burst bar is the rightmost UI strip the FAB can sit on
+     without intruding on the feed scroll area). */
   body:has(.pv-theme) .pv-fab {
-    bottom: 140px;
+    bottom: 150px;
+  }
+  /* Pad the feed list itself so the last card's reaction / Tail row
+     doesn't get hidden under the sticky burst bar. Burst bar is
+     ~60 px tall after safe-area insets — 100 px gives a comfortable
+     gap. */
+  body:has(.pv-theme) .feed-list {
+    padding-bottom: 100px;
   }
 }
 
