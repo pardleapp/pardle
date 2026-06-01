@@ -19087,29 +19087,37 @@ body:has(.v4-theme) {
   font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
 }
 
-/* Make the body itself paper-light when a pv-theme'd surface is
-   mounted. Need !important here to beat:
+/* Make the body itself paper-light whenever a .pv-theme element is
+   anywhere in the document. Using :has() instead of a JS-stamped
+   html class so the bg flips on the very first paint — no
+   useEffect race against the initial render. Need !important to
+   beat:
      1. .v4-theme { background:#000 !important } at line 14715
      2. html:has(.v4-theme) / body:has(.v4-theme) { background:#000
         !important } at line 14725-28
-   Both of those keep the viewport black whenever any .v4-theme
-   element exists in the DOM, which is true on all our pages today.
-   Scoped to html.pv-theme-body so /sharp, /leaderboard etc. (which
-   haven't been migrated yet) keep their black canvas. */
-html.pv-theme-body,
-html.pv-theme-body body,
-html.pv-theme-body:has(.v4-theme),
-html.pv-theme-body body:has(.v4-theme) {
+   Both of which match every pv-theme'd page today (we keep
+   .v4-theme on the wrapper so component-level v4 tokens stay
+   available). My selectors come later in the source than the
+   .v4-theme rules so on specificity tie they win the cascade. */
+html:has(.pv-theme),
+body:has(.pv-theme) {
   background: oklch(0.972 0.009 95) !important;
 }
 /* The page wraps Feed/Bets in <main class="container container-wide
-   v4-theme"> with its own dark background — kill that wrapper bg and
-   re-skin the brand header + nav so the whole page reads as broadcast
-   paper while a pv-theme'd surface is mounted. */
-html.pv-theme-body main.container.v4-theme,
-html.pv-theme-body main.container-wide.v4-theme {
+   v4-theme pv-theme"> with its own dark background — kill the wrapper
+   bg and re-skin the brand header + nav so the whole page reads as
+   broadcast paper. */
+main.container.v4-theme.pv-theme,
+main.container-wide.v4-theme.pv-theme {
   background: oklch(0.972 0.009 95) !important;
   color: oklch(0.26 0.04 155);
+}
+/* Legacy hooks — keep the .pv-theme-body class working so the
+   existing JS class-stamping effects don't break. The CSS-only
+   :has() rules above are now the source of truth for the bg. */
+html.pv-theme-body,
+html.pv-theme-body body {
+  background: oklch(0.972 0.009 95) !important;
 }
 html.pv-theme-body .brand,
 html.pv-theme-body .brand-split {
@@ -20255,26 +20263,28 @@ html.pv-theme-body .auth-chip-btn {
    Scoped to .pv-theme-body so v4-only pages (until migrated) keep
    their existing nav. */
 @media (max-width: 767px) {
-  html.pv-theme-body .hub-nav-tabs {
+  /* All keyed off :has(.pv-theme) so they fire from the first paint
+     without waiting for the JS class-stamping effect. */
+  html:has(.pv-theme) .hub-nav-tabs {
     display: none;
   }
-  html.pv-theme-body .brand-nav {
+  html:has(.pv-theme) .brand-nav {
     gap: 8px;
   }
   /* Push page content above the bottom nav so the last item isn't
      hidden behind the strip. */
-  html.pv-theme-body body {
+  body:has(.pv-theme) {
     padding-bottom: 76px;
   }
   /* The sticky burst-emoji bar normally pins to bottom:0 of its
      scroll container — on a pv-theme'd page that would overlap with
      the mobile BottomNav. Lift it above the nav (which is 70-ish px
      tall including safe-area insets). */
-  html.pv-theme-body .feed-burst-bar {
+  body:has(.pv-theme) .feed-burst-bar {
     bottom: 70px;
   }
   /* FAB sits above both the burst bar and the bottom nav. */
-  html.pv-theme-body .pv-fab {
+  body:has(.pv-theme) .pv-fab {
     bottom: 140px;
   }
 }
