@@ -22385,6 +22385,29 @@ html.pv-theme-body .auth-chip-btn {
   cursor: default;
 }
 
+/* Quieter follow-up paragraph beneath the install hint copy. */
+.np-s.np-s-quiet {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--pv-dim);
+}
+
+/* Debug payload shown when ?debug-pwa=1 is on the URL. Helps
+   diagnose "but I added it to home screen!" reports. */
+.np-debug {
+  margin: 10px 16px;
+  padding: 12px 14px;
+  border-radius: 11px;
+  background: oklch(0.18 0.02 150);
+  color: oklch(0.92 0.05 150);
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* Notification list rows */
 .nf-list {
   list-style: none;

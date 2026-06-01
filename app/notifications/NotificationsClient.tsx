@@ -46,20 +46,67 @@ import { getFollows } from "../live/FollowButton";
 import { useAuth } from "../live/auth/useAuth";
 import SignInModal from "../live/auth/SignInModal";
 
-/** iOS Safari detection — must be iOS, must NOT be in an in-app
- *  browser, must NOT already be installed as a PWA. Identical
- *  semantics to IosInstallHint.tsx; duplicated here to keep the
- *  notifications surface self-contained. */
-function isIosSafariNeedsInstall(): boolean {
-  if (typeof window === "undefined") return false;
+interface PwaDetect {
+  isIos: boolean;
+  isInAppBrowser: boolean;
+  /** iOS Safari's navigator.standalone — the canonical "launched
+   *  from home screen as a PWA" flag on iOS. */
+  iosStandaloneFlag: boolean;
+  /** Cross-platform display-mode media query — covers Android
+   *  Chrome PWAs + desktop installs. iOS Safari also reports this
+   *  in modern versions but the navigator.standalone flag is the
+   *  reliable one. */
+  displayModeStandalone: boolean;
+  /** Some installs report fullscreen or minimal-ui instead of
+   *  standalone. Treat any of the three as "installed". */
+  displayModeAny: boolean;
+  /** Compound — true when we should show the "add to home screen"
+   *  card, false when we should let the user tap Enable. */
+  needsInstall: boolean;
+}
+
+function detectPwa(): PwaDetect {
+  if (typeof window === "undefined") {
+    return {
+      isIos: false,
+      isInAppBrowser: false,
+      iosStandaloneFlag: false,
+      displayModeStandalone: false,
+      displayModeAny: false,
+      needsInstall: false,
+    };
+  }
   const ua = window.navigator.userAgent;
   const isIos = /iPhone|iPad|iPod/.test(ua);
-  if (!isIos) return false;
-  if (/CriOS|FxiOS|EdgiOS|FBAN|FBAV|Instagram|Line\//.test(ua)) return false;
+  const isInAppBrowser = /CriOS|FxiOS|EdgiOS|FBAN|FBAV|Instagram|Line\//.test(
+    ua,
+  );
   type NavigatorWithStandalone = Navigator & { standalone?: boolean };
-  if ((window.navigator as NavigatorWithStandalone).standalone) return false;
-  if (window.matchMedia("(display-mode: standalone)").matches) return false;
-  return true;
+  const iosStandaloneFlag =
+    (window.navigator as NavigatorWithStandalone).standalone === true;
+  const displayModeStandalone = window.matchMedia(
+    "(display-mode: standalone)",
+  ).matches;
+  const displayModeAny =
+    displayModeStandalone ||
+    window.matchMedia("(display-mode: fullscreen)").matches ||
+    window.matchMedia("(display-mode: minimal-ui)").matches;
+  // Only treat as "needs install" when we're confidently on iOS
+  // Safari (not an in-app browser) AND no installed-mode signal
+  // is present at all.
+  const needsInstall =
+    isIos &&
+    !isInAppBrowser &&
+    !iosStandaloneFlag &&
+    !displayModeAny;
+  return {
+    isIos,
+    isInAppBrowser,
+    iosStandaloneFlag,
+    displayModeStandalone,
+    displayModeAny,
+    needsInstall,
+  };
 }
 
 export default function NotificationsClient() {
@@ -67,9 +114,10 @@ export default function NotificationsClient() {
   const { state, enable, disable } = useNotifications();
   const auth = useAuth();
   const [rows, setRows] = useState<NotifRow[]>(MOCK_NOTIFS);
-  const [iosInstall, setIosInstall] = useState(false);
+  const [pwa, setPwa] = useState<PwaDetect | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [signInOpen, setSignInOpen] = useState(false);
+  const [debugPwa, setDebugPwa] = useState(false);
 
   // Apply pv-theme-body on mount so the brand bar / nav re-skin paper.
   useEffect(() => {
@@ -80,10 +128,15 @@ export default function NotificationsClient() {
     };
   }, []);
 
-  // iOS Safari detection — done client-side after mount so we don't
-  // SSR a wrong branch.
+  // PWA / standalone detection — done client-side after mount so we
+  // don't SSR a wrong branch. ?debug-pwa=1 surfaces the raw values
+  // for diagnosing "but I added it to my home screen!" reports.
   useEffect(() => {
-    setIosInstall(isIosSafariNeedsInstall());
+    setPwa(detectPwa());
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get("debug-pwa") === "1") setDebugPwa(true);
+    }
   }, []);
 
   const onEnable = async () => {
@@ -130,7 +183,7 @@ export default function NotificationsClient() {
   // would never flip to "Alerts on". Cleaner to gate first.
   const subscribed = state.subscribed && state.permission === "granted";
   const card = (() => {
-    if (iosInstall) {
+    if (pwa?.needsInstall) {
       return (
         <div className="np-card">
           <div className="np-ic" aria-hidden="true">
@@ -142,8 +195,14 @@ export default function NotificationsClient() {
               On iPhone, alerts only work when Pardle is launched from
               your home screen. Tap the Share icon{" "}
               <span aria-hidden="true">⎙</span> in Safari, then{" "}
-              <strong>Add to Home Screen</strong>. Reopen Pardle and
-              you&apos;ll see Enable here.
+              <strong>Add to Home Screen</strong>. Reopen Pardle from
+              the new icon and you&apos;ll see Enable here.
+            </div>
+            <div className="np-s np-s-quiet">
+              Already added it? If tapping the icon opens Safari (not a
+              standalone Pardle window), the old shortcut was cached
+              before push was set up — remove it from your home screen
+              and add it again from this current page.
             </div>
           </div>
         </div>
@@ -263,6 +322,23 @@ export default function NotificationsClient() {
       <div className="notif-pv-body">
         {card}
         {errorMsg && <div className="np-err">{errorMsg}</div>}
+        {debugPwa && pwa && (
+          <pre className="np-debug">
+            {JSON.stringify(
+              {
+                ua:
+                  typeof window !== "undefined"
+                    ? window.navigator.userAgent
+                    : "—",
+                ...pwa,
+                pushState: state,
+                authUser: auth.user ? auth.user.email ?? auth.user.id : null,
+              },
+              null,
+              2,
+            )}
+          </pre>
+        )}
 
         <ul className="nf-list">
           {rows.map((n, i) => (
