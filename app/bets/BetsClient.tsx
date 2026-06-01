@@ -1,79 +1,47 @@
 "use client";
 
 /**
- * BetsClient — dedicated bet-management surface for /bets.
+ * BetsClient — /bets surface, redesigned to match the design-handoff
+ * prototype (Pardle Social v2.html, Bets + BetRow components).
  *
- * Polls /api/feed for the same currentOdds / projections / top-finish
- * / recent-form / hand-status data the live feed uses, then renders
- * the BetTracker management UI. No feed events, no leaderboard, no
- * reels — bets only.
+ * First-cut layout uses the prototype's mock bets verbatim so the
+ * visual is exact end-to-end. Real wiring (own tracked bets from
+ * the bet store, live currentOdds / projections / top-finish from
+ * /api/feed) lands in the next pass — the rendering path stays the
+ * same; only the data source switches.
  *
- * Polling cadence matches /live so the chart values tick at the same
- * pace as a user watching the feed in another tab.
+ * Header: "My bets · N" + odds-format toggle (+250 / 5/2 / 3.5) +
+ * small ＋ add-bet button.
+ * Live / Settled segmented tabs with counts.
+ * Live tab: summary card (open stake + group rank) + bet rows.
+ * Settled tab: summary card (net + hit rate) + settled rows.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { CachedLeaderboardRow } from "@/lib/feed/store";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
-  DEFAULT_ODDS_FORMAT,
-  ODDS_FORMAT_STORAGE_KEY,
-  type OddsFormat,
-} from "@/lib/odds-format";
-import BetTracker from "../live/BetTracker";
-import type {
-  PlayerRoundState,
-  TopFinishProbs,
-  TournamentProjection,
-} from "../live/bet-shared";
+  MOCK_BETS_LIVE,
+  MOCK_BETS_SETTLED,
+  ODDS_FORMAT_OPTIONS,
+  type OddsFormatKey,
+} from "./mock-bets";
+import BetRow from "./BetRow";
 
-const REFRESH_MS = 6_000;
-const REFRESH_MS_HIDDEN = 30_000;
-const AUTHOR_KEY_STORAGE = "pardle_feed_author";
+const ODDS_FORMAT_STORAGE = "pardle_bets_oddsfmt_v2";
 
-interface BetsResponse {
-  tournament: { id: string; name: string; isLive: boolean } | null;
-  playerIndex?: CachedLeaderboardRow[];
-  currentOdds?: Record<string, number>;
-  playerRoundStates?: Record<string, PlayerRoundState>;
-  tournamentProjections?: Record<string, TournamentProjection>;
-  topFinishCurrent?: Record<string, TopFinishProbs>;
-  recentForm?: Record<
-    string,
-    {
-      name: string;
-      recent: Array<{
-        season: number;
-        tournament: string;
-        finishText: string;
-        finishPos: number | null;
-        madeCut: boolean;
-      }>;
-    }
-  >;
-  handStatus?: Record<string, "hot" | "cold">;
-}
-
-function getAuthorKey(): string {
-  if (typeof window === "undefined") return "";
-  let k = window.localStorage.getItem(AUTHOR_KEY_STORAGE);
-  if (!k) {
-    k = `a${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
-    window.localStorage.setItem(AUTHOR_KEY_STORAGE, k);
-  }
-  return k;
+function readPersistedFormat(): OddsFormatKey {
+  if (typeof window === "undefined") return "am";
+  const raw = window.localStorage.getItem(ODDS_FORMAT_STORAGE);
+  if (raw === "am" || raw === "frac" || raw === "dec") return raw;
+  return "am";
 }
 
 export default function BetsClient() {
-  const [data, setData] = useState<BetsResponse | null>(null);
-  const [error, setError] = useState(false);
-  const [oddsFormat, setOddsFormat] =
-    useState<OddsFormat>(DEFAULT_ODDS_FORMAT);
-  const authorKey = useRef("");
+  const [oddsFmt, setOddsFmt] = useState<OddsFormatKey>("am");
+  const [tab, setTab] = useState<"live" | "settled">("live");
 
-  // Stamp html.pv-theme-body while /bets is mounted so the body
-  // background goes warm paper and our .pv-theme overrides apply
-  // across the brand bar + nav. Mirrors what FeedClient does for
-  // /live. Cleans up on unmount.
+  // Stamp html.pv-theme-body while /bets is mounted so the body bg
+  // goes warm paper and the brand bar re-skins paper.
   useEffect(() => {
     if (typeof document === "undefined") return;
     document.documentElement.classList.add("pv-theme-body");
@@ -82,124 +50,189 @@ export default function BetsClient() {
     };
   }, []);
 
+  // Hydrate persisted odds format on mount.
   useEffect(() => {
-    authorKey.current = getAuthorKey();
-    if (typeof window === "undefined") return;
-    const raw = window.localStorage.getItem(ODDS_FORMAT_STORAGE_KEY);
-    if (raw === "american" || raw === "fractional" || raw === "decimal") {
-      setOddsFormat(raw);
-    }
-    // Cached-first: show last response instantly while the live fetch
-    // runs in the background.
-    try {
-      const cacheRaw = window.localStorage.getItem("pardle_bets_cache_v1");
-      if (cacheRaw) {
-        const env = JSON.parse(cacheRaw) as {
-          ts: number;
-          data: BetsResponse;
-        };
-        if (env?.ts && env.data && Date.now() - env.ts < 60 * 60 * 1000) {
-          setData(env.data);
-        }
-      }
-    } catch {
-      // silent
-    }
+    setOddsFmt(readPersistedFormat());
   }, []);
 
-  const pickOddsFormat = useCallback((fmt: OddsFormat) => {
-    setOddsFormat(fmt);
+  const pickFormat = (k: OddsFormatKey) => {
+    setOddsFmt(k);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(ODDS_FORMAT_STORAGE_KEY, fmt);
+      window.localStorage.setItem(ODDS_FORMAT_STORAGE, k);
     }
-  }, []);
+  };
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/feed?v=${authorKey.current}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      const json = (await res.json()) as BetsResponse;
-      setData(json);
-      setError(false);
-      try {
-        window.localStorage.setItem(
-          "pardle_bets_cache_v1",
-          JSON.stringify({ ts: Date.now(), data: json }),
-        );
-      } catch {
-        // silent
-      }
-    } catch {
-      setError(true);
-    }
-  }, []);
+  const liveCount = MOCK_BETS_LIVE.length;
+  const settledCount = MOCK_BETS_SETTLED.length;
+  const totalCount = liveCount + settledCount;
 
-  useEffect(() => {
-    load();
-    let timer: ReturnType<typeof setInterval> | null = null;
-    const isHidden = () =>
-      typeof document !== "undefined" && document.hidden;
-    const start = () => {
-      if (timer) clearInterval(timer);
-      timer = setInterval(load, isHidden() ? REFRESH_MS_HIDDEN : REFRESH_MS);
-    };
-    start();
-    const onVis = () => start();
-    document.addEventListener("visibilitychange", onVis);
-    return () => {
-      if (timer) clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVis);
-    };
-  }, [load]);
-
-  if (error && !data) {
-    return (
-      <section className="v4-theme pv-theme" style={{ padding: 14 }}>
-        <p className="feed-empty">
-          Couldn&apos;t load your bets. Retrying automatically.
-        </p>
-      </section>
-    );
+  // Open stake summary — sum by currency so we can render "£90·$100".
+  const openByCur: Record<string, number> = {};
+  for (const b of MOCK_BETS_LIVE) {
+    openByCur[b.cur] = (openByCur[b.cur] ?? 0) + b.stake;
   }
-  if (!data) {
-    return (
-      <section className="v4-theme pv-theme bets-page" aria-busy="true">
-        <div className="skeleton-line skeleton-line-title" />
-        <ul className="lb-skeleton-list" aria-label="Loading bets">
-          {[0, 1, 2].map((i) => (
-            <li key={i} className="lb-skeleton-row">
-              <div className="skeleton-avatar lb-skeleton-avatar" />
-              <div className="skeleton-line lb-skeleton-name" />
-              <div className="skeleton-line lb-skeleton-total" />
-              <div className="skeleton-line lb-skeleton-thru" />
-            </li>
-          ))}
-        </ul>
-      </section>
-    );
+  const openStakeLabel = Object.entries(openByCur)
+    .map(([cur, n]) => `${cur}${n}`)
+    .join("·");
+
+  // Settled summary — net (per currency) + hit rate.
+  let wins = 0;
+  let losses = 0;
+  const netByCur: Record<string, number> = {};
+  for (const b of MOCK_BETS_SETTLED) {
+    if (b.result === "WON") wins++;
+    else losses++;
+    // Strip "+£" / "−$" / commas, parse number.
+    const sign = b.pl.startsWith("−") || b.pl.startsWith("-") ? -1 : 1;
+    const num = parseFloat(b.pl.replace(/[^0-9.]/g, "")) || 0;
+    netByCur[b.cur] = (netByCur[b.cur] ?? 0) + sign * num;
   }
+  const netLabel = Object.entries(netByCur)
+    .map(([cur, n]) => {
+      const abs = Math.abs(n);
+      const sign = n >= 0 ? "+" : "−";
+      return `${sign}${cur}${abs.toLocaleString("en-US")}`;
+    })
+    .join(" · ");
+  const hitPct = wins + losses > 0
+    ? Math.round((wins / (wins + losses)) * 100)
+    : 0;
 
   return (
-    <section className="v4-theme pv-theme bets-page">
-      {data.tournament && (
-        <p className="bets-page-tournament">
-          {data.tournament.isLive ? "Live · " : "Next up · "}
-          {data.tournament.name}
+    <section className="bets-pv">
+      <div className="betshead">
+        <div className="betsrow">
+          <h2 className="betsrow-title">My bets · {totalCount}</h2>
+          <div className="oddstog" role="radiogroup" aria-label="Odds format">
+            {ODDS_FORMAT_OPTIONS.map((o) => (
+              <button
+                key={o.key}
+                type="button"
+                role="radio"
+                aria-checked={oddsFmt === o.key}
+                className={oddsFmt === o.key ? "on" : ""}
+                onClick={() => pickFormat(o.key)}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <Link
+            href="/bets/new"
+            className="bets-add-btn"
+            aria-label="Track a new bet"
+            title="Track a new bet"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+          </Link>
+        </div>
+      </div>
+
+      <div className="lstog" role="tablist" aria-label="Live or Settled">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "live"}
+          className={tab === "live" ? "on" : ""}
+          onClick={() => setTab("live")}
+        >
+          Live <span className="lstog-cnt mono">{liveCount}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "settled"}
+          className={tab === "settled" ? "on" : ""}
+          onClick={() => setTab("settled")}
+        >
+          Settled <span className="lstog-cnt mono">{settledCount}</span>
+        </button>
+      </div>
+
+      <div className="bets-pv-body">
+        {tab === "live" ? (
+          <>
+            <div className="bets-summary">
+              <div>
+                <div className="bets-summary-lab">Open stake</div>
+                <div className="bets-summary-big mono">{openStakeLabel}</div>
+                <div className="bets-summary-legs">all live</div>
+              </div>
+              <div className="bets-summary-r">
+                <div className="bets-summary-lab">Group rank</div>
+                <div className="bets-summary-big mono">#2/9</div>
+                <div className="bets-summary-legs">Jordan leads</div>
+              </div>
+            </div>
+            {MOCK_BETS_LIVE.map((b) => (
+              <BetRow key={b.id} bet={b} oddsFmt={oddsFmt} />
+            ))}
+          </>
+        ) : (
+          <>
+            <div className="bets-summary">
+              <div>
+                <div className="bets-summary-lab">Net · event</div>
+                <div className="bets-summary-big mono">{netLabel || "—"}</div>
+                <div className="bets-summary-legs">
+                  {settledCount} settled
+                </div>
+              </div>
+              <div className="bets-summary-r">
+                <div className="bets-summary-lab">Hit rate</div>
+                <div className="bets-summary-big mono">{hitPct}%</div>
+                <div className="bets-summary-legs">
+                  {wins} W · {losses} L
+                </div>
+              </div>
+            </div>
+            {MOCK_BETS_SETTLED.map((b) => (
+              <div className="bets-settled" key={b.id}>
+                <div>
+                  <div className="bets-settled-nm">{b.who}</div>
+                  <div className="bets-settled-sub">
+                    <span className="bets-settled-mkt">{b.mkt}</span> @{" "}
+                    {b.odds} · {b.cur}
+                    {b.stake}
+                  </div>
+                </div>
+                <div className="bets-settled-pl-col">
+                  <div
+                    className={`bets-settled-pl ${
+                      b.result === "WON" ? "win" : "loss"
+                    }`}
+                  >
+                    {b.pl}
+                  </div>
+                  <div
+                    className={`bets-settled-stat ${
+                      b.result === "WON" ? "win" : "loss"
+                    }`}
+                  >
+                    {b.result}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+        <p className="bets-compliance">
+          Pardle is a tracker, not a bookmaker — we don&apos;t accept
+          bets. 18+ only.
         </p>
-      )}
-      <BetTracker
-        players={data.playerIndex ?? []}
-        currentOdds={data.currentOdds ?? {}}
-        playerRoundStates={data.playerRoundStates ?? {}}
-        tournamentProjections={data.tournamentProjections ?? {}}
-        topFinishCurrent={data.topFinishCurrent}
-        recentForm={data.recentForm}
-        handStatus={data.handStatus}
-        oddsFormat={oddsFormat}
-        onPickOddsFormat={pickOddsFormat}
-      />
+      </div>
     </section>
   );
 }

@@ -6,9 +6,7 @@
  */
 
 import { BRAND } from "@/lib/brand";
-import HistoryClient from "../history/HistoryClient";
-import AuthChip from "../live/auth/AuthChip";
-import MainNav from "../MainNav";
+import SweatHeader from "../live/SweatHeader";
 import BetsClient from "./BetsClient";
 
 export const metadata = {
@@ -22,15 +20,8 @@ export const dynamic = "force-dynamic";
 export default function BetsPage() {
   return (
     <main className="container container-wide v4-theme pv-theme">
-      <header className="brand brand-split">
-        <h1>{BRAND.name}</h1>
-        <div className="brand-nav">
-          <MainNav active="bets" />
-          <AuthChip />
-        </div>
-      </header>
+      <SweatHeader />
       <BetsClient />
-      <HistoryClient hideList />
     </main>
   );
 }

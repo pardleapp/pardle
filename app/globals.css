@@ -19918,6 +19918,512 @@ html.pv-theme-body .auth-chip-btn {
   cursor: pointer;
 }
 
+/* =============================================================
+   Bets surface (/bets) — prototype-shaped. Header row with title +
+   odds toggle + ＋ add-bet, Live/Settled tabs, summary card, list
+   of .bets-row-card cards or settled rows. Sits inside the
+   pv-theme'd /bets page.
+   ============================================================= */
+.bets-pv {
+  padding: 0 14px 14px;
+}
+.betshead {
+  padding: 14px 0 4px;
+}
+.betsrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.betsrow-title {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--pv-ink);
+  flex: 1;
+  letter-spacing: -0.01em;
+}
+.oddstog {
+  display: flex;
+  background: var(--pv-soft);
+  border-radius: 999px;
+  padding: 3px;
+}
+.oddstog button {
+  border: none;
+  background: none;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pv-muted);
+  padding: 6px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.oddstog button.on {
+  background: var(--pv-card);
+  color: var(--pv-emerald-d);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.bets-add-btn {
+  background: var(--pv-emerald);
+  color: #fff;
+  border: 1px solid var(--pv-emerald);
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.bets-add-btn:hover {
+  background: var(--pv-emerald-d);
+  border-color: var(--pv-emerald-d);
+}
+
+/* Live / Settled segmented control */
+.lstog {
+  display: flex;
+  background: var(--pv-soft);
+  border-radius: 12px;
+  padding: 4px;
+  margin: 14px 0 8px;
+}
+.lstog button {
+  flex: 1;
+  border: none;
+  background: none;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--pv-muted);
+  padding: 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.lstog button.on {
+  background: var(--pv-card);
+  color: var(--pv-emerald-d);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+.lstog-cnt {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--pv-emerald);
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.lstog button.on .lstog-cnt {
+  background: var(--pv-emerald-d);
+}
+
+.bets-pv-body {
+  padding-top: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Summary card — emerald-d slab with two stat columns */
+.bets-summary {
+  background: var(--pv-emerald-d);
+  color: #fff;
+  border-radius: 15px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.bets-summary-lab {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: oklch(0.85 0.05 155);
+  font-weight: 800;
+  white-space: nowrap;
+}
+.bets-summary-big {
+  font-size: 25px;
+  font-weight: 900;
+  line-height: 1;
+  margin-top: 6px;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+}
+.bets-summary-legs {
+  font-size: 11.5px;
+  color: oklch(0.85 0.05 155);
+  margin-top: 5px;
+}
+.bets-summary-r {
+  text-align: right;
+}
+
+/* Live bet row card */
+.bets-row-card {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 17px;
+  padding: 15px 15px 13px;
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.16s ease, transform 0.16s ease;
+}
+@media (hover: hover) {
+  .bets-row-card:hover {
+    box-shadow: 0 10px 26px oklch(0.4 0.06 145 / 0.14);
+    transform: translateY(-2px);
+  }
+}
+.bets-row-card .bp-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.bets-row-card .bp-who {
+  flex: 1;
+  min-width: 0;
+}
+.bets-row-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--pv-ink);
+}
+.bets-row-chip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 7px;
+  padding: 7px 10px;
+  background: var(--pv-soft);
+  border-radius: 11px;
+}
+.bets-row-card .bp-prob {
+  text-align: right;
+  flex-shrink: 0;
+}
+.bets-row-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+.bets-row-shots {
+  font-size: 11.5px;
+  color: var(--pv-dim);
+  font-weight: 700;
+}
+.bets-row-chev {
+  color: var(--pv-muted);
+  font-weight: 800;
+  font-size: 18px;
+}
+
+/* Settled row */
+.bets-settled {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 13px;
+  padding: 14px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.bets-settled-nm {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--pv-ink);
+}
+.bets-settled-sub {
+  font-size: 12px;
+  color: var(--pv-muted);
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.bets-settled-mkt {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--pv-muted);
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+.bets-settled-pl-col {
+  text-align: right;
+  flex-shrink: 0;
+}
+.bets-settled-pl {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 19px;
+  font-weight: 700;
+}
+.bets-settled-pl.win {
+  color: var(--pv-up);
+}
+.bets-settled-pl.loss {
+  color: var(--pv-down);
+}
+.bets-settled-stat {
+  font-size: 10px;
+  font-weight: 800;
+  text-align: right;
+  margin-top: 4px;
+}
+.bets-settled-stat.win {
+  color: var(--pv-up);
+}
+.bets-settled-stat.loss {
+  color: var(--pv-down);
+}
+
+.bets-compliance {
+  font-size: 10px;
+  color: var(--pv-dim);
+  text-align: center;
+  padding: 14px 20px 4px;
+  line-height: 1.4;
+}
+
+/* =============================================================
+   Bet detail surface (/bets/[id]) — prototype's <BetDetail>
+   overlay matched 1:1. Sticky head + foot, scrollable body.
+   ============================================================= */
+.bd-pv {
+  background: var(--pv-bg);
+  color: var(--pv-ink);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.bd-pv-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--pv-line);
+  background: var(--pv-bg);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+.bd-pv-back {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--pv-line);
+  background: var(--pv-card);
+  font-size: 17px;
+  cursor: pointer;
+  color: var(--pv-ink);
+  flex-shrink: 0;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.bd-pv-title {
+  flex: 1;
+  min-width: 0;
+}
+.bd-pv-title-nm {
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--pv-ink);
+}
+.bd-pv-title-mk {
+  font-size: 11.5px;
+  color: var(--pv-muted);
+  font-weight: 600;
+  margin-top: 2px;
+}
+.bd-pv-body {
+  flex: 1;
+  padding-bottom: 24px;
+}
+.bd-hero {
+  padding: 18px 16px 6px;
+  text-align: center;
+}
+.bd-hero-big {
+  font-size: 54px;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+.bd-hero-dd {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+.bd-chart {
+  padding: 6px 6px 0;
+}
+.bd-chart svg {
+  display: block;
+  width: 100%;
+  height: 148px;
+}
+.bd-chart-x {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 14px 0;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--pv-dim);
+}
+.bd-chart-note {
+  font-size: 11px;
+  color: var(--pv-dim);
+  text-align: center;
+  margin-top: 8px;
+}
+.bd-sec {
+  padding: 16px;
+  border-top: 1px solid var(--pv-line);
+  margin-top: 8px;
+}
+.bd-sec-h {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pv-dim);
+  margin: 0 0 11px;
+}
+.bd-tailers {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.bd-tailers-av-row {
+  display: inline-flex;
+  align-items: center;
+}
+.bd-tailers-av-row .crew-mini-av {
+  border: 2px solid var(--pv-card);
+  margin-left: -8px;
+}
+.bd-tailers-av-row .crew-mini-av:first-child {
+  margin-left: 0;
+}
+.bd-tailers-lbl {
+  font-size: 11px;
+  color: var(--pv-muted);
+  font-weight: 600;
+  margin-left: 8px;
+}
+.bd-comments {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bd-comment {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 7px 0;
+}
+.bd-comment-bd {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--pv-ink);
+}
+.bd-comment-au {
+  font-weight: 800;
+  margin-right: 7px;
+}
+.bd-comment-sharp {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--pv-emerald);
+  background: oklch(0.93 0.05 155);
+  border-radius: 5px;
+  padding: 1px 5px;
+  margin-right: 7px;
+}
+.bd-comment-form {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 10px;
+}
+.bd-comment-form input {
+  flex: 1;
+  border: 1px solid var(--pv-line);
+  background: var(--pv-card);
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--pv-ink);
+  outline: none;
+}
+.bd-comment-send {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--pv-emerald);
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.bd-pv-foot {
+  flex-shrink: 0;
+  display: flex;
+  gap: 9px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--pv-line);
+  background: var(--pv-card);
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+}
+.bd-pv-foot button {
+  flex: 1;
+  text-align: center;
+  padding: 13px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+}
+.bd-pv-share {
+  border: 1px solid var(--pv-line);
+  background: var(--pv-card);
+  color: var(--pv-ink);
+}
+.bd-pv-share-done {
+  border-color: var(--pv-emerald);
+  color: var(--pv-emerald);
+}
+.bd-pv-tail {
+  border: 1px solid var(--pv-emerald);
+  background: var(--pv-emerald);
+  color: #fff;
+}
+
 /* "Your bets" section heading above the bet posts */
 .pv-theme .pv-section-label {
   font-size: 10.5px;
