@@ -56,6 +56,8 @@ import BetPostErrorBoundary from "./BetPostErrorBoundary";
 import SweatHeader from "./SweatHeader";
 import PnLTicker from "./PnLTicker";
 import ShotPost from "./ShotPost";
+import { CrewBetPost, CrewResultPost, CrewTipPost } from "./CrewPosts";
+import { MOCK_CREW_POSTS, type MockCrewPost } from "./mock-crew-posts";
 const ReelGroup = dynamic(() => import("./ReelGroup"), {
   ssr: false,
   loading: () => null,
@@ -880,10 +882,21 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         ts: number;
         bet: TrackedBet;
         playerId: string;
-      };
+      }
+    | { kind: "crew"; ts: number; post: MockCrewPost };
   const timeline: TimelineItem[] = [];
   for (const row of visibleRows) {
     timeline.push({ kind: "shot", ts: row.event.ts, row });
+  }
+  // Mock crew posts — bet-as-post entries from fictional members so
+  // the Sweat Feed reads as a bet-driven stream until Groups is wired.
+  // Smart-feed mode hides them (they're not directly tied to the
+  // user's tracked bets), keeping that filter honest.
+  if (filterMode !== "following") {
+    const now = Date.now();
+    for (const post of MOCK_CREW_POSTS) {
+      timeline.push({ kind: "crew", ts: now + post.tsOffsetMs, post });
+    }
   }
   for (const bet of trackedBets) {
     if (bet.settledAt != null) continue;
@@ -1017,6 +1030,18 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                       }
                     />
                   </BetPostErrorBoundary>
+                </li>
+              );
+            }
+            // ── Crew-post branch ──────────────────────────────────
+            // Mock bet/result/tip posts from fictional members.
+            if (__item.kind === "crew") {
+              const p = __item.post;
+              return (
+                <li key={`crew:${p.id}`} className="feed-row-wrap">
+                  {p.kind === "crew-bet" && <CrewBetPost post={p} />}
+                  {p.kind === "crew-result" && <CrewResultPost post={p} />}
+                  {p.kind === "crew-tip" && <CrewTipPost post={p} />}
                 </li>
               );
             }

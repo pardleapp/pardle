@@ -19743,6 +19743,181 @@ html.pv-theme-body .auth-chip-btn {
   color: var(--pv-dim);
 }
 
+/* =============================================================
+   Crew post extras — bp-foot actions row, "N on it" avatars,
+   result post (.rpost), tip post (.tpost), mini gradient avatars.
+   Sit alongside the existing .bpost styles above so own-bets and
+   crew-bets share the same card chrome.
+   ============================================================= */
+.crew-mini-av {
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  flex-shrink: 0;
+}
+.pv-theme .bp-foot {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 13px;
+  flex-wrap: wrap;
+}
+.pv-theme .bp-foot-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--pv-line);
+  background: var(--pv-card);
+  color: var(--pv-muted);
+  border-radius: 999px;
+  padding: 6px 11px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  font-family: inherit;
+}
+.pv-theme .bp-foot-tail {
+  border: 1px solid var(--pv-emerald);
+  color: var(--pv-emerald);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 13px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.pv-theme .bp-foot-on {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+.pv-theme .bp-foot-on-row {
+  display: flex;
+  align-items: center;
+}
+.pv-theme .bp-foot-on-row .crew-mini-av {
+  margin-left: -8px;
+  border: 2px solid var(--pv-card);
+}
+.pv-theme .bp-foot-on-row .crew-mini-av:first-child {
+  margin-left: 0;
+}
+.pv-theme .bp-foot-on-lbl {
+  font-size: 11px;
+  color: var(--pv-muted);
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+/* Result post — "🎉 Mia — A. Smalley · TOP 5 · cashed +£72" */
+.pv-theme .rpost {
+  padding: 15px 16px;
+  background: linear-gradient(
+    150deg,
+    oklch(0.95 0.05 150),
+    var(--pv-card)
+  );
+  border-left: 4px solid var(--pv-up);
+  border-radius: 17px;
+  border-top: 1px solid var(--pv-line);
+  border-right: 1px solid var(--pv-line);
+  border-bottom: 1px solid var(--pv-line);
+}
+.pv-theme .rpost.loss {
+  background: linear-gradient(
+    150deg,
+    oklch(0.96 0.04 28),
+    var(--pv-card)
+  );
+  border-left-color: var(--pv-down);
+}
+.pv-theme .rp-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pv-theme .rp-txt {
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--pv-ink);
+}
+.pv-theme .rp-txt b {
+  font-weight: 900;
+}
+.pv-theme .rp-pl {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 20px;
+  font-weight: 700;
+}
+.pv-theme .rp-pl.win {
+  color: var(--pv-up);
+}
+.pv-theme .rp-pl.loss {
+  color: var(--pv-down);
+}
+
+/* Tip post — channel tip with a Track-this-tip CTA. */
+.pv-theme .tpost {
+  padding: 15px 16px;
+  border-left: 4px solid var(--pv-blue);
+  background: var(--pv-card);
+  border-top: 1px solid var(--pv-line);
+  border-right: 1px solid var(--pv-line);
+  border-bottom: 1px solid var(--pv-line);
+  border-radius: 17px;
+}
+.pv-theme .tp-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pv-theme .tp-by {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--pv-ink);
+}
+.pv-theme .tp-odds {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--pv-muted);
+}
+.pv-theme .tp-body {
+  margin-top: 11px;
+}
+.pv-theme .tp-player {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--pv-ink);
+}
+.pv-theme .tp-rat {
+  font-size: 12.5px;
+  color: var(--pv-muted);
+  line-height: 1.45;
+  margin-top: 4px;
+}
+.pv-theme .tp-track {
+  margin-top: 12px;
+  width: 100%;
+  border: 1px solid var(--pv-blue);
+  color: var(--pv-blue);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 9px;
+  border-radius: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
 /* "Your bets" section heading above the bet posts */
 .pv-theme .pv-section-label {
   font-size: 10.5px;
@@ -20496,25 +20671,29 @@ html.pv-theme-body .auth-chip-btn {
   padding: 5px 10px;
 }
 
-/* + FAB — fixed bottom-right, opens add-bet flow on /bets. */
+/* + FAB — fixed bottom-right, opens add-bet flow on /bets.
+   Default position (desktop): sits in the page gutter, well clear
+   of the feed column. Mobile bumps it above the bottom nav + burst
+   bar via the media query below. */
 .pv-fab {
   position: fixed;
-  right: 16px;
-  bottom: 92px;
-  width: 54px;
-  height: 54px;
+  right: 24px;
+  bottom: 32px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background: oklch(0.50 0.13 155);
   color: #fff;
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 300;
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   text-decoration: none;
-  box-shadow: 0 12px 26px oklch(0.5 0.13 155 / 0.5);
-  z-index: 25;
+  box-shadow: 0 14px 30px oklch(0.5 0.13 155 / 0.45);
+  z-index: 28;
+  border: 3px solid var(--pv-bg);
 }
 .pv-fab:hover {
   filter: brightness(1.06);
