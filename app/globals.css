@@ -22106,8 +22106,8 @@ html.pv-theme-body .auth-chip-btn {
 .lb-cols {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 8px 16px 7px;
+  gap: 9px;
+  padding: 8px 14px 7px;
   font-size: 9.5px;
   font-weight: 800;
   letter-spacing: 0.05em;
@@ -22137,8 +22137,8 @@ html.pv-theme-body .auth-chip-btn {
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 11px;
-  padding: 11px 16px;
+  gap: 9px;
+  padding: 11px 14px;
   background: none;
   border: none;
   cursor: pointer;
@@ -22184,19 +22184,21 @@ html.pv-theme-body .auth-chip-btn {
   font-size: 10px;
   font-weight: 800;
 }
+/* Name cell is the only thing that flexes. Keeping it WITHOUT
+   overflow:hidden so the bet-tag chip is never clipped — only the
+   .lb-nm-text inside is the truncation point. */
 .lb-nm {
   flex: 1 1 0;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   font-size: 14.5px;
   font-weight: 700;
   color: var(--pv-ink);
-  overflow: hidden;
 }
 .lb-nm-text {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
