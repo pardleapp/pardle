@@ -38,6 +38,10 @@ interface Props {
   /** Hot/cold streak indicator for the player — adds an emoji
    *  suffix beside the name. */
   handStatus?: "hot" | "cold" | null;
+  /** When set, surfaces a Share button on the row that fires this
+   *  callback. Used by the Best-of-day / Worst-of-day filters so
+   *  the highlight-reel cards get a one-tap share affordance. */
+  onShare?: (event: FeedEvent) => void;
 }
 
 /** Map ScoreResult onto the prototype's tag class + label. The
@@ -81,6 +85,7 @@ export default function ShotPost({
   onReact,
   contextTag,
   handStatus,
+  onShare,
 }: Props) {
   const tag = tagFor(event);
   const reactCount = (reactions?.up ?? 0) + (reactions?.down ?? 0);
@@ -180,6 +185,34 @@ export default function ShotPost({
             </svg>
             <span>{commentCount}</span>
           </button>
+          {onShare && (
+            <button
+              type="button"
+              className="spost-act spost-act-share"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onShare(event);
+              }}
+              aria-label="Share this shot"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                width="15"
+                height="15"
+              >
+                <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
+                <path d="M16 6l-4-4-4 4" />
+                <path d="M12 2v14" />
+              </svg>
+              <span>Share</span>
+            </button>
+          )}
           {contextTag && <span className="spost-ctx">{contextTag}</span>}
         </div>
       </div>

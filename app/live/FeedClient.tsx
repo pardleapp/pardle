@@ -56,6 +56,7 @@ import BetPostErrorBoundary from "./BetPostErrorBoundary";
 import SweatHeader from "./SweatHeader";
 import PnLTicker from "./PnLTicker";
 import ShotPost from "./ShotPost";
+import ShotShareCard, { type ShotShareData } from "./ShotShareCard";
 import { CrewBetPost, CrewResultPost, CrewTipPost } from "./CrewPosts";
 import { MOCK_CREW_POSTS, type MockCrewPost } from "./mock-crew-posts";
 const ReelGroup = dynamic(() => import("./ReelGroup"), {
@@ -452,7 +453,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, [scrolledIntoFeed]);
-  const [filterMode, setFilterMode] = useState<"all" | "following">("all");
+  type FilterMode = "all" | "smart" | "best" | "worst";
+  const [filterMode, setFilterMode] = useState<FilterMode>("all");
+  /** Shot-share modal state — opens when a Best/Worst row's Share
+   *  button is tapped. */
+  const [shotShare, setShotShare] = useState<ShotShareData | null>(null);
   const [follows, setFollowsState] = useState<string[]>([]);
   // Tracked bets loaded from localStorage on mount + whenever they
   // change. Drives the per-row bet-impact chip — "🚀 +£42 your
@@ -863,18 +868,27 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     if (b.settledAt != null) continue;
     if ("playerId" in b && b.playerId) trackedPlayerIds.add(b.playerId);
   }
-  const visibleRows =
-    filterMode === "following"
-      ? rowsAfterPollFilter.filter((r) =>
-          trackedPlayerIds.has(r.event.playerId),
-        )
-      : rowsAfterPollFilter;
+  // Smart mode filters to shots that touch a tracked-bet player.
+  // Best / Worst use the curated reels from /api/feed — no bet
+  // posts, no crew posts, just the headline-worthy shots.
+  const visibleRows = (() => {
+    if (filterMode === "best") return data.bestReel ?? [];
+    if (filterMode === "worst") return data.worstReel ?? [];
+    if (filterMode === "smart") {
+      return rowsAfterPollFilter.filter((r) =>
+        trackedPlayerIds.has(r.event.playerId),
+      );
+    }
+    return rowsAfterPollFilter;
+  })();
 
   // Build interleaved timeline — tracked bets become first-class
   // posts sorted alongside shot rows. Each bet's sort timestamp
   // anchors to its most-recent player shot when one exists in the
   // current row window (so an active bet bubbles up to the action),
   // falling back to placedAt for bets whose player is quiet.
+  // Best / Worst modes skip bet + crew interleaving — those filters
+  // are pure curated highlight reels.
   type TimelineItem =
     | { kind: "shot"; ts: number; row: (typeof visibleRows)[number] }
     | {
@@ -885,20 +899,22 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       }
     | { kind: "crew"; ts: number; post: MockCrewPost };
   const timeline: TimelineItem[] = [];
+  const isReelMode = filterMode === "best" || filterMode === "worst";
   for (const row of visibleRows) {
     timeline.push({ kind: "shot", ts: row.event.ts, row });
   }
   // Mock crew posts — bet-as-post entries from fictional members so
   // the Sweat Feed reads as a bet-driven stream until Groups is wired.
-  // Smart-feed mode hides them (they're not directly tied to the
-  // user's tracked bets), keeping that filter honest.
-  if (filterMode !== "following") {
+  // Smart-feed AND reel modes hide them — Smart stays honest to your
+  // own bets; reels are curated shot-only.
+  if (filterMode === "all") {
     const now = Date.now();
     for (const post of MOCK_CREW_POSTS) {
       timeline.push({ kind: "crew", ts: now + post.tsOffsetMs, post });
     }
   }
   for (const bet of trackedBets) {
+    if (isReelMode) break;
     if (bet.settledAt != null) continue;
     if (
       bet.kind !== "outright" &&
@@ -968,37 +984,60 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
       <main className="feed-main">
 
-      {/* Filter row — All shots vs Smart feed.
-          Smart feed shows only shots that touch a player the user
-          has an active tracked bet on, plus the bet posts themselves.
-          Hidden when the user has no active bets (no relevance set
-          to filter against). */}
-      {trackedPlayerIds.size > 0 && (
-        <div className="feed-filter-row">
+      {/* Filter row — four pills.
+            All           — interleaved bet posts + crew + shots.
+            ⛳ Best of day — curated highlight reel (eagles, hole-outs,
+                            long putts) from /api/feed.bestReel.
+            💀 Worst of day — blow-ups, 3-putts, penalty drops.
+            ✦ Smart       — shots that touch a tracked-bet player,
+                            plus own + crew bet posts.
+          Smart pill is conditional on having a tracked bet — pointless
+          to show "filter to bet relevance" when there are no bets. */}
+      <div className="feed-filter-row">
+        <button
+          type="button"
+          className={`feed-filter-btn ${filterMode === "all" ? "feed-filter-on" : ""}`}
+          onClick={() => setFilterMode("all")}
+        >
+          All
+        </button>
+        <button
+          type="button"
+          className={`feed-filter-btn ${filterMode === "best" ? "feed-filter-on" : ""}`}
+          onClick={() => setFilterMode("best")}
+        >
+          ⛳ Best of day
+        </button>
+        <button
+          type="button"
+          className={`feed-filter-btn ${filterMode === "worst" ? "feed-filter-on" : ""}`}
+          onClick={() => setFilterMode("worst")}
+        >
+          💀 Worst of day
+        </button>
+        {trackedPlayerIds.size > 0 && (
           <button
             type="button"
-            className={`feed-filter-btn ${filterMode === "all" ? "feed-filter-on" : ""}`}
-            onClick={() => setFilterMode("all")}
+            className={`feed-filter-btn ${filterMode === "smart" ? "feed-filter-on" : ""}`}
+            onClick={() => setFilterMode("smart")}
           >
-            All shots
+            ✦ Smart
           </button>
-          <button
-            type="button"
-            className={`feed-filter-btn ${filterMode === "following" ? "feed-filter-on" : ""}`}
-            onClick={() => setFilterMode("following")}
-          >
-            ✦ Smart feed
-          </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {data.rows.length === 0 ? (
         <FeedWarmingUp leaderboard={data.leaderboard} />
-      ) : filterMode === "following" && timeline.length === 0 ? (
-        // Smart-feed mode but neither shots nor bets to surface.
+      ) : timeline.length === 0 ? (
+        // Filter active but nothing in it. Different copy per mode.
         <p className="feed-empty">
-          No bet-relevant updates yet — your players are quiet right
-          now. Tap All shots to see the whole feed.
+          {filterMode === "smart"
+            ? "No bet-relevant updates yet — your players are quiet right now. Tap All to see the whole feed."
+            : filterMode === "best"
+              ? "No standout shots in the highlight reel yet — the round's still warming up."
+              : filterMode === "worst"
+                ? "No blow-ups to show off (yet). Round still in progress."
+                : "No updates yet."}
         </p>
       ) : (
         <ul className="feed-list">
@@ -1070,6 +1109,42 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                   onReact={sendReaction}
                   contextTag={primaryContextTag}
                   handStatus={data.handStatus?.[event.playerId] ?? null}
+                  onShare={
+                    filterMode === "best" || filterMode === "worst"
+                      ? (ev) => {
+                          const tagWord = (() => {
+                            if (ev.ace) return "ACE";
+                            switch (ev.result) {
+                              case "albatross":
+                                return "ALBATROSS";
+                              case "eagle":
+                                return "EAGLE";
+                              case "birdie":
+                                return "BIRDIE";
+                              case "bogey":
+                                return "BOGEY";
+                              case "double":
+                                return "DOUBLE";
+                              case "triple-plus":
+                                return "BLOW-UP";
+                              default:
+                                return undefined;
+                            }
+                          })();
+                          setShotShare({
+                            kind: filterMode === "best" ? "best" : "worst",
+                            headline: ev.headline ?? "",
+                            player: ev.playerName,
+                            hole: typeof ev.hole === "number" ? ev.hole : null,
+                            toPar: ev.toPar ?? null,
+                            tag: tagWord,
+                            tournamentLabel: data.tournament
+                              ? `${data.tournament.name} · R${ev.round ?? 4}`
+                              : "Live",
+                          });
+                        }
+                      : undefined
+                  }
                 />
               </li>
             );
@@ -1085,6 +1160,13 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       {/* + Track-bet affordance lives in SweatHeader's icon row now,
           not as a floating action button — keeps the feed scroll
           surface free of overlapping chrome. */}
+
+      {shotShare && (
+        <ShotShareCard
+          data={shotShare}
+          onClose={() => setShotShare(null)}
+        />
+      )}
 
       {/* Floating-emoji overlay — fixed so bursts rise over the whole feed */}
       <div className="feed-floater-layer" aria-hidden="true">

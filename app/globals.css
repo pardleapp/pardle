@@ -21966,6 +21966,43 @@ html.pv-theme-body .auth-chip-btn {
   color: var(--pv-emerald-d);
   text-shadow: 0 0 22px oklch(0.7 0.18 150 / 0.22);
 }
+
+/* Shot share-card variants — same .share-card chrome, different
+   hero. .share-won-shot mirrors .share-won but reads in title case.
+   .share-shot-headline replaces the big mono profit with the
+   punchy headline ("Hole-out from 150" / "4-putt from 6 ft"). */
+.share-card-shot::before {
+  background: radial-gradient(
+    130% 70% at 50% 0%,
+    oklch(0.94 0.06 60 / 0.22),
+    transparent 62%
+  );
+}
+.share-won-shot {
+  position: relative;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--pv-emerald-d);
+  text-transform: uppercase;
+  margin-top: 24px;
+}
+.share-shot-headline {
+  position: relative;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1.1;
+  margin-top: 8px;
+  color: var(--pv-ink);
+  letter-spacing: -0.01em;
+}
+.share-chip-tag {
+  background: oklch(0.92 0.06 155);
+  color: var(--pv-emerald-d);
+  border-color: oklch(0.86 0.08 150);
+}
 .share-bet {
   position: relative;
   font-size: 13px;
@@ -23248,6 +23285,13 @@ html.pv-theme-body .auth-chip-btn {
   background: var(--pv-soft);
   color: var(--pv-ink);
   border-color: var(--pv-emerald);
+}
+.spost-act-share {
+  color: var(--pv-emerald-d);
+  border-color: var(--pv-emerald);
+}
+.spost-act-share:hover {
+  background: oklch(0.94 0.05 150);
 }
 .spost-act svg {
   width: 15px;
