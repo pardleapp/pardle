@@ -181,7 +181,12 @@ export default function BetPost({
           <div
             className="bp-prob-v"
             style={{
-              color: dir === "down" ? "var(--pv-down)" : "var(--pv-up)",
+              color:
+                dir === "down"
+                  ? "var(--pv-down)"
+                  : dir === "up"
+                    ? "var(--pv-up)"
+                    : "var(--pv-ink)",
             }}
           >
             {probPct != null ? `${probPct}%` : "—"}

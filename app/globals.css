@@ -19095,6 +19095,52 @@ html.pv-theme-body,
 html.pv-theme-body body {
   background: oklch(0.972 0.009 95);
 }
+/* The page wraps FeedClient in <main class="container container-wide
+   v4-theme"> with its own dark background — kill that wrapper bg and
+   re-skin the brand header + nav so the whole page reads as broadcast
+   paper while the feed is mounted. Scoped tightly to .pv-theme-body
+   so /bets, /sharp etc. stay dark until we migrate them. */
+html.pv-theme-body main.container.v4-theme,
+html.pv-theme-body main.container-wide.v4-theme {
+  background: oklch(0.972 0.009 95);
+  color: oklch(0.26 0.04 155);
+}
+html.pv-theme-body .brand,
+html.pv-theme-body .brand-split {
+  background: transparent;
+  border-bottom: 1px solid oklch(0.90 0.013 95);
+  color: oklch(0.26 0.04 155);
+}
+html.pv-theme-body .brand h1 {
+  color: oklch(0.40 0.12 156);
+  text-shadow: none;
+  filter: none;
+}
+html.pv-theme-body .brand h1 a,
+html.pv-theme-body .brand-back {
+  color: inherit;
+  text-decoration: none;
+}
+html.pv-theme-body .hub-nav-tabs {
+  background: oklch(0.995 0.004 95);
+  border: 1px solid oklch(0.90 0.013 95);
+}
+html.pv-theme-body .hub-nav-tab {
+  color: oklch(0.50 0.02 150);
+}
+html.pv-theme-body .hub-nav-tab:hover {
+  color: oklch(0.26 0.04 155);
+}
+html.pv-theme-body .hub-nav-tab-active {
+  color: oklch(0.40 0.12 156);
+  background: oklch(0.945 0.012 95);
+}
+html.pv-theme-body .auth-chip,
+html.pv-theme-body .auth-chip-btn {
+  background: oklch(0.995 0.004 95);
+  border: 1px solid oklch(0.90 0.013 95);
+  color: oklch(0.26 0.04 155);
+}
 
 /* page header — drop the dark slab + glow, use a warm hairline */
 .pv-theme.feed-wrap {
