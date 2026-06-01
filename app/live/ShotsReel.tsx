@@ -18,11 +18,9 @@
  * data.worstReel — same source the old desktop sidebar used.
  */
 
-import { useState } from "react";
-import type { FeedRow, ScoreResult } from "@/lib/feed/types";
+import type { FeedEvent, FeedRow, ScoreResult } from "@/lib/feed/types";
 import { abbreviateName } from "@/lib/text/abbreviate";
 import ShotDiagram from "./ShotDiagram";
-import ShotShareCard, { type ShotShareData } from "./ShotShareCard";
 
 interface Props {
   best: FeedRow[];
@@ -30,11 +28,16 @@ interface Props {
   /** Optional player filter — when set, only show shots by this
    *  player. Used on the player page This-week tab. */
   playerId?: string;
-  /** Tournament label for the share card eyebrow. */
+  /** Tournament label kept around for analytics + future contexts —
+   *  the share card itself is now opened from ShotDetail, which the
+   *  parent mounts. */
   tournamentLabel?: string;
   /** Override the strip's heading — e.g. "⛳ This week" on the
    *  player page. Defaults to "⛳ Shots of the day". */
   title?: string;
+  /** Tap-through handler — parent opens the full ShotDetail
+   *  overlay. Was an internal share-modal before. */
+  onTapShot: (event: FeedEvent) => void;
 }
 
 function tagFor(
@@ -112,11 +115,9 @@ export default function ShotsReel({
   best,
   worst,
   playerId,
-  tournamentLabel = "Live · Round 4",
   title = "⛳ Shots of the day",
+  onTapShot,
 }: Props) {
-  const [shareData, setShareData] = useState<ShotShareData | null>(null);
-
   // Combine best + worst, alternating for visual variety, deduped by
   // event id so a shot tagged both ways doesn't render twice.
   const seen = new Set<string>();
@@ -138,38 +139,16 @@ export default function ShotsReel({
 
   if (rows.length === 0) return null;
 
-  const openShare = (row: FeedRow) => {
-    const ev = row.event;
-    const tag = tagFor(ev.ace, ev.result);
-    setShareData({
-      kind: ev.lowlight ? "worst" : "best",
-      headline: ev.headline ?? "",
-      player: ev.playerName,
-      hole: typeof ev.hole === "number" ? ev.hole : null,
-      toPar: ev.toPar ?? null,
-      tag: tag?.label,
-      tournamentLabel,
-    });
-  };
-
   return (
-    <>
-      <section className="shots-reel">
-        <h3 className="shots-reel-title">{title}</h3>
-        <div className="shots-reel-track" role="list">
-          {rows.map((r) => (
-            <div role="listitem" key={r.event.id}>
-              <ReelCard row={r} onTap={openShare} />
-            </div>
-          ))}
-        </div>
-      </section>
-      {shareData && (
-        <ShotShareCard
-          data={shareData}
-          onClose={() => setShareData(null)}
-        />
-      )}
-    </>
+    <section className="shots-reel">
+      <h3 className="shots-reel-title">{title}</h3>
+      <div className="shots-reel-track" role="list">
+        {rows.map((r) => (
+          <div role="listitem" key={r.event.id}>
+            <ReelCard row={r} onTap={(row) => onTapShot(row.event)} />
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

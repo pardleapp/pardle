@@ -56,8 +56,9 @@ import BetPostErrorBoundary from "./BetPostErrorBoundary";
 import SweatHeader from "./SweatHeader";
 import PnLTicker from "./PnLTicker";
 import ShotPost from "./ShotPost";
-import ShotShareCard, { type ShotShareData } from "./ShotShareCard";
 import ShotsReel from "./ShotsReel";
+import ShotDetail from "./ShotDetail";
+import type { FeedEvent } from "@/lib/feed/types";
 import { CrewBetPost, CrewResultPost, CrewTipPost } from "./CrewPosts";
 import { MOCK_CREW_POSTS, type MockCrewPost } from "./mock-crew-posts";
 const ReelGroup = dynamic(() => import("./ReelGroup"), {
@@ -456,10 +457,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   }, [scrolledIntoFeed]);
   type FilterMode = "all" | "smart";
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
-  /** Shot-share modal state — opens when a notable-shot Share
-   *  button is tapped (inline on a feed shot card). The Shots-of-
-   *  the-day reel manages its own share modal internally. */
-  const [shotShare, setShotShare] = useState<ShotShareData | null>(null);
+  /** Shot-detail overlay — opens when a notable shot is tapped
+   *  (inline shot card OR a Shots-of-the-day reel card). The
+   *  detail surface in turn has its own Share button that opens
+   *  the existing ShotShareCard. */
+  const [shotDetail, setShotDetail] = useState<FeedEvent | null>(null);
   const [follows, setFollowsState] = useState<string[]>([]);
   // Tracked bets loaded from localStorage on mount + whenever they
   // change. Drives the per-row bet-impact chip — "🚀 +£42 your
@@ -1034,6 +1036,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                         ? `${data.tournament.name} · Live`
                         : "Live"
                     }
+                    onTapShot={(ev) => setShotDetail(ev)}
                   />
                 </li>
               ) : null;
@@ -1115,41 +1118,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                     contextTag={primaryContextTag}
                     handStatus={data.handStatus?.[event.playerId] ?? null}
                     onShare={
-                      isNotable
-                        ? (ev) => {
-                            const tagWord = (() => {
-                              if (ev.ace) return "ACE";
-                              switch (ev.result) {
-                                case "albatross":
-                                  return "ALBATROSS";
-                                case "eagle":
-                                  return "EAGLE";
-                                case "birdie":
-                                  return "BIRDIE";
-                                case "bogey":
-                                  return "BOGEY";
-                                case "double":
-                                  return "DOUBLE";
-                                case "triple-plus":
-                                  return "BLOW-UP";
-                                default:
-                                  return undefined;
-                              }
-                            })();
-                            setShotShare({
-                              kind: ev.lowlight ? "worst" : "best",
-                              headline: ev.headline ?? "",
-                              player: ev.playerName,
-                              hole:
-                                typeof ev.hole === "number" ? ev.hole : null,
-                              toPar: ev.toPar ?? null,
-                              tag: tagWord,
-                              tournamentLabel: data.tournament
-                                ? `${data.tournament.name} · R${ev.round ?? 4}`
-                                : "Live",
-                            });
-                          }
-                        : undefined
+                      isNotable ? (ev) => setShotDetail(ev) : undefined
                     }
                     showDiagram={isNotable}
                   />
@@ -1169,10 +1138,15 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           not as a floating action button — keeps the feed scroll
           surface free of overlapping chrome. */}
 
-      {shotShare && (
-        <ShotShareCard
-          data={shotShare}
-          onClose={() => setShotShare(null)}
+      {shotDetail && (
+        <ShotDetail
+          event={shotDetail}
+          tournamentLabel={
+            data.tournament
+              ? `${data.tournament.name} · Live`
+              : "Live"
+          }
+          onClose={() => setShotDetail(null)}
         />
       )}
 
