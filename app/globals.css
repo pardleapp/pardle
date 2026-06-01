@@ -20370,6 +20370,7 @@ html.pv-theme-body .auth-chip-btn {
   align-items: center;
   gap: 10px;
 }
+.pv-head-icon-btn,
 .pv-head-bell {
   position: relative;
   background: var(--pv-soft);
@@ -20377,12 +20378,29 @@ html.pv-theme-body .auth-chip-btn {
   border-radius: 50%;
   width: 34px;
   height: 34px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: var(--pv-ink);
   flex-shrink: 0;
+  text-decoration: none;
+}
+.pv-head-icon-btn:hover,
+.pv-head-bell:hover {
+  background: var(--pv-line);
+}
+/* Track-bet ＋ inside the header — emerald accent so it reads as
+   the primary affordance next to the muted bell. */
+.pv-head-track {
+  background: var(--pv-emerald);
+  color: #fff;
+  border-color: var(--pv-emerald);
+}
+.pv-head-track:hover {
+  background: var(--pv-emerald-d);
+  border-color: var(--pv-emerald-d);
+  color: #fff;
 }
 .pv-space-btn {
   display: flex;
@@ -20671,30 +20689,11 @@ html.pv-theme-body .auth-chip-btn {
   padding: 5px 10px;
 }
 
-/* + FAB — fixed bottom-right, opens add-bet flow on /bets.
-   Default position (desktop): sits in the page gutter, well clear
-   of the feed column. Mobile bumps it above the bottom nav + burst
-   bar via the media query below. */
-.pv-fab {
-  position: fixed;
-  right: 24px;
-  bottom: 32px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: oklch(0.50 0.13 155);
-  color: #fff;
-  font-size: 30px;
-  font-weight: 300;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
-  box-shadow: 0 14px 30px oklch(0.5 0.13 155 / 0.45);
-  z-index: 28;
-  border: 3px solid var(--pv-bg);
-}
+/* + Track-bet affordance lives in SweatHeader's icon row now — see
+   .pv-head-track styling further down. The floating FAB has been
+   retired because it overlapped feed cards no matter where it sat;
+   the header icon plus the bottom-nav "My bets" tab cover the same
+   intent without intruding on the scroll surface. */
 .pv-fab:hover {
   filter: brightness(1.06);
 }
@@ -20784,26 +20783,18 @@ html.pv-theme-body .auth-chip-btn {
   html:has(.pv-theme) .brand-nav {
     gap: 8px;
   }
-  /* Push page content above the bottom nav, burst bar and FAB so
-     the last item isn't hidden behind any of them. Stack from the
-     viewport bottom:
+  /* Stack from the viewport bottom:
        0 – 70 px   bottom nav
        70 – 130 px burst bar
-       150 – 206 px FAB
-     220 px of body padding clears the lot with breathing room. */
+     150 px of body padding clears both with breathing room. The
+     floating FAB is gone (Track-bet ＋ lives in SweatHeader now). */
   body:has(.pv-theme) {
-    padding-bottom: 220px;
+    padding-bottom: 150px;
   }
   /* The sticky burst-emoji bar pins above the bottom nav on
      pv-theme'd surfaces. */
   body:has(.pv-theme) .feed-burst-bar {
     bottom: 70px;
-  }
-  /* FAB sits above the burst bar so it never overlaps a card
-     (the burst bar is the rightmost UI strip the FAB can sit on
-     without intruding on the feed scroll area). */
-  body:has(.pv-theme) .pv-fab {
-    bottom: 150px;
   }
   /* Pad the feed list itself so the last card's reaction / Tail row
      doesn't get hidden under the sticky burst bar. Burst bar is

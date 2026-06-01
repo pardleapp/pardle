@@ -1082,13 +1082,9 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       </p>
         </main>
 
-      {/* + FAB — opens the add-bet flow. Routes to /bets which hosts
-          the existing add-bet sheet. Fixed bottom-right, mobile-first;
-          desktop keeps it in the same corner so the affordance is
-          consistent. */}
-      <Link href="/bets" className="pv-fab" aria-label="Track a new bet">
-        +
-      </Link>
+      {/* + Track-bet affordance lives in SweatHeader's icon row now,
+          not as a floating action button — keeps the feed scroll
+          surface free of overlapping chrome. */}
 
       {/* Floating-emoji overlay — fixed so bursts rise over the whole feed */}
       <div className="feed-floater-layer" aria-hidden="true">

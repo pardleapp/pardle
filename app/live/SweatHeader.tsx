@@ -23,9 +23,29 @@ export default function SweatHeader() {
         Par<b>dle</b>
       </Link>
       <div className="pv-head-right">
+        <Link
+          href="/bets"
+          className="pv-head-icon-btn pv-head-track"
+          aria-label="Track a new bet"
+          title="Track a new bet"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 5v14" />
+            <path d="M5 12h14" />
+          </svg>
+        </Link>
         <button
           type="button"
-          className="pv-head-bell"
+          className="pv-head-icon-btn pv-head-bell"
           aria-label="Notifications"
         >
           <svg
