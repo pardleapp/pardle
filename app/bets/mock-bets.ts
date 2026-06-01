@@ -94,6 +94,84 @@ export const MOCK_BETS_LIVE: MockBetLive[] = [
       ["Par 18", "+1", "up"],
     ],
   },
+  // ── Group-market views (linked from /groups "Most backed") ──
+  // Same player+market as a member's personal bet so the prob
+  // trajectory + shot timeline are identical; the difference is
+  // `mine: false`, the `on` backer list reflects every group
+  // member on the market, and the `stake` is the combined group
+  // stake instead of one person's.
+  {
+    id: "gb1",
+    who: "R. Henley",
+    mine: false,
+    on: ["JO", "YO", "TH", "DA"],
+    mkt: "OUTRIGHT",
+    cur: "£",
+    stake: 240,
+    odds: { dec: "3.50", frac: "5/2", am: "+250" },
+    prob: 54,
+    dir: "up",
+    hist: [34, 40, 46, 50, 54],
+    tl: [
+      ["Birdie 15 → −10", "+4", "up"],
+      ["Par 16", "+1", "up"],
+      ["Approach 17 to 3 ft", "+5", "up"],
+    ],
+  },
+  {
+    id: "gb2",
+    who: "A. Smalley",
+    mine: false,
+    on: ["YO", "MI", "PA"],
+    mkt: "TOP 5",
+    cur: "£",
+    stake: 95,
+    odds: { dec: "2.00", frac: "1/1", am: "+100" },
+    prob: 71,
+    dir: "up",
+    hist: [58, 64, 66, 68, 71],
+    tl: [
+      ["Bogey-free front 9", "+2", "up"],
+      ["Birdie 17", "+4", "up"],
+      ["Par 18", "+1", "up"],
+    ],
+  },
+  {
+    id: "gb3",
+    who: "M. Brennan",
+    mine: false,
+    on: ["SA", "JO"],
+    mkt: "UNDER 69.5 · R4",
+    cur: "$",
+    stake: 200,
+    odds: { dec: "1.90", frac: "10/11", am: "−110" },
+    prob: 31,
+    dir: "down",
+    hist: [62, 58, 50, 44, 36, 31],
+    tl: [
+      ["Bogey on 15 — needs three under in", "−9", "down"],
+      ["Approach 14 short-sided", "−4", "down"],
+      ["Drove into fairway bunker on 13", "−2", "down"],
+    ],
+  },
+  {
+    id: "gb4",
+    who: "N. Echavarria",
+    mine: false,
+    on: ["MI", "RO"],
+    mkt: "TOP 10",
+    cur: "$",
+    stake: 60,
+    odds: { dec: "2.50", frac: "6/4", am: "+150" },
+    prob: 58,
+    dir: "up",
+    hist: [42, 46, 50, 54, 56, 58],
+    tl: [
+      ["Birdie 14 from 18 ft", "+4", "up"],
+      ["Sand save on 12", "+2", "up"],
+      ["Approach 11 to 6 ft", "+3", "up"],
+    ],
+  },
 ];
 
 export const MOCK_BETS_SETTLED: MockBetSettled[] = [

@@ -152,6 +152,59 @@ const MOCK_COMMENTS_BY_BET: Record<string, Comment[]> = {
       text: "steadiest player all week, easy top 5",
     },
   ],
+  // Group-market chats are louder — they're the whole crew, not a
+  // single bettor's thread.
+  gb1: [
+    {
+      author: "Jordan",
+      initials: "JO",
+      sharp: "71%",
+      text: "4 of us on Henley — let's see this home",
+    },
+    {
+      author: "Dave",
+      initials: "DA",
+      text: "approach into 17 was filthy 🎯",
+    },
+    {
+      author: "Theo",
+      initials: "TH",
+      sharp: "71%",
+      text: "if he birdies 18 we all eat",
+    },
+  ],
+  gb2: [
+    {
+      author: "Mia",
+      initials: "MI",
+      text: "smalley's putter is hot rn",
+    },
+    {
+      author: "Paul",
+      initials: "PA",
+      text: "tailed this last night, ty whoever called it",
+    },
+  ],
+  gb3: [
+    {
+      author: "Sam",
+      initials: "SA",
+      text: "why did i back the under on a bomber 😮‍💨",
+    },
+    {
+      author: "Jordan",
+      initials: "JO",
+      sharp: "71%",
+      text: "hold strong lads — three pars and we're fine",
+    },
+  ],
+  gb4: [
+    {
+      author: "Mia",
+      initials: "MI",
+      text: "echavarria sneaking up the board nicely",
+    },
+  ],
 };
 
 export default function BetDetailClient({ bet }: { bet: MockBetLive }) {
@@ -183,6 +236,28 @@ export default function BetDetailClient({ bet }: { bet: MockBetLive }) {
     setInput("");
   };
 
+  // `mine:false` flags this as a group-market view (opened from the
+  // Groups tab's "Most backed in your group" row, not from My-bets).
+  // We re-skin a few labels accordingly:
+  //   header eyebrow: "Group market" instead of "Your bet"
+  //   tailers heading + lede: "{N} on this market" instead of
+  //                           "{N} tailing / {N} from your crew tailed"
+  //   chart caption: drop the "where you entered" phrasing
+  //   footer: "Discuss" + "Tail this market" instead of
+  //           "Share to group" + (hidden tail).
+  const isGroupView = bet.mine === false;
+  const headerEyebrow = isGroupView ? "Group market" : "Your bet";
+  const chartNote = isGroupView
+    ? "Today's trajectory · live win probability for the group's market"
+    : "Today's trajectory · dashed line marks where you entered";
+  const tailingHeading = isGroupView
+    ? `${bet.on.length} on this market`
+    : `${bet.on.length} tailing`;
+  const tailersLede = isGroupView
+    ? `${bet.on.length} from The Lads on this market`
+    : `${bet.on.length} from your crew tailed this`;
+  const playerHref = `/live/player/${encodeURIComponent(bet.who)}`;
+
   return (
     <div className="bd-pv">
       <div className="bd-pv-head">
@@ -190,9 +265,12 @@ export default function BetDetailClient({ bet }: { bet: MockBetLive }) {
           ←
         </Link>
         <div className="bd-pv-title">
-          <div className="bd-pv-title-nm">Your bet</div>
+          <div className="bd-pv-title-nm">{headerEyebrow}</div>
           <div className="bd-pv-title-mk">
-            {bet.who} · {bet.mkt} · {bet.cur}
+            <Link href={playerHref} className="bd-pv-title-player">
+              {bet.who}
+            </Link>{" "}
+            · {bet.mkt} · {bet.cur}
             {bet.stake}
           </div>
         </div>
@@ -209,12 +287,10 @@ export default function BetDetailClient({ bet }: { bet: MockBetLive }) {
         </div>
         <AreaChart hist={bet.hist} dir={bet.dir} />
         <div className="bd-chart-x">
-          <span>entry</span>
+          <span>{isGroupView ? "R1" : "entry"}</span>
           <span>now</span>
         </div>
-        <p className="bd-chart-note">
-          Today&apos;s trajectory · dashed line marks where you entered
-        </p>
+        <p className="bd-chart-note">{chartNote}</p>
 
         <section className="bd-sec">
           <h4 className="bd-sec-h">Shot by shot</h4>
@@ -233,7 +309,8 @@ export default function BetDetailClient({ bet }: { bet: MockBetLive }) {
 
         <section className="bd-sec">
           <h4 className="bd-sec-h">
-            On this bet · {bet.on.length} tailing
+            {isGroupView ? "Group on this market" : "On this bet"} ·{" "}
+            {tailingHeading}
           </h4>
           {bet.on.length > 0 && (
             <div className="bd-tailers">
@@ -242,9 +319,7 @@ export default function BetDetailClient({ bet }: { bet: MockBetLive }) {
                   <MiniAv key={init} initials={init} size={28} />
                 ))}
               </span>
-              <span className="bd-tailers-lbl">
-                {bet.on.length} from your crew tailed this
-              </span>
+              <span className="bd-tailers-lbl">{tailersLede}</span>
             </div>
           )}
           <ul className="bd-comments">
@@ -287,11 +362,15 @@ export default function BetDetailClient({ bet }: { bet: MockBetLive }) {
           className={`bd-pv-share${shared ? " bd-pv-share-done" : ""}`}
           onClick={() => setShared(true)}
         >
-          {shared ? "Shared ✓" : "Share to group"}
+          {shared
+            ? "Shared ✓"
+            : isGroupView
+              ? "Discuss in group"
+              : "Share to group"}
         </button>
-        {!bet.mine && (
+        {isGroupView && (
           <button type="button" className="bd-pv-tail">
-            Tail this bet
+            Tail this market
           </button>
         )}
       </div>

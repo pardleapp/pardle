@@ -36,6 +36,11 @@ import {
 import MemberProfile from "./MemberProfile";
 import RaceSheet from "./RaceSheet";
 
+/** Map each Most-Backed entry to the matching group-market bet id
+ *  in app/bets/mock-bets.ts (gb1–gb4). Index-aligned with
+ *  MOST_POPULAR so the order is stable. */
+const MOST_BACKED_BET_IDS = ["gb1", "gb2", "gb3", "gb4"];
+
 const PALETTE: Record<string, string> = {
   JO: "linear-gradient(135deg,#5cd7c1,#1f8b6e)",
   SA: "linear-gradient(135deg,#f29a4f,#d44a4a)",
@@ -161,29 +166,36 @@ export default function GroupsClient() {
         <section>
           <div className="grp-slabel">Most backed in your group</div>
           <div className="grp-card grp-most">
-            {MOST_POPULAR.map((b) => (
-              <button
-                key={b.player}
-                type="button"
-                className="pop-row"
-                onClick={() =>
-                  router.push(`/live/player/${encodeURIComponent(b.player)}`)
-                }
-              >
-                <div className="pop-nm">
-                  {b.player}
-                  <span className="bp-bet-mkt">{b.market}</span>
-                </div>
-                <span className="pop-back">
-                  <span className="pop-back-row">
-                    {b.backers.map((a) => (
-                      <Av key={a} initials={a} size={24} />
-                    ))}
+            {MOST_POPULAR.map((b, i) => {
+              // Tap → /bets/[gbN] (the group-market bet detail —
+              // same shape as the My-bets detail, but `mine:false`
+              // so the header + tailed-by copy renders the group
+              // view).
+              const betId = MOST_BACKED_BET_IDS[i];
+              return (
+                <button
+                  key={b.player}
+                  type="button"
+                  className="pop-row"
+                  onClick={() => {
+                    if (betId) router.push(`/bets/${betId}`);
+                  }}
+                >
+                  <div className="pop-nm">
+                    {b.player}
+                    <span className="bp-bet-mkt">{b.market}</span>
+                  </div>
+                  <span className="pop-back">
+                    <span className="pop-back-row">
+                      {b.backers.map((a) => (
+                        <Av key={a} initials={a} size={24} />
+                      ))}
+                    </span>
+                    <span className="pop-ct">{b.count} on it</span>
                   </span>
-                  <span className="pop-ct">{b.count} on it</span>
-                </span>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </section>
 
