@@ -51,6 +51,8 @@ import { useNotifications } from "./notifications/useNotifications";
 import PlayerAvatar from "./PlayerAvatar";
 import PlayerSearch from "./PlayerSearch";
 import PuttPollWidget from "./PuttPollWidget";
+import BetStrip from "./BetStrip";
+import BetPostErrorBoundary from "./BetPostErrorBoundary";
 const ReelGroup = dynamic(() => import("./ReelGroup"), {
   ssr: false,
   loading: () => null,
@@ -950,9 +952,20 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         </div>
       )}
 
-      {/* TEMPORARILY DISABLED — bet-strip render crashed on something
-          in the user's bet data. Isolating to confirm whether the
-          crash is in BetPost vs elsewhere in pass 2. */}
+      {/* Bet strip — tracked bets rendered as feed posts above the
+          shot feed. Wrapped in error boundary so a render crash
+          inside the strip (or any single BetPost) is contained and
+          surfaces as an inline red stripe rather than blowing up the
+          page-level error.tsx boundary. */}
+      <BetPostErrorBoundary label="bet-strip">
+        <BetStrip
+          trackedBets={trackedBets}
+          rows={data.rows}
+          currentOdds={data.currentOdds}
+          topFinishCurrent={data.topFinishCurrent}
+          oddsHistories={data.oddsHistories}
+        />
+      </BetPostErrorBoundary>
 
       {data.rows.length === 0 ? (
         <FeedWarmingUp leaderboard={data.leaderboard} />
