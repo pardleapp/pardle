@@ -19197,10 +19197,30 @@ html.pv-theme-body .auth-chip-btn {
   border-radius: 17px;
   padding: 14px 16px;
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 11px;
   box-shadow: none;
   transition: box-shadow 0.16s ease, transform 0.16s ease;
+}
+.pv-theme .feed-row > .feed-body {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* On narrow viewports lift the actions row beneath the body so the
+   thumb/comment/star pills stop colliding with the score chip on
+   the right of the row head. Full-width below the body keeps the
+   prototype's "actions at the bottom" rhythm. */
+@media (max-width: 540px) {
+  .pv-theme .feed-row {
+    flex-wrap: wrap;
+  }
+  .pv-theme .feed-row > .feed-actions {
+    flex-basis: 100%;
+    margin-left: 0;
+    margin-top: 6px;
+    justify-content: flex-start;
+  }
 }
 @media (hover: hover) {
   .pv-theme .feed-row:hover {
@@ -20245,6 +20265,17 @@ html.pv-theme-body .auth-chip-btn {
      hidden behind the strip. */
   html.pv-theme-body body {
     padding-bottom: 76px;
+  }
+  /* The sticky burst-emoji bar normally pins to bottom:0 of its
+     scroll container — on a pv-theme'd page that would overlap with
+     the mobile BottomNav. Lift it above the nav (which is 70-ish px
+     tall including safe-area insets). */
+  html.pv-theme-body .feed-burst-bar {
+    bottom: 70px;
+  }
+  /* FAB sits above both the burst bar and the bottom nav. */
+  html.pv-theme-body .pv-fab {
+    bottom: 140px;
   }
 }
 
