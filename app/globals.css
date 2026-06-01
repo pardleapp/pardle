@@ -22529,6 +22529,170 @@ html.pv-theme-body .auth-chip-btn {
   border: 1.5px solid var(--pv-bg);
 }
 
+/* =============================================================
+   Shot diagram + Shots-of-the-day reel — small hole-shape
+   thumbnails beside shot cards and inside a horizontal-scroll
+   strip partway down the feed.
+   ============================================================= */
+.shot-diagram {
+  border-radius: 9px;
+  overflow: hidden;
+  background: oklch(0.35 0.06 145);
+  flex-shrink: 0;
+}
+.shot-diagram-thumb {
+  width: 88px;
+  height: 60px;
+}
+.shot-diagram-wide {
+  width: 200px;
+  height: 112px;
+}
+.shot-diagram > svg,
+.shot-diagram .tracer-interactive {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* When a shot card carries a diagram, the headline shares a row
+   with the thumbnail to the right. */
+.pv-theme .spost-text-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 6px 0 9px;
+}
+.pv-theme .spost-text-flex {
+  flex: 1;
+  margin: 0;
+}
+.pv-theme .spost-diagram {
+  flex-shrink: 0;
+}
+
+/* Reel */
+.shots-reel {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 17px;
+  padding: 14px 0 16px;
+  margin: 4px 0;
+  overflow: hidden;
+}
+.shots-reel-title {
+  margin: 0 16px 11px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--pv-ink);
+  letter-spacing: -0.005em;
+}
+.shots-reel-track {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 0 16px 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.shots-reel-track::-webkit-scrollbar {
+  height: 0;
+}
+.shots-reel-card {
+  flex-shrink: 0;
+  width: 220px;
+  scroll-snap-align: start;
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 13px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: var(--pv-ink);
+  transition: box-shadow 0.16s ease, transform 0.16s ease;
+}
+.shots-reel-card:hover {
+  box-shadow: 0 10px 26px oklch(0.4 0.06 145 / 0.14);
+  transform: translateY(-2px);
+}
+.shots-reel-card-good {
+  border-top: 2px solid var(--pv-up);
+}
+.shots-reel-card-bad {
+  border-top: 2px solid var(--pv-down);
+}
+.shots-reel-diag {
+  width: 100%;
+  height: 88px;
+  border-radius: 9px;
+  overflow: hidden;
+  background: oklch(0.35 0.06 145);
+}
+.shots-reel-diag .shot-diagram,
+.shots-reel-diag .shot-diagram-thumb {
+  width: 100%;
+  height: 100%;
+}
+.shots-reel-tag {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 5px;
+  text-transform: uppercase;
+  align-self: flex-start;
+}
+.shots-reel-tag-good {
+  background: oklch(0.92 0.06 155);
+  color: var(--pv-emerald-d);
+}
+.shots-reel-tag-bad {
+  background: oklch(0.93 0.05 28);
+  color: var(--pv-down);
+}
+.shots-reel-head {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--pv-ink);
+  line-height: 1.3;
+}
+.shots-reel-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--pv-muted);
+  font-weight: 600;
+}
+.shots-reel-av {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #5cd7c1, #1f8b6e);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+.shots-reel-name {
+  font-weight: 700;
+  color: var(--pv-ink);
+}
+.shots-reel-hole {
+  margin-left: auto;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-weight: 700;
+  color: var(--pv-muted);
+}
+
 /* "Your bets" section heading above the bet posts */
 .pv-theme .pv-section-label {
   font-size: 10.5px;

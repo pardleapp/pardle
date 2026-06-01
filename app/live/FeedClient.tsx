@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type JSX } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type JSX } from "react";
 import type { Burst, CachedLeaderboardRow } from "@/lib/feed/store";
 import type { FeedRow } from "@/lib/feed/types";
 import {
@@ -57,6 +57,7 @@ import SweatHeader from "./SweatHeader";
 import PnLTicker from "./PnLTicker";
 import ShotPost from "./ShotPost";
 import ShotShareCard, { type ShotShareData } from "./ShotShareCard";
+import ShotsReel from "./ShotsReel";
 import { CrewBetPost, CrewResultPost, CrewTipPost } from "./CrewPosts";
 import { MOCK_CREW_POSTS, type MockCrewPost } from "./mock-crew-posts";
 const ReelGroup = dynamic(() => import("./ReelGroup"), {
@@ -453,10 +454,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, [scrolledIntoFeed]);
-  type FilterMode = "all" | "smart" | "best" | "worst";
+  type FilterMode = "all" | "smart";
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
-  /** Shot-share modal state — opens when a Best/Worst row's Share
-   *  button is tapped. */
+  /** Shot-share modal state — opens when a notable-shot Share
+   *  button is tapped (inline on a feed shot card). The Shots-of-
+   *  the-day reel manages its own share modal internally. */
   const [shotShare, setShotShare] = useState<ShotShareData | null>(null);
   const [follows, setFollowsState] = useState<string[]>([]);
   // Tracked bets loaded from localStorage on mount + whenever they
@@ -868,12 +870,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     if (b.settledAt != null) continue;
     if ("playerId" in b && b.playerId) trackedPlayerIds.add(b.playerId);
   }
-  // Smart mode filters to shots that touch a tracked-bet player.
-  // Best / Worst use the curated reels from /api/feed — no bet
-  // posts, no crew posts, just the headline-worthy shots.
+  // Smart mode filters to shots that touch a tracked-bet player;
+  // everything else stays in the regular interleaved stream.
+  // Best/Worst-of-day live in the inline ShotsReel further down,
+  // not as feed filters anymore.
   const visibleRows = (() => {
-    if (filterMode === "best") return data.bestReel ?? [];
-    if (filterMode === "worst") return data.worstReel ?? [];
     if (filterMode === "smart") {
       return rowsAfterPollFilter.filter((r) =>
         trackedPlayerIds.has(r.event.playerId),
@@ -899,14 +900,13 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       }
     | { kind: "crew"; ts: number; post: MockCrewPost };
   const timeline: TimelineItem[] = [];
-  const isReelMode = filterMode === "best" || filterMode === "worst";
   for (const row of visibleRows) {
     timeline.push({ kind: "shot", ts: row.event.ts, row });
   }
   // Mock crew posts — bet-as-post entries from fictional members so
   // the Sweat Feed reads as a bet-driven stream until Groups is wired.
-  // Smart-feed AND reel modes hide them — Smart stays honest to your
-  // own bets; reels are curated shot-only.
+  // Smart-feed mode hides them — keeps that filter honest to the
+  // user's own bets.
   if (filterMode === "all") {
     const now = Date.now();
     for (const post of MOCK_CREW_POSTS) {
@@ -914,7 +914,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     }
   }
   for (const bet of trackedBets) {
-    if (isReelMode) break;
     if (bet.settledAt != null) continue;
     if (
       bet.kind !== "outright" &&
@@ -984,38 +983,19 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
       <main className="feed-main">
 
-      {/* Filter row — four pills.
-            All           — interleaved bet posts + crew + shots.
-            ⛳ Best of day — curated highlight reel (eagles, hole-outs,
-                            long putts) from /api/feed.bestReel.
-            💀 Worst of day — blow-ups, 3-putts, penalty drops.
-            ✦ Smart       — shots that touch a tracked-bet player,
-                            plus own + crew bet posts.
-          Smart pill is conditional on having a tracked bet — pointless
-          to show "filter to bet relevance" when there are no bets. */}
-      <div className="feed-filter-row">
-        <button
-          type="button"
-          className={`feed-filter-btn ${filterMode === "all" ? "feed-filter-on" : ""}`}
-          onClick={() => setFilterMode("all")}
-        >
-          All
-        </button>
-        <button
-          type="button"
-          className={`feed-filter-btn ${filterMode === "best" ? "feed-filter-on" : ""}`}
-          onClick={() => setFilterMode("best")}
-        >
-          ⛳ Best of day
-        </button>
-        <button
-          type="button"
-          className={`feed-filter-btn ${filterMode === "worst" ? "feed-filter-on" : ""}`}
-          onClick={() => setFilterMode("worst")}
-        >
-          💀 Worst of day
-        </button>
-        {trackedPlayerIds.size > 0 && (
+      {/* Filter row — All / ✦ Smart. Smart only renders when the
+          user has a tracked bet (no point offering bet-relevance
+          when there's nothing to be relevant to). Best/Worst lives
+          inline in the ShotsReel further down. */}
+      {trackedPlayerIds.size > 0 && (
+        <div className="feed-filter-row">
+          <button
+            type="button"
+            className={`feed-filter-btn ${filterMode === "all" ? "feed-filter-on" : ""}`}
+            onClick={() => setFilterMode("all")}
+          >
+            All
+          </button>
           <button
             type="button"
             className={`feed-filter-btn ${filterMode === "smart" ? "feed-filter-on" : ""}`}
@@ -1023,25 +1003,40 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
           >
             ✦ Smart
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {data.rows.length === 0 ? (
         <FeedWarmingUp leaderboard={data.leaderboard} />
       ) : timeline.length === 0 ? (
-        // Filter active but nothing in it. Different copy per mode.
         <p className="feed-empty">
           {filterMode === "smart"
             ? "No bet-relevant updates yet — your players are quiet right now. Tap All to see the whole feed."
-            : filterMode === "best"
-              ? "No standout shots in the highlight reel yet — the round's still warming up."
-              : filterMode === "worst"
-                ? "No blow-ups to show off (yet). Round still in progress."
-                : "No updates yet."}
+            : "No updates yet."}
         </p>
       ) : (
         <ul className="feed-list">
-          {timeline.map((__item) => {
+          {timeline.map((__item, __idx) => {
+            // After the first 4 timeline items, splice in the
+            // "Shots of the day" reel as a full-width inline strip.
+            // Sits partway down the feed (not pinned at top, not
+            // tucked into a desktop sidebar).
+            const reelHere =
+              __idx === 4 &&
+              ((data.bestReel?.length ?? 0) > 0 ||
+                (data.worstReel?.length ?? 0) > 0) ? (
+                <li className="feed-row-wrap" key="shots-reel">
+                  <ShotsReel
+                    best={data.bestReel ?? []}
+                    worst={data.worstReel ?? []}
+                    tournamentLabel={
+                      data.tournament
+                        ? `${data.tournament.name} · Live`
+                        : "Live"
+                    }
+                  />
+                </li>
+              ) : null;
             // ── Bet post branch ────────────────────────────────────
             // Tracked bets render inline among shot rows. Sort ts is
             // either the player's most recent shot or placedAt — see
@@ -1053,23 +1048,25 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                 .filter((r) => r.event.playerId === __playerId)
                 .slice(0, 3);
               return (
-                <li
-                  key={`bet:${__bet.id}`}
-                  data-bet-id={__bet.id}
-                  className="feed-row-wrap"
-                >
-                  <BetPostErrorBoundary label={__bet.id}>
-                    <BetPost
-                      bet={__bet}
-                      currentOdds={data.currentOdds}
-                      topFinishCurrent={data.topFinishCurrent}
-                      recentRowsForPlayer={__rowsForPlayer}
-                      oddsHistory={
-                        data.oddsHistories?.[__playerId] ?? null
-                      }
-                    />
-                  </BetPostErrorBoundary>
-                </li>
+                <Fragment key={`bet:${__bet.id}`}>
+                  {reelHere}
+                  <li
+                    data-bet-id={__bet.id}
+                    className="feed-row-wrap"
+                  >
+                    <BetPostErrorBoundary label={__bet.id}>
+                      <BetPost
+                        bet={__bet}
+                        currentOdds={data.currentOdds}
+                        topFinishCurrent={data.topFinishCurrent}
+                        recentRowsForPlayer={__rowsForPlayer}
+                        oddsHistory={
+                          data.oddsHistories?.[__playerId] ?? null
+                        }
+                      />
+                    </BetPostErrorBoundary>
+                  </li>
+                </Fragment>
               );
             }
             // ── Crew-post branch ──────────────────────────────────
@@ -1077,11 +1074,14 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
             if (__item.kind === "crew") {
               const p = __item.post;
               return (
-                <li key={`crew:${p.id}`} className="feed-row-wrap">
-                  {p.kind === "crew-bet" && <CrewBetPost post={p} />}
-                  {p.kind === "crew-result" && <CrewResultPost post={p} />}
-                  {p.kind === "crew-tip" && <CrewTipPost post={p} />}
-                </li>
+                <Fragment key={`crew:${p.id}`}>
+                  {reelHere}
+                  <li className="feed-row-wrap">
+                    {p.kind === "crew-bet" && <CrewBetPost post={p} />}
+                    {p.kind === "crew-result" && <CrewResultPost post={p} />}
+                    {p.kind === "crew-tip" && <CrewTipPost post={p} />}
+                  </li>
+                </Fragment>
               );
             }
             const { event, reactions, commentCount } = __item.row;
@@ -1095,58 +1095,66 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
               if (t.startsWith("🔥 going off")) return false;
               return true;
             });
+            // Notable shots (highlight or lowlight from the engine)
+            // get an inline Share button + a small shot diagram.
+            const isNotable =
+              event.highlight === true || event.lowlight === true;
             return (
-              <li
-                key={event.id}
-                data-event-id={event.id}
-                className="feed-row-wrap"
-              >
-                <ShotPost
-                  event={event}
-                  reactions={reactions}
-                  commentCount={count}
-                  myReaction={myReaction}
-                  onReact={sendReaction}
-                  contextTag={primaryContextTag}
-                  handStatus={data.handStatus?.[event.playerId] ?? null}
-                  onShare={
-                    filterMode === "best" || filterMode === "worst"
-                      ? (ev) => {
-                          const tagWord = (() => {
-                            if (ev.ace) return "ACE";
-                            switch (ev.result) {
-                              case "albatross":
-                                return "ALBATROSS";
-                              case "eagle":
-                                return "EAGLE";
-                              case "birdie":
-                                return "BIRDIE";
-                              case "bogey":
-                                return "BOGEY";
-                              case "double":
-                                return "DOUBLE";
-                              case "triple-plus":
-                                return "BLOW-UP";
-                              default:
-                                return undefined;
-                            }
-                          })();
-                          setShotShare({
-                            kind: filterMode === "best" ? "best" : "worst",
-                            headline: ev.headline ?? "",
-                            player: ev.playerName,
-                            hole: typeof ev.hole === "number" ? ev.hole : null,
-                            toPar: ev.toPar ?? null,
-                            tag: tagWord,
-                            tournamentLabel: data.tournament
-                              ? `${data.tournament.name} · R${ev.round ?? 4}`
-                              : "Live",
-                          });
-                        }
-                      : undefined
-                  }
-                />
-              </li>
+              <Fragment key={event.id}>
+                {reelHere}
+                <li
+                  data-event-id={event.id}
+                  className="feed-row-wrap"
+                >
+                  <ShotPost
+                    event={event}
+                    reactions={reactions}
+                    commentCount={count}
+                    myReaction={myReaction}
+                    onReact={sendReaction}
+                    contextTag={primaryContextTag}
+                    handStatus={data.handStatus?.[event.playerId] ?? null}
+                    onShare={
+                      isNotable
+                        ? (ev) => {
+                            const tagWord = (() => {
+                              if (ev.ace) return "ACE";
+                              switch (ev.result) {
+                                case "albatross":
+                                  return "ALBATROSS";
+                                case "eagle":
+                                  return "EAGLE";
+                                case "birdie":
+                                  return "BIRDIE";
+                                case "bogey":
+                                  return "BOGEY";
+                                case "double":
+                                  return "DOUBLE";
+                                case "triple-plus":
+                                  return "BLOW-UP";
+                                default:
+                                  return undefined;
+                              }
+                            })();
+                            setShotShare({
+                              kind: ev.lowlight ? "worst" : "best",
+                              headline: ev.headline ?? "",
+                              player: ev.playerName,
+                              hole:
+                                typeof ev.hole === "number" ? ev.hole : null,
+                              toPar: ev.toPar ?? null,
+                              tag: tagWord,
+                              tournamentLabel: data.tournament
+                                ? `${data.tournament.name} · R${ev.round ?? 4}`
+                                : "Live",
+                            });
+                          }
+                        : undefined
+                    }
+                    showDiagram={isNotable}
+                  />
+                </li>
+              </Fragment>
             );
           })}
         </ul>

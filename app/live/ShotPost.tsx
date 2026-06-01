@@ -25,6 +25,7 @@ import Link from "next/link";
 import PlayerAvatar from "./PlayerAvatar";
 import type { FeedEvent } from "@/lib/feed/types";
 import { abbreviateName } from "@/lib/text/abbreviate";
+import ShotDiagram from "./ShotDiagram";
 
 interface Props {
   event: FeedEvent;
@@ -39,9 +40,13 @@ interface Props {
    *  suffix beside the name. */
   handStatus?: "hot" | "cold" | null;
   /** When set, surfaces a Share button on the row that fires this
-   *  callback. Used by the Best-of-day / Worst-of-day filters so
-   *  the highlight-reel cards get a one-tap share affordance. */
+   *  callback. Used on notable shots (highlight / lowlight) so they
+   *  get a one-tap share affordance. */
   onShare?: (event: FeedEvent) => void;
+  /** Render a small shot-diagram thumbnail beside the body. Drives
+   *  the prototype's "we drew the hole next to the headline" feel
+   *  back into the redesigned feed. */
+  showDiagram?: boolean;
 }
 
 /** Map ScoreResult onto the prototype's tag class + label. The
@@ -86,6 +91,7 @@ export default function ShotPost({
   contextTag,
   handStatus,
   onShare,
+  showDiagram,
 }: Props) {
   const tag = tagFor(event);
   const reactCount = (reactions?.up ?? 0) + (reactions?.down ?? 0);
@@ -145,9 +151,20 @@ export default function ShotPost({
             </span>
           )}
         </div>
-        <p className="spost-text">
-          {stripPlayerName(event.headline ?? "", event.playerName)}
-        </p>
+        {showDiagram ? (
+          <div className="spost-text-row">
+            <p className="spost-text spost-text-flex">
+              {stripPlayerName(event.headline ?? "", event.playerName)}
+            </p>
+            <div className="spost-diagram">
+              <ShotDiagram event={event} size="thumb" />
+            </div>
+          </div>
+        ) : (
+          <p className="spost-text">
+            {stripPlayerName(event.headline ?? "", event.playerName)}
+          </p>
+        )}
         <div className="spost-react">
           <button
             type="button"
