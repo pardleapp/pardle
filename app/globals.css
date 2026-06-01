@@ -19087,22 +19087,28 @@ body:has(.v4-theme) {
   font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
 }
 
-/* Make the body itself paper-light when the feed page is mounted.
-   Targets the body via the html.pv-theme-body class which FeedClient
-   stamps on mount + clears on unmount. Avoids a global body color
-   that would leak into /bets, /sharp etc. */
+/* Make the body itself paper-light when a pv-theme'd surface is
+   mounted. Need !important here to beat:
+     1. .v4-theme { background:#000 !important } at line 14715
+     2. html:has(.v4-theme) / body:has(.v4-theme) { background:#000
+        !important } at line 14725-28
+   Both of those keep the viewport black whenever any .v4-theme
+   element exists in the DOM, which is true on all our pages today.
+   Scoped to html.pv-theme-body so /sharp, /leaderboard etc. (which
+   haven't been migrated yet) keep their black canvas. */
 html.pv-theme-body,
-html.pv-theme-body body {
-  background: oklch(0.972 0.009 95);
+html.pv-theme-body body,
+html.pv-theme-body:has(.v4-theme),
+html.pv-theme-body body:has(.v4-theme) {
+  background: oklch(0.972 0.009 95) !important;
 }
-/* The page wraps FeedClient in <main class="container container-wide
+/* The page wraps Feed/Bets in <main class="container container-wide
    v4-theme"> with its own dark background — kill that wrapper bg and
    re-skin the brand header + nav so the whole page reads as broadcast
-   paper while the feed is mounted. Scoped tightly to .pv-theme-body
-   so /bets, /sharp etc. stay dark until we migrate them. */
+   paper while a pv-theme'd surface is mounted. */
 html.pv-theme-body main.container.v4-theme,
 html.pv-theme-body main.container-wide.v4-theme {
-  background: oklch(0.972 0.009 95);
+  background: oklch(0.972 0.009 95) !important;
   color: oklch(0.26 0.04 155);
 }
 html.pv-theme-body .brand,
