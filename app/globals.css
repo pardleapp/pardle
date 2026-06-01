@@ -22041,6 +22041,211 @@ html.pv-theme-body .auth-chip-btn {
   box-shadow: 0 10px 26px oklch(0.4 0.06 145 / 0.14);
 }
 
+/* =============================================================
+   Leaderboard surface (/leaderboard) — prototype's <Leaderboard>
+   matched 1:1. Live event line + filter pills + column header +
+   rows. Rows with a tracked bet get the soft "mine" highlight;
+   followed players get the orange .fdot.
+   ============================================================= */
+.lb-pv {
+  background: transparent;
+  color: var(--pv-ink);
+  padding: 0 0 100px;
+}
+
+.lb-head {
+  padding: 15px 16px 2px;
+}
+.lb-head-ev {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pv-emerald-d);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.lb-head-ev i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pv-up);
+}
+.lb-head-title {
+  font-size: 22px;
+  font-weight: 900;
+  margin-top: 8px;
+  color: var(--pv-ink);
+  letter-spacing: -0.01em;
+}
+
+.lb-filter {
+  display: flex;
+  gap: 8px;
+  padding: 11px 16px 6px;
+}
+.lb-filter button {
+  border: 1px solid var(--pv-line);
+  background: var(--pv-card);
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--pv-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.lb-filter button.on {
+  background: var(--pv-ink);
+  color: #fff;
+  border-color: var(--pv-ink);
+}
+
+.lb-cols {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 16px 7px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--pv-dim);
+  border-bottom: 1px solid var(--pv-line);
+}
+.lb-col-pos { width: 30px; }
+.lb-col-av { width: 30px; }
+.lb-col-nm { flex: 1; }
+.lb-col-td { width: 42px; text-align: right; }
+.lb-col-tot { width: 42px; text-align: right; }
+.lb-col-thru { width: 24px; text-align: right; }
+
+.lb-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lb-row {
+  border-bottom: 1px solid var(--pv-line);
+}
+.lb-row-mine {
+  background: oklch(0.97 0.02 145);
+}
+.lb-row-btn {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  color: var(--pv-ink);
+}
+.lb-row-btn:active {
+  background: var(--pv-soft);
+}
+.lb-pos {
+  width: 30px;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pv-muted);
+}
+.lb-av {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #56b0e8, #3a4f9b);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+.lb-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lb-av-init {
+  font-size: 10px;
+  font-weight: 800;
+}
+.lb-nm {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--pv-ink);
+}
+.lb-nm-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.fdot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pv-follow);
+  flex-shrink: 0;
+}
+.bettag {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--pv-emerald-d);
+  background: oklch(0.92 0.06 150);
+  border-radius: 5px;
+  padding: 2px 6px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.lb-td {
+  width: 42px;
+  text-align: right;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 600;
+}
+.lb-td-up { color: var(--pv-up); }
+.lb-td-down { color: var(--pv-down); }
+.lb-td-flat { color: var(--pv-muted); }
+.lb-tot {
+  width: 42px;
+  text-align: right;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--pv-up);
+}
+.lb-tot-over { color: var(--pv-down); }
+.lb-thru {
+  width: 24px;
+  text-align: right;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--pv-dim);
+}
+
+.lb-empty {
+  padding: 32px 22px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--pv-muted);
+}
+
 /* "Your bets" section heading above the bet posts */
 .pv-theme .pv-section-label {
   font-size: 10.5px;
