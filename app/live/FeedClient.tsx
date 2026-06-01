@@ -51,8 +51,6 @@ import { useNotifications } from "./notifications/useNotifications";
 import PlayerAvatar from "./PlayerAvatar";
 import PlayerSearch from "./PlayerSearch";
 import PuttPollWidget from "./PuttPollWidget";
-import BetPost from "./BetPost";
-import BetPostErrorBoundary from "./BetPostErrorBoundary";
 const ReelGroup = dynamic(() => import("./ReelGroup"), {
   ssr: false,
   loading: () => null,
@@ -952,61 +950,9 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         </div>
       )}
 
-      {/* Tracked bets rendered as feed posts (Pass 2 of broadcast theme).
-          Sits above the shot feed so the user's open positions are the
-          first thing they see when the page paints. Each card shows
-          current live prob + direction + sparkline + threaded shot
-          updates for the bet's player.
-
-          Wrapped in an error boundary so a malformed bet doesn't kill
-          the rest of the feed. */}
-      <BetPostErrorBoundary label="bet-strip">
-        {(() => {
-          const activeBets = trackedBets.filter(
-            (b) =>
-              b.settledAt == null &&
-              (b.kind === "outright" ||
-                b.kind === "top-finish" ||
-                b.kind === "round-score"),
-          );
-          if (activeBets.length === 0) return null;
-          // Newest-first so the most recently placed sweat is on top.
-          const ordered = [...activeBets].sort(
-            (a, b) => (b.placedAt ?? 0) - (a.placedAt ?? 0),
-          );
-          return (
-            <div className="pv-bet-strip">
-              <div className="pv-section-label">Your bets · live</div>
-              <div className="pv-bet-strip-list">
-                {ordered.map((bet) => {
-                  const playerId =
-                    "playerId" in bet ? (bet.playerId as string) : "";
-                  const rowsForPlayer = playerId
-                    ? data.rows
-                        .filter((r) => r.event.playerId === playerId)
-                        .slice(0, 3)
-                    : [];
-                  return (
-                    <BetPostErrorBoundary key={bet.id} label={bet.id}>
-                      <BetPost
-                        bet={bet}
-                        currentOdds={data.currentOdds}
-                        topFinishCurrent={data.topFinishCurrent}
-                        recentRowsForPlayer={rowsForPlayer}
-                        oddsHistory={
-                          playerId
-                            ? data.oddsHistories[playerId] ?? null
-                            : null
-                        }
-                      />
-                    </BetPostErrorBoundary>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
-      </BetPostErrorBoundary>
+      {/* TEMPORARILY DISABLED — bet-strip render crashed on something
+          in the user's bet data. Isolating to confirm whether the
+          crash is in BetPost vs elsewhere in pass 2. */}
 
       {data.rows.length === 0 ? (
         <FeedWarmingUp leaderboard={data.leaderboard} />
