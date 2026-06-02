@@ -26,7 +26,7 @@ import PlayerAvatar from "./PlayerAvatar";
 import type { FeedEvent } from "@/lib/feed/types";
 import { abbreviateName } from "@/lib/text/abbreviate";
 import ShotDiagram from "./ShotDiagram";
-import HoldReactPicker from "./HoldReactPicker";
+import { useHoldReact } from "./useHoldReact";
 
 interface Props {
   event: FeedEvent;
@@ -101,17 +101,26 @@ export default function ShotPost({
 }: Props) {
   const tag = tagFor(event);
   const reactCount = (reactions?.up ?? 0) + (reactions?.down ?? 0);
-  const onTapLike = () => onReact(event.id, "up");
-  const onHoldPick = (emoji: string) => {
-    // Treat the picked emoji as a "burst" the parent fires through
-    // the existing float-up animation. Also bump the local like
-    // counter so the user gets immediate feedback on the count.
+  const onLikeClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     onReact(event.id, "up");
-    onCustomReact?.(emoji);
   };
+  // Whole-card press-and-hold → tray. Quick tap on the body opens
+  // the ShotDetail when one's available; nested buttons (like /
+  // comment) keep their own clicks via the hook's button-skip.
+  const { surfaceProps, tray } = useHoldReact({
+    onReact: (emoji) => {
+      // Picking an emoji also counts as an implicit like — the
+      // parent's float-up burst handles the animation.
+      onReact(event.id, "up");
+      onCustomReact?.(emoji);
+    },
+    onTap: onShare ? () => onShare(event) : undefined,
+  });
 
   return (
-    <article className="post spost" data-event-id={event.id}>
+    <>
+    <article className="post spost" data-event-id={event.id} {...surfaceProps}>
       <Link
         href={`/live/player/${event.playerId}`}
         className="spost-avatar"
@@ -175,13 +184,27 @@ export default function ShotPost({
           </p>
         )}
         <div className="spost-react">
-          <HoldReactPicker
-            onTap={onTapLike}
-            onReact={onHoldPick}
-            count={reactCount}
-            active={myReaction === "up"}
-            ariaLabel="React — tap to like, hold to pick an emoji"
-          />
+          <button
+            type="button"
+            className={`spost-act${myReaction === "up" ? " spost-act-on" : ""}`}
+            onClick={onLikeClick}
+            aria-label="Like"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.9"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              width="15"
+              height="15"
+            >
+              <path d="M7 10v11" />
+              <path d="M7 10l4-7a2 2 0 0 1 3 1.7V9h4.5a2 2 0 0 1 2 2.4l-1.4 7A2 2 0 0 1 17 20H7" />
+            </svg>
+            <span>{reactCount}</span>
+          </button>
           <button type="button" className="spost-act" aria-label="Comments">
             <svg
               viewBox="0 0 24 24"
@@ -197,37 +220,11 @@ export default function ShotPost({
             </svg>
             <span>{commentCount}</span>
           </button>
-          {onShare && (
-            <button
-              type="button"
-              className="spost-act spost-act-share"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onShare(event);
-              }}
-              aria-label="Share this shot"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.9"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                width="15"
-                height="15"
-              >
-                <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
-                <path d="M16 6l-4-4-4 4" />
-                <path d="M12 2v14" />
-              </svg>
-              <span>Share</span>
-            </button>
-          )}
           {contextTag && <span className="spost-ctx">{contextTag}</span>}
         </div>
       </div>
     </article>
+    {tray}
+    </>
   );
 }

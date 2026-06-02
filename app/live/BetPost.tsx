@@ -17,9 +17,13 @@ import {
   normaliseBetCurrency,
 } from "@/lib/format/bet-currency";
 import { betKindShortLabel } from "./bet-impact";
+import { useHoldReact } from "./useHoldReact";
 
 interface BetPostProps {
   bet: TrackedBet;
+  /** Hold-and-pick reaction callback — parent triggers the float-up
+   *  burst (same plumbing the ShotPost / CrewBetPost surfaces use). */
+  onCustomReact?: (emoji: string) => void;
   currentOdds: Record<string, number>;
   topFinishCurrent?: Record<
     string,
@@ -56,8 +60,15 @@ export default function BetPost({
   currentOdds,
   topFinishCurrent,
   recentRowsForPlayer,
+  onCustomReact,
 }: BetPostProps) {
   const betId = safe("read id", () => String(bet?.id ?? "?"), "?", "?");
+  // Whole-card press-and-hold → emoji tray. Quick tap = Link nav
+  // (the Link handles it natively); the hook's onTap is undefined
+  // because the link already covers that case.
+  const { surfaceProps, tray } = useHoldReact({
+    onReact: (emoji) => onCustomReact?.(emoji),
+  });
 
   const playerName = safe(
     "read playerName",
@@ -160,9 +171,11 @@ export default function BetPost({
   }
 
   return (
+    <>
     <Link
       href={`/live/bet/${betId}`}
       className={`post bpost${dir === "down" ? " down" : ""}`}
+      {...surfaceProps}
     >
       <div className="bp-head">
         <PlayerAvatar
@@ -214,5 +227,7 @@ export default function BetPost({
         </div>
       )}
     </Link>
+    {tray}
+    </>
   );
 }

@@ -1094,6 +1094,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                         oddsHistory={
                           data.oddsHistories?.[__playerId] ?? null
                         }
+                        onCustomReact={(emoji) => void sendBurst(emoji)}
                       />
                     </BetPostErrorBoundary>
                   </li>
@@ -1108,9 +1109,24 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                 <Fragment key={`crew:${p.id}`}>
                   {reelHere}
                   <li className="feed-row-wrap">
-                    {p.kind === "crew-bet" && <CrewBetPost post={p} />}
-                    {p.kind === "crew-result" && <CrewResultPost post={p} />}
-                    {p.kind === "crew-tip" && <CrewTipPost post={p} />}
+                    {p.kind === "crew-bet" && (
+                      <CrewBetPost
+                        post={p}
+                        onCustomReact={(emoji) => void sendBurst(emoji)}
+                      />
+                    )}
+                    {p.kind === "crew-result" && (
+                      <CrewResultPost
+                        post={p}
+                        onCustomReact={(emoji) => void sendBurst(emoji)}
+                      />
+                    )}
+                    {p.kind === "crew-tip" && (
+                      <CrewTipPost
+                        post={p}
+                        onCustomReact={(emoji) => void sendBurst(emoji)}
+                      />
+                    )}
                   </li>
                 </Fragment>
               );

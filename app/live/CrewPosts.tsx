@@ -17,6 +17,7 @@ import type {
   MockResultPost,
   MockTipPost,
 } from "./mock-crew-posts";
+import { useHoldReact } from "./useHoldReact";
 
 const PALETTE: Record<string, string> = {
   JO: "linear-gradient(135deg,#5cd7c1,#1f8b6e)",
@@ -104,7 +105,16 @@ function Spark({
   );
 }
 
-export function CrewBetPost({ post }: { post: MockBetPost }) {
+export function CrewBetPost({
+  post,
+  onCustomReact,
+}: {
+  post: MockBetPost;
+  onCustomReact?: (emoji: string) => void;
+}) {
+  const { surfaceProps, tray } = useHoldReact({
+    onReact: (emoji) => onCustomReact?.(emoji),
+  });
   const dirClass = post.dir;
   const probColor =
     post.dir === "down"
@@ -113,9 +123,11 @@ export function CrewBetPost({ post }: { post: MockBetPost }) {
         ? "var(--pv-up)"
         : "var(--pv-ink)";
   return (
+    <>
     <article
       className={`post bpost${post.dir === "down" ? " down" : ""}`}
       data-crew-id={post.id}
+      {...surfaceProps}
     >
       <div className="bp-head">
         <MiniAv initials={post.bettorInitials} size={38} />
@@ -213,14 +225,27 @@ export function CrewBetPost({ post }: { post: MockBetPost }) {
         )}
       </div>
     </article>
+    {tray}
+    </>
   );
 }
 
-export function CrewResultPost({ post }: { post: MockResultPost }) {
+export function CrewResultPost({
+  post,
+  onCustomReact,
+}: {
+  post: MockResultPost;
+  onCustomReact?: (emoji: string) => void;
+}) {
+  const { surfaceProps, tray } = useHoldReact({
+    onReact: (emoji) => onCustomReact?.(emoji),
+  });
   return (
+    <>
     <article
       className={`post rpost${post.win ? "" : " loss"}`}
       data-crew-id={post.id}
+      {...surfaceProps}
     >
       <div className="rp-top">
         <MiniAv initials={post.bettorInitials} size={38} />
@@ -233,12 +258,24 @@ export function CrewResultPost({ post }: { post: MockResultPost }) {
         </div>
       </div>
     </article>
+    {tray}
+    </>
   );
 }
 
-export function CrewTipPost({ post }: { post: MockTipPost }) {
+export function CrewTipPost({
+  post,
+  onCustomReact,
+}: {
+  post: MockTipPost;
+  onCustomReact?: (emoji: string) => void;
+}) {
+  const { surfaceProps, tray } = useHoldReact({
+    onReact: (emoji) => onCustomReact?.(emoji),
+  });
   return (
-    <article className="post tpost" data-crew-id={post.id}>
+    <>
+    <article className="post tpost" data-crew-id={post.id} {...surfaceProps}>
       <div className="tp-head">
         <MiniAv initials="GE" size={34} />
         <span className="tp-by">
@@ -259,5 +296,7 @@ export function CrewTipPost({ post }: { post: MockTipPost }) {
         ＋ Track this tip
       </button>
     </article>
+    {tray}
+    </>
   );
 }
