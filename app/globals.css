@@ -24822,3 +24822,185 @@ html.pv-theme-body .auth-chip-btn {
   background: var(--pv-soft);
 }
 
+/* =============================================================
+   GamesHub overlay — daily-puzzle hub opened from the Sweat Feed
+   header's controller icon. Reconciled against the prototype's
+   GamesHub component (design-handoff/Pardle Social v2.html
+   L528–538) and the gm-* + detail-* styles in social-v2.css
+   (L515–524, L195–210). Uses the light .pv tokens; never falls
+   back to the old dark theme.
+   ============================================================= */
+.gh {
+  position: fixed;
+  inset: 0;
+  background: var(--pv-bg);
+  z-index: 78;
+  display: flex;
+  flex-direction: column;
+  animation: gh-slide-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
+  color: var(--pv-ink);
+}
+@keyframes gh-slide-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.gh-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--pv-line);
+  background: var(--pv-bg);
+}
+.gh-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.gh-body::-webkit-scrollbar {
+  width: 0;
+}
+
+/* Streak banner — tang-tinted bar from social-v2.css L515-516. */
+.gm-streak {
+  margin: 14px 16px 4px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: oklch(0.96 0.04 60);
+  border: 1px solid oklch(0.88 0.07 60);
+  font-size: 12.5px;
+  color: var(--pv-ink);
+  font-weight: 600;
+  line-height: 1.4;
+}
+.gm-streak b {
+  color: var(--pv-tang);
+}
+
+/* 2-col game grid — prototype L517-524. */
+.gm-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 12px 16px;
+}
+.gm-card {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 14px;
+  padding: 14px;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--pv-ink);
+  display: block;
+  min-height: 44px;
+  transition: background 0.12s ease, transform 0.1s ease;
+}
+.gm-card:hover {
+  background: var(--pv-soft);
+}
+.gm-card:active {
+  transform: scale(0.99);
+}
+.gm-ic {
+  font-size: 26px;
+  line-height: 1;
+}
+.gm-nm {
+  font-size: 15px;
+  font-weight: 800;
+  margin-top: 8px;
+}
+.gm-desc {
+  font-size: 11.5px;
+  color: var(--pv-muted);
+  margin-top: 3px;
+  line-height: 1.35;
+  min-height: 31px;
+}
+.gm-state {
+  margin-top: 10px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--pv-emerald-d);
+  background: var(--pv-soft);
+  border-radius: 999px;
+  padding: 5px 10px;
+  display: inline-block;
+}
+.gm-state-done {
+  background: oklch(0.93 0.06 150);
+}
+
+/* Crew challenge board section — reuses .racerow already in
+   globals (Groups standings). */
+.gh-sec {
+  padding: 16px;
+  border-top: 1px solid var(--pv-line);
+  margin-top: 8px;
+}
+.gh-sec-title {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pv-dim);
+  margin-bottom: 11px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gh-board {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 14px;
+  padding: 6px;
+}
+.gh-av {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+.gh-score {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pv-ink);
+  font-variant-numeric: tabular-nums;
+}
+.gh-score-x {
+  color: var(--pv-down);
+}
+.gh-challenge-btn {
+  background: var(--pv-emerald);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+  margin-top: 12px;
+  min-height: 44px;
+  transition: background 0.12s ease;
+}
+.gh-challenge-btn:hover {
+  background: var(--pv-emerald-d);
+}
+
