@@ -1,29 +1,34 @@
 "use client";
 
 /**
- * ReactionChips — pill cluster + ＋ react affordance, rendered as
- * the left half of a card's single action row.
+ * ReactionChips — pill cluster + always-visible ＋ react affordance.
+ * Sits on the left of a card's single action row.
  *
- *   🔥 12   😱 4   ⛳ 3   👏 2   ＋
+ *   ┌─ scrolls horizontally ────────────────┐
+ *   │ 🔥 12   😱 4   ⛳ 3   👏 2   +N        │  ＋
+ *   └────────────────────────────────────────┘
  *
- * Pills are sorted by count descending; the caller's own reactions
- * get an emerald-tint variant. Tapping a pill toggles the caller's
- * reaction for that emoji. The ＋ button at the end calls `onAdd`
- * with the button's centre point so the parent can pop the hold-
- * react tray anchored to it — a visible replacement for the old
- * 👍 thumb button (every reaction is just another emoji now).
+ * Layout: `.rxn-group` is the flex item the parent .post-act-row
+ * places. Inside, `.rxn-pills` is the inner scrollable container
+ * that holds pills + overflow chip; the ＋ button sits OUTSIDE
+ * that scroller so it's always visible even on cards with many
+ * reactions. Pills scroll horizontally as a safety so nothing
+ * ever clips mid-pill; in practice we cap at 4 visible chips with
+ * a +N overflow chip for the rest.
  *
- * Capped to 5 visible chips; any overflow collapses into a "+N"
- * indicator (non-interactive).
+ * Tapping a pill toggles the caller's reaction; the ＋ button
+ * calls `onAdd` with its viewport-centre point so the parent can
+ * anchor the hold-react tray to it.
  *
- * The container is horizontally scrollable when pills overflow —
- * the wider action row pins the comment / Tail buttons on the
- * right while this region scrolls under them.
+ * Matches the prototype's BetPost / ShotPost foot intent — the
+ * old 👍 `.act` button has been retired (every reaction is just
+ * another emoji now). See design-handoff/Pardle Social v2.html
+ * lines 297-302 and social-v2.css `.bp-foot` / `.tailbtn`.
  */
 
 import type React from "react";
 
-const MAX_VISIBLE = 5;
+const MAX_VISIBLE = 4;
 
 export interface ReactionState {
   /** Emoji → count map. */
@@ -61,36 +66,41 @@ export default function ReactionChips({ state, onToggle, onAdd }: Props) {
   };
 
   return (
-    <div className="rxn-chips" data-no-hold>
-      {visible.map(([emoji, count]) => {
-        const isMine = mineSet.has(emoji);
-        return (
-          <button
-            key={emoji}
-            type="button"
-            className={`rxn-chip${isMine ? " rxn-chip-mine" : ""}`}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onToggle(emoji);
-            }}
-            aria-pressed={isMine}
-            aria-label={`${emoji} ${count} reactions${
-              isMine ? " — you reacted" : ""
-            }`}
+    <div className="rxn-group" data-no-hold>
+      <div className="rxn-pills">
+        {visible.map(([emoji, count]) => {
+          const isMine = mineSet.has(emoji);
+          return (
+            <button
+              key={emoji}
+              type="button"
+              className={`rxn-chip${isMine ? " rxn-chip-mine" : ""}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggle(emoji);
+              }}
+              aria-pressed={isMine}
+              aria-label={`${emoji} ${count} reactions${
+                isMine ? " — you reacted" : ""
+              }`}
+            >
+              <span className="rxn-chip-emoji" aria-hidden="true">
+                {emoji}
+              </span>
+              <span className="rxn-chip-count">{count}</span>
+            </button>
+          );
+        })}
+        {overflow > 0 && (
+          <span
+            className="rxn-chip rxn-chip-overflow"
+            aria-label={`${overflow} more`}
           >
-            <span className="rxn-chip-emoji" aria-hidden="true">
-              {emoji}
-            </span>
-            <span className="rxn-chip-count">{count}</span>
-          </button>
-        );
-      })}
-      {overflow > 0 && (
-        <span className="rxn-chip rxn-chip-overflow" aria-label={`${overflow} more`}>
-          +{overflow}
-        </span>
-      )}
+            +{overflow}
+          </span>
+        )}
+      </div>
       <button
         type="button"
         className="rxn-chip-add"

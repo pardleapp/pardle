@@ -208,24 +208,26 @@ export function CrewBetPost({
             </svg>
             <span>{post.commentCount}</span>
           </button>
-          {!post.mine && (
-            <button
-              type="button"
-              className="post-act-tail"
-              data-no-hold
-            >
-              Tail
-            </button>
-          )}
-          {post.on.length > 0 && (
-            <span className="bp-foot-on">
-              <span className="bp-foot-on-row">
-                {post.on.map((init) => (
-                  <MiniAv key={init} initials={init} size={22} />
-                ))}
-              </span>
-              <span className="bp-foot-on-lbl">{post.on.length} on it</span>
-            </span>
+          {(!post.mine || post.on.length > 0) && (
+            <div className="post-act-tail-grp" data-no-hold>
+              {!post.mine && (
+                <button type="button" className="post-act-tail">
+                  Tail
+                </button>
+              )}
+              {post.on.length > 0 && (
+                <span className="bp-foot-on">
+                  <span className="bp-foot-on-row">
+                    {post.on.map((init) => (
+                      <MiniAv key={init} initials={init} size={22} />
+                    ))}
+                  </span>
+                  <span className="bp-foot-on-lbl">
+                    {post.on.length} on it
+                  </span>
+                </span>
+              )}
+            </div>
           )}
         </div>
       )}

@@ -23634,18 +23634,29 @@ html.pv-theme-body .auth-chip-btn {
 
 /* =============================================================
    Single action row on every feed card. Replaces the legacy
-   .spost-react / .bp-foot two-row layouts. Pills + ＋ react on
-   the left (scrolls horizontally when crowded); 💬 / Tail / tail-
-   avatars pinned on the right.
+   .spost-react / .bp-foot two-row layouts.
+   Left→right:
+     [rxn-group: scrolling pills | always-visible ＋]
+       💬 N
+       [tail-group: Tail · "N on it" avatars]   (margin-left:auto)
+   The ＋ sits outside the scrolling .rxn-pills inner element so
+   it's always visible even when the pills overflow.
    ============================================================= */
 .post-act-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 12px;
   min-width: 0;
 }
-.rxn-chips {
+.rxn-group {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.rxn-pills {
   display: flex;
   flex: 1 1 auto;
   align-items: center;
@@ -23655,7 +23666,7 @@ html.pv-theme-body .auth-chip-btn {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
-.rxn-chips::-webkit-scrollbar {
+.rxn-pills::-webkit-scrollbar {
   display: none;
 }
 .rxn-chip,
@@ -23761,31 +23772,58 @@ html.pv-theme-body .auth-chip-btn {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
+/* Tail-group bundles the Tail button with the "N on it" avatars.
+   The two are the same concept — who's also riding this bet — so
+   they sit together and float right via margin-left:auto. */
+.post-act-tail-grp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.post-act-tail-grp .bp-foot-on {
+  margin-left: 0;
+}
+/* Ghost Tail button — emerald outline, transparent fill. Matches
+   prototype .tailbtn (social-v2.css L91). Solid-green fill is
+   reserved for the post-tap "done" confirmation state. */
 .post-act-tail {
   flex-shrink: 0;
-  padding: 4px 12px;
+  padding: 6px 13px;
   border-radius: 999px;
-  background: var(--pv-emerald);
+  background: transparent;
   border: 1px solid var(--pv-emerald);
-  color: #fff;
+  color: var(--pv-emerald);
   font-family: inherit;
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.02em;
   cursor: pointer;
-  transition: transform 0.1s ease, background 0.12s ease;
+  transition: transform 0.1s ease, background 0.12s ease,
+    color 0.12s ease;
 }
 .post-act-tail:hover {
-  background: var(--pv-emerald-d);
+  background: var(--pv-soft);
 }
 .post-act-tail:active {
   transform: scale(0.96);
 }
+.post-act-tail.done {
+  background: var(--pv-emerald);
+  color: #fff;
+}
+/* Shot-card right-aligned context chip — pill-shaped, soft fill,
+   matches prototype .ctxchip (social-v2.css L110). */
 .post-act-ctx {
   flex-shrink: 0;
+  margin-left: auto;
   font-size: 11px;
+  font-weight: 600;
   color: var(--pv-muted);
-  max-width: 40%;
+  background: var(--pv-soft);
+  border-radius: 999px;
+  padding: 5px 10px;
+  max-width: 50%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
