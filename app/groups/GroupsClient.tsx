@@ -29,12 +29,20 @@ import {
   RACE,
   MEMBERS,
   MOST_POPULAR,
-  GROUP_NAME,
-  GROUP_INVITE,
-  GROUP_MEMBER_COUNT,
 } from "./mock-groups";
 import MemberProfile from "./MemberProfile";
 import RaceSheet from "./RaceSheet";
+
+/** Real group data fetched server-side and passed into the client.
+ *  Step 2: header reads from real DB; standings/most-backed/members
+ *  still mock until step 3 wires them from member bets. */
+export interface ActiveGroup {
+  id: string;
+  name: string;
+  invite_code: string;
+  member_count: number;
+  role: "admin" | "member";
+}
 
 /** Map each Most-Backed entry to the matching group-market bet id
  *  in app/bets/mock-bets.ts (gb1–gb4). Index-aligned with
@@ -79,16 +87,29 @@ function Av({
   );
 }
 
-export default function GroupsClient() {
+interface GroupsClientProps {
+  group: ActiveGroup;
+}
+
+export default function GroupsClient({ group }: GroupsClientProps) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [memOpen, setMemOpen] = useState(false);
   const [memberOpen, setMemberOpen] = useState<string | null>(null);
   const [raceOpen, setRaceOpen] = useState(false);
 
+  // Invite link in the same shape as crew-challenge links so the
+  // header copy reads the same across surfaces. The /c/[token]
+  // landing detects 8-char unambiguous-alphabet codes and routes
+  // to the group-invite landing.
+  const inviteLink =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/c/${group.invite_code}`
+      : `/c/${group.invite_code}`;
+
   const copy = () => {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(GROUP_INVITE).catch(() => {});
+      navigator.clipboard.writeText(inviteLink).catch(() => {});
     }
     setCopied(true);
   };
@@ -111,9 +132,11 @@ export default function GroupsClient() {
               🏌️
             </span>
             <div className="grp-card-title">
-              <div className="grp-card-name">{GROUP_NAME}</div>
+              <div className="grp-card-name">{group.name}</div>
               <div className="grp-card-sub">
-                {GROUP_MEMBER_COUNT} members · private group
+                {group.member_count}{" "}
+                {group.member_count === 1 ? "member" : "members"} · private
+                group
               </div>
             </div>
             <button
@@ -127,7 +150,7 @@ export default function GroupsClient() {
           <div className="invite-row">
             <div>
               <div className="il-l">Invite link</div>
-              <div className="il-v">{GROUP_INVITE}</div>
+              <div className="il-v">{inviteLink}</div>
             </div>
             <button
               type="button"
@@ -207,7 +230,7 @@ export default function GroupsClient() {
             aria-expanded={memOpen}
             onClick={() => setMemOpen((v) => !v)}
           >
-            <span>Members · {GROUP_MEMBER_COUNT}</span>
+            <span>Members · {group.member_count}</span>
             <span className={`mem-chv${memOpen ? " mem-chv-open" : ""}`}>
               ▾
             </span>

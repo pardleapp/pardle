@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import { decodeChallenge, type ChallengeGame } from "@/lib/challenge";
+import { getGroupByInviteCode, isInviteCode } from "@/lib/groups/server";
+import GroupInviteLanding from "./GroupInviteLanding";
 
 interface Params {
   params: Promise<{ token: string }>;
@@ -35,6 +37,28 @@ function formatScore(
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { token } = await params;
+  // Group invite codes are strict 8-char strings from the
+  // unambiguous alphabet — recognise those first so the page +
+  // share-card metadata read as a group invite rather than a
+  // broken challenge.
+  if (isInviteCode(token)) {
+    const group = await getGroupByInviteCode(token);
+    if (group) {
+      const title = `You're invited to ${group.name} — ${BRAND.name}`;
+      const description = `Join ${group.name} on ${BRAND.name} — private bet-tracking group.`;
+      return {
+        title,
+        description,
+        openGraph: {
+          title,
+          description,
+          url: `${BRAND.url}/c/${token}`,
+          siteName: BRAND.name,
+          type: "website",
+        },
+      };
+    }
+  }
   const decoded = decodeChallenge(token);
   if (!decoded || !decoded.game) {
     return {
@@ -70,6 +94,24 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function ChallengeLandingPage({ params }: Params) {
   const { token } = await params;
+
+  // Group invite branch — strict 8-char unambiguous-alphabet code
+  // resolves to a real group. If the code matches the regex but
+  // doesn't exist in the DB, fall through to the generic "couldn't
+  // be read" message below.
+  if (isInviteCode(token)) {
+    const group = await getGroupByInviteCode(token);
+    if (group) {
+      return (
+        <GroupInviteLanding
+          code={token}
+          groupName={group.name}
+          memberCount={group.member_count}
+        />
+      );
+    }
+  }
+
   const decoded = decodeChallenge(token);
 
   if (!decoded || !decoded.game) {

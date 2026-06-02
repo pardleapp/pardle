@@ -25065,6 +25065,69 @@ html.pv-theme-body .auth-chip-btn {
 .pv-theme .groups-soon-cta-quiet:hover {
   background: var(--pv-soft);
 }
+/* Inline create/join form inside the empty-state card. The
+   surrounding .groups-soon-cta + -cta-quiet styles cover the
+   submit + cancel buttons; these rules handle the name/code
+   input + the error line. */
+.pv-theme .groups-create-form {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+.pv-theme .groups-create-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pv-dim);
+}
+.pv-theme .groups-create-input {
+  width: 100%;
+  padding: 13px 16px;
+  font-size: 16px;
+  font-family: inherit;
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 12px;
+  color: var(--pv-ink);
+  -webkit-appearance: none;
+}
+.pv-theme .groups-create-input:focus {
+  outline: none;
+  border-color: var(--pv-emerald);
+}
+.pv-theme .groups-create-input-mono {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+}
+.pv-theme .groups-create-err {
+  font-size: 13px;
+  color: var(--pv-down);
+  font-weight: 600;
+}
+.pv-theme .groups-create-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+.pv-theme .groups-create-cancel {
+  background: transparent;
+  border: none;
+  color: var(--pv-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 12px 16px;
+  cursor: pointer;
+}
+.pv-theme .groups-create-cancel:hover {
+  color: var(--pv-ink);
+}
 
 /* =============================================================
    GamesHub overlay — daily-puzzle hub opened from the Sweat Feed
