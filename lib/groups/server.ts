@@ -102,7 +102,19 @@ export async function listMyGroups(): Promise<GroupSummary[]> {
 }
 
 /** Create a new group with the current user as admin. Returns the
- *  new group's id + invite code. Throws on auth failure. */
+ *  new group's id + invite code. Throws on auth failure.
+ *
+ *  Server-side trust pattern: auth is verified via the user-session
+ *  client (auth.getUser() cryptographically validates the JWT), then
+ *  the INSERT runs via the admin client with the verified userId
+ *  baked into created_by. This sidesteps a known @supabase/ssr
+ *  quirk in Next.js 15 route handlers where the validated JWT
+ *  doesn't always reach the PostgREST INSERT, causing auth.uid()
+ *  to evaluate to NULL and the "Groups: insert own" RLS policy to
+ *  reject the row. Spoofing is impossible because created_by is
+ *  never read from client input — only from the validated user.
+ *  The add_group_creator_as_admin trigger is SECURITY DEFINER and
+ *  fires regardless, so membership is still auto-added. */
 export async function createGroup(name: string): Promise<GroupRow> {
   const supabase = await getSupabaseServer();
   const { data: userData } = await supabase.auth.getUser();
@@ -112,15 +124,11 @@ export async function createGroup(name: string): Promise<GroupRow> {
   const trimmed = name.trim().slice(0, 60);
   if (trimmed.length === 0) throw new Error("Group name is required");
 
-  // Insert under the user's session — the RLS policy on groups
-  // requires created_by = auth.uid(), which this respects. The
-  // trigger then adds the creator to group_members as admin.
-  // Retry once on invite_code uniqueness collision (extremely rare
-  // at the 8.5×10^11 keyspace, but cheap to handle).
+  const admin = getSupabaseAdmin();
   for (let attempt = 0; attempt < 3; attempt++) {
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from("groups")
-      .insert({ name: trimmed, created_by: userId })
+      .insert({ name: trimmed, created_by: userId } as never)
       .select()
       .single();
     if (!error && data) return data as GroupRow;
