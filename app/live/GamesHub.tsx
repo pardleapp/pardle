@@ -3,25 +3,28 @@
 /**
  * GamesHub — overlay sheet opened from the games/controller icon in
  * the Sweat Feed header. Surfaces today's daily-puzzle hub: a
- * streak banner, a 2-col grid of game cards (Pros / Holes /
- * Clubhouses / Connections), and a crew challenge board with
- * today's scores.
+ * streak banner, a 2-col grid of game cards, a crew challenge
+ * board, and footer links.
  *
- * Matches design-handoff/Pardle Social v2.html → GamesHub
- * (lines 528–538) and social-v2.css gm-streak / gm-grid / gm-card
- * / gm-state styles (L515–524). Reuses the `.bd-pv-back` /
- * `.bd-pv-title` head treatment (already aligned to the
- * prototype's `.detail-back` / `.detail-title`) and the
- * `.racerow` rows already used by Groups.
+ * Layout reconciled against design-handoff/Pardle Social v2.html →
+ * GamesHub (lines 528–538) and social-v2.css `.gm-streak` /
+ * `.gm-grid` / `.gm-card` / `.gm-state` (L515–524) + the detail-
+ * head pattern reused via `.bd-pv-back` / `.bd-pv-title`.
  *
- * Cards navigate to the existing daily-puzzle routes (/pros,
- * /holes, /clubs, /connections). The streak banner and the
- * crew challenge board are stubbed for now — the existing
- * stats backend (lib/stats-backend) and Groups data will hydrate
- * them once we wire real state through.
+ * Game LIST is the real lineup from the repo, NOT the prototype's
+ * placeholder set (which still had "Clubhouses" — cut before the
+ * redesign). The five live games are pros / holes / connections /
+ * trivia / faces, mirroring `STATS_GAMES` in lib/stats-backend.
+ * Blurbs and accent colours are taken verbatim from the existing
+ * pre-redesign hub at app/games/page.tsx so this overlay is a
+ * style refresh of the SAME game catalogue. Trivia and Faces are
+ * multiplayer (get the MULTIPLAYER pill).
  *
- * The daily puzzle is deterministic per UTC date — every user
- * sees the same puzzle today, derived from
+ * Two footer actions sit below the grid:
+ *   - "See how the world's playing →"   → /today
+ *   - "🪄 Blend yourself with a PGA pro →"  → /blend/me
+ *
+ * Daily puzzles are deterministic per UTC date (CLAUDE.md):
  * `daysSinceEpoch % puzzleCount`. This hub presents the existing
  * engine; no game logic is reimplemented here.
  */
@@ -39,46 +42,60 @@ interface Game {
   ic: string;
   name: string;
   desc: string;
-  state: string;
-  done: boolean;
+  /** Per-game accent colour — surfaced as a top stripe on the
+   *  card so each game reads as distinct without breaking the
+   *  light .pv theme. Hex matches app/games/page.tsx GAMES[]. */
+  accent: string;
+  /** Multiplayer games (trivia, faces) get the MULTIPLAYER pill
+   *  in the card header — same affordance the pre-redesign hub
+   *  carried. */
+  multiplayer?: boolean;
 }
 
+/** Mirrors the real `app/games/page.tsx` lineup. Sourced from
+ *  what actually ships, not the prototype's placeholder list. */
 const GAMES: Game[] = [
   {
     key: "pros",
     href: "/pros",
-    ic: "⛳",
+    ic: "🏌️",
     name: "Pros",
-    desc: "Guess today's mystery pro in 6",
-    state: "Solved 4/6",
-    done: true,
+    desc: "Six guesses to identify today's mystery golfer.",
+    accent: "#7BAE3F",
   },
   {
     key: "holes",
     href: "/holes",
-    ic: "🏌️",
+    ic: "🛰️",
     name: "Holes",
-    desc: "Name the famous hole",
-    state: "Play",
-    done: false,
+    desc: "Identify today's golf course from a satellite view.",
+    accent: "#5BA0E0",
   },
   {
-    key: "clubs",
-    href: "/clubs",
-    ic: "🏟️",
-    name: "Clubhouses",
-    desc: "Spot the course",
-    state: "Play",
-    done: false,
-  },
-  {
-    key: "conn",
+    key: "connections",
     href: "/connections",
-    ic: "🔗",
+    ic: "🧩",
     name: "Connections",
-    desc: "Find the four groups",
-    state: "2 mistakes",
-    done: true,
+    desc: "Find four groups of four. Every item has a golf connection.",
+    accent: "#B388D6",
+  },
+  {
+    key: "trivia",
+    href: "/trivia",
+    ic: "❓",
+    name: "Trivia",
+    desc: "10 golf trivia questions. Easy, medium, or hard.",
+    accent: "#E8C547",
+    multiplayer: true,
+  },
+  {
+    key: "faces",
+    href: "/faces",
+    ic: "👥",
+    name: "Faces",
+    desc: "Six blended-face puzzles. Name both pros in each.",
+    accent: "#E07B5B",
+    multiplayer: true,
   },
 ];
 
@@ -130,20 +147,39 @@ export default function GamesHub({ open, onClose }: GamesHubProps) {
               key={g.key}
               href={g.href}
               className="gm-card"
+              style={
+                { ["--gm-accent" as string]: g.accent } as React.CSSProperties
+              }
               onClick={onClose}
             >
+              <span
+                className="gm-stripe"
+                aria-hidden="true"
+                style={{ background: g.accent }}
+              />
+              {g.multiplayer && (
+                <span className="gm-mp">MULTIPLAYER</span>
+              )}
               <div className="gm-ic" aria-hidden="true">
                 {g.ic}
               </div>
               <div className="gm-nm">{g.name}</div>
               <div className="gm-desc">{g.desc}</div>
-              <div
-                className={`gm-state${g.done ? " gm-state-done" : ""}`}
-              >
-                {g.state}
-              </div>
+              <div className="gm-state">Play today →</div>
             </Link>
           ))}
+        </div>
+        <div className="gm-foot">
+          <Link href="/today" className="gm-foot-link" onClick={onClose}>
+            See how the world&rsquo;s playing →
+          </Link>
+          <Link
+            href="/blend/me"
+            className="gm-foot-link gm-foot-link-quiet"
+            onClick={onClose}
+          >
+            🪄 Blend yourself with a PGA pro →
+          </Link>
         </div>
         <section className="gh-sec">
           <h4 className="gh-sec-title">Today&rsquo;s Pros · The Lads</h4>
