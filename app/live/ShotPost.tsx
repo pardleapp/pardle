@@ -26,6 +26,7 @@ import PlayerAvatar from "./PlayerAvatar";
 import type { FeedEvent } from "@/lib/feed/types";
 import { abbreviateName } from "@/lib/text/abbreviate";
 import ShotDiagram from "./ShotDiagram";
+import HoldReactPicker from "./HoldReactPicker";
 
 interface Props {
   event: FeedEvent;
@@ -47,6 +48,10 @@ interface Props {
    *  the prototype's "we drew the hole next to the headline" feel
    *  back into the redesigned feed. */
   showDiagram?: boolean;
+  /** Hold-and-pick reaction — fires when the user holds the
+   *  thumb button and selects an emoji from the floating tray.
+   *  Parent triggers the float-up burst animation. */
+  onCustomReact?: (emoji: string) => void;
 }
 
 /** Map ScoreResult onto the prototype's tag class + label. The
@@ -92,13 +97,17 @@ export default function ShotPost({
   handStatus,
   onShare,
   showDiagram,
+  onCustomReact,
 }: Props) {
   const tag = tagFor(event);
   const reactCount = (reactions?.up ?? 0) + (reactions?.down ?? 0);
-  const onThumbClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const onTapLike = () => onReact(event.id, "up");
+  const onHoldPick = (emoji: string) => {
+    // Treat the picked emoji as a "burst" the parent fires through
+    // the existing float-up animation. Also bump the local like
+    // counter so the user gets immediate feedback on the count.
     onReact(event.id, "up");
+    onCustomReact?.(emoji);
   };
 
   return (
@@ -166,27 +175,13 @@ export default function ShotPost({
           </p>
         )}
         <div className="spost-react">
-          <button
-            type="button"
-            className={`spost-act${myReaction === "up" ? " spost-act-on" : ""}`}
-            onClick={onThumbClick}
-            aria-label="React with thumbs up"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.9"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              width="15"
-              height="15"
-            >
-              <path d="M7 10v11" />
-              <path d="M7 10l4-7a2 2 0 0 1 3 1.7V9h4.5a2 2 0 0 1 2 2.4l-1.4 7A2 2 0 0 1 17 20H7" />
-            </svg>
-            <span>{reactCount}</span>
-          </button>
+          <HoldReactPicker
+            onTap={onTapLike}
+            onReact={onHoldPick}
+            count={reactCount}
+            active={myReaction === "up"}
+            ariaLabel="React — tap to like, hold to pick an emoji"
+          />
           <button type="button" className="spost-act" aria-label="Comments">
             <svg
               viewBox="0 0 24 24"

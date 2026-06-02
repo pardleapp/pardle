@@ -85,7 +85,6 @@ const FEED_CACHE_TTL_MS = 60 * 60 * 1000;
  *  expectation instead of an open-ended wait. */
 const FEED_LOAD_TIMES_STORAGE = "pardle_feed_load_times_v1";
 const FEED_LOAD_TIMES_KEEP = 8;
-const BURST_EMOJIS = ["🔥", "😱", "⛳", "👏", "💀", "🐐"];
 const FLOATER_LIFETIME_MS = 2600;
 
 interface FeedResponse {
@@ -440,21 +439,9 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   const [floaters, setFloaters] = useState<Floater[]>([]);
   // Burst bar visibility — hidden on cold landing so a brand-new
   // visitor doesn't see a permanent strip of unexplained emoji
-  // chrome before they've scrolled into the actual feed. Flips on
-  // as soon as they scroll past ~200 px.
-  const [scrolledIntoFeed, setScrolledIntoFeed] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (scrolledIntoFeed) return;
-    const onScroll = () => {
-      if (window.scrollY > 200) {
-        setScrolledIntoFeed(true);
-      }
-    };
-    onScroll(); // catch the case where the page restored a scroll position
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [scrolledIntoFeed]);
+  // (Used to gate the bottom burst-bar's visibility on first
+  // scroll. Bar removed in favour of the per-card hold-to-react
+  // gesture; this scroll listener went with it.)
   type FilterMode = "all" | "smart";
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   /** Shot-detail overlay — opens when a notable shot is tapped
@@ -1121,6 +1108,12 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                       isNotable ? (ev) => setShotDetail(ev) : undefined
                     }
                     showDiagram={isNotable}
+                    onCustomReact={(emoji) => {
+                      // Reuse the existing /api/feed/burst path so
+                      // the picked emoji floats up across the page
+                      // and increments the round-wide burst counter.
+                      void sendBurst(emoji);
+                    }}
                   />
                 </li>
               </Fragment>
@@ -1163,25 +1156,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         ))}
       </div>
 
-      {/* Burst reaction bar — sticky at the bottom. Hidden until
-          the user has actively scrolled into the feed so a cold
-          visitor doesn't see unexplained emoji chrome before they
-          have any context for what they'd react to. */}
-      {scrolledIntoFeed && (
-      <div className="feed-burst-bar">
-        {BURST_EMOJIS.map((e) => (
-          <button
-            key={e}
-            type="button"
-            className="feed-burst-btn"
-            onClick={() => sendBurst(e)}
-            aria-label={`React ${e}`}
-          >
-            {e}
-          </button>
-        ))}
-      </div>
-      )}
+      {/* Old bottom burst bar removed — reactions now live per-card
+          via the hold-to-pick tray on each shot's thumb button.
+          Frees up the vertical space the sticky strip used to eat
+          and ties the gesture to the specific shot the user is
+          reacting to (not a global "this round" burst). */}
     </section>
   );
 }

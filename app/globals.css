@@ -23442,6 +23442,128 @@ html.pv-theme-body .auth-chip-btn {
   color: var(--pv-emerald);
 }
 
+/* =============================================================
+   Hold-to-react picker — replaces the old sticky bottom burst
+   bar. Quick tap on a shot card's thumb button = default like;
+   press-and-hold (~300 ms) pops a small floating emoji tray.
+   ============================================================= */
+.hrp-button {
+  position: relative;
+}
+.hrp-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: transparent;
+}
+.hrp-tray {
+  position: fixed;
+  z-index: 81;
+  transform: translate(-50%, calc(-100% - 14px));
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 999px;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  box-shadow: 0 14px 30px oklch(0.4 0.06 145 / 0.18);
+  animation: hrp-tray-in 0.18s cubic-bezier(0.2, 0.7, 0.3, 1);
+  white-space: nowrap;
+}
+@keyframes hrp-tray-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 6px)) scale(0.86);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 14px)) scale(1);
+  }
+}
+.hrp-tray::after {
+  /* Little notch pointing down at the button. */
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 10px;
+  height: 10px;
+  background: var(--pv-card);
+  border-right: 1px solid var(--pv-line);
+  border-bottom: 1px solid var(--pv-line);
+}
+.hrp-tray-emoji {
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  padding: 6px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.hrp-tray-emoji:hover,
+.hrp-tray-emoji:focus-visible {
+  background: var(--pv-soft);
+  transform: scale(1.25);
+  outline: none;
+}
+.hrp-tray-emoji:active {
+  transform: scale(1.1);
+}
+
+/* First-use hint — small tooltip above the thumb button, fades
+   out once the user has either tapped or held. */
+.hrp-hint {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--pv-ink);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 4px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: hrp-hint-pulse 1.8s ease-in-out infinite;
+}
+.hrp-hint::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: var(--pv-ink);
+}
+@keyframes hrp-hint-pulse {
+  0%, 100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  50%      { opacity: 0.78; transform: translateX(-50%) translateY(-2px); }
+}
+
+/* Reduced motion — kill the tray + hint + floater animations.
+   Tray + hint snap in, floaters skip the rise entirely (we just
+   skip the burst visual; the count still updates). */
+@media (prefers-reduced-motion: reduce) {
+  .hrp-tray,
+  .hrp-hint {
+    animation: none;
+  }
+  .hrp-tray-emoji {
+    transition: none;
+  }
+  .feed-floater {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* "Your bets" section heading above the bet posts */
 .pv-theme .pv-section-label {
   font-size: 10.5px;
