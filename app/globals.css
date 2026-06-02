@@ -9281,6 +9281,268 @@ footer {
   background: oklch(0.97 0.04 28 / 0.4);
 }
 
+/* =============================================================
+   Realtime group chat — message bubbles + composer. Net-new
+   surface (the prototype doesn't define a chat component), so
+   the visuals follow the .pv broadcast tokens: paper bg,
+   pv-soft other bubbles with hairline border, pv-emerald own
+   bubbles in solid emerald with white text. Composer is sticky
+   at the bottom of its scroll container with safe-area-inset-
+   bottom padding so it sits above the iOS keyboard.
+   ============================================================= */
+.pv-theme .grp-chat-card {
+  padding: 0;
+  overflow: hidden;
+}
+.chat-stack {
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+  max-height: 560px;
+}
+.chat-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 14px 14px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.chat-scroll::-webkit-scrollbar {
+  width: 0;
+}
+.chat-empty {
+  text-align: center;
+  font-size: 13px;
+  color: var(--pv-muted);
+  padding: 40px 18px;
+  margin: 0;
+}
+
+/* One message row — avatar + body. .chat-row-mine flips the row
+   to right-aligned with no avatar. .chat-row-grouped removes the
+   author name + tightens the top margin for consecutive messages
+   from the same person within 4 minutes. */
+.chat-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+.chat-row-grouped {
+  margin-top: 2px;
+}
+.chat-row-mine {
+  flex-direction: row-reverse;
+}
+.chat-row-av {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+  margin-bottom: 4px;
+}
+.chat-row-av-spacer {
+  width: 28px;
+  flex-shrink: 0;
+}
+.chat-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 78%;
+  min-width: 0;
+}
+.chat-row-mine .chat-row-body {
+  align-items: flex-end;
+}
+.chat-row-author {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--pv-muted);
+  letter-spacing: 0.02em;
+  padding: 0 4px;
+}
+.chat-row-bubble {
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  border-radius: 16px;
+  padding: 8px 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--pv-ink);
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.chat-row-mine .chat-row-bubble {
+  background: var(--pv-emerald);
+  border-color: var(--pv-emerald);
+  color: #fff;
+}
+.chat-row-ts {
+  font-size: 10px;
+  color: var(--pv-dim);
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  padding: 0 4px;
+}
+
+/* Inline bet chip — rendered inside a bubble when msg.bet_id is
+   set. Taps through to /live/bet/[id]. Sits beneath the bubble
+   text, slightly smaller, with a contrasting card-paper bg so it
+   reads as a clickable artefact even inside an emerald-fill mine
+   bubble. */
+.chat-bet-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  padding: 5px 10px;
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pv-ink);
+  text-decoration: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-row-mine .chat-bet-chip {
+  background: oklch(0.97 0.04 150);
+  color: var(--pv-emerald-d);
+}
+.chat-bet-chip-player {
+  font-weight: 800;
+}
+.chat-bet-chip-market {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--pv-muted);
+}
+.chat-row-mine .chat-bet-chip-market {
+  color: var(--pv-emerald-d);
+  opacity: 0.7;
+}
+.chat-bet-chip-arrow {
+  font-size: 11px;
+  color: var(--pv-muted);
+}
+
+/* Composer pinned to the bottom of the chat surface. The
+   padding-bottom inset matches iOS safe-area so the input sits
+   above the home indicator on notched devices. */
+.chat-composer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--pv-card);
+  border-top: 1px solid var(--pv-line);
+  flex-shrink: 0;
+}
+.chat-composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 11px 14px;
+  font-size: 15px;
+  font-family: inherit;
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  border-radius: 999px;
+  color: var(--pv-ink);
+  -webkit-appearance: none;
+}
+.chat-composer-input:focus {
+  outline: none;
+  border-color: var(--pv-emerald);
+  background: var(--pv-card);
+}
+.chat-composer-input::placeholder {
+  color: var(--pv-muted);
+}
+.chat-composer-send {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: var(--pv-emerald);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease, transform 0.1s ease;
+}
+.chat-composer-send:hover {
+  background: var(--pv-emerald-d);
+}
+.chat-composer-send:active {
+  transform: scale(0.94);
+}
+.chat-composer-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.chat-error {
+  font-size: 12px;
+  color: var(--pv-down);
+  padding: 6px 14px 10px;
+  margin: 0;
+}
+
+/* "On this bet" thread on the bet-detail page. Same chat
+   internals; wrapped in a card with a label. */
+.pv-theme.bd-page .bd-thread-card {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.pv-theme.bd-page .bd-thread-h {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pv-dim);
+  padding: 14px 16px 4px;
+  margin: 0;
+}
+.pv-theme.bd-page .bd-thread-grp {
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--pv-emerald-d);
+}
+.pv-theme.bd-page .bd-thread-loading {
+  font-size: 13px;
+  color: var(--pv-muted);
+  padding: 20px 16px 18px;
+  margin: 0;
+}
+.pv-theme.bd-page .bd-thread-link {
+  color: var(--pv-emerald-d);
+  text-decoration: underline;
+}
+.pv-theme.bd-page .bd-thread-card .chat-stack {
+  min-height: 240px;
+  max-height: 420px;
+}
+
 @media (max-width: 640px) {
   .bd-head {
     flex-direction: column;

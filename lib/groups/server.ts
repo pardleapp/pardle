@@ -243,6 +243,225 @@ export async function listGroupMembers(
   });
 }
 
+/** Lightweight bet preview rendered inline on a chat message that
+ *  references a bet (msg.bet_id non-null). Just enough for the
+ *  inline chip — full detail lives on /live/bet/[id]. */
+export interface ChatBetRef {
+  id: string;
+  player_name: string | null;
+  market_label: string;
+  owner_user_id: string;
+}
+
+export interface GroupMessageRow {
+  id: string;
+  group_id: string;
+  user_id: string;
+  body: string;
+  created_at: string;
+  bet_id: string | null;
+  /** Display name resolved from profiles (or "Member" if unset). */
+  author_name: string;
+  author_initials: string;
+  /** When bet_id is non-null AND the bet is non-private AND owned
+   *  by a group member, the inline preview is attached so the chat
+   *  bubble can render a tappable chip. Null otherwise. */
+  bet: ChatBetRef | null;
+}
+
+/** Recent chat messages for a group. Caller must be a member —
+ *  membership is enforced by the page-level branch (page.tsx or
+ *  the route handler) before reaching this helper. Returns
+ *  ascending by created_at so the UI can render top→bottom and
+ *  auto-scroll to the last row. */
+export async function listGroupMessages(
+  groupId: string,
+  limit = 100,
+): Promise<GroupMessageRow[]> {
+  const admin = getSupabaseAdmin();
+  const { data: msgRows } = await admin
+    .from("group_messages")
+    .select("id, group_id, user_id, body, created_at, bet_id")
+    .eq("group_id", groupId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  const rows = (msgRows ?? []) as Array<{
+    id: string;
+    group_id: string;
+    user_id: string;
+    body: string;
+    created_at: string;
+    bet_id: string | null;
+  }>;
+  if (rows.length === 0) return [];
+
+  // Resolve author display names from profiles.
+  const userIds = Array.from(new Set(rows.map((r) => r.user_id)));
+  const { data: profileRows } = await admin
+    .from("profiles")
+    .select("user_id, display_name")
+    .in("user_id", userIds);
+  const profiles = (profileRows ?? []) as Array<{
+    user_id: string;
+    display_name: string | null;
+  }>;
+  const nameById = new Map(profiles.map((p) => [p.user_id, p.display_name]));
+
+  // Resolve bet previews — only for messages that reference a bet
+  // AND only when the bet is non-private (owner control) AND owned
+  // by a member of this group (defence in depth). The page-level
+  // membership check above already covers the read access; this
+  // adds a "no leaking other groups' bets" guarantee in case bet_id
+  // is ever set to a foreign id.
+  const betIds = Array.from(
+    new Set(rows.map((r) => r.bet_id).filter((x): x is string => !!x)),
+  );
+  const betMap = new Map<string, ChatBetRef>();
+  if (betIds.length > 0) {
+    const { data: betRows } = await admin
+      .from("bets")
+      .select("id, user_id, kind, data")
+      .in("id", betIds)
+      .is("removed_at", null);
+    const bets = (betRows ?? []) as Array<{
+      id: string;
+      user_id: string;
+      kind: string;
+      data: Record<string, unknown> | null;
+    }>;
+    // Build member set to gate the bet preview.
+    const { data: memRows } = await admin
+      .from("group_members")
+      .select("user_id")
+      .eq("group_id", groupId);
+    const memberSet = new Set(
+      ((memRows ?? []) as Array<{ user_id: string }>).map((r) => r.user_id),
+    );
+    for (const b of bets) {
+      if ((b.data ?? {}).isPrivate === true) continue;
+      if (!memberSet.has(b.user_id)) continue;
+      const data = b.data ?? {};
+      const playerName =
+        typeof data.playerName === "string" ? data.playerName : null;
+      let market_label = "";
+      if (b.kind === "outright") market_label = "OUTRIGHT";
+      else if (b.kind === "top-finish") {
+        market_label = `TOP ${
+          typeof data.cutoff === "number" ? data.cutoff : "?"
+        }`;
+      } else if (b.kind === "round-score") {
+        market_label = `${
+          typeof data.side === "string" ? data.side.toUpperCase() : "?"
+        } ${typeof data.line === "number" ? data.line : "?"}${
+          data.round != null ? ` · R${data.round}` : ""
+        }`;
+      } else if (b.kind === "winning-score") {
+        market_label = `${
+          typeof data.side === "string" ? data.side.toUpperCase() : "?"
+        } ${typeof data.line === "number" ? data.line : "?"} · TOT`;
+      } else {
+        market_label = b.kind.toUpperCase();
+      }
+      betMap.set(b.id, {
+        id: b.id,
+        player_name: playerName,
+        market_label,
+        owner_user_id: b.user_id,
+      });
+    }
+  }
+
+  return rows
+    .map((m): GroupMessageRow => {
+      const profileName = nameById.get(m.user_id) ?? null;
+      const displayName = profileName || "Member";
+      return {
+        id: m.id,
+        group_id: m.group_id,
+        user_id: m.user_id,
+        body: m.body,
+        created_at: m.created_at,
+        bet_id: m.bet_id,
+        author_name: displayName,
+        author_initials: deriveInitials(displayName, m.user_id),
+        bet: m.bet_id ? betMap.get(m.bet_id) ?? null : null,
+      };
+    })
+    .reverse(); // ascending for top→bottom render
+}
+
+/** Insert a chat message into a group. Server-side trust pattern:
+ *  verify auth + membership, then admin-client insert (same JWT-
+ *  on-wire workaround used by createGroup). Optional bet_id can
+ *  be passed to attach the message to a specific bet — must be
+ *  a real bet owned by a member of this group, else the FK
+ *  constraint passes but the preview would be empty. */
+export async function postGroupMessage(
+  groupId: string,
+  body: string,
+  betId: string | null,
+): Promise<GroupMessageRow> {
+  const supabase = await getSupabaseServer();
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
+  if (!userId) throw new Error("Not signed in");
+
+  const trimmed = body.trim().slice(0, 2000);
+  if (trimmed.length === 0) throw new Error("Empty message");
+
+  const admin = getSupabaseAdmin();
+  // Membership check.
+  const { data: memRow } = await admin
+    .from("group_members")
+    .select("user_id")
+    .eq("group_id", groupId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!memRow) throw new Error("Not a member of this group");
+
+  const { data: inserted, error } = await admin
+    .from("group_messages")
+    .insert({
+      group_id: groupId,
+      user_id: userId,
+      body: trimmed,
+      bet_id: betId ?? null,
+    } as never)
+    .select()
+    .single();
+  if (error || !inserted) throw new Error(error?.message ?? "Insert failed");
+  const row = inserted as {
+    id: string;
+    group_id: string;
+    user_id: string;
+    body: string;
+    created_at: string;
+    bet_id: string | null;
+  };
+
+  // Resolve author for the immediate return so the optimistic
+  // replacement on the client has the right name.
+  const { data: profileRow } = await admin
+    .from("profiles")
+    .select("display_name")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const profile = profileRow as { display_name: string | null } | null;
+  const displayName = profile?.display_name || "Member";
+
+  return {
+    id: row.id,
+    group_id: row.group_id,
+    user_id: row.user_id,
+    body: row.body,
+    created_at: row.created_at,
+    bet_id: row.bet_id,
+    author_name: displayName,
+    author_initials: deriveInitials(displayName, row.user_id),
+    bet: null, // bet preview is enriched on next list; not critical for own message.
+  };
+}
+
 /** Bet rows the admin client reads for group-aggregation. Only the
  *  fields actually consumed by the standings / most-backed / member-
  *  profile views — the JSONB data column carries everything else but

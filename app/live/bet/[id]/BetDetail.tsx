@@ -37,6 +37,7 @@ import dynamic from "next/dynamic";
 import { computeBetInsight } from "@/lib/feed/bet-insights";
 import { useToast } from "@/app/live/Toast";
 import { formatBetCurrency } from "@/lib/format/bet-currency";
+import OnThisBetThread from "./OnThisBetThread";
 
 // BetChartFull is the heaviest piece of the bet-detail page (SVG
 // chart engine, axis helpers, hover tooltip, optional PastBetReplay
@@ -859,6 +860,8 @@ export default function BetDetail({ betId }: { betId: string }) {
           )}
         </div>
       )}
+
+      {bet && <OnThisBetThread betId={bet.id} />}
 
       <div className="bd-actions">
         <button

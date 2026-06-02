@@ -30,8 +30,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import MemberProfile from "./MemberProfile";
 import RaceSheet from "./RaceSheet";
+import GroupChat from "./GroupChat";
 import type {
   GroupMemberRow,
+  GroupMessageRow,
   GroupStandingsRow,
   MostBackedRow,
 } from "@/lib/groups/server";
@@ -88,6 +90,8 @@ interface GroupsClientProps {
   members: GroupMemberRow[];
   standings: GroupStandingsRow[];
   mostBacked: MostBackedRow[];
+  initialMessages: GroupMessageRow[];
+  currentUserId: string;
 }
 
 function fmtSignedCurrency(n: number, currency: string): string {
@@ -104,6 +108,8 @@ export default function GroupsClient({
   members,
   standings,
   mostBacked,
+  initialMessages,
+  currentUserId,
 }: GroupsClientProps) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
@@ -322,6 +328,19 @@ export default function GroupsClient({
               )}
             </div>
           )}
+        </section>
+
+        {/* Chat — realtime group chat. Subscribes to Supabase
+            Realtime on group_messages filtered by group_id. */}
+        <section>
+          <div className="grp-slabel">Chat</div>
+          <div className="grp-card grp-chat-card">
+            <GroupChat
+              groupId={group.id}
+              currentUserId={currentUserId}
+              initialMessages={initialMessages}
+            />
+          </div>
         </section>
 
         {/* Footer actions — wired to real Supabase in a follow-up. */}

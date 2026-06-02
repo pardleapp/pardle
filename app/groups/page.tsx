@@ -24,6 +24,7 @@ import {
   listGroupMembers,
   getGroupStandings,
   getMostBacked,
+  listGroupMessages,
 } from "@/lib/groups/server";
 
 export const metadata = {
@@ -51,10 +52,11 @@ export default async function GroupsPage() {
       // First group is the "active" one for now — multi-group
       // navigation via the space-switcher lands in a follow-up.
       const active = groups[0];
-      const [members, standings, mostBacked] = await Promise.all([
+      const [members, standings, mostBacked, messages] = await Promise.all([
         listGroupMembers(active.id),
         getGroupStandings(active.id),
         getMostBacked(active.id),
+        listGroupMessages(active.id, 100),
       ]);
       body = (
         <GroupsClient
@@ -62,6 +64,8 @@ export default async function GroupsPage() {
           members={members}
           standings={standings}
           mostBacked={mostBacked}
+          initialMessages={messages}
+          currentUserId={userData.user!.id}
         />
       );
     }
