@@ -23665,9 +23665,35 @@ html.pv-theme-body .auth-chip-btn {
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  /* Soft fade on the right edge so partially-scrolled pills
+     dissolve into the card background instead of being chopped
+     mid-pill with a hard edge. Tells the user "there's more here,
+     scroll" without looking broken. The fade only applies when
+     there's actual overflow — when pills fit, the mask is fully
+     opaque (the fade band is only the last 14% of width). */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black 0,
+    black 86%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    black 0,
+    black 86%,
+    transparent 100%
+  );
+  /* Proximity-snap so a flick stops with a pill flush at the left
+     edge rather than half-way through one — avoids the thin-sliver
+     problem the user reported on the E. Cole card. */
+  scroll-snap-type: x proximity;
+  scroll-padding-left: 2px;
 }
 .rxn-pills::-webkit-scrollbar {
   display: none;
+}
+.rxn-pills > * {
+  scroll-snap-align: start;
 }
 .rxn-chip,
 .rxn-chip-overflow,
@@ -23813,9 +23839,14 @@ html.pv-theme-body .auth-chip-btn {
   color: #fff;
 }
 /* Shot-card right-aligned context chip — pill-shaped, soft fill,
-   matches prototype .ctxchip (social-v2.css L110). */
+   matches prototype .ctxchip (social-v2.css L110). The chip is
+   LOWER priority than the reaction pills + ＋ + 💬: when the row
+   gets crowded it shrinks (ellipsis) before the pill cluster
+   does, and below 380px it hides entirely. The pills must never
+   be clipped to make room for it. */
 .post-act-ctx {
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
   margin-left: auto;
   font-size: 11px;
   font-weight: 600;
@@ -23827,6 +23858,11 @@ html.pv-theme-body .auth-chip-btn {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+@media (max-width: 380px) {
+  .post-act-ctx {
+    display: none;
+  }
 }
 
 /* "Your bets" section heading above the bet posts */
