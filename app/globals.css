@@ -5219,6 +5219,51 @@ footer {
   }
 }
 
+/* Kill the dark-mode overrides above on any .pv-theme'd page,
+   plus the hardcoded dark-green .faces-stage backdrop at L4058
+   (which is always-on, not gated by a media query). Brings the
+   two answer slots, the placeholder "?", the pip row, and the
+   blended-face stage container onto the broadcast palette. The
+   face image itself keeps its built-in cropping/contrast —
+   only the surrounding chrome changes. */
+.pv-theme .faces-stage,
+:has(.pv-theme) .faces-stage {
+  background: var(--pv-card);
+  box-shadow: 0 10px 28px oklch(0.3 0.04 150 / 0.12);
+  border: 1px solid var(--pv-line);
+}
+.pv-theme .faces-slot,
+:has(.pv-theme) .faces-slot {
+  background: var(--pv-soft);
+  border-color: var(--pv-line);
+}
+.pv-theme .faces-slot-solved,
+:has(.pv-theme) .faces-slot-solved {
+  background: oklch(0.93 0.06 150);
+  border-color: var(--pv-emerald);
+}
+.pv-theme .faces-slot-num,
+:has(.pv-theme) .faces-slot-num {
+  color: var(--pv-muted);
+}
+.pv-theme .faces-slot-name,
+:has(.pv-theme) .faces-slot-name {
+  color: var(--pv-ink);
+}
+.pv-theme .faces-slot-placeholder,
+:has(.pv-theme) .faces-slot-placeholder {
+  color: var(--pv-line);
+}
+.pv-theme .faces-pip,
+:has(.pv-theme) .faces-pip {
+  border-color: var(--pv-line);
+}
+.pv-theme .faces-result,
+:has(.pv-theme) .faces-result {
+  background: oklch(0.93 0.06 150 / 0.4);
+  border-color: var(--pv-line);
+}
+
 /* ──────────────────────────────────────────────────────────────── */
 /* Fantasy Golf                                                     */
 /* ──────────────────────────────────────────────────────────────── */
