@@ -27,6 +27,7 @@ import type { FeedEvent } from "@/lib/feed/types";
 import { abbreviateName } from "@/lib/text/abbreviate";
 import ShotDiagram from "./ShotDiagram";
 import { useHoldReact } from "./useHoldReact";
+import ReactionChips, { type ReactionState } from "./ReactionChips";
 
 interface Props {
   event: FeedEvent;
@@ -52,6 +53,12 @@ interface Props {
    *  thumb button and selects an emoji from the floating tray.
    *  Parent triggers the float-up burst animation. */
   onCustomReact?: (emoji: string) => void;
+  /** Aggregated emoji reactions for this card — drives the
+   *  ReactionChips cluster above the action row. */
+  reactionState?: ReactionState;
+  /** Toggle the caller's reaction for a given emoji. Fires when
+   *  an existing chip is tapped. */
+  onToggleReaction?: (emoji: string) => void;
 }
 
 /** Map ScoreResult onto the prototype's tag class + label. The
@@ -98,6 +105,8 @@ export default function ShotPost({
   onShare,
   showDiagram,
   onCustomReact,
+  reactionState,
+  onToggleReaction,
 }: Props) {
   const tag = tagFor(event);
   const reactCount = (reactions?.up ?? 0) + (reactions?.down ?? 0);
@@ -182,6 +191,12 @@ export default function ShotPost({
           <p className="spost-text">
             {stripPlayerName(event.headline ?? "", event.playerName)}
           </p>
+        )}
+        {reactionState && onToggleReaction && (
+          <ReactionChips
+            state={reactionState}
+            onToggle={onToggleReaction}
+          />
         )}
         <div className="spost-react">
           <button

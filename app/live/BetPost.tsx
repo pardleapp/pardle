@@ -18,12 +18,17 @@ import {
 } from "@/lib/format/bet-currency";
 import { betKindShortLabel } from "./bet-impact";
 import { useHoldReact } from "./useHoldReact";
+import ReactionChips, { type ReactionState } from "./ReactionChips";
 
 interface BetPostProps {
   bet: TrackedBet;
   /** Hold-and-pick reaction callback — parent triggers the float-up
    *  burst (same plumbing the ShotPost / CrewBetPost surfaces use). */
   onCustomReact?: (emoji: string) => void;
+  /** Aggregated emoji reactions for this card. */
+  reactionState?: ReactionState;
+  /** Tap-toggle an existing chip's reaction. */
+  onToggleReaction?: (emoji: string) => void;
   currentOdds: Record<string, number>;
   topFinishCurrent?: Record<
     string,
@@ -61,6 +66,8 @@ export default function BetPost({
   topFinishCurrent,
   recentRowsForPlayer,
   onCustomReact,
+  reactionState,
+  onToggleReaction,
 }: BetPostProps) {
   const betId = safe("read id", () => String(bet?.id ?? "?"), "?", "?");
   // Whole-card press-and-hold → emoji tray. Quick tap = Link nav
@@ -225,6 +232,12 @@ export default function BetPost({
             </div>
           ))}
         </div>
+      )}
+      {reactionState && onToggleReaction && (
+        <ReactionChips
+          state={reactionState}
+          onToggle={onToggleReaction}
+        />
       )}
     </Link>
     {tray}

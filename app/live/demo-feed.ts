@@ -142,6 +142,23 @@ export const DEMO_ROWS: FeedRow[] = [
   }),
 ];
 
+/** Pre-seeded emoji reaction clusters for the demo cards — so a
+ *  fresh load of /?demo=1 already shows the chips populated and
+ *  the user has something to tap-toggle. Maps event id → counts
+ *  per emoji + the user's own reactions. */
+export const DEMO_EMOJI_REACTIONS: Record<
+  string,
+  { counts: Record<string, number>; mine: string[] }
+> = {
+  "shot:demo-1": { counts: { "🔥": 12, "👏": 4, "⛳": 3 }, mine: [] },
+  "shot:demo-2": { counts: { "💀": 8, "😱": 3 }, mine: [] },
+  "shot:demo-5": {
+    counts: { "🔥": 22, "⛳": 7, "👏": 5, "🐐": 3, "😱": 1 },
+    mine: ["🔥"],
+  },
+  "shot:demo-4": { counts: { "😱": 6, "💀": 2 }, mine: [] },
+};
+
 /** Whole envelope the FeedClient consumes. Only fields the Sweat
  *  Feed actually reads are populated — everything else is left as
  *  the empty / null shapes the type expects. */

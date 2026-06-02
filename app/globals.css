@@ -23631,6 +23631,68 @@ html.pv-theme-body .auth-chip-btn {
   font-weight: 800;
 }
 
+/* =============================================================
+   Reaction chip cluster — emoji+count pills above the action row
+   on a feed card. Surfaces who's reacted to what. Tapping a pill
+   toggles the caller's reaction without opening the long-press
+   tray.
+   ============================================================= */
+.rxn-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+.rxn-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px 4px 7px;
+  border-radius: 999px;
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  color: var(--pv-ink);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.12s ease,
+    border-color 0.12s ease;
+}
+.rxn-chip:hover {
+  background: var(--pv-card);
+  border-color: var(--pv-emerald);
+}
+.rxn-chip:active {
+  transform: scale(0.94);
+}
+.rxn-chip-mine {
+  background: oklch(0.93 0.05 155);
+  border-color: var(--pv-emerald);
+  color: var(--pv-emerald-d);
+}
+.rxn-chip-mine:hover {
+  background: oklch(0.9 0.06 155);
+}
+.rxn-chip-emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+.rxn-chip-count {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.rxn-chip-overflow {
+  background: transparent;
+  border: 1px dashed var(--pv-line);
+  color: var(--pv-muted);
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  padding: 4px 9px;
+  cursor: default;
+}
+
 /* "Your bets" section heading above the bet posts */
 .pv-theme .pv-section-label {
   font-size: 10.5px;

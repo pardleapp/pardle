@@ -18,6 +18,7 @@ import type {
   MockTipPost,
 } from "./mock-crew-posts";
 import { useHoldReact } from "./useHoldReact";
+import ReactionChips, { type ReactionState } from "./ReactionChips";
 
 const PALETTE: Record<string, string> = {
   JO: "linear-gradient(135deg,#5cd7c1,#1f8b6e)",
@@ -108,9 +109,13 @@ function Spark({
 export function CrewBetPost({
   post,
   onCustomReact,
+  reactionState,
+  onToggleReaction,
 }: {
   post: MockBetPost;
   onCustomReact?: (emoji: string) => void;
+  reactionState?: ReactionState;
+  onToggleReaction?: (emoji: string) => void;
 }) {
   const { surfaceProps, tray } = useHoldReact({
     onReact: (emoji) => onCustomReact?.(emoji),
@@ -224,6 +229,12 @@ export function CrewBetPost({
           </span>
         )}
       </div>
+      {reactionState && onToggleReaction && (
+        <ReactionChips
+          state={reactionState}
+          onToggle={onToggleReaction}
+        />
+      )}
     </article>
     {tray}
     </>
@@ -233,9 +244,13 @@ export function CrewBetPost({
 export function CrewResultPost({
   post,
   onCustomReact,
+  reactionState,
+  onToggleReaction,
 }: {
   post: MockResultPost;
   onCustomReact?: (emoji: string) => void;
+  reactionState?: ReactionState;
+  onToggleReaction?: (emoji: string) => void;
 }) {
   const { surfaceProps, tray } = useHoldReact({
     onReact: (emoji) => onCustomReact?.(emoji),
@@ -257,6 +272,12 @@ export function CrewResultPost({
           {post.plLabel}
         </div>
       </div>
+      {reactionState && onToggleReaction && (
+        <ReactionChips
+          state={reactionState}
+          onToggle={onToggleReaction}
+        />
+      )}
     </article>
     {tray}
     </>
@@ -266,9 +287,13 @@ export function CrewResultPost({
 export function CrewTipPost({
   post,
   onCustomReact,
+  reactionState,
+  onToggleReaction,
 }: {
   post: MockTipPost;
   onCustomReact?: (emoji: string) => void;
+  reactionState?: ReactionState;
+  onToggleReaction?: (emoji: string) => void;
 }) {
   const { surfaceProps, tray } = useHoldReact({
     onReact: (emoji) => onCustomReact?.(emoji),
@@ -295,6 +320,12 @@ export function CrewTipPost({
       <button type="button" className="tp-track">
         ＋ Track this tip
       </button>
+      {reactionState && onToggleReaction && (
+        <ReactionChips
+          state={reactionState}
+          onToggle={onToggleReaction}
+        />
+      )}
     </article>
     {tray}
     </>

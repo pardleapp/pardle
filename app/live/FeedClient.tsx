@@ -59,7 +59,8 @@ import ShotPost from "./ShotPost";
 import ShotsReel from "./ShotsReel";
 import ShotDetail from "./ShotDetail";
 import type { FeedEvent } from "@/lib/feed/types";
-import { DEMO_RESPONSE } from "./demo-feed";
+import { DEMO_RESPONSE, DEMO_EMOJI_REACTIONS } from "./demo-feed";
+import type { ReactionState } from "./ReactionChips";
 import { CrewBetPost, CrewResultPost, CrewTipPost } from "./CrewPosts";
 import { MOCK_CREW_POSTS, type MockCrewPost } from "./mock-crew-posts";
 const ReelGroup = dynamic(() => import("./ReelGroup"), {
@@ -391,6 +392,40 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   // very first render — no useEffect race against the polling
   // load() to lose.
   const [demoMode] = useState<boolean>(isDemo);
+
+  // Per-event emoji reactions — counts + the user's own reactions.
+  // Seeded from DEMO_EMOJI_REACTIONS on demo mounts; on real loads
+  // starts empty and accumulates as users tap-toggle / hold-pick.
+  // (Persisted-server reactions are a follow-up — same shape on
+  // the wire, just hydrated from /api/feed.)
+  const [emojiReactions, setEmojiReactions] = useState<
+    Record<string, ReactionState>
+  >(() => (isDemo ? { ...DEMO_EMOJI_REACTIONS } : {}));
+  const toggleEmojiReaction = useCallback(
+    (eventId: string, emoji: string) => {
+      setEmojiReactions((all) => {
+        const cur: ReactionState = all[eventId] ?? { counts: {}, mine: [] };
+        const had = cur.mine.includes(emoji);
+        const nextCount = Math.max(
+          0,
+          (cur.counts[emoji] ?? 0) + (had ? -1 : 1),
+        );
+        const nextCounts = { ...cur.counts };
+        if (nextCount === 0) delete nextCounts[emoji];
+        else nextCounts[emoji] = nextCount;
+        return {
+          ...all,
+          [eventId]: {
+            counts: nextCounts,
+            mine: had
+              ? cur.mine.filter((e) => e !== emoji)
+              : [...cur.mine, emoji],
+          },
+        };
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1094,7 +1129,14 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                         oddsHistory={
                           data.oddsHistories?.[__playerId] ?? null
                         }
-                        onCustomReact={(emoji) => void sendBurst(emoji)}
+                        onCustomReact={(emoji) => {
+                          void sendBurst(emoji);
+                          toggleEmojiReaction(`bet:${__bet.id}`, emoji);
+                        }}
+                        reactionState={emojiReactions[`bet:${__bet.id}`]}
+                        onToggleReaction={(emoji) =>
+                          toggleEmojiReaction(`bet:${__bet.id}`, emoji)
+                        }
                       />
                     </BetPostErrorBoundary>
                   </li>
@@ -1112,19 +1154,40 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                     {p.kind === "crew-bet" && (
                       <CrewBetPost
                         post={p}
-                        onCustomReact={(emoji) => void sendBurst(emoji)}
+                        onCustomReact={(emoji) => {
+                          void sendBurst(emoji);
+                          toggleEmojiReaction(`crew:${p.id}`, emoji);
+                        }}
+                        reactionState={emojiReactions[`crew:${p.id}`]}
+                        onToggleReaction={(emoji) =>
+                          toggleEmojiReaction(`crew:${p.id}`, emoji)
+                        }
                       />
                     )}
                     {p.kind === "crew-result" && (
                       <CrewResultPost
                         post={p}
-                        onCustomReact={(emoji) => void sendBurst(emoji)}
+                        onCustomReact={(emoji) => {
+                          void sendBurst(emoji);
+                          toggleEmojiReaction(`crew:${p.id}`, emoji);
+                        }}
+                        reactionState={emojiReactions[`crew:${p.id}`]}
+                        onToggleReaction={(emoji) =>
+                          toggleEmojiReaction(`crew:${p.id}`, emoji)
+                        }
                       />
                     )}
                     {p.kind === "crew-tip" && (
                       <CrewTipPost
                         post={p}
-                        onCustomReact={(emoji) => void sendBurst(emoji)}
+                        onCustomReact={(emoji) => {
+                          void sendBurst(emoji);
+                          toggleEmojiReaction(`crew:${p.id}`, emoji);
+                        }}
+                        reactionState={emojiReactions[`crew:${p.id}`]}
+                        onToggleReaction={(emoji) =>
+                          toggleEmojiReaction(`crew:${p.id}`, emoji)
+                        }
                       />
                     )}
                   </li>
@@ -1166,11 +1229,15 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                     }
                     showDiagram={isNotable}
                     onCustomReact={(emoji) => {
-                      // Reuse the existing /api/feed/burst path so
-                      // the picked emoji floats up across the page
-                      // and increments the round-wide burst counter.
+                      // Float-up across the page + bump the chip
+                      // cluster on this card.
                       void sendBurst(emoji);
+                      toggleEmojiReaction(`shot:${event.id}`, emoji);
                     }}
+                    reactionState={emojiReactions[`shot:${event.id}`]}
+                    onToggleReaction={(emoji) =>
+                      toggleEmojiReaction(`shot:${event.id}`, emoji)
+                    }
                   />
                 </li>
               </Fragment>
