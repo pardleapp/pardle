@@ -35,6 +35,10 @@ export interface BetSettlementFields {
    *  with bets placed before multi-currency landed — those default
    *  to GBP at render time. */
   currency?: import("@/lib/format/bet-currency").BetCurrency;
+  /** Owner-only flag: when true the bet is hidden from fellow group
+   *  members (excluded from standings P&L, most-backed aggregation,
+   *  and the member's profile). Defaults to undefined / false. */
+  isPrivate?: boolean;
 }
 
 

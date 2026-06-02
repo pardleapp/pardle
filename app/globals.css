@@ -9156,6 +9156,37 @@ footer {
 .bd-remove:hover {
   background: rgba(177, 56, 56, 0.08);
 }
+/* Hide-from-group toggle — emerald outline when off, emerald fill
+   when on (matches the .tailbtn / .tailbtn.done pattern from the
+   prototype). Sits next to .bd-remove. */
+.bd-hide-grp {
+  align-self: flex-end;
+  border: 1px solid var(--pv-emerald, #1f8b6e);
+  border-radius: 8px;
+  padding: 8px 14px;
+  background: transparent;
+  color: var(--pv-emerald-d, #1f8b6e);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  margin-right: 8px;
+  transition: background 0.12s ease;
+}
+.bd-hide-grp:hover {
+  background: var(--pv-soft, rgba(31, 139, 110, 0.08));
+}
+.bd-hide-grp-on {
+  background: var(--pv-emerald, #1f8b6e);
+  color: #fff;
+}
+.bd-hide-grp-on:hover {
+  background: var(--pv-emerald-d, #176d56);
+}
+.bd-hide-grp:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
 @media (max-width: 640px) {
   .bd-head {

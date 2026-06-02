@@ -19,7 +19,12 @@ import SweatHeader from "../live/SweatHeader";
 import GroupsClient from "./GroupsClient";
 import GroupsEmpty from "./GroupsEmpty";
 import GroupsSignedOut from "./GroupsSignedOut";
-import { listMyGroups, listGroupMembers } from "@/lib/groups/server";
+import {
+  listMyGroups,
+  listGroupMembers,
+  getGroupStandings,
+  getMostBacked,
+} from "@/lib/groups/server";
 
 export const metadata = {
   title: `Groups — ${BRAND.name}`,
@@ -46,8 +51,19 @@ export default async function GroupsPage() {
       // First group is the "active" one for now — multi-group
       // navigation via the space-switcher lands in a follow-up.
       const active = groups[0];
-      const members = await listGroupMembers(active.id);
-      body = <GroupsClient group={active} members={members} />;
+      const [members, standings, mostBacked] = await Promise.all([
+        listGroupMembers(active.id),
+        getGroupStandings(active.id),
+        getMostBacked(active.id),
+      ]);
+      body = (
+        <GroupsClient
+          group={active}
+          members={members}
+          standings={standings}
+          mostBacked={mostBacked}
+        />
+      );
     }
   }
 

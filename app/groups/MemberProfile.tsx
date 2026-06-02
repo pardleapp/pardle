@@ -2,36 +2,39 @@
 
 /**
  * MemberProfile — full-screen overlay opened from a member row or
- * a standings rank. Matches the design-handoff prototype's
- * <MemberProfile>:
+ * a standings rank. Reads real data from the DB:
+ *   - name + initials + role from the standings/members row that
+ *     the caller already has in memory (passed as props).
+ *   - open non-private bets are fetched lazily from
+ *     /api/groups/[id]/members/[memberId]/bets on mount.
  *
- *   ← Jordan · Admin
- *     In The Lads · this week · 12 bets · 8 W
+ * Privacy: open bets are filtered server-side via
+ * lib/groups/server::getMemberOpenBets (excludes isPrivate=true).
+ * Live unrealised P&L on each open bet is a Step 3.5 follow-up;
+ * for now we show stake + odds + market only.
  *
- *   [JO avatar 56]   Jordan
- *                    Today +£312 · this tournament         [Nudge]
- *
- *   P&L · this tournament
- *     ░░░░░▁▂▃▅▆▇        (area chart, green/red)
- *     R1                                                       now
- *
- *   Open bets · 3
- *     [pro av]  R. Henley   OUTRIGHT    £50 @ 3.50   62%
- *     [pro av]  C. Morikawa TOP 10      £30 @ 2.10   55%
- *     [pro av]  M. Brennan  UNDER 69.5  $40 @ 1.90   46% (red)
- *
- *   ────────────────────────────────────────
- *   [View full profile]              [Tail their slip]
- *
- * Tapping a bet row routes to /live/player/[name] — caller is
- * expected to dismiss this overlay first (see openPlayer in
- * GroupsClient) so the route change leaves a clean stack.
+ * The "P&L · this tournament" chart from the prototype's
+ * MemberProfile is intentionally not rendered at v1 — it needs
+ * the same shared-feed pipeline as live unrealised. The headline
+ * P&L number (settled outcomes) is still shown from props.
  */
 
-import { MEMBER_INFO } from "./mock-groups";
+import { useEffect, useState } from "react";
+import type {
+  GroupStandingsRow,
+  MemberOpenBet,
+} from "@/lib/groups/server";
+import { formatBetCurrency, normaliseBetCurrency } from "@/lib/format/bet-currency";
 
 interface Props {
-  name: string;
+  groupId: string;
+  memberUserId: string;
+  displayName: string;
+  initials: string;
+  /** Optional pre-computed standings row for the member — drives
+   *  the headline P&L number + colour. Falls back to a neutral
+   *  zero when omitted. */
+  standings?: GroupStandingsRow;
   onClose: () => void;
   onOpenPlayer: (player: string) => void;
 }
@@ -51,65 +54,71 @@ function bgFor(initials: string): string {
   return PALETTE[initials] ?? "linear-gradient(135deg,#6b7df2,#3b1f8a)";
 }
 
-function AreaChart({
-  hist,
-  dir,
-}: {
-  hist: number[];
-  dir: "up" | "down";
-}) {
-  if (hist.length < 2) return null;
-  const w = 320;
-  const h = 148;
-  const max = Math.max(...hist);
-  const min = Math.min(...hist);
-  const rng = Math.max(0.001, max - min);
-  const xy = hist.map((v, i) => [
-    (i / (hist.length - 1)) * w,
-    h - ((v - min) / rng) * (h - 26) - 14,
-  ]);
-  const line = xy.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
-  const area = `0,${h} ${line} ${w},${h}`;
-  const color = dir === "down" ? "var(--pv-down)" : "var(--pv-up)";
-  return (
-    <div className="bd-chart">
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="mpgrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor={color} stopOpacity="0.22" />
-            <stop offset="1" stopColor={color} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <polygon points={area} fill="url(#mpgrad)" />
-        <polyline
-          points={line}
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
-    </div>
-  );
+function fmtSignedCurrency(n: number, currency: string): string {
+  const cur = normaliseBetCurrency(currency);
+  if (Math.abs(n) < 0.5) {
+    return formatBetCurrency(0, cur, { maximumFractionDigits: 0 });
+  }
+  const sign = n >= 0 ? "+" : "−";
+  return `${sign}${formatBetCurrency(Math.abs(n), cur, {
+    maximumFractionDigits: 0,
+  })}`;
 }
 
-export default function MemberProfile({ name, onClose, onOpenPlayer }: Props) {
-  const fallback = {
-    initials: name.slice(0, 2).toUpperCase(),
-    role: "" as const,
-    today: "+£0",
-    dir: "up" as const,
-    hist: [0, 0],
-    record: "—",
-    bets: [] as never[],
-  };
-  const info = MEMBER_INFO[name] ?? fallback;
-  const negative = info.dir === "down";
+export default function MemberProfile({
+  groupId,
+  memberUserId,
+  displayName,
+  initials,
+  standings,
+  onClose,
+  onOpenPlayer,
+}: Props) {
+  const [bets, setBets] = useState<MemberOpenBet[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBets(null);
+    setErr(null);
+    fetch(
+      `/api/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(
+        memberUserId,
+      )}/bets`,
+    )
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(body.error ?? `Failed (${res.status})`);
+        }
+        const json = (await res.json()) as { bets: MemberOpenBet[] };
+        if (!cancelled) setBets(json.bets);
+      })
+      .catch((e) => {
+        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, memberUserId]);
+
+  const pnl = standings?.net_pnl ?? 0;
+  const currency = standings?.currency ?? "GBP";
+  const dir = standings?.dir ?? "flat";
+  const negative = dir === "down";
+  const role = standings?.role;
+  const settledCount = standings?.settled_count ?? 0;
+  const recordLabel =
+    settledCount > 0
+      ? `${settledCount} settled bet${settledCount === 1 ? "" : "s"}`
+      : "No settled bets yet";
 
   return (
-    <div className="grp-overlay" role="dialog" aria-label={`${name} profile`}>
+    <div
+      className="grp-overlay"
+      role="dialog"
+      aria-label={`${displayName} profile`}
+    >
       <header className="grp-overlay-head">
         <button
           type="button"
@@ -121,10 +130,10 @@ export default function MemberProfile({ name, onClose, onOpenPlayer }: Props) {
         </button>
         <div className="bd-pv-title">
           <div className="bd-pv-title-nm">
-            {name}
-            {info.role && <span className="role-tag">{info.role}</span>}
+            {displayName}
+            {role === "admin" && <span className="role-tag">admin</span>}
           </div>
-          <div className="bd-pv-title-mk">In The Lads · {info.record}</div>
+          <div className="bd-pv-title-mk">In your group · {recordLabel}</div>
         </div>
       </header>
 
@@ -136,68 +145,72 @@ export default function MemberProfile({ name, onClose, onOpenPlayer }: Props) {
               width: 56,
               height: 56,
               fontSize: 19,
-              background: bgFor(info.initials),
+              background: bgFor(initials),
             }}
             aria-hidden="true"
           >
-            {info.initials}
+            {initials}
           </span>
           <div className="mp-hero-body">
-            <div className="mp-hero-nm">{name}</div>
+            <div className="mp-hero-nm">{displayName}</div>
             <div className="mp-hero-sub">
-              Today{" "}
+              P&amp;L · settled{" "}
               <b
                 style={{
-                  color: negative ? "var(--pv-down)" : "var(--pv-up)",
+                  color:
+                    Math.abs(pnl) < 0.5
+                      ? "var(--pv-muted)"
+                      : negative
+                        ? "var(--pv-down)"
+                        : "var(--pv-up)",
                 }}
               >
-                {info.today}
-              </b>{" "}
-              · this tournament
+                {fmtSignedCurrency(pnl, currency)}
+              </b>
             </div>
           </div>
-          <button type="button" className="mp-nudge">
-            Nudge
-          </button>
         </section>
 
         <section className="bd-sec">
-          <h4 className="bd-sec-h">P&amp;L · this tournament</h4>
-          <AreaChart hist={info.hist} dir={info.dir} />
-          <div className="bd-chart-x">
-            <span>R1</span>
-            <span>now</span>
-          </div>
-        </section>
-
-        <section className="bd-sec">
-          <h4 className="bd-sec-h">Open bets · {info.bets.length}</h4>
-          {info.bets.length === 0 ? (
-            <p className="pl-gbet-empty">No open bets right now.</p>
+          <h4 className="bd-sec-h">
+            Open bets {bets ? `· ${bets.length}` : ""}
+          </h4>
+          {err ? (
+            <p className="pl-gbet-empty">Couldn&rsquo;t load bets — {err}.</p>
+          ) : bets === null ? (
+            <p className="pl-gbet-empty">Loading…</p>
+          ) : bets.length === 0 ? (
+            <p className="pl-gbet-empty">
+              {displayName === "You"
+                ? "You haven't tracked any open bets."
+                : `${displayName} hasn't tracked any open bets (or has marked them private).`}
+            </p>
           ) : (
             <ul className="mp-bets">
-              {info.bets.map((b, i) => {
-                const probColor =
-                  b.dir === "down" ? "var(--pv-down)" : "var(--pv-up)";
+              {bets.map((b) => {
+                const cur = normaliseBetCurrency(b.currency);
+                const stakeLabel = formatBetCurrency(b.stake, cur, {
+                  maximumFractionDigits: 0,
+                });
                 return (
-                  <li key={i}>
+                  <li key={b.id}>
                     <button
                       type="button"
                       className="mp-bet-row"
-                      onClick={() => onOpenPlayer(b.player)}
+                      onClick={() =>
+                        b.player_name && onOpenPlayer(b.player_name)
+                      }
+                      disabled={!b.player_name}
                     >
                       <div className="mp-bet-row-l">
                         <div className="mp-bet-row-nm">
-                          {b.player}
-                          <span className="bp-bet-mkt">{b.market}</span>
+                          {b.player_name ?? "—"}
+                          <span className="bp-bet-mkt">{b.market_label}</span>
                         </div>
                         <div className="mp-bet-row-sub">
-                          {b.stakeLabel} @ {b.oddsLabel}
+                          {stakeLabel} @ {b.odds_label}
                         </div>
                       </div>
-                      <span className="mp-bet-row-prob" style={{ color: probColor }}>
-                        {b.probPct}%
-                      </span>
                     </button>
                   </li>
                 );
@@ -206,15 +219,6 @@ export default function MemberProfile({ name, onClose, onOpenPlayer }: Props) {
           )}
         </section>
       </div>
-
-      <footer className="grp-overlay-foot">
-        <button type="button" className="bd-pv-share">
-          View full profile
-        </button>
-        <button type="button" className="bd-pv-tail">
-          Tail their slip
-        </button>
-      </footer>
     </div>
   );
 }

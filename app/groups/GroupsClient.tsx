@@ -30,7 +30,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import MemberProfile from "./MemberProfile";
 import RaceSheet from "./RaceSheet";
-import type { GroupMemberRow } from "@/lib/groups/server";
+import type {
+  GroupMemberRow,
+  GroupStandingsRow,
+  MostBackedRow,
+} from "@/lib/groups/server";
+import { formatBetCurrency, normaliseBetCurrency } from "@/lib/format/bet-currency";
 
 export interface ActiveGroup {
   id: string;
@@ -81,9 +86,25 @@ function Av({
 interface GroupsClientProps {
   group: ActiveGroup;
   members: GroupMemberRow[];
+  standings: GroupStandingsRow[];
+  mostBacked: MostBackedRow[];
 }
 
-export default function GroupsClient({ group, members }: GroupsClientProps) {
+function fmtSignedCurrency(n: number, currency: string): string {
+  const cur = normaliseBetCurrency(currency);
+  if (Math.abs(n) < 0.5) return formatBetCurrency(0, cur, { maximumFractionDigits: 0 });
+  const sign = n >= 0 ? "+" : "−";
+  return `${sign}${formatBetCurrency(Math.abs(n), cur, {
+    maximumFractionDigits: 0,
+  })}`;
+}
+
+export default function GroupsClient({
+  group,
+  members,
+  standings,
+  mostBacked,
+}: GroupsClientProps) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [memOpen, setMemOpen] = useState(false);
@@ -110,12 +131,16 @@ export default function GroupsClient({ group, members }: GroupsClientProps) {
     router.push(`/live/player/${encodeURIComponent(name)}`);
   };
 
-  // Step 2.5: until step 3 aggregates real bets, treat any group
-  // as "race not started yet". A solo group (just you) always sits
-  // in this state — you can't race against yourself. Once member
-  // bets are wired (step 3) this flips to the real standings.
-  const raceReady = false;
-  const mostBackedReady = false;
+  // Race "lights up" once there are at least 2 members AND at least
+  // one settled bet across the group — otherwise the standings card
+  // shows the invite-your-crew empty state. Live unrealised movement
+  // on open bets is a follow-up (would need the /api/feed odds
+  // pipeline plumbed server-side).
+  const hasSettledActivity = standings.some(
+    (s) => s.settled_count > 0 || Math.abs(s.net_pnl) > 0.5,
+  );
+  const raceReady = group.member_count >= 2 && hasSettledActivity;
+  const mostBackedReady = mostBacked.length > 0;
 
   return (
     <section className="groups-pv">
@@ -159,37 +184,100 @@ export default function GroupsClient({ group, members }: GroupsClientProps) {
           </div>
         </div>
 
-        {/* Standings · today — empty state until member bets are
-            wired in step 3. */}
+        {/* Standings · this tournament — real per-member P&L when
+            settled bets exist; invite-the-crew placeholder
+            otherwise. P&L is settled outcomes only at v1; live
+            unrealised movement on open bets is a follow-up. */}
         <section>
-          <div className="grp-slabel">Standings · today</div>
-          <div className="grp-card grp-empty">
-            <div className="grp-empty-emoji" aria-hidden="true">
-              🏁
+          <div className="grp-slabel">Standings · this tournament</div>
+          {raceReady ? (
+            <div className="grp-card grp-list">
+              {standings.map((r, i) => (
+                <button
+                  key={r.user_id}
+                  type="button"
+                  className={`racerow${r.is_me ? " racerow-you" : ""}`}
+                  onClick={() =>
+                    r.is_me ? null : setMemberOpen(r.user_id)
+                  }
+                  disabled={r.is_me}
+                >
+                  <span className="racerow-rk">{i + 1}</span>
+                  <Av initials={r.initials} size={32} />
+                  <span className="racerow-nm">
+                    {r.is_me ? <b>{r.display_name}</b> : r.display_name}
+                    {i === 0 && r.net_pnl > 0 && " 👑"}
+                  </span>
+                  <span className={`racerow-pl ${r.dir}`}>
+                    {fmtSignedCurrency(r.net_pnl, r.currency)}
+                  </span>
+                </button>
+              ))}
             </div>
-            <div className="grp-empty-title">
-              {group.member_count === 1
-                ? "Invite your crew to start the race"
-                : "No tracked bets in the group yet"}
+          ) : (
+            <div className="grp-card grp-empty">
+              <div className="grp-empty-emoji" aria-hidden="true">
+                🏁
+              </div>
+              <div className="grp-empty-title">
+                {group.member_count === 1
+                  ? "Invite your crew to start the race"
+                  : "Race lights up when bets start settling"}
+              </div>
+              <div className="grp-empty-blurb">
+                The P&amp;L race ranks members by settled wins &amp;
+                losses. Track a bet (or share the invite link) to
+                get the race moving.
+              </div>
             </div>
-            <div className="grp-empty-blurb">
-              The P&amp;L race lights up once two or more members have
-              tracked bets. Share the invite link to add people, then
-              start logging picks.
-            </div>
-          </div>
+          )}
         </section>
 
-        {/* Most backed in your group — empty state until member
-            bets are wired. */}
+        {/* Most backed in your group — real aggregation of open
+            non-private bets across the group, sorted by backer
+            count. Cold-start empty state when there's nothing. */}
         <section>
           <div className="grp-slabel">Most backed in your group</div>
-          <div className="grp-card grp-empty grp-empty-tight">
-            <div className="grp-empty-blurb">
-              Nobody&rsquo;s tracked a bet in this group yet. Open
-              the Bets tab and log one to be the first.
+          {mostBackedReady ? (
+            <div className="grp-card grp-most">
+              {mostBacked.slice(0, 4).map((b) => (
+                <button
+                  key={`${b.player_id}-${b.market_label}`}
+                  type="button"
+                  className="pop-row"
+                  onClick={() =>
+                    router.push(
+                      `/live/player/${encodeURIComponent(b.player_name)}`,
+                    )
+                  }
+                >
+                  <div className="pop-nm">
+                    {b.player_name}
+                    <span className="bp-bet-mkt">{b.market_label}</span>
+                  </div>
+                  <span className="pop-back">
+                    <span className="pop-back-row">
+                      {b.backers.slice(0, 4).map((bk) => (
+                        <Av
+                          key={bk.user_id}
+                          initials={bk.initials}
+                          size={24}
+                        />
+                      ))}
+                    </span>
+                    <span className="pop-ct">{b.count} on it</span>
+                  </span>
+                </button>
+              ))}
             </div>
-          </div>
+          ) : (
+            <div className="grp-card grp-empty grp-empty-tight">
+              <div className="grp-empty-blurb">
+                Nobody&rsquo;s tracked a bet in this group yet. Open
+                the Bets tab and log one to be the first.
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Members — real group_members rows. */}
@@ -216,7 +304,7 @@ export default function GroupsClient({ group, members }: GroupsClientProps) {
                     type="button"
                     className="mem-row"
                     onClick={() =>
-                      m.is_me ? null : setMemberOpen(m.display_name)
+                      m.is_me ? null : setMemberOpen(m.user_id)
                     }
                     disabled={m.is_me}
                   >
@@ -247,13 +335,23 @@ export default function GroupsClient({ group, members }: GroupsClientProps) {
         </div>
       </div>
 
-      {memberOpen && (
-        <MemberProfile
-          name={memberOpen}
-          onClose={() => setMemberOpen(null)}
-          onOpenPlayer={openPlayer}
-        />
-      )}
+      {memberOpen && (() => {
+        const m =
+          members.find((x) => x.user_id === memberOpen) ??
+          standings.find((s) => s.user_id === memberOpen);
+        if (!m) return null;
+        return (
+          <MemberProfile
+            groupId={group.id}
+            memberUserId={memberOpen}
+            displayName={m.display_name}
+            initials={m.initials}
+            standings={standings.find((s) => s.user_id === memberOpen)}
+            onClose={() => setMemberOpen(null)}
+            onOpenPlayer={openPlayer}
+          />
+        );
+      })()}
       {raceOpen && raceReady && (
         <RaceSheet onClose={() => setRaceOpen(false)} />
       )}

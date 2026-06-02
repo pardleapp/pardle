@@ -527,6 +527,39 @@ export default function BetDetail({ betId }: { betId: string }) {
     window.location.href = "/bets";
   }
 
+  const [privateBusy, setPrivateBusy] = useState(false);
+  const [privateOptimistic, setPrivateOptimistic] = useState<
+    boolean | null
+  >(null);
+  const effectivePrivate =
+    privateOptimistic ?? bet?.isPrivate ?? false;
+  async function toggleHideFromGroup() {
+    if (!bet || privateBusy) return;
+    const next = !effectivePrivate;
+    setPrivateBusy(true);
+    setPrivateOptimistic(next);
+    try {
+      const res = await fetch(`/api/bets/${encodeURIComponent(bet.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPrivate: next }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // Mirror into localStorage so the next render reads the new
+      // value even before /api/bets re-fetches on /bets navigation.
+      const local = readBets();
+      const updated = local.map((b) =>
+        b.id === bet.id ? { ...b, isPrivate: next } : b,
+      );
+      writeBets(updated);
+    } catch {
+      // Roll back the optimistic flip on failure.
+      setPrivateOptimistic(effectivePrivate);
+    } finally {
+      setPrivateBusy(false);
+    }
+  }
+
   if (!hydrated) return null;
   if (!bet) {
     return (
@@ -842,6 +875,17 @@ export default function BetDetail({ betId }: { betId: string }) {
             : shareStatus === "err"
             ? "Try again"
             : "Share this bet"}
+        </button>
+        <button
+          type="button"
+          className={`bd-hide-grp${effectivePrivate ? " bd-hide-grp-on" : ""}`}
+          onClick={toggleHideFromGroup}
+          disabled={privateBusy}
+          aria-pressed={effectivePrivate}
+        >
+          {effectivePrivate
+            ? "Hidden from your crew ✓"
+            : "Hide from your crew"}
         </button>
         <button type="button" className="bd-remove" onClick={removeThis}>
           Remove this bet
