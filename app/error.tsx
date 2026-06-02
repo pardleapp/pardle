@@ -29,7 +29,7 @@ export default function ErrorBoundary({
   }, [error]);
 
   return (
-    <main className="container container-wide v4-theme">
+    <main className="container container-wide v4-theme pv-theme">
       <header className="brand brand-split">
         <h1>
           <Link href="/" className="brand-back">

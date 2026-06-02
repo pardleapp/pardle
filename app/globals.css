@@ -19119,36 +19119,53 @@ html.pv-theme-body,
 html.pv-theme-body body {
   background: oklch(0.972 0.009 95) !important;
 }
+/* Brand-bar + hub-nav + auth-chip re-skin — fires either via the
+   legacy JS-stamped html.pv-theme-body class OR (and this is the
+   important addition) the CSS-only :has(.pv-theme) selector so
+   server-rendered static pages (terms, privacy, tipster, share
+   landings, error states) get paper chrome without needing a
+   useEffect to run. */
+body:has(.pv-theme) .brand,
+body:has(.pv-theme) .brand-split,
 html.pv-theme-body .brand,
 html.pv-theme-body .brand-split {
   background: transparent;
   border-bottom: 1px solid oklch(0.90 0.013 95);
   color: oklch(0.26 0.04 155);
 }
+body:has(.pv-theme) .brand h1,
 html.pv-theme-body .brand h1 {
   color: oklch(0.40 0.12 156);
   text-shadow: none;
   filter: none;
 }
+body:has(.pv-theme) .brand h1 a,
+body:has(.pv-theme) .brand-back,
 html.pv-theme-body .brand h1 a,
 html.pv-theme-body .brand-back {
   color: inherit;
   text-decoration: none;
 }
+body:has(.pv-theme) .hub-nav-tabs,
 html.pv-theme-body .hub-nav-tabs {
   background: oklch(0.995 0.004 95);
   border: 1px solid oklch(0.90 0.013 95);
 }
+body:has(.pv-theme) .hub-nav-tab,
 html.pv-theme-body .hub-nav-tab {
   color: oklch(0.50 0.02 150);
 }
+body:has(.pv-theme) .hub-nav-tab:hover,
 html.pv-theme-body .hub-nav-tab:hover {
   color: oklch(0.26 0.04 155);
 }
+body:has(.pv-theme) .hub-nav-tab-active,
 html.pv-theme-body .hub-nav-tab-active {
   color: oklch(0.40 0.12 156);
   background: oklch(0.945 0.012 95);
 }
+body:has(.pv-theme) .auth-chip,
+body:has(.pv-theme) .auth-chip-btn,
 html.pv-theme-body .auth-chip,
 html.pv-theme-body .auth-chip-btn {
   background: oklch(0.995 0.004 95);
@@ -23057,6 +23074,101 @@ html.pv-theme-body .auth-chip-btn {
   padding: 8px 18px 0;
   margin: 0;
   line-height: 1.5;
+}
+
+/* =============================================================
+   Error states + loading skeleton — re-skinned to broadcast paper
+   when their .pv-theme wrapper is active. Default dark styling
+   stays in place for any non-migrated callers.
+   ============================================================= */
+.pv-theme .error-shell {
+  color: var(--pv-ink);
+  text-align: center;
+  padding: 60px 22px;
+}
+.pv-theme .error-eyebrow {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pv-emerald-d);
+}
+.pv-theme .error-title {
+  color: var(--pv-ink);
+  font-size: 24px;
+  font-weight: 900;
+  margin: 10px 0 12px;
+  letter-spacing: -0.005em;
+}
+.pv-theme .error-body {
+  color: var(--pv-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.pv-theme .error-cta {
+  background: var(--pv-emerald);
+  color: #fff;
+  border: 1px solid var(--pv-emerald);
+  border-radius: 999px;
+  padding: 12px 22px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.pv-theme .error-cta:hover {
+  background: var(--pv-emerald-d);
+  border-color: var(--pv-emerald-d);
+}
+.pv-theme .error-cta-quiet {
+  background: var(--pv-card);
+  color: var(--pv-ink);
+  border: 1px solid var(--pv-line);
+  border-radius: 999px;
+  padding: 12px 22px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.pv-theme .error-cta-quiet:hover {
+  background: var(--pv-soft);
+}
+.pv-theme .error-digest {
+  color: var(--pv-dim);
+  font-size: 11.5px;
+}
+.pv-theme .error-digest code {
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  color: var(--pv-ink);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* Skeleton placeholders — soft paper instead of dark blocks. */
+.pv-theme .skeleton-line,
+.pv-theme .skeleton-avatar,
+.pv-theme .skeleton-score {
+  background: linear-gradient(
+    90deg,
+    var(--pv-soft),
+    oklch(0.93 0.012 95),
+    var(--pv-soft)
+  );
+  background-size: 200% 100%;
+  animation: pv-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes pv-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+.pv-theme .skeleton-row {
+  background: var(--pv-card);
+  border-color: var(--pv-line);
+}
+.pv-theme .skeleton-row-wrap {
+  background: transparent;
 }
 
 /* "Your bets" section heading above the bet posts */

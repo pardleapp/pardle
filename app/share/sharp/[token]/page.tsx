@@ -86,7 +86,7 @@ export default async function SharpSharePage({ params }: PageProps) {
         : "poor";
 
   return (
-    <main className="container container-wide v4-theme">
+    <main className="container container-wide v4-theme pv-theme">
       <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
         <div className="brand-nav">

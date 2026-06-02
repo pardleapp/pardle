@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 export default async function BetDetailPage({ params }: PageProps) {
   const { id } = await params;
   return (
-    <main className="container container-wide v4-theme">
+    <main className="container container-wide v4-theme pv-theme">
       <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
         <div className="brand-nav">

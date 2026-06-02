@@ -22,7 +22,7 @@ export default function FeedSkeleton({ hintMs }: Props) {
     hintMs && hintMs > 200 ? (hintMs / 1000).toFixed(1) : null;
 
   return (
-    <section className="feed-wrap v4-theme">
+    <section className="feed-wrap v4-theme pv-theme">
       <div className="feed-header-row">
         <div className="skeleton-line skeleton-line-title" />
       </div>

@@ -152,7 +152,7 @@ export default async function PlayerTournamentPage({
   const payload = await getCachedHistoricalRounds(eventIdNum, yearNum);
   if (!payload) {
     return (
-      <main className="container container-wide v4-theme">
+      <main className="container container-wide v4-theme pv-theme">
         <header className="brand">
           <Link
             className="brand-back"
@@ -176,7 +176,7 @@ export default async function PlayerTournamentPage({
   const player = name ? findPlayer(payload.scores, name) : null;
   if (!player) {
     return (
-      <main className="container container-wide v4-theme">
+      <main className="container container-wide v4-theme pv-theme">
         <header className="brand">
           <Link
             className="brand-back"

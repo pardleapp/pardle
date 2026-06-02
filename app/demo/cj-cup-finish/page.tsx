@@ -167,7 +167,7 @@ export default function CjCupDemoPage() {
   const finalValue = BET.payout;
 
   return (
-    <main className="container container-wide v4-theme">
+    <main className="container container-wide v4-theme pv-theme">
       <header className="brand brand-split">
         <h1>Pardle</h1>
         <div className="brand-nav">
@@ -177,7 +177,7 @@ export default function CjCupDemoPage() {
         </div>
       </header>
 
-      <section className="feed-wrap v4-theme" style={{ paddingBottom: 80 }}>
+      <section className="feed-wrap v4-theme pv-theme" style={{ paddingBottom: 80 }}>
         <p
           style={{
             margin: "0 0 6px",
