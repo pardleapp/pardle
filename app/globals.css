@@ -9594,6 +9594,24 @@ footer {
    (100dvh shrinks with the iOS keyboard so the composer stays
    visible — that's the whole point of this route).
    ============================================================= */
+/* Lock the document scroll while the full-screen chat overlay is
+   mounted. The page sits on top via position: fixed, but the
+   body underneath still contains the site-footer + bottom-nav
+   in natural flow — if any of those (or a stray wide descendant
+   anywhere on the page) widens the body past viewport, the user
+   can swipe the page horizontally even though .chat-fs itself
+   doesn't move. Belt-and-braces: kill horizontal AND vertical
+   scroll on html/body while chat-fs is in the DOM. */
+html:has(.chat-fs),
+body:has(.chat-fs) {
+  overflow: hidden !important;
+  /* Pin width so a future descendant can't push the body
+     scrollWidth past clientWidth. */
+  width: 100%;
+  max-width: 100vw;
+  position: relative;
+}
+
 .pv-theme.chat-fs {
   position: fixed;
   inset: 0;
