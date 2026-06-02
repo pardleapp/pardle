@@ -9299,6 +9299,15 @@ footer {
   flex-direction: column;
   min-height: 420px;
   max-height: 560px;
+  /* Flex-item safety so the inline chat (inside a card on
+     /groups) doesn't blow out when a long-message bubble's
+     min-content exceeds the card width. Same reason the full-
+     screen variant needs it on every flex ancestor — propagating
+     min-width: 0 up the chain so the bubble's max-width %
+     actually takes effect. */
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 .chat-scroll {
   flex: 1 1 auto;
@@ -9588,11 +9597,16 @@ footer {
 .pv-theme.chat-fs {
   position: fixed;
   inset: 0;
+  /* Width pin: inset:0 sets left+right to 0 which yields
+     viewport-width, but be explicit + set max-width so a wide
+     descendant can never push the root past the viewport.
+     Use 100% (not 100vw — vw includes the scrollbar gutter on
+     desktop Safari and would overflow by ~15px). */
+  width: 100%;
+  max-width: 100vw;
+  min-width: 0;
   height: 100dvh;
-  /* Fallback for browsers without dvh support — keep the
-     composer visible by sizing the body section to fill what's
-     left after the head, and trusting position: fixed to anchor
-     us to the visual viewport. */
+  /* Fallback for browsers without dvh support. */
   height: 100vh;
   height: 100dvh;
   display: flex;
@@ -9602,16 +9616,28 @@ footer {
   /* Block iOS rubber-band scroll on the page itself; the inner
      .chat-scroll handles its own scroll. */
   overscroll-behavior: contain;
+  /* Clip > hidden — guarantees no descendant can produce a
+     horizontal scroll on the page even if its min-content
+     exceeds the viewport. The original right-edge clip bug came
+     from this missing on the root. */
+  overflow-x: clip;
+  box-sizing: border-box;
 }
 .pv-theme.chat-fs .chat-fs-head {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px calc(12px + env(safe-area-inset-top, 0px));
-  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  /* Notch-aware top padding; horizontal padding pulled in so the
+     title and back button always sit inside the viewport. The
+     previous 3-value shorthand mistakenly put safe-area-inset-
+     TOP on the bottom edge. */
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 14px 12px;
   border-bottom: 1px solid var(--pv-line);
   background: var(--pv-card);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .pv-theme.chat-fs .chat-fs-back {
   width: 36px;
@@ -9633,8 +9659,12 @@ footer {
   background: var(--pv-soft);
 }
 .pv-theme.chat-fs .chat-fs-title {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
+  /* Belt-and-braces: overflow hidden on the title column so a
+     long group name truncates instead of pushing the back
+     button or the header itself off-screen. */
+  overflow: hidden;
 }
 .pv-theme.chat-fs .chat-fs-name {
   font-size: 16px;
@@ -9654,8 +9684,16 @@ footer {
 .pv-theme.chat-fs .chat-fs-body {
   flex: 1 1 auto;
   min-height: 0;
+  /* Critical for the overflow fix: as a flex item of .chat-fs
+     (column flex), default min-width is min-content. A wide
+     descendant min-content would push .chat-fs-body past the
+     viewport width. min-width: 0 forces it to honour the parent
+     width regardless of children. */
+  min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
   /* The .chat-stack inside fills this — its flex layout puts the
      scroll region above the sticky composer. */
 }
@@ -9663,6 +9701,10 @@ footer {
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
+  /* Same reason — flex item of .chat-fs-body (column flex). */
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* The expand icon + "Open chat ›" trailer below the inline chat
