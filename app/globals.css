@@ -22412,10 +22412,21 @@ html.pv-theme-body .auth-chip-btn {
   margin: 0;
   padding: 0;
 }
-.lb-row {
+/* The legacy .lb-row rule at L6446 (still used by the embedded
+   LeaderboardPanel in the feed) makes .lb-row a 6-column grid.
+   Scope the redesigned rule under .lb-pv so it wins on specificity
+   and explicitly reset display:block — otherwise the <li>'s
+   inherited grid squishes the inner .lb-row-btn into a 28px
+   first-column cell, hiding the player name and overlapping the
+   bet-tag onto the Today number. */
+.lb-pv .lb-row {
+  display: block;
+  grid-template-columns: none;
+  padding: 0;
+  border-top: none;
   border-bottom: 1px solid var(--pv-line);
 }
-.lb-row-mine {
+.lb-pv .lb-row-mine {
   background: oklch(0.97 0.02 145);
 }
 /* Row is a true CSS grid — every column has a hard width except

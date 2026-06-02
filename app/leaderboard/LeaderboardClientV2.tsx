@@ -67,14 +67,16 @@ function gradientFor(seed: string): [string, string] {
   return PALETTE[Math.abs(h) % PALETTE.length];
 }
 
-function Headshot({ name }: { name: string }) {
-  // Mock-only mode — always render the gradient + initials avatar
-  // so no row ever shows a "?" placeholder from a failed remote
-  // headshot. When real wiring lands the playerId-keyed Cloudinary
-  // URL gets layered on top with an onError fallback to this same
-  // gradient.
+function Headshot({ name, photo }: { name: string; photo?: string }) {
+  // Initials + per-player gradient is the always-on baseline so a
+  // row never shows a bare circle. When a `photo` URL is supplied
+  // it stacks on top (covers the initials on load) and falls back
+  // to the initials on broken image via the .lb-av img CSS rule.
+  // Real PGA headshot URLs wire in once /leaderboard reads from
+  // /api/feed; mock-only mode passes no photo and shows initials.
   const initials = lastNameInitials(name);
   const [from, to] = gradientFor(initials);
+  const [photoFailed, setPhotoFailed] = useState(false);
   return (
     <span
       className="lb-av"
@@ -82,6 +84,14 @@ function Headshot({ name }: { name: string }) {
       style={{ background: `linear-gradient(135deg, ${from}, ${to})` }}
     >
       <span className="lb-av-init">{initials}</span>
+      {photo && !photoFailed && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={photo}
+          alt=""
+          onError={() => setPhotoFailed(true)}
+        />
+      )}
     </span>
   );
 }
