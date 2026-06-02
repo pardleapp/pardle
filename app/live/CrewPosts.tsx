@@ -181,6 +181,12 @@ export function CrewBetPost({
           ))}
         </div>
       )}
+      {reactionState && onToggleReaction && (
+        <ReactionChips
+          state={reactionState}
+          onToggle={onToggleReaction}
+        />
+      )}
       <div className="bp-foot">
         <button type="button" className="bp-foot-act">
           <svg
@@ -229,12 +235,6 @@ export function CrewBetPost({
           </span>
         )}
       </div>
-      {reactionState && onToggleReaction && (
-        <ReactionChips
-          state={reactionState}
-          onToggle={onToggleReaction}
-        />
-      )}
     </article>
     {tray}
     </>

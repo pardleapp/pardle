@@ -150,6 +150,7 @@ export const DEMO_EMOJI_REACTIONS: Record<
   string,
   { counts: Record<string, number>; mine: string[] }
 > = {
+  // Shot cards
   "shot:demo-1": { counts: { "🔥": 12, "👏": 4, "⛳": 3 }, mine: [] },
   "shot:demo-2": { counts: { "💀": 8, "😱": 3 }, mine: [] },
   "shot:demo-5": {
@@ -157,6 +158,28 @@ export const DEMO_EMOJI_REACTIONS: Record<
     mine: ["🔥"],
   },
   "shot:demo-4": { counts: { "😱": 6, "💀": 2 }, mine: [] },
+  // Crew (bet/result/tip) cards — keys match MOCK_CREW_POSTS ids
+  // with the `crew:` prefix FeedClient stamps on them.
+  "crew:crew-bet-jordan-henley": {
+    counts: { "🔥": 12, "😱": 4, "⛳": 3 },
+    mine: [],
+  },
+  "crew:crew-bet-sam-brennan": {
+    counts: { "💀": 6, "😬": 2 },
+    mine: [],
+  },
+  "crew:crew-result-mia-smalley": {
+    counts: { "🎉": 9, "💸": 3 },
+    mine: ["🎉"],
+  },
+  "crew:crew-bet-theo-aberg": {
+    counts: { "😱": 5, "💀": 2 },
+    mine: [],
+  },
+  "crew:crew-tip-edge-echavarria": {
+    counts: { "👀": 4, "🤔": 2 },
+    mine: [],
+  },
 };
 
 /** Whole envelope the FeedClient consumes. Only fields the Sweat

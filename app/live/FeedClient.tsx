@@ -426,6 +426,28 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     },
     [],
   );
+  // Long-press pick is always an ADD — never a toggle-off. Re-picking
+  // the same emoji is idempotent so the pill stays put. The tap-pill
+  // path (`toggleEmojiReaction` above) is what removes a reaction.
+  const addEmojiReaction = useCallback(
+    (eventId: string, emoji: string) => {
+      setEmojiReactions((all) => {
+        const cur: ReactionState = all[eventId] ?? { counts: {}, mine: [] };
+        if (cur.mine.includes(emoji)) return all;
+        return {
+          ...all,
+          [eventId]: {
+            counts: {
+              ...cur.counts,
+              [emoji]: (cur.counts[emoji] ?? 0) + 1,
+            },
+            mine: [...cur.mine, emoji],
+          },
+        };
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1131,7 +1153,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                         }
                         onCustomReact={(emoji) => {
                           void sendBurst(emoji);
-                          toggleEmojiReaction(`bet:${__bet.id}`, emoji);
+                          addEmojiReaction(`bet:${__bet.id}`, emoji);
                         }}
                         reactionState={emojiReactions[`bet:${__bet.id}`]}
                         onToggleReaction={(emoji) =>
@@ -1156,7 +1178,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                         post={p}
                         onCustomReact={(emoji) => {
                           void sendBurst(emoji);
-                          toggleEmojiReaction(`crew:${p.id}`, emoji);
+                          addEmojiReaction(`crew:${p.id}`, emoji);
                         }}
                         reactionState={emojiReactions[`crew:${p.id}`]}
                         onToggleReaction={(emoji) =>
@@ -1169,7 +1191,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                         post={p}
                         onCustomReact={(emoji) => {
                           void sendBurst(emoji);
-                          toggleEmojiReaction(`crew:${p.id}`, emoji);
+                          addEmojiReaction(`crew:${p.id}`, emoji);
                         }}
                         reactionState={emojiReactions[`crew:${p.id}`]}
                         onToggleReaction={(emoji) =>
@@ -1182,7 +1204,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                         post={p}
                         onCustomReact={(emoji) => {
                           void sendBurst(emoji);
-                          toggleEmojiReaction(`crew:${p.id}`, emoji);
+                          addEmojiReaction(`crew:${p.id}`, emoji);
                         }}
                         reactionState={emojiReactions[`crew:${p.id}`]}
                         onToggleReaction={(emoji) =>
@@ -1230,9 +1252,10 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                     showDiagram={isNotable}
                     onCustomReact={(emoji) => {
                       // Float-up across the page + bump the chip
-                      // cluster on this card.
+                      // cluster on this card. Long-press adds (never
+                      // toggles off); tap-pill below toggles.
                       void sendBurst(emoji);
-                      toggleEmojiReaction(`shot:${event.id}`, emoji);
+                      addEmojiReaction(`shot:${event.id}`, emoji);
                     }}
                     reactionState={emojiReactions[`shot:${event.id}`]}
                     onToggleReaction={(emoji) =>
