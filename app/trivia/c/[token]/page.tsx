@@ -197,7 +197,7 @@ export default function TriviaChallengePage() {
       fetchError !== null ||
       (token.length > SHORT_ID_MAX && !inlinePayload);
     return (
-      <main className="container">
+      <main className="container pv-theme">
         <header className="brand">
           <Link className="brand-back" href="/games" aria-label="All games">
             ←
@@ -230,7 +230,7 @@ export default function TriviaChallengePage() {
   // INTRO — friend's first view: who challenged them + start button.
   if (intro) {
     return (
-      <main className="container">
+      <main className="container pv-theme">
         <header className="brand">
           <Link className="brand-back" href="/games" aria-label="All games">
             ←
@@ -290,7 +290,7 @@ export default function TriviaChallengePage() {
   // ACTIVE QUESTION
   if (!isFinished && currentQ) {
     return (
-      <main className="container">
+      <main className="container pv-theme">
         <header className="brand">
           <Link className="brand-back" href="/games" aria-label="All games">
             ←
@@ -452,7 +452,7 @@ export default function TriviaChallengePage() {
   const tied = myCorrect === payload.s;
 
   return (
-    <main className="container">
+    <main className="container pv-theme">
       <header className="brand">
         <Link className="brand-back" href="/games" aria-label="All games">
           ←

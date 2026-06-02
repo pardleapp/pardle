@@ -74,7 +74,7 @@ export default async function ChallengeLandingPage({ params }: Params) {
 
   if (!decoded || !decoded.game) {
     return (
-      <main className="container share-landing">
+      <main className="container share-landing pv-theme">
         <h1>{BRAND.name}</h1>
         <p>This challenge link couldn&apos;t be read.</p>
         <Link href="/" className="share-cta">
@@ -95,7 +95,7 @@ export default async function ChallengeLandingPage({ params }: Params) {
   const playHref = `/${decoded.game}?c=${token}`;
 
   return (
-    <main className="container share-landing">
+    <main className="container share-landing pv-theme">
       <header className="brand">
         <Link className="brand-back" href="/games" aria-label="All games">
           ←

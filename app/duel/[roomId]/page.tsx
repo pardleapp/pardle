@@ -244,7 +244,7 @@ export default function DuelGamePage() {
 
   if (fetchError === "not_found") {
     return (
-      <main className="container">
+      <main className="container pv-theme">
         <header className="brand">
           <Link className="brand-back" href="/games" aria-label="All games">
             ←
@@ -267,7 +267,7 @@ export default function DuelGamePage() {
 
   if (!room) {
     return (
-      <main className="container">
+      <main className="container pv-theme">
         <header className="brand">
           <Link className="brand-back" href="/games" aria-label="All games">
             ←
@@ -289,7 +289,7 @@ export default function DuelGamePage() {
     (room.status !== "waiting" || activePlayers.length >= MAX_PLAYERS);
 
   return (
-    <main className="container">
+    <main className="container pv-theme">
       <header className="brand">
         <Link className="brand-back" href="/games" aria-label="All games">
           ←

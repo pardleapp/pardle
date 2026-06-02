@@ -51,7 +51,7 @@ export default async function ShareLandingPage({ params }: Params) {
   if (!payload) {
     // Bad / forged token — just show the hub.
     return (
-      <main className="container share-landing">
+      <main className="container share-landing pv-theme">
         <h1>{BRAND.name}</h1>
         <p>This share link couldn&apos;t be read.</p>
         <Link href="/" className="share-cta">
@@ -68,7 +68,7 @@ export default async function ShareLandingPage({ params }: Params) {
   // For the on-page preview we render the same grid we render in the
   // OG image, but smaller and inline. Same colour palette.
   return (
-    <main className="container share-landing">
+    <main className="container share-landing pv-theme">
       <header className="brand">
         <Link className="brand-back" href="/games" aria-label="All games">
           ←

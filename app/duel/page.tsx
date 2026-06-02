@@ -84,7 +84,7 @@ export default function DuelLandingPage() {
   }
 
   return (
-    <main className="container">
+    <main className="container pv-theme">
       <header className="brand">
         <Link className="brand-back" href="/games" aria-label="All games">
           ←

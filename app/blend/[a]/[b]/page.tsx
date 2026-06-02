@@ -43,7 +43,7 @@ export default async function BlendLanding({ params }: Params) {
   const tweetIntent = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(pageUrl)}`;
 
   return (
-    <main className="container blend-landing">
+    <main className="container blend-landing pv-theme">
       <header className="brand">
         <Link className="brand-back" href="/blend" aria-label="Make another blend">
           ←

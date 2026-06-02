@@ -4038,6 +4038,97 @@ footer {
   color: var(--pv-ink);
 }
 
+/* Sweep — kill selector-targeted dark @media overrides that hit
+   the daily-puzzle + challenge + fantasy + share surfaces.
+   Each pair below pins the .pv-theme'd render to broadcast paper
+   regardless of OS dark preference. */
+.pv-theme .conn-tile,
+:has(.pv-theme) .conn-tile {
+  background: var(--pv-card);
+  color: var(--pv-ink);
+}
+.pv-theme .conn-tile:hover,
+:has(.pv-theme) .conn-tile:hover {
+  background: var(--pv-soft);
+}
+.pv-theme .hole-input,
+:has(.pv-theme) .hole-input {
+  background: var(--pv-card);
+  color: var(--pv-ink);
+  border-color: var(--pv-line);
+}
+.pv-theme .tutorial-card,
+:has(.pv-theme) .tutorial-card {
+  background: var(--pv-card);
+  color: var(--pv-ink);
+}
+.pv-theme .welcome-card,
+:has(.pv-theme) .welcome-card {
+  background: var(--pv-card);
+  color: var(--pv-ink);
+}
+.pv-theme .welcome-item,
+:has(.pv-theme) .welcome-item {
+  background: var(--pv-soft);
+  color: var(--pv-ink);
+}
+.pv-theme .challenge-banner,
+:has(.pv-theme) .challenge-banner {
+  background: oklch(0.96 0.04 60);
+  color: var(--pv-ink);
+  border-color: oklch(0.88 0.07 60);
+}
+.pv-theme .challenge-banner.challenge-expired,
+:has(.pv-theme) .challenge-banner.challenge-expired {
+  background: var(--pv-soft);
+  color: var(--pv-muted);
+  border-color: var(--pv-line);
+}
+.pv-theme .answer-card-streak,
+:has(.pv-theme) .answer-card-streak {
+  color: var(--pv-tang);
+}
+/* Fantasy: auth input + member rows + invite box */
+.pv-theme .fantasy-auth-input,
+:has(.pv-theme) .fantasy-auth-input {
+  background: var(--pv-card);
+  color: var(--pv-ink);
+  border-color: var(--pv-line);
+}
+.pv-theme .fantasy-member-row,
+.pv-theme .fantasy-invite-box,
+:has(.pv-theme) .fantasy-member-row,
+:has(.pv-theme) .fantasy-invite-box {
+  background: var(--pv-card);
+  color: var(--pv-ink);
+  border-color: var(--pv-line);
+}
+.pv-theme .fantasy-invite-value,
+:has(.pv-theme) .fantasy-invite-value {
+  background: var(--pv-soft);
+  color: var(--pv-ink);
+}
+.pv-theme .fantasy-steps li,
+:has(.pv-theme) .fantasy-steps li {
+  border-color: var(--pv-line);
+}
+/* Player-search dropdown used in fantasy + faces multiplayer flows */
+.pv-theme .psearch-input,
+.pv-theme .psearch-list,
+.pv-theme .psearch-empty,
+:has(.pv-theme) .psearch-input,
+:has(.pv-theme) .psearch-list,
+:has(.pv-theme) .psearch-empty {
+  background: var(--pv-card);
+  color: var(--pv-ink);
+  border-color: var(--pv-line);
+}
+.pv-theme .psearch-row:hover,
+:has(.pv-theme) .psearch-row:hover {
+  background: var(--pv-soft);
+  color: var(--pv-emerald-d);
+}
+
 /* ---------- /faces ---------- */
 
 .faces-hint {
