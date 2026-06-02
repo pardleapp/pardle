@@ -1,41 +1,37 @@
 "use client";
 
 /**
- * GroupsClient — /groups surface, full rebuild matching the design-
- * handoff prototype's <Groups> + <MemberProfile> + <RaceSheet> +
- * <CreateGroup>. Mock data drives the first cut; real wiring lands
- * once the Supabase groups / group_members tables exist.
+ * GroupsClient — /groups surface for a single active group. Reads
+ * the group + members from real Supabase tables (the page server-
+ * fetches them and passes both as props).
  *
  * Sections top → bottom:
- *   1. Group header card (name + member count + P&L race button +
- *      invite link with Copy → Copied ✓ flip).
- *   2. Standings · today — top 5 of today's P&L race, each row
- *      tappable into a member profile overlay.
- *   3. Most backed in your group — player + market chip + backer
- *      avatar stack + "N on it"; tap routes to /live/player/[name].
- *   4. Members · 9 — collapsible dropdown with the full member
- *      list (avatars + role tags + today P&L).
- *   5. Footer — Mute notifications + Leave group.
+ *   1. Group header card — name, real member count, P&L race
+ *      button, invite link (pardle.app/c/{code}) with Copy → ✓.
+ *   2. Standings · today — derived from real members' tracked
+ *      bets. Empty until step 3 wires the aggregation; for now
+ *      shows an "Invite your crew to start the race" placeholder
+ *      whenever there are fewer than 2 members (or no bets).
+ *   3. Most backed in your group — same: empty placeholder until
+ *      step 3 reads real member bets.
+ *   4. Members — real group_members rows, joined with profile
+ *      display names. New members without a profile show as
+ *      "Member" with UUID-derived initials.
+ *   5. Footer — Mute notifications + Leave group (Leave wires in
+ *      step 3; placeholder buttons for now).
  *
- * Member profile + race sheet are full-screen overlays mounted at
- * the same layer; when the user opens a player from a member's bet
- * we close the member overlay first so the route change doesn't
- * leave it stranded (z-index gotcha called out in the brief).
+ * The mock data in mock-groups.ts is intentionally not imported
+ * here anymore — a freshly-created group must never inject fake
+ * members. Mock content lives only in the optional seed file
+ * (supabase/seed/seed_the_lads.sql) for the dev-test path.
  */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  RACE,
-  MEMBERS,
-  MOST_POPULAR,
-} from "./mock-groups";
 import MemberProfile from "./MemberProfile";
 import RaceSheet from "./RaceSheet";
+import type { GroupMemberRow } from "@/lib/groups/server";
 
-/** Real group data fetched server-side and passed into the client.
- *  Step 2: header reads from real DB; standings/most-backed/members
- *  still mock until step 3 wires them from member bets. */
 export interface ActiveGroup {
   id: string;
   name: string;
@@ -43,11 +39,6 @@ export interface ActiveGroup {
   member_count: number;
   role: "admin" | "member";
 }
-
-/** Map each Most-Backed entry to the matching group-market bet id
- *  in app/bets/mock-bets.ts (gb1–gb4). Index-aligned with
- *  MOST_POPULAR so the order is stable. */
-const MOST_BACKED_BET_IDS = ["gb1", "gb2", "gb3", "gb4"];
 
 const PALETTE: Record<string, string> = {
   JO: "linear-gradient(135deg,#5cd7c1,#1f8b6e)",
@@ -89,19 +80,16 @@ function Av({
 
 interface GroupsClientProps {
   group: ActiveGroup;
+  members: GroupMemberRow[];
 }
 
-export default function GroupsClient({ group }: GroupsClientProps) {
+export default function GroupsClient({ group, members }: GroupsClientProps) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [memOpen, setMemOpen] = useState(false);
   const [memberOpen, setMemberOpen] = useState<string | null>(null);
   const [raceOpen, setRaceOpen] = useState(false);
 
-  // Invite link in the same shape as crew-challenge links so the
-  // header copy reads the same across surfaces. The /c/[token]
-  // landing detects 8-char unambiguous-alphabet codes and routes
-  // to the group-invite landing.
   const inviteLink =
     typeof window !== "undefined"
       ? `${window.location.origin}/c/${group.invite_code}`
@@ -121,6 +109,13 @@ export default function GroupsClient({ group }: GroupsClientProps) {
     setMemberOpen(null);
     router.push(`/live/player/${encodeURIComponent(name)}`);
   };
+
+  // Step 2.5: until step 3 aggregates real bets, treat any group
+  // as "race not started yet". A solo group (just you) always sits
+  // in this state — you can't race against yourself. Once member
+  // bets are wired (step 3) this flips to the real standings.
+  const raceReady = false;
+  const mostBackedReady = false;
 
   return (
     <section className="groups-pv">
@@ -143,6 +138,8 @@ export default function GroupsClient({ group }: GroupsClientProps) {
               type="button"
               className="grp-race-btn"
               onClick={() => setRaceOpen(true)}
+              disabled={!raceReady}
+              aria-disabled={!raceReady}
             >
               P&amp;L race
             </button>
@@ -162,67 +159,40 @@ export default function GroupsClient({ group }: GroupsClientProps) {
           </div>
         </div>
 
-        {/* Standings · today */}
+        {/* Standings · today — empty state until member bets are
+            wired in step 3. */}
         <section>
           <div className="grp-slabel">Standings · today</div>
-          <div className="grp-card grp-list">
-            {RACE.today.map((r, i) => (
-              <button
-                key={r.name}
-                type="button"
-                className={`racerow${r.name === "You" ? " racerow-you" : ""}`}
-                onClick={() => setMemberOpen(r.name)}
-              >
-                <span className="racerow-rk">{i + 1}</span>
-                <Av initials={r.initials} size={32} />
-                <span className="racerow-nm">
-                  {r.name === "You" ? <b>You</b> : r.name}
-                  {i === 0 && " 👑"}
-                </span>
-                <span className={`racerow-pl ${r.dir}`}>{r.pl}</span>
-              </button>
-            ))}
+          <div className="grp-card grp-empty">
+            <div className="grp-empty-emoji" aria-hidden="true">
+              🏁
+            </div>
+            <div className="grp-empty-title">
+              {group.member_count === 1
+                ? "Invite your crew to start the race"
+                : "No tracked bets in the group yet"}
+            </div>
+            <div className="grp-empty-blurb">
+              The P&amp;L race lights up once two or more members have
+              tracked bets. Share the invite link to add people, then
+              start logging picks.
+            </div>
           </div>
         </section>
 
-        {/* Most backed */}
+        {/* Most backed in your group — empty state until member
+            bets are wired. */}
         <section>
           <div className="grp-slabel">Most backed in your group</div>
-          <div className="grp-card grp-most">
-            {MOST_POPULAR.map((b, i) => {
-              // Tap → /bets/[gbN] (the group-market bet detail —
-              // same shape as the My-bets detail, but `mine:false`
-              // so the header + tailed-by copy renders the group
-              // view).
-              const betId = MOST_BACKED_BET_IDS[i];
-              return (
-                <button
-                  key={b.player}
-                  type="button"
-                  className="pop-row"
-                  onClick={() => {
-                    if (betId) router.push(`/bets/${betId}`);
-                  }}
-                >
-                  <div className="pop-nm">
-                    {b.player}
-                    <span className="bp-bet-mkt">{b.market}</span>
-                  </div>
-                  <span className="pop-back">
-                    <span className="pop-back-row">
-                      {b.backers.map((a) => (
-                        <Av key={a} initials={a} size={24} />
-                      ))}
-                    </span>
-                    <span className="pop-ct">{b.count} on it</span>
-                  </span>
-                </button>
-              );
-            })}
+          <div className="grp-card grp-empty grp-empty-tight">
+            <div className="grp-empty-blurb">
+              Nobody&rsquo;s tracked a bet in this group yet. Open
+              the Bets tab and log one to be the first.
+            </div>
           </div>
         </section>
 
-        {/* Members · 9 — collapsible */}
+        {/* Members — real group_members rows. */}
         <section>
           <button
             type="button"
@@ -237,28 +207,36 @@ export default function GroupsClient({ group }: GroupsClientProps) {
           </button>
           {memOpen && (
             <div className="grp-card grp-mem-list">
-              {MEMBERS.map((m) => (
-                <button
-                  key={m.name}
-                  type="button"
-                  className="mem-row"
-                  onClick={() => setMemberOpen(m.name)}
-                >
-                  <Av initials={m.initials} size={32} />
-                  <div className="mem-row-bd">
-                    <div className="mem-row-nm">
-                      {m.name}
-                      {m.role && <span className="role-tag">{m.role}</span>}
+              {members.length === 0 ? (
+                <div className="grp-empty-blurb">No members yet.</div>
+              ) : (
+                members.map((m) => (
+                  <button
+                    key={m.user_id}
+                    type="button"
+                    className="mem-row"
+                    onClick={() =>
+                      m.is_me ? null : setMemberOpen(m.display_name)
+                    }
+                    disabled={m.is_me}
+                  >
+                    <Av initials={m.initials} size={32} />
+                    <div className="mem-row-bd">
+                      <div className="mem-row-nm">
+                        {m.is_me ? <b>{m.display_name}</b> : m.display_name}
+                        {m.role === "admin" && (
+                          <span className="role-tag">admin</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <span className={`mem-row-pl ${m.dir}`}>{m.pl}</span>
-                </button>
-              ))}
+                  </button>
+                ))
+              )}
             </div>
           )}
         </section>
 
-        {/* Footer actions */}
+        {/* Footer actions — wired to real Supabase in a follow-up. */}
         <div className="grp-footer">
           <button type="button" className="grp-mute">
             Mute notifications
@@ -276,7 +254,9 @@ export default function GroupsClient({ group }: GroupsClientProps) {
           onOpenPlayer={openPlayer}
         />
       )}
-      {raceOpen && <RaceSheet onClose={() => setRaceOpen(false)} />}
+      {raceOpen && raceReady && (
+        <RaceSheet onClose={() => setRaceOpen(false)} />
+      )}
     </section>
   );
 }

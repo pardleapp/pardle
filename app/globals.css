@@ -25129,6 +25129,43 @@ html.pv-theme-body .auth-chip-btn {
   color: var(--pv-ink);
 }
 
+/* Empty-state cards shown inside a group when there are no
+   tracked bets yet (standings, most-backed). Tight variant
+   skips the emoji + title for the smaller "most backed" slot. */
+.pv-theme .grp-empty {
+  padding: 22px 18px;
+  text-align: center;
+  color: var(--pv-ink);
+}
+.pv-theme .grp-empty-tight {
+  padding: 14px 18px;
+}
+.pv-theme .grp-empty-emoji {
+  font-size: 30px;
+  line-height: 1;
+}
+.pv-theme .grp-empty-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--pv-ink);
+  margin-top: 10px;
+}
+.pv-theme .grp-empty-blurb {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--pv-muted);
+  margin-top: 6px;
+}
+/* P&L race button is muted when there's nothing to race against
+   (solo group / no member bets yet). */
+.pv-theme .grp-race-btn:disabled,
+.pv-theme .grp-race-btn[aria-disabled="true"] {
+  background: transparent;
+  border: 1px solid var(--pv-line);
+  color: var(--pv-muted);
+  cursor: not-allowed;
+}
+
 /* =============================================================
    GamesHub overlay — daily-puzzle hub opened from the Sweat Feed
    header's controller icon. Reconciled against the prototype's

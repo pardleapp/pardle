@@ -19,7 +19,7 @@ import SweatHeader from "../live/SweatHeader";
 import GroupsClient from "./GroupsClient";
 import GroupsEmpty from "./GroupsEmpty";
 import GroupsSignedOut from "./GroupsSignedOut";
-import { listMyGroups } from "@/lib/groups/server";
+import { listMyGroups, listGroupMembers } from "@/lib/groups/server";
 
 export const metadata = {
   title: `Groups — ${BRAND.name}`,
@@ -45,7 +45,9 @@ export default async function GroupsPage() {
     } else {
       // First group is the "active" one for now — multi-group
       // navigation via the space-switcher lands in a follow-up.
-      body = <GroupsClient group={groups[0]} />;
+      const active = groups[0];
+      const members = await listGroupMembers(active.id);
+      body = <GroupsClient group={active} members={members} />;
     }
   }
 

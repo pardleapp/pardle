@@ -45,6 +45,30 @@ export interface GroupSummary {
   role: "admin" | "member";
 }
 
+export interface GroupMemberRow {
+  user_id: string;
+  display_name: string;
+  initials: string;
+  role: "admin" | "member";
+  joined_at: string;
+  is_me: boolean;
+}
+
+function deriveInitials(name: string, fallbackId: string): string {
+  if (!name || name === "Member") {
+    // Stable per-user fallback — first two hex chars of the user
+    // UUID. Looks like "7C" / "8B" — reads as initials, doesn't
+    // ever collide with another user.
+    return fallbackId.replace(/-/g, "").slice(0, 2).toUpperCase();
+  }
+  if (name === "You") return "YO";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+}
+
 /** Get the current authenticated user's id, or null. */
 export async function getAuthUserId(): Promise<string | null> {
   const supabase = await getSupabaseServer();
@@ -165,6 +189,58 @@ export async function getGroupByInviteCode(
     name: group.name,
     member_count: count ?? 1,
   };
+}
+
+/** List the real members of a group from the DB, joined with their
+ *  profile display names. New users without a profile row are shown
+ *  as "You" (for the caller) or "Member" (for others), with initials
+ *  derived from the UUID so the avatar still reads. */
+export async function listGroupMembers(
+  groupId: string,
+): Promise<GroupMemberRow[]> {
+  const supabase = await getSupabaseServer();
+  const { data: userData } = await supabase.auth.getUser();
+  const currentUserId = userData.user?.id ?? null;
+
+  const admin = getSupabaseAdmin();
+  const { data: memberRows } = await admin
+    .from("group_members")
+    .select("user_id, role, joined_at")
+    .eq("group_id", groupId)
+    .order("joined_at", { ascending: true });
+  const members =
+    (memberRows ?? []) as Array<{
+      user_id: string;
+      role: string;
+      joined_at: string;
+    }>;
+  if (members.length === 0) return [];
+
+  const userIds = members.map((m) => m.user_id);
+  const { data: profileRows } = await admin
+    .from("profiles")
+    .select("user_id, display_name")
+    .in("user_id", userIds);
+  const profiles =
+    (profileRows ?? []) as Array<{
+      user_id: string;
+      display_name: string | null;
+    }>;
+  const nameById = new Map(profiles.map((p) => [p.user_id, p.display_name]));
+
+  return members.map((m) => {
+    const profileName = nameById.get(m.user_id) ?? null;
+    const isMe = m.user_id === currentUserId;
+    const displayName = profileName || (isMe ? "You" : "Member");
+    return {
+      user_id: m.user_id,
+      display_name: displayName,
+      initials: deriveInitials(displayName, m.user_id),
+      role: m.role as "admin" | "member",
+      joined_at: m.joined_at,
+      is_me: isMe,
+    };
+  });
 }
 
 /** Add the current user to a group via its invite code. Idempotent —
