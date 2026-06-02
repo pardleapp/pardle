@@ -43,12 +43,29 @@ const REACT_EMOJIS = ["🔥", "😱", "⛳", "👏", "💀", "🐐"];
 const HOLD_THRESHOLD_MS = 300;
 const DRAG_CANCEL_PX = 8;
 
-const SURFACE_STYLE: CSSProperties = {
+const SURFACE_STYLE_BASE: CSSProperties = {
   touchAction: "manipulation",
   userSelect: "none",
   WebkitUserSelect: "none",
   WebkitTouchCallout: "none",
+  transition:
+    "transform 0.18s cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 0.18s ease",
 };
+
+/** Inline style applied to the surface during the lifted state.
+ *  z-index pulls the card above the scrim; transform scale + soft
+ *  lift shadow is the "card popping toward you" iMessage feel. */
+const SURFACE_STYLE_HELD: CSSProperties = {
+  transform: "scale(1.04)",
+  boxShadow: "0 30px 60px oklch(0.2 0.04 150 / 0.28)",
+  position: "relative",
+  zIndex: 81,
+};
+
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
 interface Opts {
   /** Picked emoji from the tray. */
@@ -119,6 +136,14 @@ export function useHoldReact({ onReact, onTap }: Opts): {
         timerRef.current = null;
         const d = downRef.current;
         if (!d) return;
+        // Subtle haptic on hold-trigger — Android Chrome buzzes, iOS
+        // Safari is a no-op (vibrate API isn't exposed in-tab).
+        try {
+          navigator.vibrate?.(10);
+        } catch {
+          // ignore — some browsers reject vibrate inside a passive
+          // listener; the visual feedback is the primary signal.
+        }
         setTrayPos({ left: d.x, top: d.y });
       }, HOLD_THRESHOLD_MS);
     },
@@ -201,36 +226,48 @@ export function useHoldReact({ onReact, onTap }: Opts): {
 
   const close = useCallback(() => setTrayPos(null), []);
 
-  const tray =
-    trayPos != null ? (
-      <>
-        <div
-          className="hrp-scrim"
-          onPointerDown={close}
-          onClick={close}
-          aria-hidden="true"
-        />
-        <div
-          className="hrp-tray"
-          role="menu"
-          aria-label="React"
-          style={{ left: trayPos.left, top: trayPos.top }}
-        >
-          {REACT_EMOJIS.map((e) => (
-            <button
-              key={e}
-              type="button"
-              role="menuitem"
-              className="hrp-tray-emoji"
-              onClick={() => onPick(e)}
-              aria-label={`React ${e}`}
-            >
-              {e}
-            </button>
-          ))}
-        </div>
-      </>
-    ) : null;
+  const isHeld = trayPos != null;
+  const reducedMotion = prefersReducedMotion();
+
+  const tray = isHeld ? (
+    <>
+      <div
+        className={`hrp-scrim${reducedMotion ? "" : " hrp-scrim-active"}`}
+        onPointerDown={close}
+        onClick={close}
+        aria-hidden="true"
+      />
+      <div
+        className="hrp-tray"
+        role="menu"
+        aria-label="React"
+        style={{ left: trayPos!.left, top: trayPos!.top }}
+      >
+        {REACT_EMOJIS.map((e) => (
+          <button
+            key={e}
+            type="button"
+            role="menuitem"
+            className="hrp-tray-emoji"
+            onClick={() => onPick(e)}
+            aria-label={`React ${e}`}
+          >
+            {e}
+          </button>
+        ))}
+      </div>
+    </>
+  ) : null;
+
+  // Composite the always-on style with the held-state lift. When
+  // reduced-motion is on, skip the transform entirely — only the
+  // z-index nudge stays so the card still floats above the scrim
+  // visually without movement.
+  const style: CSSProperties = isHeld
+    ? reducedMotion
+      ? { ...SURFACE_STYLE_BASE, position: "relative", zIndex: 81 }
+      : { ...SURFACE_STYLE_BASE, ...SURFACE_STYLE_HELD }
+    : SURFACE_STYLE_BASE;
 
   return {
     surfaceProps: {
@@ -239,7 +276,7 @@ export function useHoldReact({ onReact, onTap }: Opts): {
       onPointerUp,
       onPointerCancel,
       onContextMenu,
-      style: SURFACE_STYLE,
+      style,
     },
     tray,
   };
