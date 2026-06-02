@@ -27,6 +27,7 @@
  */
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import MemberProfile from "./MemberProfile";
 import RaceSheet from "./RaceSheet";
@@ -331,9 +332,36 @@ export default function GroupsClient({
         </section>
 
         {/* Chat — realtime group chat. Subscribes to Supabase
-            Realtime on group_messages filtered by group_id. */}
+            Realtime on group_messages filtered by group_id. The
+            expand icon in the header + "Open chat ›" button below
+            route to the dedicated full-screen view at
+            /groups/[id]/chat for heavy use. */}
         <section>
-          <div className="grp-slabel">Chat</div>
+          <div className="grp-chat-head">
+            <div className="grp-slabel grp-slabel-flush">Chat</div>
+            <Link
+              href={`/groups/${encodeURIComponent(group.id)}/chat`}
+              className="grp-chat-expand"
+              aria-label="Open chat full-screen"
+              title="Open full-screen"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M15 3h6v6" />
+                <path d="M9 21H3v-6" />
+                <path d="M21 3l-7 7" />
+                <path d="M3 21l7-7" />
+              </svg>
+            </Link>
+          </div>
           <div className="grp-card grp-chat-card">
             <GroupChat
               groupId={group.id}
@@ -341,6 +369,12 @@ export default function GroupsClient({
               initialMessages={initialMessages}
             />
           </div>
+          <Link
+            href={`/groups/${encodeURIComponent(group.id)}/chat`}
+            className="grp-chat-open"
+          >
+            Open chat ›
+          </Link>
         </section>
 
         {/* Footer actions — wired to real Supabase in a follow-up. */}
