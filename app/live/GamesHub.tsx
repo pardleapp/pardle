@@ -30,92 +30,16 @@
  */
 
 import Link from "next/link";
+import {
+  HUB_GAMES,
+  HUB_CHALLENGE,
+  HUB_AVATAR_PALETTE,
+} from "./games-hub-data";
 
 interface GamesHubProps {
   open: boolean;
   onClose: () => void;
 }
-
-interface Game {
-  key: string;
-  href: string;
-  ic: string;
-  name: string;
-  desc: string;
-  /** Per-game accent colour — surfaced as a top stripe on the
-   *  card so each game reads as distinct without breaking the
-   *  light .pv theme. Hex matches app/games/page.tsx GAMES[]. */
-  accent: string;
-  /** Multiplayer games (trivia, faces) get the MULTIPLAYER pill
-   *  in the card header — same affordance the pre-redesign hub
-   *  carried. */
-  multiplayer?: boolean;
-}
-
-/** Mirrors the real `app/games/page.tsx` lineup. Sourced from
- *  what actually ships, not the prototype's placeholder list. */
-const GAMES: Game[] = [
-  {
-    key: "pros",
-    href: "/pros",
-    ic: "🏌️",
-    name: "Pros",
-    desc: "Six guesses to identify today's mystery golfer.",
-    accent: "#7BAE3F",
-  },
-  {
-    key: "holes",
-    href: "/holes",
-    ic: "🛰️",
-    name: "Holes",
-    desc: "Identify today's golf course from a satellite view.",
-    accent: "#5BA0E0",
-  },
-  {
-    key: "connections",
-    href: "/connections",
-    ic: "🧩",
-    name: "Connections",
-    desc: "Find four groups of four. Every item has a golf connection.",
-    accent: "#B388D6",
-  },
-  {
-    key: "trivia",
-    href: "/trivia",
-    ic: "❓",
-    name: "Trivia",
-    desc: "10 golf trivia questions. Easy, medium, or hard.",
-    accent: "#E8C547",
-    multiplayer: true,
-  },
-  {
-    key: "faces",
-    href: "/faces",
-    ic: "👥",
-    name: "Faces",
-    desc: "Six blended-face puzzles. Name both pros in each.",
-    accent: "#E07B5B",
-    multiplayer: true,
-  },
-];
-
-const GAME_CHALLENGE: Array<{
-  initials: string;
-  name: string;
-  score: string;
-}> = [
-  { initials: "JO", name: "Jordan", score: "3/6" },
-  { initials: "MI", name: "Mia", score: "5/6" },
-  { initials: "YO", name: "You", score: "4/6" },
-  { initials: "TH", name: "Theo", score: "X" },
-];
-
-const AV_PALETTE: Record<string, string> = {
-  JO: "linear-gradient(135deg,#5cd7c1,#1f8b6e)",
-  MI: "linear-gradient(135deg,#ed7a99,#7a274d)",
-  YO: "linear-gradient(135deg,#ffb35a,#c4691a)",
-  TH: "linear-gradient(135deg,#6b7df2,#c659d8)",
-};
 
 export default function GamesHub({ open, onClose }: GamesHubProps) {
   if (!open) return null;
@@ -142,7 +66,7 @@ export default function GamesHub({ open, onClose }: GamesHubProps) {
           🔥 <b>12-day</b> streak · play today&rsquo;s to keep it alive
         </div>
         <div className="gm-grid">
-          {GAMES.map((g) => (
+          {HUB_GAMES.map((g) => (
             <Link
               key={g.key}
               href={g.href}
@@ -184,7 +108,7 @@ export default function GamesHub({ open, onClose }: GamesHubProps) {
         <section className="gh-sec">
           <h4 className="gh-sec-title">Today&rsquo;s Pros · The Lads</h4>
           <div className="gh-board">
-            {GAME_CHALLENGE.map((r, i) => (
+            {HUB_CHALLENGE.map((r, i) => (
               <div
                 key={r.initials}
                 className={`racerow${r.name === "You" ? " racerow-you" : ""}`}
@@ -192,7 +116,7 @@ export default function GamesHub({ open, onClose }: GamesHubProps) {
                 <span className="racerow-rk">{i + 1}</span>
                 <span
                   className="gh-av"
-                  style={{ background: AV_PALETTE[r.initials] }}
+                  style={{ background: HUB_AVATAR_PALETTE[r.initials] }}
                   aria-hidden="true"
                 >
                   {r.initials}

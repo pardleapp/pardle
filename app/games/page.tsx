@@ -1,23 +1,15 @@
-import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { BRAND } from "@/lib/brand";
-import AuthChip from "../live/auth/AuthChip";
-import MainNav from "../MainNav";
-import { todayDayNumber } from "@/lib/day-index";
-import { getActiveTournament } from "@/lib/golf-api/pgatour";
-import { getEvents } from "@/lib/feed/store";
 import {
-  readPerGameStats,
-  STATS_GAMES,
-  type GameDayStats,
-  type StatsGameId,
-} from "@/lib/stats-backend";
+  HUB_GAMES,
+  HUB_CHALLENGE,
+  HUB_AVATAR_PALETTE,
+} from "../live/games-hub-data";
 
-// Hub revalidates every 2 minutes so the per-card 'today's stats'
-// numbers stay fresh enough to feel live, without re-hitting the
-// upstream news feed or Redis on every visitor.
-export const revalidate = 120;
+// Static — the game catalogue itself only changes on a deploy.
+export const dynamic = "force-static";
 
 export const metadata: Metadata = {
   title: `Games — ${BRAND.name}`,
@@ -25,193 +17,108 @@ export const metadata: Metadata = {
     "Daily puzzles for golf fans. Guess today's mystery pro, identify famous holes from satellite, and more.",
 };
 
-interface GameTile {
-  id: StatsGameId;
-  href: string;
-  name: string;
-  blurb: string;
-  emoji: string;
-  status: "live" | "soon";
-  accent: string;
-  /** Optional badge shown on the card (e.g. 'Multiplayer'). */
-  tag?: string;
-}
-
-const GAMES: GameTile[] = [
-  {
-    id: "pros",
-    href: "/pros",
-    name: "Pros",
-    blurb: "Six guesses to identify today's mystery golfer.",
-    emoji: "🏌️",
-    status: "live",
-    accent: "#7BAE3F",
-  },
-  {
-    id: "holes",
-    href: "/holes",
-    name: "Holes",
-    blurb: "Identify today's golf course from a satellite view.",
-    emoji: "🛰️",
-    status: "live",
-    accent: "#5BA0E0",
-  },
-  {
-    id: "connections",
-    href: "/connections",
-    name: "Connections",
-    blurb: "Find four groups of four. Every item has a golf connection.",
-    emoji: "🧩",
-    status: "live",
-    accent: "#B388D6",
-  },
-  {
-    id: "trivia",
-    href: "/trivia",
-    name: "Trivia",
-    blurb: "10 golf trivia questions. Easy, medium, or hard.",
-    emoji: "❓",
-    status: "live",
-    accent: "#E8C547",
-    tag: "Multiplayer",
-  },
-  {
-    id: "faces",
-    href: "/faces",
-    name: "Faces",
-    blurb: "Six blended-face puzzles. Name both pros in each.",
-    emoji: "👥",
-    status: "live",
-    accent: "#E07B5B",
-    tag: "Multiplayer",
-  },
-];
-
-
-function tileStyle(accent: string): CSSProperties {
-  return { "--accent": accent } as CSSProperties;
-}
-
-function statsLine(stats: GameDayStats | undefined): string | null {
-  if (!stats || stats.total === 0) return null;
-  const rate = Math.round((stats.wins / stats.total) * 100);
-  return `${stats.total} played today · ${rate}% solved`;
-}
-
-function CardBody({
-  game,
-  stats,
-}: {
-  game: GameTile;
-  stats: GameDayStats | undefined;
-}) {
-  const line = statsLine(stats);
+/** /games — standalone page form of the v2 GamesHub, used as the
+ *  destination for the off-week landing's "Sharpen up with a
+ *  daily puzzle" card and any legacy bookmarks. Mirrors the
+ *  GamesHub overlay's layout (streak banner + 2-col grid + crew
+ *  challenge board + footer links), but renders in document flow
+ *  rather than as a fixed overlay so it nests cleanly with the
+ *  rest of the page chrome.
+ *
+ *  Replaces the pre-redesign dark hub (the legacy .hub layout
+ *  that was breaking the design-source-of-truth rule by being
+ *  the only dark page in the v2 flow). Wraps in .pv-theme so the
+ *  body bg flips to warm paper (via the `:has(.pv-theme)` rule
+ *  in globals.css) on the first paint — no useEffect race.
+ */
+export default function GamesPage() {
   return (
-    <>
-      {game.tag && <span className="hub-card-tag">{game.tag}</span>}
-      <div className="hub-card-emoji">{game.emoji}</div>
-      <div className="hub-card-name">{game.name}</div>
-      <p className="hub-card-blurb">{game.blurb}</p>
-      {line && <p className="hub-card-stats">{line}</p>}
-      {game.status === "live" ? (
-        <span className="hub-card-cta">Play today →</span>
-      ) : (
-        <span className="hub-card-status">Coming soon</span>
-      )}
-    </>
-  );
-}
-
-async function getLiveFeedLabel(): Promise<string> {
-  const active = await getActiveTournament().catch(() => null);
-  if (!active || !active.isLive) return "Live tournament feed";
-  const events = await getEvents(active.tournament.id, 5).catch(() => []);
-  const rounds = events.map((e) => e.round).filter((r) => Number.isFinite(r));
-  const round = rounds.length > 0 ? Math.max(...rounds) : null;
-  return round
-    ? `${active.tournament.name} R${round} live feed`
-    : `${active.tournament.name} live feed`;
-}
-
-export default async function HubHome() {
-  const [statsList, liveLabel] = await Promise.all([
-    readPerGameStats(
-      Object.fromEntries(
-        STATS_GAMES.map((g) => [g, todayDayNumber(g)]),
-      ) as Record<StatsGameId, number>,
-    ).catch(() => [] as GameDayStats[]),
-    getLiveFeedLabel(),
-  ]);
-  const statsByGame = new Map(statsList.map((s) => [s.game, s]));
-  const totalToday = statsList.reduce((sum, s) => sum + s.total, 0);
-
-  return (
-    <main className="hub">
-      <header className="hub-header hub-header-split">
-        <h1 className="hub-wordmark">{BRAND.name}</h1>
-        <div className="brand-nav">
-          <MainNav active="games" />
-          <AuthChip />
+    <main className="pv-theme gh-page">
+      <header className="gh-head">
+        <Link href="/" className="bd-pv-back" aria-label="Back home">
+          ←
+        </Link>
+        <div className="bd-pv-title">
+          <div className="bd-pv-title-nm">Daily games</div>
+          <div className="bd-pv-title-mk">
+            Free to play · challenge your crew
+          </div>
         </div>
       </header>
-
-      <Link href="/" className="hub-live-link">
-        <span className="hub-live-badge">
-          <span className="hub-live-badge-dot" /> LIVE
-        </span>
-        <span className="hub-live-text">{liveLabel}</span>
-        <span className="hub-live-arrow" aria-hidden="true">
-          →
-        </span>
-      </Link>
-
-      <div className="hub-grid">
-        {GAMES.map((game) =>
-          game.status === "live" ? (
+      <div className="gh-body">
+        <div className="gm-streak">
+          🔥 <b>12-day</b> streak · play today&rsquo;s to keep it alive
+        </div>
+        <div className="gm-grid">
+          {HUB_GAMES.map((g) => (
             <Link
-              key={game.href}
-              href={game.href}
-              className="hub-card hub-card-live"
-              style={tileStyle(game.accent)}
+              key={g.key}
+              href={g.href}
+              className="gm-card"
+              style={
+                { ["--gm-accent" as string]: g.accent } as CSSProperties
+              }
             >
-              <CardBody game={game} stats={statsByGame.get(game.id)} />
+              <span
+                className="gm-stripe"
+                aria-hidden="true"
+                style={{ background: g.accent }}
+              />
+              {g.multiplayer && (
+                <span className="gm-mp">MULTIPLAYER</span>
+              )}
+              <div className="gm-ic" aria-hidden="true">
+                {g.ic}
+              </div>
+              <div className="gm-nm">{g.name}</div>
+              <div className="gm-desc">{g.desc}</div>
+              <div className="gm-state">Play today →</div>
             </Link>
-          ) : (
-            <div
-              key={game.href}
-              className="hub-card hub-card-soon"
-              style={tileStyle(game.accent)}
-            >
-              <CardBody game={game} stats={statsByGame.get(game.id)} />
-            </div>
-          ),
-        )}
-      </div>
-
-      <Link href="/today" className="hub-stats-link">
-        <span className="hub-stats-link-label">
-          See how the world&apos;s playing →
-        </span>
-        {totalToday > 0 && (
-          <span className="hub-stats-link-count">{totalToday} today</span>
-        )}
-      </Link>
-
-      <Link href="/blend/me" className="hub-tool-link">
-        📸 Blend yourself with a PGA pro →
-      </Link>
-
-      <footer className="hub-footer">
-        <p>{BRAND.domain} · A daily-puzzle hub for golf nerds.</p>
-        <p>
-          <a
-            className="hub-footer-link"
-            href={`mailto:${BRAND.email}?subject=Pardle%20feedback`}
+          ))}
+        </div>
+        <div className="gm-foot">
+          <Link href="/today" className="gm-foot-link">
+            See how the world&rsquo;s playing →
+          </Link>
+          <Link
+            href="/blend/me"
+            className="gm-foot-link gm-foot-link-quiet"
           >
-            Contact us
-          </a>
-        </p>
-      </footer>
+            🪄 Blend yourself with a PGA pro →
+          </Link>
+        </div>
+        <section className="gh-sec">
+          <h4 className="gh-sec-title">Today&rsquo;s Pros · The Lads</h4>
+          <div className="gh-board">
+            {HUB_CHALLENGE.map((r, i) => (
+              <div
+                key={r.initials}
+                className={`racerow${r.name === "You" ? " racerow-you" : ""}`}
+              >
+                <span className="racerow-rk">{i + 1}</span>
+                <span
+                  className="gh-av"
+                  style={{ background: HUB_AVATAR_PALETTE[r.initials] }}
+                  aria-hidden="true"
+                >
+                  {r.initials}
+                </span>
+                <span className="racerow-nm">
+                  {r.name === "You" ? <b>You</b> : r.name}
+                </span>
+                <span
+                  className={`gh-score${r.score === "X" ? " gh-score-x" : ""}`}
+                >
+                  {r.score}
+                </span>
+              </div>
+            ))}
+          </div>
+          <button type="button" className="gh-challenge-btn">
+            Challenge your crew ↗
+          </button>
+        </section>
+      </div>
     </main>
   );
 }

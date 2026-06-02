@@ -19074,6 +19074,22 @@ body:has(.v4-theme) {
   --pv-down: oklch(0.57 0.19 28);
   --pv-follow: oklch(0.66 0.16 60);
 
+  /* Override the legacy semantic vars (--bg, --text, --border,
+     --surface, --empty …) defined on :root so daily-puzzle pages
+     wrapped in .pv-theme stop following the system dark-mode
+     media query at line 48. Killing the dark theme everywhere
+     per the design-source-of-truth rule. */
+  --bg: var(--pv-bg);
+  --surface: var(--pv-card);
+  --surface-2: var(--pv-soft);
+  --text: var(--pv-ink);
+  --text-soft: var(--pv-emerald-d);
+  --muted: var(--pv-muted);
+  --border: var(--pv-line);
+  --border-strong: oklch(0.85 0.018 95);
+  --empty: var(--pv-soft);
+  color-scheme: light;
+
   background: var(--pv-bg);
   color: var(--pv-ink);
   font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
@@ -24839,6 +24855,16 @@ html.pv-theme-body .auth-chip-btn {
   flex-direction: column;
   animation: gh-slide-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
   color: var(--pv-ink);
+}
+/* Standalone page form of the hub (rendered at /games as the
+   off-week landing destination). Same internals as the overlay
+   but in document flow instead of fixed-position. */
+.gh-page {
+  min-height: 100dvh;
+  background: var(--pv-bg);
+  color: var(--pv-ink);
+  display: flex;
+  flex-direction: column;
 }
 @keyframes gh-slide-in {
   from {
