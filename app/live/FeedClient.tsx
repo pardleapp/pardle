@@ -487,9 +487,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   }, [data, deepLinkPollId, deepLinkFired]);
 
   const [error, setError] = useState(false);
-  const [myReactions, setMyReactions] = useState<
-    Record<string, "up" | "down">
-  >({});
   // Optimistic putt-poll state — overlays server data for instant
   // feedback when the user clicks yes/no. Keyed by pollId.
   const [myPollVotes, setMyPollVotes] = useState<
@@ -776,35 +773,6 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       });
     } catch {
       /* the floater still showed; no-op on failure */
-    }
-  }
-
-  async function sendReaction(eventId: string, dir: "up" | "down") {
-    setMyReactions((m) => ({ ...m, [eventId]: dir }));
-    setData((d) => {
-      if (!d) return d;
-      return {
-        ...d,
-        rows: d.rows.map((row) => {
-          if (row.event.id !== eventId) return row;
-          const prev = myReactions[eventId];
-          const r = { ...row.reactions };
-          if (prev === dir) return row;
-          if (prev === "up") r.up = Math.max(0, r.up - 1);
-          if (prev === "down") r.down = Math.max(0, r.down - 1);
-          r[dir] += 1;
-          return { ...row, reactions: r };
-        }),
-      };
-    });
-    try {
-      await fetch("/api/feed/react", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId, dir, authorKey: authorKey.current }),
-      });
-    } catch {
-      /* optimistic update stays; next refresh corrects it */
     }
   }
 
@@ -1216,8 +1184,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                 </Fragment>
               );
             }
-            const { event, reactions, commentCount } = __item.row;
-            const myReaction = myReactions[event.id];
+            const { event, commentCount } = __item.row;
             const count = commentCounts[event.id] ?? commentCount;
             // First non-deprecated context tag worth surfacing.
             const primaryContextTag = (event.tags ?? []).find((t) => {
@@ -1240,10 +1207,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                 >
                   <ShotPost
                     event={event}
-                    reactions={reactions}
                     commentCount={count}
-                    myReaction={myReaction}
-                    onReact={sendReaction}
                     contextTag={primaryContextTag}
                     handStatus={data.handStatus?.[event.playerId] ?? null}
                     onShare={
@@ -1470,36 +1434,6 @@ function MomentumStrip({
         </div>
       )}
     </div>
-  );
-}
-
-// ── Inline icons for reaction buttons ─────────────────────────────
-
-function IconThumbUp() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M7 22V11" />
-      <path d="M5 11h2" />
-      <path d="M7 11h7l2-2 0-4a2 2 0 0 1 2 2v4l-1 2h4a2 2 0 0 1 2 2l-2 7a2 2 0 0 1-2 1H7" />
-    </svg>
-  );
-}
-
-function IconThumbDown() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M17 2v11" />
-      <path d="M19 13h-2" />
-      <path d="M17 13h-7l-2 2 0 4a2 2 0 0 0 2 2 2 2 0 0 0 2-2v-4l1-2H7a2 2 0 0 0-2-2L7 2a2 2 0 0 0 2-1h8" transform="translate(0,0)" />
-    </svg>
-  );
-}
-
-function IconComment() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
   );
 }
 

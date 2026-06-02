@@ -88,10 +88,22 @@ interface SurfaceProps {
 export function useHoldReact({ onReact, onTap }: Opts): {
   surfaceProps: SurfaceProps;
   tray: React.ReactNode;
+  /** Programmatically open the tray near a viewport-anchor point.
+   *  Used by the in-row ＋ react button — gives a discoverable tap
+   *  target alongside the long-press gesture. Defaults to the
+   *  viewport centre when no anchor is supplied. */
+  openTray: (anchor?: { x: number; y: number }) => void;
 } {
   const [trayPos, setTrayPos] = useState<{ left: number; top: number } | null>(
     null,
   );
+  /** Why the tray is open — distinguishes the press-and-hold path
+   *  (needs the capture-phase click suppressor to swallow the
+   *  synthetic pointerup → click that would otherwise navigate)
+   *  from the explicit-button path (caller's click was intentional;
+   *  no suppressor needed, and a fast subsequent emoji tap should
+   *  go through cleanly). */
+  const openReasonRef = useRef<"hold" | "button">("hold");
   const holdFiredRef = useRef(false);
   const downRef = useRef<{
     x: number;
@@ -144,6 +156,7 @@ export function useHoldReact({ onReact, onTap }: Opts): {
           // ignore — some browsers reject vibrate inside a passive
           // listener; the visual feedback is the primary signal.
         }
+        openReasonRef.current = "hold";
         setTrayPos({ left: d.x, top: d.y });
       }, HOLD_THRESHOLD_MS);
     },
@@ -200,8 +213,12 @@ export function useHoldReact({ onReact, onTap }: Opts): {
   // Block the synthetic click that follows pointerup when a hold
   // fired — React's onPointerUp.preventDefault doesn't always
   // suppress it. A capture-phase click handler does the job.
+  // Only arm this when the tray was opened via the hold gesture;
+  // tray-via-button doesn't have a pending synthetic click and
+  // shouldn't swallow a fast subsequent emoji tap.
   useEffect(() => {
     if (trayPos == null) return;
+    if (openReasonRef.current !== "hold") return;
     const suppress = (e: MouseEvent) => {
       e.stopPropagation();
       e.preventDefault();
@@ -225,6 +242,19 @@ export function useHoldReact({ onReact, onTap }: Opts): {
   );
 
   const close = useCallback(() => setTrayPos(null), []);
+
+  const openTray = useCallback(
+    (anchor?: { x: number; y: number }) => {
+      const x =
+        anchor?.x ?? (typeof window !== "undefined" ? window.innerWidth / 2 : 0);
+      const y =
+        anchor?.y ??
+        (typeof window !== "undefined" ? window.innerHeight / 2 : 0);
+      openReasonRef.current = "button";
+      setTrayPos({ left: x, top: y });
+    },
+    [],
+  );
 
   const isHeld = trayPos != null;
   const reducedMotion = prefersReducedMotion();
@@ -279,5 +309,6 @@ export function useHoldReact({ onReact, onTap }: Opts): {
       style,
     },
     tray,
+    openTray,
   };
 }

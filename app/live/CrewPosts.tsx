@@ -117,7 +117,7 @@ export function CrewBetPost({
   reactionState?: ReactionState;
   onToggleReaction?: (emoji: string) => void;
 }) {
-  const { surfaceProps, tray } = useHoldReact({
+  const { surfaceProps, tray, openTray } = useHoldReact({
     onReact: (emoji) => onCustomReact?.(emoji),
   });
   const dirClass = post.dir;
@@ -181,60 +181,54 @@ export function CrewBetPost({
           ))}
         </div>
       )}
-      {reactionState && onToggleReaction && (
-        <ReactionChips
-          state={reactionState}
-          onToggle={onToggleReaction}
-        />
-      )}
-      <div className="bp-foot">
-        <button type="button" className="bp-foot-act">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            width="15"
-            height="15"
+      {onToggleReaction && (
+        <div className="post-act-row">
+          <ReactionChips
+            state={reactionState}
+            onToggle={onToggleReaction}
+            onAdd={openTray}
+          />
+          <button
+            type="button"
+            className="post-act-cmt"
+            aria-label="Comments"
+            data-no-hold
           >
-            <path d="M7 10v11" />
-            <path d="M7 10l4-7a2 2 0 0 1 3 1.7V9h4.5a2 2 0 0 1 2 2.4l-1.4 7A2 2 0 0 1 17 20H7" />
-          </svg>
-          <span>{post.reactCount}</span>
-        </button>
-        <button type="button" className="bp-foot-act">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            width="15"
-            height="15"
-          >
-            <path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
-          </svg>
-          <span>{post.commentCount}</span>
-        </button>
-        {!post.mine && (
-          <button type="button" className="bp-foot-tail">
-            Tail
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.9"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              width="15"
+              height="15"
+            >
+              <path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
+            </svg>
+            <span>{post.commentCount}</span>
           </button>
-        )}
-        {post.on.length > 0 && (
-          <span className="bp-foot-on">
-            <span className="bp-foot-on-row">
-              {post.on.map((init) => (
-                <MiniAv key={init} initials={init} size={22} />
-              ))}
+          {!post.mine && (
+            <button
+              type="button"
+              className="post-act-tail"
+              data-no-hold
+            >
+              Tail
+            </button>
+          )}
+          {post.on.length > 0 && (
+            <span className="bp-foot-on">
+              <span className="bp-foot-on-row">
+                {post.on.map((init) => (
+                  <MiniAv key={init} initials={init} size={22} />
+                ))}
+              </span>
+              <span className="bp-foot-on-lbl">{post.on.length} on it</span>
             </span>
-            <span className="bp-foot-on-lbl">{post.on.length} on it</span>
-          </span>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </article>
     {tray}
     </>
@@ -252,7 +246,7 @@ export function CrewResultPost({
   reactionState?: ReactionState;
   onToggleReaction?: (emoji: string) => void;
 }) {
-  const { surfaceProps, tray } = useHoldReact({
+  const { surfaceProps, tray, openTray } = useHoldReact({
     onReact: (emoji) => onCustomReact?.(emoji),
   });
   return (
@@ -272,11 +266,14 @@ export function CrewResultPost({
           {post.plLabel}
         </div>
       </div>
-      {reactionState && onToggleReaction && (
-        <ReactionChips
-          state={reactionState}
-          onToggle={onToggleReaction}
-        />
+      {onToggleReaction && (
+        <div className="post-act-row">
+          <ReactionChips
+            state={reactionState}
+            onToggle={onToggleReaction}
+            onAdd={openTray}
+          />
+        </div>
       )}
     </article>
     {tray}
@@ -295,7 +292,7 @@ export function CrewTipPost({
   reactionState?: ReactionState;
   onToggleReaction?: (emoji: string) => void;
 }) {
-  const { surfaceProps, tray } = useHoldReact({
+  const { surfaceProps, tray, openTray } = useHoldReact({
     onReact: (emoji) => onCustomReact?.(emoji),
   });
   return (
@@ -317,14 +314,17 @@ export function CrewTipPost({
         <div className="tp-player">{post.playerName}</div>
         <div className="tp-rat">&ldquo;{post.rationale}&rdquo;</div>
       </div>
-      <button type="button" className="tp-track">
+      <button type="button" className="tp-track" data-no-hold>
         ＋ Track this tip
       </button>
-      {reactionState && onToggleReaction && (
-        <ReactionChips
-          state={reactionState}
-          onToggle={onToggleReaction}
-        />
+      {onToggleReaction && (
+        <div className="post-act-row">
+          <ReactionChips
+            state={reactionState}
+            onToggle={onToggleReaction}
+            onAdd={openTray}
+          />
+        </div>
       )}
     </article>
     {tray}

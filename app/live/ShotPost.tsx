@@ -6,19 +6,12 @@
  *
  *   [avatar] [name] [BIRDIE tag] [H18] [-12]
  *            [action sentence text]
- *            [👍 react] [💬 comment]    [context chip]
+ *            [reaction pills · ＋   💬 N  · context]
  *
- * Replaces the old feed-row markup from the v4-themed feed. Keeps
- * what matters from the original — thumbs-up reaction toggle wired
- * to the same /api/feed/react endpoint, comment count visible,
- * context tag chip (first non-deprecated tag from event.tags) —
- * and drops what doesn't translate to the prototype: multi-emoji
- * reactions, follow-star, inline odds-shift / impact chips, the
- * putt-poll widget (which lives at its own surface now).
- *
- * Bet-impact chips live in the chrome of the bet-post that owns
- * the player, not on every shot. Putt polls render through the
- * existing PredictionPollDeck flow on bet-relevant putts.
+ * The thumbs-up has been retired: every reaction is just another
+ * emoji now. The single action row pins the comment count + the
+ * context tag on the right while the reaction pills scroll
+ * horizontally on the left when there are many.
  */
 
 import Link from "next/link";
@@ -31,10 +24,7 @@ import ReactionChips, { type ReactionState } from "./ReactionChips";
 
 interface Props {
   event: FeedEvent;
-  reactions: { up: number; down: number };
   commentCount: number;
-  myReaction: "up" | "down" | undefined;
-  onReact: (eventId: string, kind: "up" | "down") => void;
   /** First context tag worth surfacing — pre-filtered by the parent
    *  to drop deprecated patterns. Empty string when nothing to show. */
   contextTag?: string;
@@ -50,11 +40,10 @@ interface Props {
    *  back into the redesigned feed. */
   showDiagram?: boolean;
   /** Hold-and-pick reaction — fires when the user holds the
-   *  thumb button and selects an emoji from the floating tray.
-   *  Parent triggers the float-up burst animation. */
+   *  card and selects an emoji from the floating tray. */
   onCustomReact?: (emoji: string) => void;
   /** Aggregated emoji reactions for this card — drives the
-   *  ReactionChips cluster above the action row. */
+   *  ReactionChips cluster in the action row. */
   reactionState?: ReactionState;
   /** Toggle the caller's reaction for a given emoji. Fires when
    *  an existing chip is tapped. */
@@ -96,10 +85,7 @@ function stripPlayerName(headline: string, playerName: string): string {
 
 export default function ShotPost({
   event,
-  reactions,
   commentCount,
-  myReaction,
-  onReact,
   contextTag,
   handStatus,
   onShare,
@@ -109,19 +95,12 @@ export default function ShotPost({
   onToggleReaction,
 }: Props) {
   const tag = tagFor(event);
-  const reactCount = (reactions?.up ?? 0) + (reactions?.down ?? 0);
-  const onLikeClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onReact(event.id, "up");
-  };
   // Whole-card press-and-hold → tray. Quick tap on the body opens
-  // the ShotDetail when one's available; nested buttons (like /
-  // comment) keep their own clicks via the hook's button-skip.
-  const { surfaceProps, tray } = useHoldReact({
+  // the ShotDetail when one's available; nested buttons (like the
+  // comment / ＋ react / context chip) keep their own clicks via
+  // the data-no-hold opt-out the chips container carries.
+  const { surfaceProps, tray, openTray } = useHoldReact({
     onReact: (emoji) => {
-      // Picking an emoji also counts as an implicit like — the
-      // parent's float-up burst handles the animation.
-      onReact(event.id, "up");
       onCustomReact?.(emoji);
     },
     onTap: onShare ? () => onShare(event) : undefined,
@@ -192,51 +171,36 @@ export default function ShotPost({
             {stripPlayerName(event.headline ?? "", event.playerName)}
           </p>
         )}
-        {reactionState && onToggleReaction && (
-          <ReactionChips
-            state={reactionState}
-            onToggle={onToggleReaction}
-          />
+        {onToggleReaction && (
+          <div className="post-act-row">
+            <ReactionChips
+              state={reactionState}
+              onToggle={onToggleReaction}
+              onAdd={openTray}
+            />
+            <button
+              type="button"
+              className="post-act-cmt"
+              aria-label="Comments"
+              data-no-hold
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                width="15"
+                height="15"
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
+              </svg>
+              <span>{commentCount}</span>
+            </button>
+            {contextTag && <span className="post-act-ctx">{contextTag}</span>}
+          </div>
         )}
-        <div className="spost-react">
-          <button
-            type="button"
-            className={`spost-act${myReaction === "up" ? " spost-act-on" : ""}`}
-            onClick={onLikeClick}
-            aria-label="Like"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.9"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              width="15"
-              height="15"
-            >
-              <path d="M7 10v11" />
-              <path d="M7 10l4-7a2 2 0 0 1 3 1.7V9h4.5a2 2 0 0 1 2 2.4l-1.4 7A2 2 0 0 1 17 20H7" />
-            </svg>
-            <span>{reactCount}</span>
-          </button>
-          <button type="button" className="spost-act" aria-label="Comments">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.9"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              width="15"
-              height="15"
-            >
-              <path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
-            </svg>
-            <span>{commentCount}</span>
-          </button>
-          {contextTag && <span className="spost-ctx">{contextTag}</span>}
-        </div>
       </div>
     </article>
     {tray}

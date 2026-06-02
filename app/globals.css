@@ -19824,6 +19824,7 @@ html.pv-theme-body .auth-chip-btn {
   display: flex;
   align-items: center;
   margin-left: auto;
+  flex-shrink: 0;
 }
 .pv-theme .bp-foot-on-row {
   display: flex;
@@ -23632,16 +23633,35 @@ html.pv-theme-body .auth-chip-btn {
 }
 
 /* =============================================================
-   Reaction chip cluster — emoji+count pills above the action row
-   on a feed card. Surfaces who's reacted to what. Tapping a pill
-   toggles the caller's reaction without opening the long-press
-   tray.
+   Single action row on every feed card. Replaces the legacy
+   .spost-react / .bp-foot two-row layouts. Pills + ＋ react on
+   the left (scrolls horizontally when crowded); 💬 / Tail / tail-
+   avatars pinned on the right.
    ============================================================= */
+.post-act-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  min-width: 0;
+}
 .rxn-chips {
   display: flex;
-  flex-wrap: wrap;
+  flex: 1 1 auto;
+  align-items: center;
   gap: 6px;
-  margin: 8px 0 10px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.rxn-chips::-webkit-scrollbar {
+  display: none;
+}
+.rxn-chip,
+.rxn-chip-overflow,
+.rxn-chip-add {
+  flex-shrink: 0;
 }
 .rxn-chip {
   display: inline-flex;
@@ -23691,6 +23711,84 @@ html.pv-theme-body .auth-chip-btn {
   font-size: 11px;
   padding: 4px 9px;
   cursor: default;
+}
+.rxn-chip-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px dashed var(--pv-line);
+  color: var(--pv-muted);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.12s ease,
+    border-color 0.12s ease, color 0.12s ease;
+}
+.rxn-chip-add:hover {
+  background: var(--pv-soft);
+  border-color: var(--pv-emerald);
+  color: var(--pv-emerald-d);
+}
+.rxn-chip-add:active {
+  transform: scale(0.92);
+}
+.post-act-cmt {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--pv-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.post-act-cmt:hover {
+  color: var(--pv-ink);
+}
+.post-act-cmt span {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.post-act-tail {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--pv-emerald);
+  border: 1px solid var(--pv-emerald);
+  color: #fff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.12s ease;
+}
+.post-act-tail:hover {
+  background: var(--pv-emerald-d);
+}
+.post-act-tail:active {
+  transform: scale(0.96);
+}
+.post-act-ctx {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--pv-muted);
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* "Your bets" section heading above the bet posts */

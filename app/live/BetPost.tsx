@@ -73,7 +73,7 @@ export default function BetPost({
   // Whole-card press-and-hold → emoji tray. Quick tap = Link nav
   // (the Link handles it natively); the hook's onTap is undefined
   // because the link already covers that case.
-  const { surfaceProps, tray } = useHoldReact({
+  const { surfaceProps, tray, openTray } = useHoldReact({
     onReact: (emoji) => onCustomReact?.(emoji),
   });
 
@@ -233,11 +233,14 @@ export default function BetPost({
           ))}
         </div>
       )}
-      {reactionState && onToggleReaction && (
-        <ReactionChips
-          state={reactionState}
-          onToggle={onToggleReaction}
-        />
+      {onToggleReaction && (
+        <div className="post-act-row">
+          <ReactionChips
+            state={reactionState}
+            onToggle={onToggleReaction}
+            onAdd={openTray}
+          />
+        </div>
       )}
     </Link>
     {tray}
