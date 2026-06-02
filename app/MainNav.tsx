@@ -21,11 +21,14 @@ export type MainNavTab =
    *  navigate to other surfaces. No tab is highlighted. */
   | "none";
 
+// Course was dropped from the redesign — the page itself still
+// exists at /course for any old bookmarks, but it's no longer a
+// primary tab. Direct links from in-feed shot rows go to the
+// player page, not the course map.
 const TABS: Array<{ key: MainNavTab; href: string; label: string }> = [
   { key: "live", href: "/", label: "Feed" },
   { key: "bets", href: "/bets", label: "Bets" },
   { key: "leaderboard", href: "/leaderboard", label: "Leaderboard" },
-  { key: "course", href: "/course", label: "Course" },
   { key: "sharp", href: "/sharp", label: "Sharp" },
   { key: "games", href: "/games", label: "Games" },
 ];

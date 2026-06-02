@@ -23171,6 +23171,277 @@ html.pv-theme-body .auth-chip-btn {
   background: transparent;
 }
 
+/* =============================================================
+   Sharp Score surface (/sharp) — prototype's <Sharp> rebuilt on
+   broadcast paper. Hero gauge, Putt-IQ poll card, open / settled
+   calls lists.
+   ============================================================= */
+.sh-pv {
+  background: transparent;
+  color: var(--pv-ink);
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+.sh-pv-body {
+  padding: 16px 14px 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Hero gauge — big number on a paper card with emerald accent. */
+.sh-gauge {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 18px;
+  padding: 26px 22px 22px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.sh-gauge::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 80% at 50% 0%,
+    oklch(0.94 0.06 150 / 0.4),
+    transparent 65%
+  );
+  pointer-events: none;
+}
+.sh-gauge > * {
+  position: relative;
+}
+.sh-gauge-num {
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  font-size: 64px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--pv-emerald);
+  text-shadow: 0 0 24px oklch(0.7 0.18 150 / 0.25);
+  letter-spacing: -0.02em;
+}
+.sh-gauge-lbl {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--pv-dim);
+  margin-top: 8px;
+}
+.sh-gauge-sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pv-muted);
+  margin-top: 8px;
+}
+.sh-gauge-delta-up {
+  color: var(--pv-up);
+  font-weight: 800;
+}
+.sh-gauge-delta-down {
+  color: var(--pv-down);
+  font-weight: 800;
+}
+.sh-gauge-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--pv-line);
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--pv-muted);
+}
+.sh-gauge-stats b {
+  color: var(--pv-ink);
+  font-weight: 700;
+}
+.sh-gauge-sep {
+  color: var(--pv-dim);
+}
+
+/* Section label + count chip */
+.sh-section-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pv-dim);
+  margin-bottom: 11px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sh-section-count {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--pv-emerald);
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 7px;
+  letter-spacing: 0;
+}
+
+/* Putt-IQ poll card */
+.sh-poll {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 16px;
+  padding: 16px;
+}
+.sh-poll-q {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--pv-ink);
+  margin-bottom: 14px;
+  line-height: 1.3;
+}
+.sh-poll-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.sh-poll-opt {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--pv-line);
+  border-radius: 11px;
+  padding: 13px 15px;
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--pv-card);
+  color: var(--pv-ink);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: inherit;
+  text-align: left;
+}
+.sh-poll-opt:hover {
+  background: var(--pv-soft);
+}
+.sh-poll-fill {
+  position: absolute;
+  inset: 0;
+  background: oklch(0.93 0.05 155);
+  width: 0;
+  transition: width 0.6s ease;
+}
+.sh-poll-opt-voted .sh-poll-fill {
+  width: var(--pct, 0%);
+}
+.sh-poll-opt-mine {
+  border-color: var(--pv-emerald);
+}
+.sh-poll-lab,
+.sh-poll-pct {
+  position: relative;
+}
+.sh-poll-pct {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  color: var(--pv-muted);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.sh-poll-opt-voted .sh-poll-pct {
+  opacity: 1;
+}
+.sh-poll-foot {
+  font-size: 12px;
+  color: var(--pv-dim);
+  margin-top: 12px;
+  text-align: center;
+}
+
+/* Open / settled calls list */
+.sh-call-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sh-call {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 13px;
+  padding: 13px 15px;
+}
+.sh-call-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sh-call-q {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--pv-ink);
+  line-height: 1.3;
+}
+.sh-call-status {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  padding: 3px 7px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.sh-call-status-pending {
+  background: var(--pv-soft);
+  color: var(--pv-muted);
+  border: 1px solid var(--pv-line);
+}
+.sh-call-status-right {
+  background: oklch(0.92 0.06 155);
+  color: var(--pv-emerald-d);
+}
+.sh-call-status-wrong {
+  background: oklch(0.93 0.05 28);
+  color: var(--pv-down);
+}
+.sh-call-sub {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--pv-muted);
+  flex-wrap: wrap;
+}
+.sh-call-pick {
+  font-weight: 600;
+}
+.sh-call-meta {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  color: var(--pv-dim);
+  flex-shrink: 0;
+}
+
+.sh-foot {
+  text-align: center;
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+.sh-foot-link {
+  color: var(--pv-emerald-d);
+  font-weight: 800;
+  text-decoration: none;
+}
+.sh-foot-link:hover {
+  color: var(--pv-emerald);
+}
+
 /* "Your bets" section heading above the bet posts */
 .pv-theme .pv-section-label {
   font-size: 10.5px;
