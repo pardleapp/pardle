@@ -59,6 +59,7 @@ import ShotPost from "./ShotPost";
 import ShotsReel from "./ShotsReel";
 import ShotDetail from "./ShotDetail";
 import type { FeedEvent } from "@/lib/feed/types";
+import { DEMO_RESPONSE } from "./demo-feed";
 import { CrewBetPost, CrewResultPost, CrewTipPost } from "./CrewPosts";
 import { MOCK_CREW_POSTS, type MockCrewPost } from "./mock-crew-posts";
 const ReelGroup = dynamic(() => import("./ReelGroup"), {
@@ -368,44 +369,39 @@ function findEventIdForPoll(
 }
 
 export default function FeedClient({ forcedTournamentId }: FeedClientProps = {}) {
-  const [data, setData] = useState<FeedResponse | null>(null);
+  /** Read demo flag synchronously so initial state can seed
+   *  DEMO_RESPONSE into `data` and the very first paint already
+   *  shows stub cards — no flash to the off-week landing on
+   *  re-hydration. */
+  const isDemo =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("demo") === "1";
+  const [data, setData] = useState<FeedResponse | null>(
+    isDemo ? (DEMO_RESPONSE as unknown as FeedResponse) : null,
+  );
   /** Pulled from ?poll=<id> on first mount. When set, the matching
    *  feed row scrolls into view + flashes a highlight ring once
    *  the data resolves. */
   const [deepLinkPollId, setDeepLinkPollId] = useState<string | null>(null);
   const [deepLinkFired, setDeepLinkFired] = useState(false);
-  /** ?demo=1 flag — skips the /api/feed fetch and renders the
-   *  Sweat Feed against a stub envelope of mock shot rows so the
-   *  hold-to-react gesture + Shots-of-the-day reel + ShotPost
-   *  diagrams can all be exercised without a live tournament. */
-  const [demoMode, setDemoMode] = useState(false);
+  // Mirror isDemo into state so any future flips (e.g. clicking
+  // "Exit demo") could be wired through; today it's a one-way flag
+  // for the lifetime of the page mount. Crucially: this state is
+  // initialised SYNCHRONOUSLY from isDemo so it's correct from the
+  // very first render — no useEffect race against the polling
+  // load() to lose.
+  const [demoMode] = useState<boolean>(isDemo);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const p = params.get("poll");
     if (p) setDeepLinkPollId(p);
-    if (params.get("demo") === "1") setDemoMode(true);
   }, []);
 
-  // When demo mode is active, swap the entire feed envelope for the
-  // stub. Skips the /api/feed fetch entirely so nothing's
-  // network-blocking. Re-runs on demoMode flip (so toggling without
-  // a hard reload works too).
-  useEffect(() => {
-    if (!demoMode) return;
-    let cancelled = false;
-    void (async () => {
-      const { DEMO_RESPONSE } = await import("./demo-feed");
-      if (!cancelled) {
-        setData(DEMO_RESPONSE as unknown as FeedResponse);
-        setError(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [demoMode]);
+  // (Demo data is now seeded synchronously in initial useState so
+  // the very first paint already shows stub cards. No post-mount
+  // effect is needed.)
 
   // Once data arrives + the deep-link poll exists, scroll its row
   // into view and apply a brief highlight ring. Strip the ?poll
@@ -511,6 +507,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
   useEffect(() => {
     authorKey.current = getAuthorKey();
+    if (demoMode) return; // demo seeded synchronously — don't overwrite
     // Cached-first display: show last successful response immediately
     // so repeat visits feel instant. Background fetch (kicked off by
     // the load() polling effect below) replaces with fresh data
@@ -518,7 +515,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     const cached = readCachedFeed();
     if (cached) setData(cached);
     setMedianLoadMs(medianMs(readLoadTimes()));
-  }, []);
+  }, [demoMode]);
 
   // Stamp the html element so body bg goes warm paper while the feed
   // is mounted; clear on unmount so /bets, /sharp etc. keep their
@@ -578,6 +575,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   }, []);
 
   const load = useCallback(async () => {
+    // Belt-and-braces: even if something accidentally calls load()
+    // in demo mode (manual trigger, stale interval that survived a
+    // demoMode flip), bail before touching state so the stub is
+    // never overwritten.
+    if (demoMode) return;
     const startedAt = performance.now();
     try {
       const tParam = forcedTournamentId
@@ -681,7 +683,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     } catch {
       setError(true);
     }
-  }, [spawnFloater, forcedTournamentId]);
+  }, [spawnFloater, forcedTournamentId, demoMode]);
 
   useEffect(() => {
     // Demo mode owns the data — skip the network fetch + the
