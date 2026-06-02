@@ -22860,6 +22860,205 @@ html.pv-theme-body .auth-chip-btn {
   border-color: var(--pv-emerald-d);
 }
 
+/* =============================================================
+   Off-week landing (.ow-*) — what /live shows when no tournament
+   is live. Same broadcast paper theme as the live feed; mounts
+   its own SweatHeader so the chrome stays seamless between
+   states.
+   ============================================================= */
+.ow-pv {
+  background: transparent;
+  color: var(--pv-ink);
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+.ow-pv-body {
+  padding: 16px 14px 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+/* Up-next hero card */
+.ow-up-next {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 18px;
+  padding: 22px 20px;
+  position: relative;
+  overflow: hidden;
+}
+.ow-up-next::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 80% at 0% 0%,
+    oklch(0.94 0.05 150 / 0.6),
+    transparent 60%
+  );
+  pointer-events: none;
+}
+.ow-up-next > * {
+  position: relative;
+}
+.ow-up-next-tag {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pv-emerald-d);
+}
+.ow-up-next-name {
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--pv-ink);
+  margin: 8px 0 12px;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.ow-up-next-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+.ow-up-next-date {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pv-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ow-up-next-pill {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pv-emerald-d);
+  background: oklch(0.92 0.06 150);
+  border: 1px solid oklch(0.86 0.08 150);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+.ow-up-next-blurb {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--pv-muted);
+  margin: 0;
+}
+
+/* Generic linked card */
+.ow-card {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 16px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-decoration: none;
+  color: var(--pv-ink);
+  transition: box-shadow 0.16s ease, transform 0.16s ease;
+}
+@media (hover: hover) {
+  .ow-card:hover {
+    box-shadow: 0 10px 26px oklch(0.4 0.06 145 / 0.14);
+    transform: translateY(-2px);
+  }
+}
+.ow-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ow-card-eyebrow {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pv-emerald-d);
+}
+.ow-card-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--pv-ink);
+  line-height: 1.3;
+}
+.ow-card-blurb {
+  font-size: 12.5px;
+  color: var(--pv-muted);
+  line-height: 1.45;
+}
+.ow-card-foot {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pv-emerald-d);
+  margin-top: 4px;
+}
+.ow-card-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--pv-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ow-card-arrow {
+  color: var(--pv-emerald);
+  font-weight: 800;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* Bets-waiting variant — emerald accent so it pops against the
+   regular paper cards. */
+.ow-card-bets {
+  border-color: oklch(0.86 0.08 150);
+  background: linear-gradient(135deg, oklch(0.97 0.04 150), var(--pv-card));
+}
+.ow-card-bets .ow-card-title {
+  color: var(--pv-emerald-d);
+}
+
+/* Sharp-score promo — taller card, no inline icon. */
+.ow-card-sharp {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 18px 20px;
+}
+.ow-card-sharp .ow-card-blurb {
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* Games card — tangerine eyebrow + warm soft icon background. */
+.ow-card-games {
+  background: linear-gradient(135deg, oklch(0.96 0.04 60), var(--pv-card));
+  border-color: oklch(0.88 0.07 60);
+}
+.ow-card-games .ow-card-eyebrow {
+  color: oklch(0.45 0.13 50);
+}
+.ow-card-games .ow-card-icon {
+  background: oklch(0.94 0.06 60);
+}
+
+.ow-footnote {
+  font-size: 10.5px;
+  color: var(--pv-dim);
+  text-align: center;
+  padding: 8px 18px 0;
+  margin: 0;
+  line-height: 1.5;
+}
+
 /* "Your bets" section heading above the bet posts */
 .pv-theme .pv-section-label {
   font-size: 10.5px;
