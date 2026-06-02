@@ -92,7 +92,7 @@ export default async function TodayStatsPage() {
   const totalPlays = grouped.reduce((sum, g) => sum + g.totalAcross, 0);
 
   return (
-    <main className="container today-stats">
+    <main className="container today-stats pv-theme">
       <header className="brand">
         <Link className="brand-back" href="/games" aria-label="All games">
           ←

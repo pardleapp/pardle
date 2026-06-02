@@ -605,7 +605,7 @@ export default function HolesPage() {
   }
 
   return (
-    <main className="container">
+    <main className="container pv-theme">
       {challengeIsForToday && (
         <div className="challenge-banner">
           <span aria-hidden="true">🛰️</span>{" "}

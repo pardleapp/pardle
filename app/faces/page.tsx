@@ -353,7 +353,7 @@ export default function FacesPage() {
 
   if (!puzzles || !day || dayNumber == null) {
     return (
-      <main className="container">
+      <main className="container pv-theme">
         <header className="brand">
           <Link className="brand-back" href="/games" aria-label="All games">
             ←
@@ -369,7 +369,7 @@ export default function FacesPage() {
   if (isFinished) {
     const correct = totalCorrect(day);
     return (
-      <main className="container">
+      <main className="container pv-theme">
         <header className="brand">
           <Link className="brand-back" href="/games" aria-label="All games">
             ←
@@ -475,7 +475,7 @@ export default function FacesPage() {
   );
 
   return (
-    <main className="container">
+    <main className="container pv-theme">
       <header className="brand">
         <Link className="brand-back" href="/games" aria-label="All games">
           ←

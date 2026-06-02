@@ -3981,6 +3981,63 @@ footer {
   }
 }
 
+/* Kill the dark-mode overrides above inside any .pv-theme'd page.
+   The @media block at L3942 carries selector-targeted dark bg /
+   text rules (input[type=text] / .suggestions / .guess-name /
+   etc.) that beat the .pv-theme CSS-variable aliases at L19057
+   on a system-dark device — leaving Pros's player-search field
+   and autocomplete dropdown as dark-on-dark unreadable boxes.
+   Force them back to broadcast paper whenever a .pv-theme
+   ancestor is present, regardless of OS dark preference. */
+.pv-theme input[type=text],
+.pv-theme input[type=search],
+.pv-theme input:not([type]),
+:has(.pv-theme) input[type=text],
+:has(.pv-theme) input[type=search] {
+  background: var(--pv-card);
+  color: var(--pv-ink);
+  border-color: var(--pv-line);
+}
+.pv-theme input[type=text]::placeholder,
+:has(.pv-theme) input[type=text]::placeholder {
+  color: var(--pv-muted);
+  opacity: 1;
+}
+.pv-theme input[type=text]:focus,
+:has(.pv-theme) input[type=text]:focus {
+  border-color: var(--pv-emerald);
+  outline: none;
+}
+.pv-theme .suggestions,
+:has(.pv-theme) .suggestions {
+  background: var(--pv-card);
+  border-color: var(--pv-line);
+  color: var(--pv-ink);
+  box-shadow: 0 12px 28px oklch(0.3 0.04 150 / 0.12);
+}
+.pv-theme .suggestions li,
+:has(.pv-theme) .suggestions li {
+  border-bottom-color: var(--pv-line);
+  color: var(--pv-ink);
+}
+.pv-theme .suggestions li:hover,
+.pv-theme .suggestions li:active,
+:has(.pv-theme) .suggestions li:hover,
+:has(.pv-theme) .suggestions li:active {
+  background: var(--pv-soft);
+  color: var(--pv-emerald-d);
+}
+.pv-theme .suggestion-country,
+:has(.pv-theme) .suggestion-country {
+  color: var(--pv-muted);
+}
+.pv-theme .guess-name,
+:has(.pv-theme) .guess-name {
+  background: var(--pv-soft);
+  border-color: var(--pv-line);
+  color: var(--pv-ink);
+}
+
 /* ---------- /faces ---------- */
 
 .faces-hint {

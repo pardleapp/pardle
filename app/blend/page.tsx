@@ -127,7 +127,7 @@ export default function BlendPicker() {
   }
 
   return (
-    <main className="container blend-landing">
+    <main className="container blend-landing pv-theme">
       <header className="brand">
         <Link className="brand-back" href="/games" aria-label="All games">
           ←
