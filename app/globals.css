@@ -9188,6 +9188,99 @@ footer {
   cursor: not-allowed;
 }
 
+/* ───── /live/bet/[id] page — light theme reconciliation ─────
+   The page wrapper now carries .pv-theme + .bd-page (not v4-theme),
+   so the dark `.v4-theme .bd-*` rules at L16210+ no longer apply.
+   Below are the few targeted overrides needed because the base
+   .bd-* rules at L8420+ use translucent rgba() backgrounds tuned
+   for a dark page; on a paper page those read as nearly-invisible
+   tints. Reconciled against the prototype's BetDetail (.detail,
+   .detail-head, .detail-body, .detail-foot — Pardle Social v2.html
+   L65–84) and social-v2.css .detail-back style. */
+.pv-theme.bd-page {
+  background: var(--pv-bg);
+  color: var(--pv-ink);
+}
+.pv-theme.bd-page .bd-back {
+  background: var(--pv-card);
+  border-color: var(--pv-line);
+  color: var(--pv-ink);
+}
+.pv-theme.bd-page .bd-back:hover {
+  background: var(--pv-soft);
+}
+.pv-theme.bd-page .bd-head,
+.pv-theme.bd-page .bd-head-hero {
+  background: var(--pv-card);
+  border-color: var(--pv-line);
+  color: var(--pv-ink);
+}
+/* The hero variant carried a faint green gradient that read as a
+   warm wash on dark; on paper it's almost invisible and clashes
+   with the surrounding card chrome. Drop the gradient, let the
+   bd-hero-amt colour carry the up/down signal. */
+.pv-theme.bd-page .bd-head-hero {
+  background: var(--pv-card);
+}
+.pv-theme.bd-page .bd-hero-meta {
+  color: var(--pv-muted);
+}
+
+/* Bottom action group: Share as a full-width primary emerald
+   button, Hide + Remove as smaller secondary buttons side-by-side
+   below it. Replaces the wrapping pill row that crammed three
+   buttons together. */
+.pv-theme.bd-page .bd-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-wrap: nowrap;
+  margin-top: 14px;
+}
+.pv-theme.bd-page .bd-share {
+  width: 100%;
+  background: var(--pv-emerald);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 22px;
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+  min-height: 48px;
+  box-shadow: none;
+}
+.pv-theme.bd-page .bd-share:hover {
+  background: var(--pv-emerald-d);
+}
+.pv-theme.bd-page .bd-share:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.pv-theme.bd-page .bd-actions-secondary {
+  display: flex;
+  gap: 8px;
+}
+.pv-theme.bd-page .bd-actions-secondary .bd-hide-grp,
+.pv-theme.bd-page .bd-actions-secondary .bd-remove {
+  flex: 1 1 0;
+  align-self: stretch;
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  min-height: 44px;
+}
+.pv-theme.bd-page .bd-actions-secondary .bd-remove {
+  border-color: var(--pv-line);
+  color: var(--pv-muted);
+}
+.pv-theme.bd-page .bd-actions-secondary .bd-remove:hover {
+  color: var(--pv-down);
+  background: oklch(0.97 0.04 28 / 0.4);
+}
+
 @media (max-width: 640px) {
   .bd-head {
     flex-direction: column;

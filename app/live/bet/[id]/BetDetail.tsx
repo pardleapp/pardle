@@ -876,20 +876,22 @@ export default function BetDetail({ betId }: { betId: string }) {
             ? "Try again"
             : "Share this bet"}
         </button>
-        <button
-          type="button"
-          className={`bd-hide-grp${effectivePrivate ? " bd-hide-grp-on" : ""}`}
-          onClick={toggleHideFromGroup}
-          disabled={privateBusy}
-          aria-pressed={effectivePrivate}
-        >
-          {effectivePrivate
-            ? "Hidden from your crew ✓"
-            : "Hide from your crew"}
-        </button>
-        <button type="button" className="bd-remove" onClick={removeThis}>
-          Remove this bet
-        </button>
+        <div className="bd-actions-secondary">
+          <button
+            type="button"
+            className={`bd-hide-grp${effectivePrivate ? " bd-hide-grp-on" : ""}`}
+            onClick={toggleHideFromGroup}
+            disabled={privateBusy}
+            aria-pressed={effectivePrivate}
+          >
+            {effectivePrivate
+              ? "Hidden from your crew ✓"
+              : "Hide from your crew"}
+          </button>
+          <button type="button" className="bd-remove" onClick={removeThis}>
+            Remove this bet
+          </button>
+        </div>
       </div>
     </section>
   );
