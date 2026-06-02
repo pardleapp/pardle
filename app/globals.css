@@ -23564,6 +23564,43 @@ html.pv-theme-body .auth-chip-btn {
   }
 }
 
+/* Demo-mode banner — only renders when ?demo=1 is on the URL.
+   Slim tangerine strip under SweatHeader so it's obviously not
+   real data + an exit link back to the regular feed. */
+.demo-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  background: oklch(0.94 0.06 60);
+  border-bottom: 1px solid oklch(0.86 0.09 60);
+  color: oklch(0.40 0.13 50);
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+.demo-banner-tag {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  background: oklch(0.55 0.16 50);
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.demo-banner-text {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  flex: 1;
+  min-width: 0;
+}
+.demo-banner-exit {
+  color: oklch(0.40 0.13 50);
+  text-decoration: underline;
+  font-weight: 800;
+}
+
 /* "Your bets" section heading above the bet posts */
 .pv-theme .pv-section-label {
   font-size: 10.5px;

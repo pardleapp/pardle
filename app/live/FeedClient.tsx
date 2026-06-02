@@ -374,13 +374,38 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
    *  the data resolves. */
   const [deepLinkPollId, setDeepLinkPollId] = useState<string | null>(null);
   const [deepLinkFired, setDeepLinkFired] = useState(false);
+  /** ?demo=1 flag — skips the /api/feed fetch and renders the
+   *  Sweat Feed against a stub envelope of mock shot rows so the
+   *  hold-to-react gesture + Shots-of-the-day reel + ShotPost
+   *  diagrams can all be exercised without a live tournament. */
+  const [demoMode, setDemoMode] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const p = params.get("poll");
     if (p) setDeepLinkPollId(p);
+    if (params.get("demo") === "1") setDemoMode(true);
   }, []);
+
+  // When demo mode is active, swap the entire feed envelope for the
+  // stub. Skips the /api/feed fetch entirely so nothing's
+  // network-blocking. Re-runs on demoMode flip (so toggling without
+  // a hard reload works too).
+  useEffect(() => {
+    if (!demoMode) return;
+    let cancelled = false;
+    void (async () => {
+      const { DEMO_RESPONSE } = await import("./demo-feed");
+      if (!cancelled) {
+        setData(DEMO_RESPONSE as unknown as FeedResponse);
+        setError(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [demoMode]);
 
   // Once data arrives + the deep-link poll exists, scroll its row
   // into view and apply a brief highlight ring. Strip the ?poll
@@ -659,6 +684,9 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   }, [spawnFloater, forcedTournamentId]);
 
   useEffect(() => {
+    // Demo mode owns the data — skip the network fetch + the
+    // polling loop entirely so the stub doesn't get overwritten.
+    if (demoMode) return;
     let timer: ReturnType<typeof setInterval> | null = null;
     const isHidden = () =>
       typeof document !== "undefined" && document.hidden;
@@ -677,7 +705,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       if (timer) clearInterval(timer);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [load]);
+  }, [load, demoMode]);
 
   async function sendBurst(emoji: string) {
     spawnFloater(emoji); // optimistic — instant feedback for the tapper
@@ -941,6 +969,17 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   return (
     <section className="feed-wrap v4-theme pv-theme">
       <SweatHeader />
+      {demoMode && (
+        <div className="demo-banner" role="note" aria-live="polite">
+          <span className="demo-banner-tag">DEMO</span>
+          <span className="demo-banner-text">
+            Stub shot cards · for previewing the gesture + reel.{" "}
+            <a className="demo-banner-exit" href="/">
+              Exit demo
+            </a>
+          </span>
+        </div>
+      )}
       <PnLTicker
         trackedBets={trackedBets}
         displayName={
