@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { useDismissibleOverlay } from "@/app/_hooks/useDismissibleOverlay";
 
@@ -48,7 +47,6 @@ async function withTimeout<T>(
  * the PKCE verifier isn't there."
  */
 export default function SignInModal({ open, onClose }: Props) {
-  const router = useRouter();
   useDismissibleOverlay(open, onClose);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -127,10 +125,20 @@ export default function SignInModal({ open, onClose }: Props) {
         setErrMsg("Signed in, but the session didn't load. Try the email link.");
         return;
       }
-      // Success — refresh the route so server components re-fetch
-      // with the new session cookie, then close.
-      router.refresh();
+      // Hard reload on success. router.refresh() works in most
+      // cases but races with @supabase/ssr's async cookie write —
+      // sometimes the refresh request goes out before the new
+      // session cookie is fully committed, so the server re-
+      // renders the signed-out branch and the user is stuck on
+      // the gate until they manually refresh. window.location
+      // .reload() guarantees the next request carries every
+      // freshly-set cookie. Heavier than router.refresh() but
+      // unambiguously correct, and the user is about to see a
+      // completely different signed-in surface anyway.
+      // eslint-disable-next-line no-console
+      console.info("[SignInModal] sign-in success — reloading");
       onClose();
+      window.location.reload();
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error("[SignInModal] verifyOtp threw", e);
