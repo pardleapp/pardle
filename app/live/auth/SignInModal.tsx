@@ -13,14 +13,29 @@ const VERIFY_TIMEOUT_MS = 12_000;
 
 /** Wrap a promise with a timeout race so a stuck network call
  *  surfaces as an error instead of leaving the button on
- *  "Signing in…" forever. */
-function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
-  return Promise.race([
-    p,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out`)), ms),
-    ),
-  ]);
+ *  "Signing in…" forever. The explicit `<T>` annotation on the
+ *  rejecting promise keeps TS's union narrowing happy — without
+ *  it the race result widens to unknown. */
+async function withTimeout<T>(
+  p: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // Promise<never> lets Promise.race resolve cleanly to T —
+  // the timeout branch only ever rejects, so it contributes
+  // nothing to the resolved value's type union.
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} timed out`)),
+      ms,
+    );
+  });
+  try {
+    return await Promise.race([p, timeoutPromise]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 /**
@@ -82,15 +97,14 @@ export default function SignInModal({ open, onClose }: Props) {
       // try/catch in case verifyOtp THROWS instead of returning
       // { error } — that path bypasses the error branch and the
       // status would never reset.
-      const { data, error } = await withTimeout(
-        supabase.auth.verifyOtp({
-          email: email.trim(),
-          token: trimmed,
-          type: "email",
-        }),
-        VERIFY_TIMEOUT_MS,
-        "Sign-in verify",
-      );
+      const verifyPromise = supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: trimmed,
+        type: "email",
+      });
+      const { data, error } = await withTimeout<
+        Awaited<typeof verifyPromise>
+      >(verifyPromise, VERIFY_TIMEOUT_MS, "Sign-in verify");
       if (error) {
         // eslint-disable-next-line no-console
         console.error("[SignInModal] verifyOtp error", error);
