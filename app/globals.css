@@ -25923,17 +25923,28 @@ html.pv-theme-body .auth-chip-btn {
 .gh-body::-webkit-scrollbar {
   width: 0;
 }
-/* Standalone /games page: pad the bottom of the internal-scroll
-   region so its scrollable content can never sit behind the fixed
-   bottom nav. Measured cause: on iPhone-SE-class viewports the
-   third grid row (Faces) lands at y=505 while the nav covers
-   y=498→568 — elementFromPoint at the visible sliver of the card
-   returns bottom-nav-btn (Sweats on the left, Leaders on the
-   right), and the tap goes to / or /leaderboard instead of /faces.
-   90px clears the nav and the safe-area inset clears iOS home
-   indicator. */
+/* Standalone /games page: behave like every other pv-theme page
+   (/sharp, /leaderboard, …) — document scroll, with the global
+   body:has(.pv-theme) { padding-bottom: 150px } rule handling nav
+   clearance. The overlay form (.gh) keeps its fixed-position flex
+   column + internal scroll because it covers the bottom nav.
+   .gh-body inherits flex:1 + overflow-y:auto from the overlay
+   form; on the standalone page that combo silently grew gh-body
+   to fit its content height (overflow:auto never engaged) and
+   the document never scrolled enough for body padding-bottom to
+   clear the nav — leaving the bottom grid row sitting under
+   bottom-nav-btn at scrollY=0 on small viewports.
+
+   Strip both the flex layout on .gh-page and the internal scroll
+   on its .gh-body so the page falls back to ordinary block flow
+   + document scroll. */
+.gh-page {
+  display: block;
+}
 .gh-page > .gh-body {
-  padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+  flex: none;
+  overflow: visible;
+  -webkit-overflow-scrolling: auto;
 }
 
 /* Streak banner — tang-tinted bar from social-v2.css L515-516. */
