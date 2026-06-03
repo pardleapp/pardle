@@ -41,6 +41,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { GroupMessageRow } from "@/lib/groups/server";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
+import { hapticTap } from "@/lib/haptic";
 
 interface Props {
   groupId: string;
@@ -196,6 +197,7 @@ export default function GroupChat({
       if (sending) return;
       const body = input.trim();
       if (!body) return;
+      hapticTap();
       setSending(true);
       setErr(null);
       const optimisticId = `opt-${Date.now()}`;

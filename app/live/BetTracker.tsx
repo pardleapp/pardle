@@ -37,6 +37,7 @@ import RecentFormSparkline, {
   type RecentEvent,
 } from "./RecentFormSparkline";
 import { abbreviateName } from "@/lib/text/abbreviate";
+import { hapticSuccess } from "@/lib/haptic";
 import {
   BET_CURRENCIES,
   DEFAULT_BET_CURRENCY,
@@ -253,6 +254,7 @@ export default function BetTracker({
   function addBet(b: TrackedBet) {
     const next = [...bets, b];
     setBets(next);
+    hapticSuccess();
     // persistBet writes to localStorage AND fire-and-forget POSTs to
     // the server. Anonymous users get a 401 and just keep the local
     // copy; signed-in users get cross-device sync.

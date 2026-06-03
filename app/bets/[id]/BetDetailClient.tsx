@@ -32,6 +32,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import BackButton from "@/app/_components/BackButton";
+import { hapticTap } from "@/lib/haptic";
 import type { MockBetLive } from "../mock-bets";
 
 const PALETTE: Record<string, string> = {
@@ -238,6 +239,7 @@ export default function BetDetailClient({
   const send = () => {
     const text = input.trim();
     if (!text) return;
+    hapticTap();
     setComments((list) => [
       ...list,
       { author: "You", initials: "YO", text },

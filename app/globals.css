@@ -26119,3 +26119,201 @@ html.pv-theme-body .auth-chip-btn {
   background: var(--pv-emerald-d);
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Press / tap-feedback system  (native-feeling touch response)
+
+   Goal: every tappable surface in a .pv-theme tree gives an
+   immediate :active response — scale-down for buttons / cards,
+   background-tint for list rows — without the ugly iOS grey
+   tap-highlight flash. Defined as one cascade so we don't have
+   to remember to opt in component by component.
+
+   Specificity layering:
+     1. Base button / [role=button] / .pressable → scale(.97)
+     2. .pressable-card                          → scale(.985) + tint
+     3. Row classes (.lb-row, .pop-row, etc.)    → tint + tiny scale
+   Row rules carry higher specificity than the base button rule,
+   so a <button class="pop-row"> picks up the row press, not the
+   button press.
+
+   Reduced motion: drop the scale, keep the tint so the user
+   still gets confirmation feedback without movement.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --pv-press-tint: rgba(30, 90, 60, 0.06);
+  --pv-press-tint-strong: rgba(30, 90, 60, 0.10);
+}
+
+/* Kill iOS / Android native grey flash app-wide. Our own :active
+   replaces it. */
+*,
+*::before,
+*::after {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Eliminate the 300ms tap delay on every interactive surface. */
+button,
+a,
+[role="button"],
+input,
+select,
+textarea,
+label,
+summary,
+.pressable {
+  touch-action: manipulation;
+}
+
+/* Default press: any button-like control inside the redesigned
+   surfaces, plus anything explicitly opting in via .pressable. */
+.pv-theme button,
+.pv-theme [role="button"],
+.pv-theme a.pressable,
+.pv-theme .pressable {
+  transition:
+    transform 90ms cubic-bezier(0.2, 0.6, 0.3, 1),
+    background-color 90ms ease,
+    opacity 90ms ease;
+}
+.pv-theme button:not(:disabled):not([aria-disabled="true"]):active,
+.pv-theme [role="button"]:not([aria-disabled="true"]):active,
+.pv-theme a.pressable:active,
+.pv-theme .pressable:active {
+  transform: scale(0.97);
+}
+
+/* Card variant — for the larger tap-targets where 0.97 looks
+   exaggerated. Bet posts, game cards, group cards. */
+.pv-theme .pressable-card:not(:disabled):active,
+.pv-theme .bp-card:not(:disabled):active,
+.pv-theme .game-card:not(:disabled):active,
+.pv-theme .gh-card:not(:disabled):active,
+.pv-theme .grp-card.grp-card-tappable:not(:disabled):active {
+  transform: scale(0.985);
+  background-color: var(--pv-press-tint);
+}
+
+/* List-row variant — scaling a wide row looks janky; tint the
+   background instead. Covers every row pattern across the app:
+   groups, leaderboard, bets, members, most-backed, notifications,
+   chat-bet-chip, etc. */
+.pv-theme .pressable-row,
+.pv-theme .pop-row,
+.pv-theme .racerow,
+.pv-theme .mem-row,
+.pv-theme .lb-row,
+.pv-theme .nb-row,
+.pv-theme .bets-settled,
+.pv-theme .player-row,
+.pv-theme .chat-bet-chip,
+.pv-theme .feed-card-row,
+.pv-theme .mob-bottom-tab,
+.pv-theme .nav-tab {
+  transition:
+    background-color 90ms ease,
+    transform 90ms cubic-bezier(0.2, 0.6, 0.3, 1);
+}
+.pv-theme .pressable-row:not(:disabled):active,
+.pv-theme .pop-row:not(:disabled):active,
+.pv-theme .racerow:not(:disabled):active,
+.pv-theme .mem-row:not(:disabled):active,
+.pv-theme .lb-row:not(:disabled):active,
+.pv-theme .nb-row:not(:disabled):active,
+.pv-theme .bets-settled:not(:disabled):active,
+.pv-theme .player-row:not(:disabled):active,
+.pv-theme .chat-bet-chip:not(:disabled):active,
+.pv-theme .feed-card-row:not(:disabled):active,
+.pv-theme .mob-bottom-tab:not(:disabled):active,
+.pv-theme .nav-tab:not(:disabled):active {
+  background-color: var(--pv-press-tint);
+  transform: scale(0.995);
+}
+
+/* Chip / tab variant — small clickable pills (odds toggle, live/
+   settled segmented control, reaction chips). A snappier scale
+   feels right at this size. */
+.pv-theme .pressable-chip:not(:disabled):active,
+.pv-theme .oddstog button:not(:disabled):active,
+.pv-theme .lstog button:not(:disabled):active,
+.pv-theme .rxn-chip:not(:disabled):active,
+.pv-theme .lb-round-chip:not(:disabled):active {
+  transform: scale(0.94);
+}
+
+/* Primary CTA variant — make the press a touch darker on solid
+   emerald / accent buttons so the response reads on a saturated
+   surface where a small scale alone is subtle. */
+.pv-theme .auth-modal-btn:not(:disabled):active,
+.pv-theme .bd-pv-share:not(:disabled):active,
+.pv-theme .bd-pv-tail:not(:disabled):active,
+.pv-theme .grp-race-btn:not(:disabled):active,
+.pv-theme .gh-challenge-btn:not(:disabled):active {
+  filter: brightness(0.92);
+}
+
+/* Disabled controls: no press response. Defensive — :active is
+   already suppressed by :not(:disabled) above, but this also
+   kills the cursor + softens the look. */
+.pv-theme button[disabled],
+.pv-theme [role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pv-theme button,
+  .pv-theme [role="button"],
+  .pv-theme a.pressable,
+  .pv-theme .pressable,
+  .pv-theme .pressable-card,
+  .pv-theme .pressable-row,
+  .pv-theme .pop-row,
+  .pv-theme .racerow,
+  .pv-theme .mem-row,
+  .pv-theme .lb-row,
+  .pv-theme .nb-row,
+  .pv-theme .bets-settled,
+  .pv-theme .player-row,
+  .pv-theme .chat-bet-chip,
+  .pv-theme .feed-card-row,
+  .pv-theme .mob-bottom-tab,
+  .pv-theme .nav-tab,
+  .pv-theme .bp-card,
+  .pv-theme .game-card,
+  .pv-theme .gh-card,
+  .pv-theme .oddstog button,
+  .pv-theme .lstog button,
+  .pv-theme .rxn-chip,
+  .pv-theme .lb-round-chip {
+    transition: background-color 90ms ease;
+  }
+  .pv-theme button:active,
+  .pv-theme [role="button"]:active,
+  .pv-theme a.pressable:active,
+  .pv-theme .pressable:active,
+  .pv-theme .pressable-card:active,
+  .pv-theme .pressable-row:active,
+  .pv-theme .pop-row:active,
+  .pv-theme .racerow:active,
+  .pv-theme .mem-row:active,
+  .pv-theme .lb-row:active,
+  .pv-theme .nb-row:active,
+  .pv-theme .bets-settled:active,
+  .pv-theme .player-row:active,
+  .pv-theme .chat-bet-chip:active,
+  .pv-theme .feed-card-row:active,
+  .pv-theme .mob-bottom-tab:active,
+  .pv-theme .nav-tab:active,
+  .pv-theme .bp-card:active,
+  .pv-theme .game-card:active,
+  .pv-theme .gh-card:active,
+  .pv-theme .oddstog button:active,
+  .pv-theme .lstog button:active,
+  .pv-theme .rxn-chip:active,
+  .pv-theme .lb-round-chip:active {
+    transform: none;
+    background-color: var(--pv-press-tint);
+  }
+}
+
+

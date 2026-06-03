@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { useDismissibleOverlay } from "@/app/_hooks/useDismissibleOverlay";
+import { hapticTap, hapticSuccess } from "@/lib/haptic";
 
 interface Props {
   open: boolean;
@@ -59,6 +60,7 @@ export default function SignInModal({ open, onClose }: Props) {
 
   async function submitEmail(e: React.FormEvent) {
     e.preventDefault();
+    hapticTap();
     setStatus("sending");
     setErrMsg(null);
     const supabase = getSupabaseBrowser();
@@ -121,6 +123,7 @@ export default function SignInModal({ open, onClose }: Props) {
       // Hard reload so the next request carries the freshly-set
       // auth cookies and the server-rendered Groups gate re-runs
       // on the signed-in branch.
+      hapticSuccess();
       onClose();
       window.location.reload();
     } catch (e) {

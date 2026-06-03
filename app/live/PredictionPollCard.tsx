@@ -22,6 +22,7 @@ import type {
   PredictionPoll,
   PredictionPollCounts,
 } from "@/lib/feed/prediction-polls";
+import { hapticTap } from "@/lib/haptic";
 
 interface Props {
   poll: PredictionPoll;
@@ -56,6 +57,7 @@ export default function PredictionPollCard({
   const handleVote = (key: string) => {
     if (pending) return;
     if (hasVoted) return;
+    hapticTap();
     setPending(key);
     onVote(key);
     // Visual feedback only; parent triggers refresh which clears
