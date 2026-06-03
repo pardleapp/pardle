@@ -49,10 +49,6 @@ interface MarketDef {
   defaultOdds: string;
   /** For top-finish: 5/10/20. */
   cutoff?: 5 | 10 | 20;
-  /** For round-score: round number 1-4, side, default line. */
-  round?: number;
-  side?: "under" | "over";
-  defaultLine?: number;
   /** Whether this market needs the user to pick a player. */
   needsPlayer: boolean;
 }
@@ -82,24 +78,29 @@ const MARKETS: MarketDef[] = [
     needsPlayer: true,
   },
   {
-    key: "r4-under-695",
-    label: "R4 under 69.5",
+    key: "round-score",
+    label: "Round score",
     kind: "round-score",
-    round: 4,
-    side: "under",
-    defaultLine: 69.5,
     defaultOdds: "-110",
     needsPlayer: true,
   },
   {
-    key: "winning-under",
-    label: "Winning score under",
+    key: "winning-score",
+    label: "Winning score",
     kind: "winning-score",
-    side: "under",
-    defaultLine: 268.5,
     defaultOdds: "+125",
     needsPlayer: false,
   },
+];
+
+const DEFAULT_ROUND_LINE = "69.5";
+const DEFAULT_WIN_LINE = "270.5";
+const ROUND_OPTIONS: Array<{ value: number | null; label: string }> = [
+  { value: null, label: "Any" },
+  { value: 1, label: "R1" },
+  { value: 2, label: "R2" },
+  { value: 3, label: "R3" },
+  { value: 4, label: "R4" },
 ];
 
 const CURRENCIES: Array<{ symbol: "£" | "$"; code: BetCurrency }> = [
@@ -134,6 +135,11 @@ export default function AddBetSheet({
   const [cur, setCur] = useState<{ symbol: "£" | "$"; code: BetCurrency }>(
     CURRENCIES[0],
   );
+  // Per-market extras — used only for round-score + winning-score.
+  // Stored as text so the input field stays editable; parsed on submit.
+  const [side, setSide] = useState<"under" | "over">("under");
+  const [lineText, setLineText] = useState(DEFAULT_ROUND_LINE);
+  const [round, setRound] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -145,6 +151,9 @@ export default function AddBetSheet({
     setMarketIdx(0);
     setOddsText(MARKETS[0].defaultOdds);
     setStake("");
+    setSide("under");
+    setLineText(DEFAULT_ROUND_LINE);
+    setRound(null);
     setErr(null);
     setSaving(false);
   }, [open, prefillPlayer]);
@@ -217,6 +226,16 @@ export default function AddBetSheet({
   const market = MARKETS[marketIdx];
   const previewName =
     market.needsPlayer && picked ? picked.name : "the field";
+  const marketPreview: string = (() => {
+    if (market.kind === "round-score") {
+      const r = round != null ? ` · R${round}` : "";
+      return `${side.toUpperCase()} ${lineText || "—"}${r}`;
+    }
+    if (market.kind === "winning-score") {
+      return `${side.toUpperCase()} ${lineText || "—"} · TOT`;
+    }
+    return market.label;
+  })();
 
   const submit = useCallback(
     async (e: React.FormEvent) => {
@@ -245,12 +264,17 @@ export default function AddBetSheet({
 
       let bet: TrackedBet;
       if (market.kind === "winning-score") {
+        const line = Number(lineText);
+        if (!Number.isFinite(line) || line < 230 || line > 320) {
+          setErr("Enter a realistic winning-score line, e.g. 270.5.");
+          return;
+        }
         bet = {
           id,
           kind: "winning-score",
           placedAt,
-          line: market.defaultLine ?? 268.5,
-          side: market.side ?? "under",
+          line,
+          side,
           oddsTaken: parsed.decimal,
           oddsTakenLabel,
           stake: stakeNum,
@@ -270,15 +294,20 @@ export default function AddBetSheet({
           currency: cur.code,
         } satisfies TopFinishBet;
       } else if (market.kind === "round-score") {
+        const line = Number(lineText);
+        if (!Number.isFinite(line) || line < 55 || line > 90) {
+          setErr("Enter a realistic round-score line, e.g. 69.5.");
+          return;
+        }
         bet = {
           id,
           kind: "round-score",
           placedAt,
           playerId: picked!.id,
           playerName: picked!.name,
-          round: market.round ?? null,
-          line: market.defaultLine ?? 69.5,
-          side: market.side ?? "under",
+          round,
+          line,
+          side,
           oddsTaken: parsed.decimal,
           oddsTakenLabel,
           stake: stakeNum,
@@ -311,7 +340,19 @@ export default function AddBetSheet({
         setSaving(false);
       }
     },
-    [cur.code, market, oddsText, onClose, onTracked, picked, saving, stake],
+    [
+      cur.code,
+      lineText,
+      market,
+      oddsText,
+      onClose,
+      onTracked,
+      picked,
+      round,
+      saving,
+      side,
+      stake,
+    ],
   );
 
   if (!open) return null;
@@ -369,6 +410,16 @@ export default function AddBetSheet({
                 onClick={() => {
                   setMarketIdx(i);
                   setOddsText(m.defaultOdds);
+                  // Reset side/line defaults per market so the user
+                  // sees a sensible starting line for the kind they
+                  // just picked instead of a stale value from another.
+                  if (m.kind === "winning-score") {
+                    setLineText(DEFAULT_WIN_LINE);
+                    setSide("under");
+                  } else if (m.kind === "round-score") {
+                    setLineText(DEFAULT_ROUND_LINE);
+                    setSide("under");
+                  }
                 }}
               >
                 {m.label}
@@ -376,6 +427,70 @@ export default function AddBetSheet({
             ))}
           </div>
         </div>
+
+        {market.kind === "round-score" && (
+          <div className="addbet-field">
+            <div className="addbet-fl">Round</div>
+            <div className="addbet-chiprow">
+              {ROUND_OPTIONS.map((r) => (
+                <button
+                  key={r.label}
+                  type="button"
+                  className={`addbet-chip${
+                    round === r.value ? " addbet-chip-on" : ""
+                  }`}
+                  onClick={() => setRound(r.value)}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(market.kind === "round-score" ||
+          market.kind === "winning-score") && (
+          <div className="addbet-field">
+            <div className="addbet-fl">
+              {market.kind === "round-score"
+                ? "Round score line"
+                : "Winning-score line"}
+            </div>
+            <div className="addbet-stakerow">
+              <div
+                className="addbet-curtog"
+                role="radiogroup"
+                aria-label="Side"
+              >
+                {(["under", "over"] as const).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    role="radio"
+                    aria-checked={side === s}
+                    className={side === s ? "on" : ""}
+                    onClick={() => setSide(s)}
+                  >
+                    {s === "under" ? "U" : "O"}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="number"
+                inputMode="decimal"
+                className="addbet-stake-input"
+                value={lineText}
+                onChange={(e) => setLineText(e.target.value)}
+                placeholder={
+                  market.kind === "round-score"
+                    ? DEFAULT_ROUND_LINE
+                    : DEFAULT_WIN_LINE
+                }
+                step="0.5"
+              />
+            </div>
+          </div>
+        )}
 
         <div className="addbet-field">
           <div className="addbet-fl">Odds taken</div>
@@ -440,7 +555,7 @@ export default function AddBetSheet({
               ? "Enter a stake to continue."
               : (
                   <>
-                    Posts as <b>{previewName} · {market.label}</b> — your crew
+                    Posts as <b>{previewName} · {marketPreview}</b> — your crew
                     sees it live.
                   </>
                 )}
