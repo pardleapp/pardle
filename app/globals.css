@@ -25923,6 +25923,16 @@ html.pv-theme-body .auth-chip-btn {
 .gh-body::-webkit-scrollbar {
   width: 0;
 }
+/* Standalone /games page: the document itself scrolls, so the
+   global body:has(.pv-theme) { padding-bottom: 150px } rule that
+   clears the bottom nav on every other surface can do its job.
+   Without this, gh-body's internal scroll swallowed the document
+   scroll and the bottom ~70px of the games grid sat behind the
+   fixed bottom nav — taps in that strip hit the rightmost nav
+   tab (Sharp) instead of the game card the user was aiming at. */
+.gh-page > .gh-body {
+  overflow: visible;
+}
 
 /* Streak banner — tang-tinted bar from social-v2.css L515-516. */
 .gm-streak {
