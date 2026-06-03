@@ -25970,6 +25970,18 @@ html.pv-theme-body .auth-chip-btn {
   gap: 10px;
   padding: 12px 16px;
 }
+/* On OG-iPhone-SE-class viewports (320×568, iPhone 5/SE-1st-gen)
+   the 2-col grid's third row lands its top at the same y as the
+   fixed bottom nav. Even with document scroll + body padding-bottom
+   it puts a 1px sliver of the last card behind the nav at scrollY=0
+   and elementFromPoint returns bottom-nav-btn. Stack to a single
+   column at this width so cards are simply pushed below the fold
+   and only ever appear in the safe scrolled-in zone. */
+@media (max-width: 340px) {
+  .gm-grid {
+    grid-template-columns: 1fr;
+  }
+}
 .gm-card {
   position: relative;
   background: var(--pv-card);
