@@ -1,3 +1,4 @@
+import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -10,11 +11,13 @@ import { NextRequest, NextResponse } from "next/server";
  *    so we rewrite the root → `/pros` while keeping the URL bar at
  *    "/" for friendliness.
  *
- * 2. Supabase auth-session refresh. Without this, the access token
- *    expires after ~1h and `auth.getUser()` in route handlers starts
- *    returning null until the user manually refreshes. Calling
- *    `supabase.auth.getUser()` here lets the SSR cookie helper
- *    rotate the token in-flight and keep the session live.
+ * 2. Supabase auth-session refresh — canonical @supabase/ssr pattern
+ *    from supabase.com/docs. Without this, the access token expires
+ *    after ~1h and `auth.getUser()` in route handlers / server
+ *    components starts returning null until the user re-signs-in.
+ *    The setAll handler propagates rotated cookies onto the response
+ *    so the browser stores the refreshed token; getUser() triggers
+ *    the rotation as a side effect.
  */
 export async function middleware(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;
@@ -26,18 +29,32 @@ export async function middleware(req: NextRequest) {
     return NextResponse.rewrite(target);
   }
 
-  // TEMPORARY DIAGNOSTIC PATH — disabled supabase session
-  // refresh. The previous debug round confirmed the auth-token
-  // cookie disappears between the post-verifyOtp moment and
-  // the reload landing. Filtering "deletion" items in setAll
-  // didn't help, so we suspect the underlying supabase-ssr
-  // refresh code is clearing cookies via some path other than
-  // setAll. Skipping the middleware refresh entirely lets us
-  // test whether the cookie survives a clean reload without any
-  // server-side auth processing — if it does, we restore a
-  // patched refresh; if not, the issue is elsewhere (browser-
-  // client storage / response headers from page.tsx).
-  return NextResponse.next({ request: req });
+  // Path 2: Supabase session refresh — canonical pattern.
+  let response = NextResponse.next({ request: req });
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll();
+        },
+        setAll(items) {
+          for (const { name, value } of items) {
+            req.cookies.set(name, value);
+          }
+          response = NextResponse.next({ request: req });
+          for (const { name, value, options } of items) {
+            response.cookies.set(name, value, options);
+          }
+        },
+      },
+    },
+  );
+  // IMPORTANT: don't remove. getUser() validates the access token
+  // and triggers token rotation; without it the cookie goes stale.
+  await supabase.auth.getUser();
+  return response;
 }
 
 export const config = {

@@ -89,73 +89,43 @@ export default function SignInModal({ open, onClose }: Props) {
     }
     setStatus("verifying");
     setErrMsg(null);
-    const supabase = getSupabaseBrowser();
     try {
-      // Race against a 12s timeout so a hung network call surfaces
-      // as a clear error instead of leaving the button stuck on
-      // "Signing in…" forever (the original bug). Also wrap in
-      // try/catch in case verifyOtp THROWS instead of returning
-      // { error } — that path bypasses the error branch and the
-      // status would never reset.
-      const verifyPromise = supabase.auth.verifyOtp({
-        email: email.trim(),
-        token: trimmed,
-        type: "email",
+      // POST to a server route handler instead of verifying via the
+      // browser client. The route sets Supabase cookies via real
+      // HTTP Set-Cookie response headers, which the browser persists
+      // reliably across the reload below — fixing the bug where the
+      // session cookie disappeared on the very next request.
+      const verifyFetch = fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), token: trimmed }),
       });
-      const { data, error } = await withTimeout<
-        Awaited<typeof verifyPromise>
-      >(verifyPromise, VERIFY_TIMEOUT_MS, "Sign-in verify");
-      if (error) {
-        // eslint-disable-next-line no-console
-        console.error("[SignInModal] verifyOtp error", error);
+      const res = await withTimeout(
+        verifyFetch,
+        VERIFY_TIMEOUT_MS,
+        "Sign-in verify",
+      );
+      if (!res.ok) {
+        const { error: msg } = (await res
+          .json()
+          .catch(() => ({ error: "Unknown error" }))) as { error?: string };
         setStatus("sent");
         setErrMsg(
-          /invalid|expired|incorrect/i.test(error.message)
+          msg && /invalid|expired|incorrect/i.test(msg)
             ? "That code didn't work — check it again, or tap the link in the email."
-            : error.message,
+            : msg ?? "Sign-in failed. Try the link in the email.",
         );
         setCode("");
         return;
       }
-      if (!data?.session) {
-        // Theoretically unreachable — verifyOtp returns either a
-        // session or an error. Guard so we never declare success
-        // without a real session in hand.
-        setStatus("sent");
-        setErrMsg("Signed in, but the session didn't load. Try the email link.");
-        return;
-      }
-      // Diagnostic: log what cookies are in document.cookie
-      // immediately after verifyOtp succeeds. If sb-* auth
-      // cookies are absent here, the browser client wrote the
-      // session to localStorage (or nowhere) instead — which
-      // is the root cause if reloads aren't picking up auth.
-      const sbCookies =
-        typeof document !== "undefined"
-          ? document.cookie
-              .split(";")
-              .map((c) => c.trim())
-              .filter((c) => c.startsWith("sb-"))
-              .map((c) => c.split("=")[0])
-              .join(", ")
-          : "(no document)";
-      // eslint-disable-next-line no-console
-      console.info(
-        "[SignInModal] sign-in success — session received:",
-        !!data.session,
-        "sb-cookies:",
-        sbCookies || "(NONE — session not in cookies!)",
-      );
-
-      // Hard reload — the next request includes every committed
-      // cookie. window.location.reload() is unambiguously
-      // correct vs router.refresh() which can race with the
-      // async cookie write.
+      // Hard reload so the next request carries the freshly-set
+      // auth cookies and the server-rendered Groups gate re-runs
+      // on the signed-in branch.
       onClose();
       window.location.reload();
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.error("[SignInModal] verifyOtp threw", e);
+      console.error("[SignInModal] verify request threw", e);
       setStatus("sent");
       setErrMsg(
         e instanceof Error && e.message.includes("timed out")
