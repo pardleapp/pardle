@@ -71,6 +71,11 @@ function bgFor(initials: string): string {
   return PALETTE[initials] ?? "linear-gradient(135deg,#6b7df2,#3b1f8a)";
 }
 
+/** Relative-time label. Uses Date.now() so the server-rendered
+ *  string and the client-rendered string can differ (server's
+ *  "now" is older than the client's "now"). The caller wraps the
+ *  span in suppressHydrationWarning so React doesn't throw on
+ *  the mismatch — recommended React pattern for time-of-day. */
 function timeAgo(iso: string): string {
   const t = new Date(iso).getTime();
   if (!Number.isFinite(t)) return "";
@@ -298,7 +303,12 @@ export default function GroupChat({
                       </span>
                     </Link>
                   )}
-                  <span className="chat-row-ts">{timeAgo(m.created_at)}</span>
+                  <span
+                    className="chat-row-ts"
+                    suppressHydrationWarning
+                  >
+                    {timeAgo(m.created_at)}
+                  </span>
                 </div>
               </div>
             );
