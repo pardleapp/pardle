@@ -207,6 +207,56 @@ export const MOCK_BETS_SETTLED: MockBetSettled[] = [
   },
 ];
 
+/**
+ * Find the mock bet whose trajectory + prob best matches a given
+ * (playerName, marketLabel). Used by the group-market view so the
+ * win-% / chart shown for "R. Henley · OUTRIGHT" matches what a
+ * member sees on their own tracked version of the bet.
+ *
+ * Match is lenient: last-name match on the player (so "R. Henley"
+ * matches "Russell Henley") + normalised market keyword match.
+ * Prefers group-market gb* mocks, then personal b* mocks. Returns
+ * null when no candidate exists — caller falls back to a neutral
+ * placeholder so the page still renders.
+ */
+export function findMatchingMockBet(
+  playerName: string,
+  marketLabel: string,
+): MockBetLive | null {
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  const lastName = (s: string) => {
+    const parts = norm(s).split(" ");
+    return parts[parts.length - 1] ?? "";
+  };
+  const targetLast = lastName(playerName);
+  const targetMkt = norm(marketLabel);
+
+  const sorted = [...MOCK_BETS_LIVE].sort((a, b) => {
+    const aGb = a.id.startsWith("gb") ? 0 : 1;
+    const bGb = b.id.startsWith("gb") ? 0 : 1;
+    return aGb - bGb;
+  });
+
+  return (
+    sorted.find(
+      (b) =>
+        lastName(b.who) === targetLast && norm(b.mkt) === targetMkt,
+    ) ??
+    sorted.find(
+      (b) =>
+        lastName(b.who) === targetLast &&
+        norm(b.mkt).startsWith(targetMkt.split(" ")[0] ?? ""),
+    ) ??
+    sorted.find((b) => lastName(b.who) === targetLast) ??
+    null
+  );
+}
+
 export type OddsFormatKey = keyof MockBetLiveOdds;
 
 export const ODDS_FORMAT_OPTIONS: Array<{

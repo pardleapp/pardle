@@ -208,7 +208,15 @@ const MOCK_COMMENTS_BY_BET: Record<string, Comment[]> = {
   ],
 };
 
-export default function BetDetailClient({ bet }: { bet: MockBetLive }) {
+export default function BetDetailClient({
+  bet,
+  backFallback = "/bets",
+  backAriaLabel = "Back to My bets",
+}: {
+  bet: MockBetLive;
+  backFallback?: string;
+  backAriaLabel?: string;
+}) {
   // Apply pv-theme-body so the page bg matches the rest of the
   // redesigned surfaces.
   useEffect(() => {
@@ -262,15 +270,25 @@ export default function BetDetailClient({ bet }: { bet: MockBetLive }) {
   return (
     <div className="bd-pv">
       <div className="bd-pv-head">
-        <BackButton fallback="/bets" className="bd-pv-back" ariaLabel="Back to My bets" />
+        <BackButton
+          fallback={backFallback}
+          className="bd-pv-back"
+          ariaLabel={backAriaLabel}
+        />
         <div className="bd-pv-title">
           <div className="bd-pv-title-nm">{headerEyebrow}</div>
           <div className="bd-pv-title-mk">
             <Link href={playerHref} className="bd-pv-title-player">
               {bet.who}
             </Link>{" "}
-            · {bet.mkt} · {bet.cur}
-            {bet.stake}
+            · {bet.mkt}
+            {!isGroupView && (
+              <>
+                {" "}
+                · {bet.cur}
+                {bet.stake}
+              </>
+            )}
           </div>
         </div>
       </div>

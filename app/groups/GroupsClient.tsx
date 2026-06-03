@@ -254,7 +254,7 @@ export default function GroupsClient({
                   className="pop-row"
                   onClick={() =>
                     router.push(
-                      `/live/player/${encodeURIComponent(b.player_name)}`,
+                      `/groups/${encodeURIComponent(group.id)}/market?p=${encodeURIComponent(b.player_id)}&m=${encodeURIComponent(b.market_label)}`,
                     )
                   }
                 >
