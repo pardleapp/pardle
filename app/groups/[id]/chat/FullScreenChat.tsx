@@ -31,25 +31,50 @@ function probeOverflow(label: string) {
   const vw = root.clientWidth;
   const bodyW = document.body.scrollWidth;
   const docW = root.scrollWidth;
-  const offenders: HTMLElement[] = [];
+
+  // Two distinct kinds of horizontal overflow to find:
+  //   (1) bounding-rect overflow — element extends past viewport
+  //       right edge (catches absolute/fixed bleed)
+  //   (2) internal overflow — element's content is wider than its
+  //       own box (scrollWidth > clientWidth + 1). This is the
+  //       pattern that produces a page-level horizontal scrollbar
+  //       when the parent doesn't clip.
+  const rectOverflows: HTMLElement[] = [];
+  const internalOverflows: HTMLElement[] = [];
   for (const el of document.querySelectorAll<HTMLElement>("*")) {
     const r = el.getBoundingClientRect();
-    if (r.right > vw + 1) offenders.push(el);
+    if (r.right > vw + 1) rectOverflows.push(el);
+    if (el.scrollWidth > el.clientWidth + 1) internalOverflows.push(el);
   }
+
   // eslint-disable-next-line no-console
   console.warn(
     `[chat-fs probe ${label}]`,
     `viewport=${vw}`,
     `body.scrollWidth=${bodyW}`,
     `doc.scrollWidth=${docW}`,
-    `offenders=${offenders.length}`,
+    `rectOverflows=${rectOverflows.length}`,
+    `internalOverflows=${internalOverflows.length}`,
   );
-  for (const el of offenders.slice(0, 10)) {
+
+  for (const el of rectOverflows.slice(0, 10)) {
     const r = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
     // eslint-disable-next-line no-console
     console.warn(
-      `  ${el.tagName.toLowerCase()}.${el.className || "(no class)"} ` +
-        `right=${Math.round(r.right)} width=${Math.round(r.width)}`,
+      `  RECT ${el.tagName.toLowerCase()}.${el.className || "(no class)"} ` +
+        `right=${Math.round(r.right)} width=${Math.round(r.width)} ` +
+        `overflow-x=${style.overflowX}`,
+      el,
+    );
+  }
+  for (const el of internalOverflows.slice(0, 10)) {
+    const style = window.getComputedStyle(el);
+    // eslint-disable-next-line no-console
+    console.warn(
+      `  INT  ${el.tagName.toLowerCase()}.${el.className || "(no class)"} ` +
+        `scrollW=${el.scrollWidth} clientW=${el.clientWidth} ` +
+        `overflow-x=${style.overflowX}`,
       el,
     );
   }
