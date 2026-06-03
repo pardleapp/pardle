@@ -22,6 +22,7 @@
 
 import { useState } from "react";
 import { RACE } from "./mock-groups";
+import { useDismissibleOverlay } from "@/app/_hooks/useDismissibleOverlay";
 
 interface Props {
   onClose: () => void;
@@ -41,6 +42,7 @@ function bgFor(initials: string): string {
 type RangeKey = "today" | "season" | "alltime";
 
 export default function RaceSheet({ onClose }: Props) {
+  useDismissibleOverlay(true, onClose);
   const [range, setRange] = useState<RangeKey>("today");
   const rows = RACE[range];
   return (

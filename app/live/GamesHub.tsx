@@ -35,6 +35,7 @@ import {
   HUB_CHALLENGE,
   HUB_AVATAR_PALETTE,
 } from "./games-hub-data";
+import { useDismissibleOverlay } from "@/app/_hooks/useDismissibleOverlay";
 
 interface GamesHubProps {
   open: boolean;
@@ -42,6 +43,7 @@ interface GamesHubProps {
 }
 
 export default function GamesHub({ open, onClose }: GamesHubProps) {
+  useDismissibleOverlay(open, onClose);
   if (!open) return null;
   return (
     <div className="gh" role="dialog" aria-modal="true" aria-label="Daily games">

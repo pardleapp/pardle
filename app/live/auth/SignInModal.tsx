@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
+import { useDismissibleOverlay } from "@/app/_hooks/useDismissibleOverlay";
 
 interface Props {
   open: boolean;
@@ -48,6 +49,7 @@ async function withTimeout<T>(
  */
 export default function SignInModal({ open, onClose }: Props) {
   const router = useRouter();
+  useDismissibleOverlay(open, onClose);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [status, setStatus] = useState<

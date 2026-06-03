@@ -25,6 +25,7 @@ import type {
   MemberOpenBet,
 } from "@/lib/groups/server";
 import { formatBetCurrency, normaliseBetCurrency } from "@/lib/format/bet-currency";
+import { useDismissibleOverlay } from "@/app/_hooks/useDismissibleOverlay";
 
 interface Props {
   groupId: string;
@@ -74,6 +75,7 @@ export default function MemberProfile({
   onClose,
   onOpenPlayer,
 }: Props) {
+  useDismissibleOverlay(true, onClose);
   const [bets, setBets] = useState<MemberOpenBet[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
 

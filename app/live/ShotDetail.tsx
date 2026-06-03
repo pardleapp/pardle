@@ -24,6 +24,7 @@ import ShotTracer from "./ShotTracer";
 import ShotDiagram from "./ShotDiagram";
 import ShotShareCard, { type ShotShareData } from "./ShotShareCard";
 import { abbreviateName } from "@/lib/text/abbreviate";
+import { useDismissibleOverlay } from "@/app/_hooks/useDismissibleOverlay";
 
 interface Props {
   event: FeedEvent;
@@ -90,6 +91,7 @@ export default function ShotDetail({
   tournamentLabel,
   onClose,
 }: Props) {
+  useDismissibleOverlay(true, onClose);
   const [shareOpen, setShareOpen] = useState(false);
   const tag = tagFor(event);
   const strokes = strokeListFromEvent(event);

@@ -26,6 +26,7 @@
 
 import { useState } from "react";
 import type { SettlementData } from "./SettlementModal";
+import { useDismissibleOverlay } from "@/app/_hooks/useDismissibleOverlay";
 
 interface Props {
   data: SettlementData;
@@ -41,6 +42,7 @@ export default function ShareCard({
   onClose,
   tournamentLabel = "Charles Schwab · R4",
 }: Props) {
+  useDismissibleOverlay(true, onClose);
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
     setCopied(true);

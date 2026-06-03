@@ -26,6 +26,7 @@
  */
 
 import { useState } from "react";
+import { useDismissibleOverlay } from "@/app/_hooks/useDismissibleOverlay";
 
 export interface ShotShareData {
   /** "best" or "worst" — drives the status icon + label. */
@@ -49,6 +50,7 @@ interface Props {
 }
 
 export default function ShotShareCard({ data, onClose }: Props) {
+  useDismissibleOverlay(true, onClose);
   const [copied, setCopied] = useState(false);
   const handleCopy = () => setCopied(true);
 

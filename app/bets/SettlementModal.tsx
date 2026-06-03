@@ -15,6 +15,7 @@
  */
 
 import Confetti from "./Confetti";
+import { useDismissibleOverlay } from "@/app/_hooks/useDismissibleOverlay";
 
 export interface SettlementData {
   win: boolean;
@@ -41,6 +42,7 @@ interface Props {
 }
 
 export default function SettlementModal({ data, onClose, onShare }: Props) {
+  useDismissibleOverlay(true, onClose);
   const win = data.win;
   return (
     <div

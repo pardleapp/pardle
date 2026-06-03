@@ -32,6 +32,7 @@
 
 import type { PlayerFormEvent } from "./mock-player-data";
 import { pf } from "./mock-player-data";
+import { useDismissibleOverlay } from "@/app/_hooks/useDismissibleOverlay";
 
 interface Props {
   ev: PlayerFormEvent;
@@ -65,6 +66,7 @@ function splitSg(total: string, seed: number): number[] {
 const BUCKETS = ["Off the tee", "Approach", "Around green", "Putting"];
 
 export default function EventDetail({ ev, playerName, onClose }: Props) {
+  useDismissibleOverlay(true, onClose);
   const totalNum = pf(ev.sgTotal);
   const totalNeg = totalNum < 0;
   const split = splitSg(ev.sgTotal, ev.t.length);
