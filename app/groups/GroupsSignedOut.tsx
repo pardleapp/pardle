@@ -8,8 +8,16 @@
 
 import { useState } from "react";
 import SignInModal from "../live/auth/SignInModal";
+import { useAuthRefresh } from "@/app/_hooks/useAuthRefresh";
 
 export default function GroupsSignedOut() {
+  // Subscribe to Supabase auth changes — when the user signs in
+  // (via the modal below or a magic-link click in another tab),
+  // this triggers a router.refresh() so the server component
+  // re-renders with the new session and the page swaps to the
+  // signed-in <GroupsClient/> branch. Without this, the user
+  // would stay on this gate until they manually reloaded.
+  useAuthRefresh();
   const [signInOpen, setSignInOpen] = useState(false);
   return (
     <>
