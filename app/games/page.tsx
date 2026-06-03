@@ -7,7 +7,6 @@ import {
   HUB_CHALLENGE,
   HUB_AVATAR_PALETTE,
 } from "../live/games-hub-data";
-import TapDebugOverlay from "./TapDebugOverlay";
 
 // Static — the game catalogue itself only changes on a deploy.
 export const dynamic = "force-static";
@@ -35,7 +34,6 @@ export const metadata: Metadata = {
 export default function GamesPage() {
   return (
     <main className="pv-theme gh-page">
-      <TapDebugOverlay />
       <header className="gh-head">
         <Link href="/" className="bd-pv-back" aria-label="Back home">
           ←

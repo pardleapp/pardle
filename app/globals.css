@@ -25988,12 +25988,7 @@ html.pv-theme-body .auth-chip-btn {
   border: 1px solid var(--pv-line);
   border-radius: 14px;
   padding: 16px 14px 14px;
-  /* iOS Safari first-tap reliability: explicit cursor:pointer +
-     touch-action:manipulation. The global anchor rule already sets
-     touch-action; declared again here so the card carries the
-     property directly without relying on the global cascade. */
   cursor: pointer;
-  touch-action: manipulation;
   text-decoration: none;
   color: var(--pv-ink);
   display: block;

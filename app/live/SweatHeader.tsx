@@ -6,23 +6,21 @@
  *
  *   [Par**dle**]    [＋]   [🎮]   [🔔]   [🌍 The Lads ▾]
  *
- * The games/controller icon (left of the bell) opens the daily-
- * puzzles GamesHub overlay — matches the prototype's
- * `<button className="bell" onClick={setGamesOpen(true)}>` in
- * Pardle Social v2.html (line 565, App component) and the
- * GamesHub overlay (lines 528–538).
+ * The games/controller icon (left of the bell) routes to /games —
+ * previously opened an in-place GamesHub overlay rendering the
+ * same card grid, but a single tap on a card inside the overlay
+ * misfired on every platform (verified on desktop too). The
+ * standalone /games page already works correctly, so the icon
+ * just navigates there now and the overlay variant is gone.
  *
  * The Space switcher chip is presentational for now — Groups
  * doesn't have a backend yet so it shows the static placeholder.
  */
 
-import { useState } from "react";
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
-import GamesHub from "./GamesHub";
 
 export default function SweatHeader() {
-  const [gamesOpen, setGamesOpen] = useState(false);
   return (
     <>
       <header className="pv-head" aria-label="Pardle">
@@ -50,12 +48,11 @@ export default function SweatHeader() {
               <path d="M5 12h14" />
             </svg>
           </Link>
-          <button
-            type="button"
+          <Link
+            href="/games"
             className="pv-head-icon-btn pv-head-games"
             aria-label="Daily games"
             title="Daily games"
-            onClick={() => setGamesOpen(true)}
           >
             <svg
               width="20"
@@ -72,7 +69,7 @@ export default function SweatHeader() {
               <circle cx="15.5" cy="11.5" r="0.6" fill="currentColor" />
               <circle cx="17.6" cy="13.6" r="0.6" fill="currentColor" />
             </svg>
-          </button>
+          </Link>
           <Link
             href="/notifications"
             className="pv-head-icon-btn pv-head-bell"
@@ -113,7 +110,6 @@ export default function SweatHeader() {
           </button>
         </div>
       </header>
-      <GamesHub open={gamesOpen} onClose={() => setGamesOpen(false)} />
     </>
   );
 }
