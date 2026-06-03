@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 
 interface Props {
@@ -8,15 +9,30 @@ interface Props {
   onClose: () => void;
 }
 
+const VERIFY_TIMEOUT_MS = 12_000;
+
+/** Wrap a promise with a timeout race so a stuck network call
+ *  surfaces as an error instead of leaving the button on
+ *  "Signing in…" forever. */
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out`)), ms),
+    ),
+  ]);
+}
+
 /**
  * Email sign-in modal. After requesting the magic link the user gets
- * BOTH a one-tap link AND a 6-digit code in the same email. The
+ * BOTH a one-tap link AND a 6–8 digit code in the same email. The
  * link works on desktop / when the email opens in the same browser
  * that requested it; the code is the cross-device fallback for the
  * common case of "tapped the link from Gmail's in-app browser and
  * the PKCE verifier isn't there."
  */
 export default function SignInModal({ open, onClose }: Props) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [status, setStatus] = useState<
@@ -59,19 +75,56 @@ export default function SignInModal({ open, onClose }: Props) {
     setStatus("verifying");
     setErrMsg(null);
     const supabase = getSupabaseBrowser();
-    const { error } = await supabase.auth.verifyOtp({
-      email: email.trim(),
-      token: trimmed,
-      type: "email",
-    });
-    if (error) {
-      setStatus("sent"); // back to the sent screen so they can retype
-      setErrMsg(error.message);
-      return;
+    try {
+      // Race against a 12s timeout so a hung network call surfaces
+      // as a clear error instead of leaving the button stuck on
+      // "Signing in…" forever (the original bug). Also wrap in
+      // try/catch in case verifyOtp THROWS instead of returning
+      // { error } — that path bypasses the error branch and the
+      // status would never reset.
+      const { data, error } = await withTimeout(
+        supabase.auth.verifyOtp({
+          email: email.trim(),
+          token: trimmed,
+          type: "email",
+        }),
+        VERIFY_TIMEOUT_MS,
+        "Sign-in verify",
+      );
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error("[SignInModal] verifyOtp error", error);
+        setStatus("sent");
+        setErrMsg(
+          /invalid|expired|incorrect/i.test(error.message)
+            ? "That code didn't work — check it again, or tap the link in the email."
+            : error.message,
+        );
+        setCode("");
+        return;
+      }
+      if (!data?.session) {
+        // Theoretically unreachable — verifyOtp returns either a
+        // session or an error. Guard so we never declare success
+        // without a real session in hand.
+        setStatus("sent");
+        setErrMsg("Signed in, but the session didn't load. Try the email link.");
+        return;
+      }
+      // Success — refresh the route so server components re-fetch
+      // with the new session cookie, then close.
+      router.refresh();
+      onClose();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("[SignInModal] verifyOtp threw", e);
+      setStatus("sent");
+      setErrMsg(
+        e instanceof Error && e.message.includes("timed out")
+          ? "Took too long. Check your connection and try again — or tap the link in the email."
+          : "Couldn't sign in. Try the link in the email instead.",
+      );
     }
-    // Success — close, the auth state listener will pick up the
-    // new session and re-render.
-    onClose();
   }
 
   return (
