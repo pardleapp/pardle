@@ -28,6 +28,17 @@ export async function middleware(req: NextRequest) {
   }
 
   // Path 2: Supabase session refresh for any other request.
+  // The setAll handler filters out deletion items (empty value
+  // or maxAge:0) so an auth-validation failure during getUser()
+  // can't nuke the user's cookie. This was the root cause of
+  // the "sign in → reload → still signed out" bug: on the first
+  // request after verifyOtp, getUser() couldn't validate the
+  // newly-set token (likely a race between the cookie being
+  // committed and the middleware reading it), so supabase's
+  // session handler tried to clean up by writing a deletion to
+  // every sb-* cookie. Filtering deletions keeps the freshly-
+  // issued cookie alive long enough for the next request to
+  // succeed.
   let response = NextResponse.next({ request: req });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,18 +49,41 @@ export async function middleware(req: NextRequest) {
           return req.cookies.getAll();
         },
         setAll(items) {
-          for (const { name, value } of items) {
+          // Drop any item that looks like a cookie deletion —
+          // empty value, or maxAge: 0, or expires in the past.
+          // We never want the middleware to clear an existing
+          // session; that's only valid for an explicit signOut
+          // flow which doesn't go through this path.
+          const writes = items.filter(({ value, options }) => {
+            if (!value) return false;
+            if (options?.maxAge === 0) return false;
+            if (
+              options?.expires instanceof Date &&
+              options.expires.getTime() < Date.now()
+            ) {
+              return false;
+            }
+            return true;
+          });
+          for (const { name, value } of writes) {
             req.cookies.set(name, value);
           }
           response = NextResponse.next({ request: req });
-          for (const { name, value, options } of items) {
+          for (const { name, value, options } of writes) {
             response.cookies.set(name, value, options);
           }
         },
       },
     },
   );
-  await supabase.auth.getUser();
+  // Wrap in try/catch so a thrown validation error doesn't
+  // bubble up and 500 the request. The session stays as-is
+  // and the next request can retry.
+  try {
+    await supabase.auth.getUser();
+  } catch {
+    // ignore — keep cookies, let the page-level code render
+  }
   return response;
 }
 
