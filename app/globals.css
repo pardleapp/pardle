@@ -13289,18 +13289,97 @@ body:has(.chat-fs) {
 }
 
 @media (prefers-color-scheme: dark) {
-  .auth-modal {
-    background: #1f1f20;
-  }
   .auth-chip-menu {
     background: #1f1f20;
   }
   .auth-chip-menu-item:hover {
     background: rgba(255, 255, 255, 0.06);
   }
-  .auth-modal-label input {
-    background: #1f1f20;
-  }
+  /* The .auth-modal dark-mode bg + the input dark-mode bg are
+     intentionally removed here. The modal always renders light
+     (see the .pv-token block below) so it stays readable even
+     when mounted inside a .pv-theme'd page (which sets color:
+     var(--pv-ink) — a dark green ink designed for paper that
+     would otherwise leave dark ink on a dark modal bg). */
+}
+
+/* Sign-in modal — always light v2 broadcast theme, regardless of
+   parent .pv-theme or system dark mode. Selector specificity
+   matches the base rules above but source order is later, so
+   these win the cascade. */
+.auth-overlay {
+  background: oklch(0.2 0.04 150 / 0.55);
+}
+.auth-modal {
+  background: oklch(0.995 0.004 95);
+  color: oklch(0.26 0.04 155);
+  border: 1px solid oklch(0.90 0.013 95);
+  box-shadow: 0 24px 60px oklch(0.2 0.04 150 / 0.28);
+}
+.auth-modal-title {
+  color: oklch(0.26 0.04 155);
+}
+.auth-modal-close {
+  color: oklch(0.50 0.02 150);
+}
+.auth-modal-close:hover {
+  color: oklch(0.26 0.04 155);
+}
+.auth-modal-blurb {
+  color: oklch(0.50 0.02 150);
+}
+.auth-modal-benefits li {
+  color: oklch(0.50 0.02 150);
+}
+.auth-modal-benefits li strong {
+  color: oklch(0.26 0.04 155);
+}
+.auth-modal-benefits li::before {
+  color: oklch(0.50 0.13 155);
+}
+.auth-modal-label {
+  color: oklch(0.62 0.018 150);
+}
+.auth-modal-label input {
+  background: oklch(0.995 0.004 95);
+  color: oklch(0.26 0.04 155);
+  border-color: oklch(0.90 0.013 95);
+  -webkit-appearance: none;
+}
+.auth-modal-label input::placeholder {
+  color: oklch(0.62 0.018 150);
+  opacity: 1;
+}
+.auth-modal-label input:focus {
+  outline: none;
+  border-color: oklch(0.50 0.13 155);
+}
+.auth-modal-err {
+  color: oklch(0.57 0.19 28);
+}
+.auth-modal-btn {
+  background: oklch(0.50 0.13 155);
+  color: #fff;
+}
+.auth-modal-btn:hover {
+  background: oklch(0.40 0.12 156);
+}
+.auth-modal-btn[disabled] {
+  background: oklch(0.50 0.13 155 / 0.4);
+}
+.auth-modal-btn-secondary {
+  background: oklch(0.995 0.004 95);
+  color: oklch(0.26 0.04 155);
+  border: 1px solid oklch(0.90 0.013 95);
+}
+.auth-modal-btn-secondary:hover {
+  background: oklch(0.945 0.012 95);
+}
+.auth-modal-sent {
+  color: oklch(0.26 0.04 155);
+}
+.auth-modal-sent strong {
+  color: oklch(0.40 0.12 156);
 }
 
 /* ═══════════════════════════════════════════════════════════════
