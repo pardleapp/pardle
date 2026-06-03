@@ -28,6 +28,7 @@ import BetRow from "./BetRow";
 import SettlementModal, { type SettlementData } from "./SettlementModal";
 import ShareCard from "./ShareCard";
 import { useRealBets } from "./useRealBets";
+import AddBetTrigger from "@/app/_components/AddBetTrigger";
 
 /** Build the settlement-modal data from a MockBetSettled — derives
  *  returnedLabel for wins (stake × odds), books a mock daily P&L
@@ -304,6 +305,7 @@ export default function BetsClient() {
         />
       )}
       {shareData && <ShareCard data={shareData} onClose={closeShare} />}
+      <AddBetTrigger />
     </section>
   );
 }

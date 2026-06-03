@@ -26351,4 +26351,245 @@ summary,
   }
 }
 
+/* ─── Track-a-bet FAB + sheet (restored from prototype) ──────── */
+
+.addbet-fab {
+  position: fixed;
+  right: 16px;
+  /* Sit above the bottom-nav (z-30, ~70px tall + safe-area inset).
+     Body padding-bottom on .pv-theme pages is 150px, so 90px from
+     bottom puts the FAB comfortably above the nav. */
+  bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--pv-emerald, #1f8b6e);
+  color: #fff;
+  font-size: 30px;
+  font-weight: 300;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 6px 18px rgba(20, 60, 40, 0.28),
+    0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  z-index: 60;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 90ms cubic-bezier(0.2, 0.6, 0.3, 1),
+    background-color 120ms ease;
+}
+.addbet-fab:hover {
+  background: var(--pv-emerald-d, #15725a);
+}
+.addbet-fab:active {
+  transform: scale(0.92);
+}
+@media (min-width: 768px) {
+  /* Desktop: no bottom nav, so pin to the bottom of the viewport
+     with a normal margin. */
+  .addbet-fab {
+    bottom: 24px;
+  }
+}
+
+.addbet-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 24, 30, 0.42);
+  z-index: 80;
+  animation: addbet-fade 0.18s ease-out;
+}
+.addbet-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 81;
+  background: var(--pv-bg, oklch(0.972 0.009 95));
+  color: var(--pv-ink, #1c2724);
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+  padding: 14px 18px calc(24px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -12px 32px rgba(20, 32, 28, 0.25);
+  animation: addbet-slide 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+  max-height: 86vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+@keyframes addbet-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes addbet-slide {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.addbet-grip {
+  width: 44px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(28, 39, 36, 0.22);
+  margin: 0 auto 12px;
+}
+.addbet-title {
+  margin: 0 0 14px;
+  font-size: 18px;
+  font-weight: 800;
+}
+.addbet-field {
+  margin-bottom: 14px;
+}
+.addbet-fl {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pv-muted, #5b6a64);
+  margin-bottom: 6px;
+}
+.addbet-search,
+.addbet-odds,
+.addbet-stake-input {
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--pv-line, rgba(20, 30, 26, 0.16));
+  background: var(--pv-card, #fff);
+  font-size: 16px; /* iOS auto-zoom guard */
+  color: var(--pv-ink);
+  font-family: inherit;
+  outline: none;
+}
+.addbet-search:focus,
+.addbet-odds:focus,
+.addbet-stake-input:focus {
+  border-color: var(--pv-emerald, #1f8b6e);
+}
+.addbet-chiprow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.addbet-chip {
+  background: var(--pv-card, #fff);
+  border: 1px solid var(--pv-line, rgba(20, 30, 26, 0.16));
+  color: var(--pv-ink);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  min-height: 36px;
+  touch-action: manipulation;
+}
+.addbet-chip-on {
+  background: var(--pv-emerald, #1f8b6e);
+  color: #fff;
+  border-color: var(--pv-emerald, #1f8b6e);
+}
+.addbet-chip:active {
+  transform: scale(0.96);
+}
+.addbet-hint {
+  font-size: 12px;
+  color: var(--pv-muted, #5b6a64);
+  font-style: italic;
+}
+.addbet-stakerow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.addbet-curtog {
+  display: inline-flex;
+  border: 1px solid var(--pv-line, rgba(20, 30, 26, 0.16));
+  border-radius: 10px;
+  overflow: hidden;
+}
+.addbet-curtog button {
+  background: var(--pv-card, #fff);
+  border: none;
+  width: 40px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--pv-ink);
+  cursor: pointer;
+  font-family: inherit;
+}
+.addbet-curtog button.on {
+  background: var(--pv-emerald, #1f8b6e);
+  color: #fff;
+}
+.addbet-stake-input {
+  flex: 1;
+}
+.addbet-err {
+  background: rgba(200, 60, 60, 0.08);
+  color: oklch(0.46 0.16 28);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.addbet-cta {
+  width: 100%;
+  background: var(--pv-emerald, #1f8b6e);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  min-height: 48px;
+  touch-action: manipulation;
+}
+.addbet-cta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.addbet-cta:active:not(:disabled) {
+  filter: brightness(0.94);
+}
+.addbet-preview {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--pv-muted, #5b6a64);
+  text-align: center;
+}
+.addbet-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  color: var(--pv-muted, #5b6a64);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-family: inherit;
+}
+.addbet-close:active {
+  background: rgba(0, 0, 0, 0.06);
+}
+
 

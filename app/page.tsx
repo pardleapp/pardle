@@ -1,7 +1,7 @@
+import { Suspense } from "react";
 import { BRAND } from "@/lib/brand";
 import FeedClient from "./live/FeedClient";
-import AuthChip from "./live/auth/AuthChip";
-import MainNav from "./MainNav";
+import AddBetTrigger from "./_components/AddBetTrigger";
 
 export const metadata = {
   title: `${BRAND.name} — Live bet tracker + tournament feed`,
@@ -15,6 +15,9 @@ export default function HomeLive() {
   return (
     <main className="container container-wide v4-theme pv-theme">
       <FeedClient />
+      <Suspense fallback={null}>
+        <AddBetTrigger />
+      </Suspense>
     </main>
   );
 }
