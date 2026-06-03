@@ -6,7 +6,7 @@
  * prompt and the existing magic-link SignInModal opens on tap.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import SignInModal from "../live/auth/SignInModal";
 import { useAuthRefresh } from "@/app/_hooks/useAuthRefresh";
 
@@ -15,10 +15,30 @@ export default function GroupsSignedOut() {
   // (via the modal below or a magic-link click in another tab),
   // this triggers a router.refresh() so the server component
   // re-renders with the new session and the page swaps to the
-  // signed-in <GroupsClient/> branch. Without this, the user
-  // would stay on this gate until they manually reloaded.
+  // signed-in <GroupsClient/> branch.
   useAuthRefresh();
   const [signInOpen, setSignInOpen] = useState(false);
+
+  // Diagnostic: log what auth cookies are present when this
+  // signed-out gate renders. If sb-* cookies ARE here but the
+  // server still rendered this branch, the issue is server-side
+  // cookie reading. If they're absent, the browser client never
+  // wrote them — the issue is client storage config.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const sbCookies = document.cookie
+      .split(";")
+      .map((c) => c.trim())
+      .filter((c) => c.startsWith("sb-"))
+      .map((c) => c.split("=")[0])
+      .join(", ");
+    // eslint-disable-next-line no-console
+    console.info(
+      "[GroupsSignedOut] mounted — server saw no session.",
+      "Client sb-cookies present:",
+      sbCookies || "(NONE)",
+    );
+  }, []);
   return (
     <>
       <section className="groups-pv">

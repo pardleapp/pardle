@@ -125,18 +125,32 @@ export default function SignInModal({ open, onClose }: Props) {
         setErrMsg("Signed in, but the session didn't load. Try the email link.");
         return;
       }
-      // Hard reload on success. router.refresh() works in most
-      // cases but races with @supabase/ssr's async cookie write —
-      // sometimes the refresh request goes out before the new
-      // session cookie is fully committed, so the server re-
-      // renders the signed-out branch and the user is stuck on
-      // the gate until they manually refresh. window.location
-      // .reload() guarantees the next request carries every
-      // freshly-set cookie. Heavier than router.refresh() but
-      // unambiguously correct, and the user is about to see a
-      // completely different signed-in surface anyway.
+      // Diagnostic: log what cookies are in document.cookie
+      // immediately after verifyOtp succeeds. If sb-* auth
+      // cookies are absent here, the browser client wrote the
+      // session to localStorage (or nowhere) instead — which
+      // is the root cause if reloads aren't picking up auth.
+      const sbCookies =
+        typeof document !== "undefined"
+          ? document.cookie
+              .split(";")
+              .map((c) => c.trim())
+              .filter((c) => c.startsWith("sb-"))
+              .map((c) => c.split("=")[0])
+              .join(", ")
+          : "(no document)";
       // eslint-disable-next-line no-console
-      console.info("[SignInModal] sign-in success — reloading");
+      console.info(
+        "[SignInModal] sign-in success — session received:",
+        !!data.session,
+        "sb-cookies:",
+        sbCookies || "(NONE — session not in cookies!)",
+      );
+
+      // Hard reload — the next request includes every committed
+      // cookie. window.location.reload() is unambiguously
+      // correct vs router.refresh() which can race with the
+      // async cookie write.
       onClose();
       window.location.reload();
     } catch (e) {
