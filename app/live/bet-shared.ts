@@ -267,10 +267,24 @@ export function readBets(): TrackedBet[] {
   }
 }
 
+/** Custom event fired on any write to the local bet store. Same
+ *  pattern as `pardle-follows-changed`: consumers (BetTracker,
+ *  useRealBets on /bets, useRealLeaderboard's bet-tag layer) listen
+ *  for this and re-read so a new bet shows up immediately without
+ *  a page reload. The native `storage` event only fires cross-tab,
+ *  so we need our own event for same-tab updates. */
+export const BETS_CHANGED_EVENT = "pardle-bets-changed";
+
 export function writeBets(bets: TrackedBet[]): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(bets));
   window.localStorage.removeItem(LEGACY_KEY);
+  try {
+    window.dispatchEvent(new CustomEvent(BETS_CHANGED_EVENT));
+  } catch {
+    // CustomEvent constructor exists in every browser we support
+    // but defend against odd embedded webviews just in case.
+  }
 }
 
 export function readBetById(id: string): TrackedBet | null {

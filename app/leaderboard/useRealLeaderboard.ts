@@ -15,7 +15,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getFollows } from "@/app/live/FollowButton";
-import { readBets } from "@/app/live/bet-shared";
+import { BETS_CHANGED_EVENT, readBets } from "@/app/live/bet-shared";
 import type { LeaderboardRow } from "./mock-leaderboard";
 
 const POLL_MS = 5_000;
@@ -157,9 +157,11 @@ export function useRealLeaderboard(): UseRealLeaderboardResult {
     };
     sync();
     window.addEventListener("pardle-follows-changed", sync);
+    window.addEventListener(BETS_CHANGED_EVENT, sync);
     window.addEventListener("storage", sync);
     return () => {
       window.removeEventListener("pardle-follows-changed", sync);
+      window.removeEventListener(BETS_CHANGED_EVENT, sync);
       window.removeEventListener("storage", sync);
     };
   }, []);

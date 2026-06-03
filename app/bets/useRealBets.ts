@@ -28,6 +28,7 @@ import {
   type PlayerRoundState,
   type TournamentProjection,
   type TopFinishProbs,
+  BETS_CHANGED_EVENT,
   currentValueForBet,
   detectBetSettlement,
   evaluateRoundScore,
@@ -285,10 +286,20 @@ export function useRealBets(): UseRealBetsResult {
   const [slice, setSlice] = useState<FeedSlice | null>(null);
   const { user } = useAuth();
 
-  // Hydrate from localStorage on mount.
+  // Hydrate from localStorage on mount, then on every BETS_CHANGED
+  // event (sheet submit, BetTracker addBet, removal). Native storage
+  // events only fire cross-tab; the custom event covers same-tab
+  // updates so a placed bet shows up here instantly without reload.
   useEffect(() => {
-    setBets(readBets());
+    const sync = () => setBets(readBets());
+    sync();
     setHydrated(true);
+    window.addEventListener(BETS_CHANGED_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(BETS_CHANGED_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
   }, []);
 
   // Migrate + merge from server on sign-in.
