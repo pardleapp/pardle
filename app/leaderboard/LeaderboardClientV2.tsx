@@ -28,11 +28,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  LEADERBOARD,
-  EVENT_LINE,
-  TOURNAMENT_NAME,
-} from "./mock-leaderboard";
+import { useRealLeaderboard } from "./useRealLeaderboard";
 
 type Filter = "all" | "following" | "bets";
 
@@ -99,8 +95,15 @@ function Headshot({ name, photo }: { name: string; photo?: string }) {
 export default function LeaderboardClientV2() {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
+  const {
+    rows: allRows,
+    eventLine,
+    tournamentName,
+    ready,
+    isPreEvent,
+  } = useRealLeaderboard();
 
-  const rows = LEADERBOARD.filter((r) => {
+  const rows = allRows.filter((r) => {
     if (filter === "following") return r.following;
     if (filter === "bets") return r.bet !== "";
     return true;
@@ -115,9 +118,10 @@ export default function LeaderboardClientV2() {
       <header className="lb-head">
         <div className="lb-head-ev">
           <i aria-hidden="true" />
-          Live · {EVENT_LINE}
+          {isPreEvent ? "Up next · " : "Live · "}
+          {eventLine}
         </div>
-        <h2 className="lb-head-title">{TOURNAMENT_NAME}</h2>
+        <h2 className="lb-head-title">{tournamentName}</h2>
       </header>
 
       <div className="lb-filter" role="tablist" aria-label="Leaderboard filter">
@@ -162,9 +166,13 @@ export default function LeaderboardClientV2() {
       <ul className="lb-list">
         {rows.length === 0 ? (
           <li className="lb-empty">
-            {filter === "following"
-              ? "You're not following anyone on the leaderboard yet — tap a player to follow them."
-              : "No tracked bets on the leaderboard yet."}
+            {!ready
+              ? "Loading the field…"
+              : filter === "following"
+                ? "You're not following anyone on the leaderboard yet — tap a player to follow them."
+                : filter === "bets"
+                  ? "No tracked bets on the leaderboard yet."
+                  : "No leaderboard data yet — check back once play starts."}
           </li>
         ) : (
           rows.map((r, i) => {

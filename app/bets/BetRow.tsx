@@ -71,7 +71,11 @@ export default function BetRow({ bet, oddsFmt }: Props) {
   const probColor =
     bet.dir === "down" ? "var(--pv-down)" : "var(--pv-up)";
   return (
-    <Link href={`/bets/${bet.id}`} className="bets-row-card" prefetch={false}>
+    <Link
+      href={`/live/bet/${bet.id}`}
+      className="bets-row-card"
+      prefetch={false}
+    >
       <div className="bp-head">
         <div className="bp-who">
           <div className="bets-row-name">{bet.who}</div>

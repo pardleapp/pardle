@@ -20,8 +20,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
-  MOCK_BETS_LIVE,
-  MOCK_BETS_SETTLED,
   ODDS_FORMAT_OPTIONS,
   type OddsFormatKey,
   type MockBetSettled,
@@ -29,6 +27,7 @@ import {
 import BetRow from "./BetRow";
 import SettlementModal, { type SettlementData } from "./SettlementModal";
 import ShareCard from "./ShareCard";
+import { useRealBets } from "./useRealBets";
 
 /** Build the settlement-modal data from a MockBetSettled — derives
  *  returnedLabel for wins (stake × odds), books a mock daily P&L
@@ -71,20 +70,26 @@ export default function BetsClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
+  // Real tracked bets — same source the inline /live BetTracker uses
+  // (localStorage + Supabase, valued via /api/feed). Replaces the
+  // MOCK_BETS_LIVE / MOCK_BETS_SETTLED constants this page rendered
+  // until tonight.
+  const { live: bets, settled: settledBets, ready } = useRealBets();
+
   // Deep-link support: /bets?settle=s1 opens the settlement moment
   // for a given settled bet id. Used by the feed's compact settled-
   // bet card so tapping it reopens the modal.
   useEffect(() => {
     const id = searchParams.get("settle");
     if (!id) return;
-    const bet = MOCK_BETS_SETTLED.find((b) => b.id === id);
+    const bet = settledBets.find((b) => b.id === id);
     if (!bet) return;
     setSettle(buildSettlementData(bet));
     // Strip the query param so a refresh doesn't reopen.
     const url = new URL(window.location.href);
     url.searchParams.delete("settle");
     router.replace(`${url.pathname}${url.search}${url.hash}`);
-  }, [searchParams, router]);
+  }, [searchParams, router, settledBets]);
 
   // When the user dismisses the share card, also clear settle so we
   // don't bounce them back to the modal.
@@ -115,13 +120,13 @@ export default function BetsClient() {
     }
   };
 
-  const liveCount = MOCK_BETS_LIVE.length;
-  const settledCount = MOCK_BETS_SETTLED.length;
+  const liveCount = bets.length;
+  const settledCount = settledBets.length;
   const totalCount = liveCount + settledCount;
 
   // Open stake summary — sum by currency so we can render "£90·$100".
   const openByCur: Record<string, number> = {};
-  for (const b of MOCK_BETS_LIVE) {
+  for (const b of bets) {
     openByCur[b.cur] = (openByCur[b.cur] ?? 0) + b.stake;
   }
   const openStakeLabel = Object.entries(openByCur)
@@ -132,7 +137,7 @@ export default function BetsClient() {
   let wins = 0;
   let losses = 0;
   const netByCur: Record<string, number> = {};
-  for (const b of MOCK_BETS_SETTLED) {
+  for (const b of settledBets) {
     if (b.result === "WON") wins++;
     else losses++;
     // Strip "+£" / "−$" / commas, parse number.
@@ -209,9 +214,21 @@ export default function BetsClient() {
                 <div className="bets-summary-legs">Jordan leads</div>
               </div>
             </div>
-            {MOCK_BETS_LIVE.map((b) => (
-              <BetRow key={b.id} bet={b} oddsFmt={oddsFmt} />
-            ))}
+            {bets.length === 0 ? (
+              <div className="bets-empty">
+                <div className="bets-empty-title">
+                  {ready ? "No live bets yet" : "Loading your bets…"}
+                </div>
+                {ready && (
+                  <div className="bets-empty-sub">
+                    Track a bet from the Sweat feed and it&rsquo;ll appear
+                    here.
+                  </div>
+                )}
+              </div>
+            ) : (
+              bets.map((b) => <BetRow key={b.id} bet={b} oddsFmt={oddsFmt} />)
+            )}
           </>
         ) : (
           <>
@@ -231,7 +248,14 @@ export default function BetsClient() {
                 </div>
               </div>
             </div>
-            {MOCK_BETS_SETTLED.map((b) => (
+            {settledBets.length === 0 ? (
+              <div className="bets-empty">
+                <div className="bets-empty-title">
+                  {ready ? "No settled bets yet" : "Loading…"}
+                </div>
+              </div>
+            ) : null}
+            {settledBets.map((b) => (
               <button
                 type="button"
                 className="bets-settled"
