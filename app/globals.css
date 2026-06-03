@@ -25997,9 +25997,16 @@ html.pv-theme-body .auth-chip-btn {
   transition: background 0.12s ease, transform 0.1s ease,
     border-color 0.12s ease;
 }
-.gm-card:hover {
-  background: var(--pv-soft);
-  border-color: var(--gm-accent, var(--pv-line));
+/* Scope :hover to actual hover-capable devices. iOS Safari treats
+   the first tap on any clickable element with a :hover style as a
+   "hover preview" and swallows the click — the user has to tap a
+   second time (or hold) to fire navigation. Stripping :hover for
+   touch-only devices skips that ghost-click step. */
+@media (hover: hover) {
+  .gm-card:hover {
+    background: var(--pv-soft);
+    border-color: var(--gm-accent, var(--pv-line));
+  }
 }
 .gm-card:active {
   transform: scale(0.99);
@@ -26081,8 +26088,10 @@ html.pv-theme-body .auth-chip-btn {
   min-height: 44px;
   transition: background 0.12s ease;
 }
-.gm-foot-link:hover {
-  background: var(--pv-soft);
+@media (hover: hover) {
+  .gm-foot-link:hover {
+    background: var(--pv-soft);
+  }
 }
 .gm-foot-link-quiet {
   color: var(--pv-muted);
@@ -26150,8 +26159,10 @@ html.pv-theme-body .auth-chip-btn {
   min-height: 44px;
   transition: background 0.12s ease;
 }
-.gh-challenge-btn:hover {
-  background: var(--pv-emerald-d);
+@media (hover: hover) {
+  .gh-challenge-btn:hover {
+    background: var(--pv-emerald-d);
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────
