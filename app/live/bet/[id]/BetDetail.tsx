@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import BackButton from "@/app/_components/BackButton";
 import { useCallback, useEffect, useState } from "react";
 import {
   DEFAULT_ODDS_FORMAT,
@@ -656,9 +657,9 @@ export default function BetDetail({ betId }: { betId: string }) {
 
   return (
     <section className="bd-wrap">
-      <Link href="/bets" className="bd-back" aria-label="Back to bets">
-        ← Bets
-      </Link>
+      <BackButton fallback="/bets" className="bd-back" ariaLabel="Back">
+        ←
+      </BackButton>
       {showWinCard && bet && (
         <div className="bd-win-card" role="status">
           <button

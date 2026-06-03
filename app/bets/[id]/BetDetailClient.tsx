@@ -31,6 +31,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import BackButton from "@/app/_components/BackButton";
 import type { MockBetLive } from "../mock-bets";
 
 const PALETTE: Record<string, string> = {
@@ -261,9 +262,7 @@ export default function BetDetailClient({ bet }: { bet: MockBetLive }) {
   return (
     <div className="bd-pv">
       <div className="bd-pv-head">
-        <Link href="/bets" className="bd-pv-back" aria-label="Back to My bets">
-          ←
-        </Link>
+        <BackButton fallback="/bets" className="bd-pv-back" ariaLabel="Back to My bets" />
         <div className="bd-pv-title">
           <div className="bd-pv-title-nm">{headerEyebrow}</div>
           <div className="bd-pv-title-mk">

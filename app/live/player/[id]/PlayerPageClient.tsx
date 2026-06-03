@@ -33,6 +33,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import BackButton from "@/app/_components/BackButton";
 import {
   PLAYER_DATA,
   SEASON,
@@ -100,9 +101,7 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
   return (
     <div className="pl-pv">
       <header className="pl-pv-head">
-        <Link href="/" className="bd-pv-back" aria-label="Back">
-          ←
-        </Link>
+        <BackButton fallback="/" className="bd-pv-back" />
         <div className="bd-pv-title">
           <div className="bd-pv-title-nm">{displayName}</div>
           <div className="bd-pv-title-mk">

@@ -17,8 +17,8 @@
  */
 
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
 import type { Metadata } from "next";
+import BackButton from "@/app/_components/BackButton";
 import { BRAND } from "@/lib/brand";
 import { getSupabaseServer, getSupabaseAdmin } from "@/lib/supabase/server";
 import { listGroupMessages } from "@/lib/groups/server";
@@ -74,13 +74,11 @@ export default async function GroupChatPage({ params }: PageProps) {
   return (
     <main className="pv-theme chat-fs" role="main" aria-label={`${group.name} chat`}>
       <header className="chat-fs-head">
-        <Link
-          href="/groups"
+        <BackButton
+          fallback="/groups"
           className="chat-fs-back"
-          aria-label="Back to Groups"
-        >
-          ←
-        </Link>
+          ariaLabel="Back to Groups"
+        />
         <div className="chat-fs-title">
           <div className="chat-fs-name">{group.name}</div>
           <div className="chat-fs-sub">
