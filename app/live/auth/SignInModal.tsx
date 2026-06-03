@@ -53,7 +53,7 @@ export default function SignInModal({ open, onClose }: Props) {
     e.preventDefault();
     const trimmed = code.trim();
     if (trimmed.length < 6) {
-      setErrMsg("Code is 6 digits.");
+      setErrMsg("Enter the full code from the email.");
       return;
     }
     setStatus("verifying");
@@ -91,22 +91,22 @@ export default function SignInModal({ open, onClose }: Props) {
         {status === "sent" || status === "verifying" ? (
           <div className="auth-modal-sent">
             <p>
-              We sent a link <strong>and</strong> a 6-digit code to{" "}
+              We sent a link <strong>and</strong> a code to{" "}
               <strong>{email}</strong>. Tap the link, or enter the
               code below if the link doesn&apos;t sign you in.
             </p>
             <form onSubmit={submitCode} className="auth-modal-form">
               <label className="auth-modal-label">
-                <span>6-digit code</span>
+                <span>Code from email</span>
                 <input
                   type="text"
                   inputMode="numeric"
-                  pattern="\d{6}"
-                  maxLength={6}
-                  placeholder="000000"
+                  pattern="\d{6,8}"
+                  maxLength={8}
+                  placeholder="00000000"
                   value={code}
                   onChange={(e) =>
-                    setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                    setCode(e.target.value.replace(/\D/g, "").slice(0, 8))
                   }
                   autoFocus
                   autoComplete="one-time-code"
@@ -167,7 +167,7 @@ export default function SignInModal({ open, onClose }: Props) {
               />
             </label>
             <p className="auth-modal-blurb">
-              We&apos;ll send a link AND a code. No password.
+              We&apos;ll send a sign-in link and a code. No password.
             </p>
             {errMsg && <p className="auth-modal-err">{errMsg}</p>}
             <button
