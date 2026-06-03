@@ -25923,15 +25923,17 @@ html.pv-theme-body .auth-chip-btn {
 .gh-body::-webkit-scrollbar {
   width: 0;
 }
-/* Standalone /games page: the document itself scrolls, so the
-   global body:has(.pv-theme) { padding-bottom: 150px } rule that
-   clears the bottom nav on every other surface can do its job.
-   Without this, gh-body's internal scroll swallowed the document
-   scroll and the bottom ~70px of the games grid sat behind the
-   fixed bottom nav — taps in that strip hit the rightmost nav
-   tab (Sharp) instead of the game card the user was aiming at. */
+/* Standalone /games page: pad the bottom of the internal-scroll
+   region so its scrollable content can never sit behind the fixed
+   bottom nav. Measured cause: on iPhone-SE-class viewports the
+   third grid row (Faces) lands at y=505 while the nav covers
+   y=498→568 — elementFromPoint at the visible sliver of the card
+   returns bottom-nav-btn (Sweats on the left, Leaders on the
+   right), and the tap goes to / or /leaderboard instead of /faces.
+   90px clears the nav and the safe-area inset clears iOS home
+   indicator. */
 .gh-page > .gh-body {
-  overflow: visible;
+  padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Streak banner — tang-tinted bar from social-v2.css L515-516. */
