@@ -9499,7 +9499,12 @@ footer {
   flex: 1 1 auto;
   min-width: 0;
   padding: 11px 14px;
-  font-size: 15px;
+  /* 16px is the iOS Safari magic number — anything smaller and
+     mobile Safari auto-zooms the page when the input is focused,
+     extending the layout past 100vw and giving the user a
+     horizontal scrollbar until they zoom back out. This is the
+     "tap to type → page pans sideways" bug. Keep at 16px. */
+  font-size: 16px;
   font-family: inherit;
   background: var(--pv-soft);
   border: 1px solid var(--pv-line);
@@ -13234,7 +13239,9 @@ body:has(.chat-fs) {
 
 .auth-modal-label input {
   font-family: inherit;
-  font-size: 15px;
+  /* 16px to prevent iOS Safari's input-focus auto-zoom. Anything
+     smaller and the page zooms in on focus, breaking layout. */
+  font-size: 16px;
   font-weight: 600;
   padding: 10px 12px;
   border-radius: 10px;
