@@ -26637,4 +26637,262 @@ summary,
   background: rgba(0, 0, 0, 0.06);
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Desktop shell — left nav rail + centered content + optional
+   right context rail. Mobile (< 1024px) is untouched: the
+   .desktop-rail and .desktop-ctx components paint nothing and
+   no body/page selectors are altered below this breakpoint.
+   ───────────────────────────────────────────────────────────── */
+
+/* Hidden by default — only paint on desktop. */
+.desktop-rail,
+.desktop-ctx {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  /* ── Left rail ───────────────────────────────────────────── */
+  .desktop-rail {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 240px;
+    padding: 22px 14px 22px 18px;
+    border-right: 1px solid var(--pv-line);
+    background: var(--pv-bg);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 60;
+    font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  }
+  .desktop-rail-brand {
+    font-size: 24px;
+    font-weight: 900;
+    color: var(--pv-emerald);
+    text-decoration: none;
+    padding: 6px 10px 12px;
+    letter-spacing: -0.01em;
+  }
+  .desktop-rail-brand b {
+    color: var(--pv-tang);
+    font-weight: 900;
+  }
+  .desktop-rail-list,
+  .desktop-rail-secondary {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .desktop-rail-secondary {
+    margin-top: auto;
+    border-top: 1px solid var(--pv-line);
+    padding-top: 10px;
+  }
+  .desktop-rail-link {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    color: var(--pv-ink);
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 700;
+    transition: background-color 90ms ease, color 90ms ease;
+  }
+  .desktop-rail-link:hover {
+    background: var(--pv-soft);
+  }
+  .desktop-rail-link:focus-visible {
+    outline: 2px solid var(--pv-emerald);
+    outline-offset: 2px;
+  }
+  .desktop-rail-link-on {
+    background: var(--pv-emerald);
+    color: #fff;
+  }
+  .desktop-rail-link-on:hover {
+    background: var(--pv-emerald-d);
+  }
+  .desktop-rail-ic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+  }
+
+  /* ── Page content — centered, constrained ───────────────── */
+  body:has(.pv-theme) {
+    padding-left: 240px !important;
+    padding-bottom: 24px !important; /* mobile 150px not needed on desktop */
+  }
+  body:has(.pv-theme) main.container,
+  body:has(.pv-theme) main.container-wide {
+    max-width: 640px !important;
+    margin: 0 auto !important;
+    background: var(--pv-bg) !important;
+  }
+  /* Hide the mobile pv-head — left rail covers nav, FAB covers
+     Track-a-bet. Keeps the centered column from getting an extra
+     redundant row of brand + icon-buttons across its top. */
+  body:has(.pv-theme) .pv-head {
+    display: none !important;
+  }
+  /* Footer compliance text — keep but center against the content
+     column so it doesn't anchor to the body's full width. */
+  body:has(.pv-theme) .site-footer {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  /* Hide the floating Track-a-bet FAB on desktop — the AddBet sheet
+     is reached from the rail's secondary actions (Games) and any
+     in-page +Track-a-bet button. The FAB looks misplaced against
+     a centered narrow column. */
+  /* Actually keep it — it's still the fastest way to track a bet.
+     Just nudge it inward so it sits over the content column. */
+  .addbet-fab {
+    right: calc(50% - 320px) !important;
+    bottom: 24px !important;
+  }
+
+  /* ── Right context rail (only when the viewport is wide enough
+        to spare ~320px of side space) ───────────────────────── */
+}
+
+@media (min-width: 1280px) {
+  body:has(.pv-theme) {
+    padding-right: 320px !important;
+  }
+  .desktop-ctx {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 320px;
+    padding: 22px 16px;
+    border-left: 1px solid var(--pv-line);
+    background: var(--pv-bg);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    z-index: 60;
+    font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  }
+  .desktop-ctx-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .desktop-ctx-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--pv-muted);
+  }
+  .desktop-ctx-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .desktop-ctx-link {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--pv-emerald);
+    text-decoration: none;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .desktop-ctx-link:hover {
+    text-decoration: underline;
+  }
+  .desktop-ctx-tournament {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--pv-card);
+    border: 1px solid var(--pv-line);
+    border-radius: 12px;
+  }
+  .desktop-ctx-tournament-name {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--pv-emerald-d);
+    line-height: 1.2;
+  }
+  .desktop-ctx-lb {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    background: var(--pv-card);
+    border: 1px solid var(--pv-line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .desktop-ctx-lb-row {
+    display: grid;
+    grid-template-columns: 32px 1fr auto auto;
+    gap: 10px;
+    padding: 9px 12px;
+    font-size: 13px;
+    align-items: center;
+    border-bottom: 1px solid var(--pv-line);
+  }
+  .desktop-ctx-lb-row:last-child {
+    border-bottom: none;
+  }
+  .desktop-ctx-lb-pos {
+    color: var(--pv-muted);
+    font-weight: 700;
+    font-size: 12px;
+  }
+  .desktop-ctx-lb-name {
+    color: var(--pv-ink);
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .desktop-ctx-lb-total {
+    color: var(--pv-down);
+    font-weight: 800;
+    font-size: 13px;
+    min-width: 32px;
+    text-align: right;
+  }
+  .desktop-ctx-lb-thru {
+    color: var(--pv-muted);
+    font-size: 12px;
+    min-width: 26px;
+    text-align: right;
+  }
+  .desktop-ctx-empty {
+    padding: 12px;
+    background: var(--pv-card);
+    border: 1px solid var(--pv-line);
+    border-radius: 12px;
+    font-size: 13px;
+    color: var(--pv-muted);
+    text-align: center;
+  }
+  .desktop-ctx-help {
+    padding: 10px 12px;
+    background: var(--pv-card);
+    border: 1px solid var(--pv-line);
+    border-radius: 12px;
+    font-size: 12.5px;
+    color: var(--pv-muted);
+    line-height: 1.4;
+  }
+}
+
+
 
