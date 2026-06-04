@@ -58,11 +58,16 @@ interface FeedSnapshot {
   playerRoundStates: Record<string, PlayerRoundState>;
   tournamentProjections?: Record<string, TournamentProjection>;
   topFinishCurrent?: Record<string, TopFinishProbs>;
+  /** /api/feed wraps each poll in a `{ poll, counts, ... }` envelope.
+   *  The rail only consumes the inner poll's shape; counts/myVote
+   *  live in their own envelope fields and are read where needed. */
   predictionPolls?: Array<{
-    id: string;
-    type: string;
-    question: string;
-    options: Array<{ key: string; label: string }>;
+    poll?: {
+      id?: string;
+      type?: string;
+      question?: string;
+      options?: Array<{ key?: string; label?: string }>;
+    };
   }>;
   bestReel?: FeedRow[];
 }
@@ -193,12 +198,21 @@ export default function DesktopContextRail() {
   }, []);
 
   const liveTournament = feed?.tournament?.isLive;
-  const openPoll = feed?.predictionPolls?.[0];
+  // Unwrap the poll envelope safely — /api/feed returns
+  // [{ poll: { id, type, options, … }, counts, … }, …]. Old code
+  // assumed the items themselves had `.options` and crashed every
+  // route with `f.options.slice is not a function`.
+  const openPoll = feed?.predictionPolls?.[0]?.poll;
+  const openPollOptions = Array.isArray(openPoll?.options)
+    ? openPoll!.options!.slice(0, 2)
+    : [];
   const activeBets = useMemo(
     () => bets.filter((b) => b.settledAt == null),
     [bets],
   );
-  const reelTop3 = (feed?.bestReel ?? []).slice(0, 3);
+  const reelTop3 = Array.isArray(feed?.bestReel)
+    ? feed!.bestReel!.slice(0, 3)
+    : [];
 
   return (
     <aside className="desktop-ctx" aria-label="Context">
@@ -218,24 +232,33 @@ export default function DesktopContextRail() {
         </div>
       </section>
 
-      {/* Active prediction call (mini) */}
-      {openPoll && (
+      {/* Active prediction call (mini) — null-guarded at every read
+          so a missing poll / options array never throws. */}
+      {openPoll && openPoll.question && (
         <section className="desktop-ctx-block">
           <div className="desktop-ctx-label desktop-ctx-label-row">
-            <span>{callTypeLabel(openPoll.type)}</span>
+            <span>{callTypeLabel(openPoll.type ?? "")}</span>
             <Link href="/" className="desktop-ctx-link">
               Vote →
             </Link>
           </div>
           <div className="desktop-ctx-call">
             <div className="desktop-ctx-call-q">{openPoll.question}</div>
-            <div className="desktop-ctx-call-opts">
-              {openPoll.options.slice(0, 2).map((o) => (
-                <span key={o.key} className="desktop-ctx-call-opt">
-                  {o.label.length > 28 ? `${o.label.slice(0, 26)}…` : o.label}
-                </span>
-              ))}
-            </div>
+            {openPollOptions.length > 0 && (
+              <div className="desktop-ctx-call-opts">
+                {openPollOptions.map((o, i) => {
+                  const label = o?.label ?? "";
+                  return (
+                    <span
+                      key={o?.key ?? i}
+                      className="desktop-ctx-call-opt"
+                    >
+                      {label.length > 28 ? `${label.slice(0, 26)}…` : label}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </section>
       )}

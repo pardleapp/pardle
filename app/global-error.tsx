@@ -7,7 +7,9 @@
  *
  * Must include its own <html>/<body> because the root layout never
  * mounted. Inline-styled rather than relying on globals.css since
- * the stylesheet may not be the reason the layout failed.
+ * the stylesheet may not be the reason the layout failed. Uses the
+ * v2 light tokens (warm-paper bg, emerald accents) — no dark states
+ * anywhere in the app per CLAUDE.md.
  */
 
 import { useEffect } from "react";
@@ -27,8 +29,8 @@ export default function GlobalError({
         style={{
           margin: 0,
           minHeight: "100vh",
-          background: "#0a0a0b",
-          color: "#f5f5f7",
+          background: "oklch(0.972 0.009 95)",
+          color: "oklch(0.26 0.04 155)",
           fontFamily:
             "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
           display: "flex",
@@ -44,7 +46,7 @@ export default function GlobalError({
               fontSize: 12,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: "#00d96e",
+              color: "oklch(0.50 0.13 155)",
               fontWeight: 800,
             }}
           >
@@ -55,6 +57,7 @@ export default function GlobalError({
               fontSize: 22,
               fontWeight: 900,
               margin: "16px 0 8px",
+              color: "oklch(0.26 0.04 155)",
             }}
           >
             Something went wrong.
@@ -62,7 +65,7 @@ export default function GlobalError({
           <p
             style={{
               fontSize: 14,
-              color: "#a1a1a6",
+              color: "oklch(0.50 0.02 150)",
               margin: "0 0 20px",
               lineHeight: 1.45,
             }}
@@ -76,8 +79,8 @@ export default function GlobalError({
               display: "inline-block",
               padding: "10px 18px",
               borderRadius: 999,
-              background: "#00d96e",
-              color: "#0a0a0b",
+              background: "oklch(0.50 0.13 155)",
+              color: "#fff",
               fontWeight: 800,
               textDecoration: "none",
               fontSize: 13.5,
@@ -90,7 +93,7 @@ export default function GlobalError({
               style={{
                 marginTop: 18,
                 fontSize: 11,
-                color: "#6b6b70",
+                color: "oklch(0.62 0.018 150)",
                 fontFamily: "monospace",
               }}
             >
