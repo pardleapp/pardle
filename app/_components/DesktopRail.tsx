@@ -23,6 +23,10 @@ interface Item {
   iconPath: React.ReactNode;
 }
 
+// One flat list — desktop rail reads as a single continuous menu.
+// Games + Notifications used to sit in a separate bottom-pinned
+// block; per design feedback they're now an inline continuation of
+// the primary five, no visual separator.
 const PRIMARY: Item[] = [
   {
     href: "/",
@@ -84,9 +88,6 @@ const PRIMARY: Item[] = [
       </>
     ),
   },
-];
-
-const SECONDARY: Item[] = [
   {
     href: "/games",
     label: "Games",
@@ -160,13 +161,6 @@ export default function DesktopRail() {
       </Link>
       <ul className="desktop-rail-list">
         {PRIMARY.map((item) => (
-          <li key={item.href}>
-            <Row item={item} pathname={pathname} />
-          </li>
-        ))}
-      </ul>
-      <ul className="desktop-rail-secondary">
-        {SECONDARY.map((item) => (
           <li key={item.href}>
             <Row item={item} pathname={pathname} />
           </li>

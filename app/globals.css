@@ -26693,19 +26693,13 @@ summary,
     color: var(--pv-tang);
     font-weight: 900;
   }
-  .desktop-rail-list,
-  .desktop-rail-secondary {
+  .desktop-rail-list {
     list-style: none;
     padding: 0;
     margin: 0;
     display: flex;
     flex-direction: column;
     gap: 2px;
-  }
-  .desktop-rail-secondary {
-    margin-top: auto;
-    border-top: 1px solid var(--pv-line);
-    padding-top: 10px;
   }
   .desktop-rail-link {
     display: flex;
