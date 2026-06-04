@@ -20007,6 +20007,27 @@ body:has(.v4-theme) {
   --border: var(--pv-line);
   --border-strong: oklch(0.85 0.018 95);
   --empty: var(--pv-soft);
+  /* Also override the v4-theme tokens (--bg-card, --bg-elevated,
+     --bg-card-hi, --text-faint, --green, --red, --amber, --purple
+     etc.). The live Sweat feed renders post cards / reel tiles /
+     leaderboard rail under both .v4-theme and .pv-theme — when the
+     v4 dark values leaked through tokens the cards paint dark even
+     though their own background reads var(--pv-card). Rewriting
+     the tokens here covers any descendant that still uses var(--bg-
+     card) / var(--bg-elevated) without needing a per-selector fix. */
+  --bg-card: var(--pv-card);
+  --bg-elevated: var(--pv-card);
+  --bg-card-hi: var(--pv-soft);
+  --text-faint: var(--pv-dim);
+  --green: var(--pv-emerald);
+  --green-soft: oklch(0.50 0.13 155 / 0.10);
+  --green-glow: oklch(0.50 0.13 155 / 0.25);
+  --red: var(--pv-down);
+  --red-soft: oklch(0.57 0.19 28 / 0.10);
+  --red-glow: oklch(0.57 0.19 28 / 0.25);
+  --amber: var(--pv-tang);
+  --amber-soft: oklch(0.66 0.18 45 / 0.12);
+  --amber-glow: oklch(0.66 0.18 45 / 0.25);
   color-scheme: light;
 
   background: var(--pv-bg);
@@ -20038,12 +20059,16 @@ html:has(.pv-theme),
 body:has(.pv-theme) {
   background: oklch(0.972 0.009 95) !important;
 }
-/* The page wraps Feed/Bets in <main class="container container-wide
-   v4-theme pv-theme"> with its own dark background — kill the wrapper
-   bg and re-skin the brand header + nav so the whole page reads as
-   broadcast paper. */
-main.container.v4-theme.pv-theme,
-main.container-wide.v4-theme.pv-theme {
+/* Live-tournament feed bug (2026-06-04): isLive=true paints the
+   page black because FeedClient wraps in <section class="feed-wrap
+   v4-theme pv-theme"> AND the legacy .v4-theme { background:#000
+   !important } at line ~15634 wins over the .pv-theme bg. The
+   off-week branch never hit this because FeedClient short-circuits
+   to OffWeekLanding which doesn't carry .v4-theme. Override every
+   v4-theme.pv-theme element — main wrapper, the inner feed-wrap
+   section, and any future surface that combines both classes —
+   with the warm-paper bg. */
+.v4-theme.pv-theme {
   background: oklch(0.972 0.009 95) !important;
   color: oklch(0.26 0.04 155);
 }
