@@ -87,11 +87,18 @@ export default function RootLayout({
     >
       <body>
         <ToastProvider>
-          {/* Desktop-only chrome — hidden by CSS below 1024px so the
-              mobile experience is byte-identical. */}
-          <DesktopRail />
-          <DesktopContextRail />
-          {children}
+          {/* Desktop-only chrome wrapped with the page content in a
+              centered grid shell. On mobile the .desktop-shell div is
+              a transparent passthrough (no grid styles apply); on
+              desktop it becomes a 2- or 3-column grid with the rails
+              sitting inside a max-width container so the outer
+              margins absorb leftover viewport width — no big voids
+              between columns. */}
+          <div className="desktop-shell">
+            <DesktopRail />
+            {children}
+            <DesktopContextRail />
+          </div>
           <SiteFooter />
           <BottomNav />
         </ToastProvider>
