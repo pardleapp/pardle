@@ -34,6 +34,7 @@ import {
   evaluateRoundScore,
   mergeServerAndLocal,
   readBets,
+  resolveBetPlayerId,
   writeBets,
 } from "@/app/live/bet-shared";
 import {
@@ -89,13 +90,21 @@ function marketLabel(bet: TrackedBet): string {
 }
 
 function liveProbFor(bet: TrackedBet, slice: FeedSlice): number | null {
+  // Reconcile dg-* / legacy ids to the live orchestrator id by name
+  // before keying into the state maps. Without this, every pre-
+  // tournament-placed bet reads null state and shows "Settling soon".
+  const leaderboardForResolve = Object.entries(slice.leaderboardById).map(
+    ([playerId, info]) => ({ playerId, displayName: info.displayName }),
+  );
+  const pid = resolveBetPlayerId(bet, leaderboardForResolve);
   if (bet.kind === "outright") {
-    const decimal = slice.currentOdds[(bet as OutrightBet).playerId];
+    const decimal = slice.currentOdds[pid || (bet as OutrightBet).playerId];
     if (Number.isFinite(decimal) && decimal > 1) return 1 / decimal;
     return null;
   }
   if (bet.kind === "top-finish") {
-    const snap = slice.topFinishCurrent?.[(bet as TopFinishBet).playerId];
+    const snap =
+      slice.topFinishCurrent?.[pid || (bet as TopFinishBet).playerId];
     if (!snap) return null;
     const cutoff = (bet as TopFinishBet).cutoff;
     const key = `top${cutoff}` as keyof TopFinishProbs;
@@ -105,7 +114,7 @@ function liveProbFor(bet: TrackedBet, slice: FeedSlice): number | null {
   if (bet.kind === "round-score") {
     const ev = evaluateRoundScore(
       bet as RoundScoreBet,
-      slice.playerRoundStates[(bet as RoundScoreBet).playerId],
+      slice.playerRoundStates[pid || (bet as RoundScoreBet).playerId],
     );
     if (!ev) return null;
     if (ev.kind === "not-started") {

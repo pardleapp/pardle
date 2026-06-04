@@ -315,6 +315,91 @@ export async function persistBet(bet: TrackedBet): Promise<void> {
   }
 }
 
+/** Resolve a bet's playerId to a canonical orchestrator id by
+ *  matching against a live leaderboard. Handles two failure modes:
+ *
+ *   (a) The bet was placed pre-tournament via the AddBetSheet's
+ *       /api/field fallback, which stored a DataGolf-prefixed id
+ *       ("dg-12345") that never matches the orchestrator's numeric
+ *       ids ("40026") once play starts.
+ *   (b) Any other future ID-system drift between the bet store and
+ *       the live feed.
+ *
+ *  Returns the bet's existing playerId when it already matches a
+ *  leaderboard row, otherwise the orchestrator id of the player
+ *  whose name matches. Falls back to the original id if no match
+ *  is found so callers can still do their default "no live state"
+ *  rendering.
+ *
+ *  When a resolution happens, side-effect-writes the new id back
+ *  into localStorage so the bet self-heals — subsequent renders
+ *  use the canonical id directly without paying the lookup cost.
+ */
+function normaliseName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+function lastNameOf(name: string): string {
+  const parts = normaliseName(name).split(" ");
+  return parts[parts.length - 1] ?? "";
+}
+
+interface LeaderboardLike {
+  playerId: string;
+  displayName: string;
+}
+
+export function resolveBetPlayerId(
+  bet: TrackedBet,
+  leaderboard: LeaderboardLike[],
+): string {
+  if (bet.kind === "winning-score") return ""; // no player to resolve
+  const currentId =
+    "playerId" in bet ? (bet as { playerId: string }).playerId : "";
+  if (!currentId) return "";
+  // Direct match — most common case once the bet has been resolved
+  // once. Also covers bets placed via real-leaderboard ids from the
+  // start.
+  if (leaderboard.some((r) => r.playerId === currentId)) return currentId;
+  const name = "playerName" in bet ? bet.playerName : "";
+  if (!name) return currentId;
+  const target = normaliseName(name);
+  const targetLast = lastNameOf(name);
+  // Exact normalised match.
+  let hit = leaderboard.find((r) => normaliseName(r.displayName) === target);
+  // Fall back to last-name match — covers "R. Henley" ↔ "Russell Henley"
+  // and other initial/full forms users picked from in the sheet.
+  if (!hit && targetLast.length >= 3) {
+    hit = leaderboard.find((r) => lastNameOf(r.displayName) === targetLast);
+  }
+  if (!hit) return currentId;
+  // Self-heal: write the resolved id back so future loads skip the
+  // lookup. Anonymous bets stay in localStorage; signed-in users get
+  // a follow-up POST to /api/bets on the next persistBet path.
+  if (typeof window !== "undefined") {
+    try {
+      const all = readBets();
+      let dirty = false;
+      const next = all.map((b) => {
+        if (b.id !== bet.id) return b;
+        if ("playerId" in b && b.playerId !== hit!.playerId) {
+          dirty = true;
+          return { ...b, playerId: hit!.playerId } as TrackedBet;
+        }
+        return b;
+      });
+      if (dirty) writeBets(next);
+    } catch {
+      // localStorage quota / private mode — ignore; in-memory
+      // resolution still works for this render.
+    }
+  }
+  return hit.playerId;
+}
+
 /** Soft-remove a bet from both local and (if authed) server. */
 export async function removeBetEverywhere(betId: string): Promise<void> {
   if (typeof window === "undefined") return;
@@ -841,7 +926,16 @@ export function currentValueForBet(
    *  finished + we've decided this bet won/lost — short-circuits the
    *  live model maths to a definite payout or zero. */
   settled?: { won: boolean } | null,
+  /** Leaderboard rows for playerId reconciliation — pre-tournament
+   *  bets saved via /api/field have dg-* ids; resolve them to the
+   *  orchestrator id by name before keying into the state maps. */
+  leaderboard?: LeaderboardLike[],
 ): number | null {
+  const resolvedPid = leaderboard
+    ? resolveBetPlayerId(b, leaderboard)
+    : "playerId" in b
+      ? (b as { playerId: string }).playerId
+      : "";
   // Tournament-over short-circuit applies uniformly to outright /
   // top-finish / winning-score (round-score has its own per-round
   // settlement path via evaluateRoundScore further down).
@@ -855,12 +949,15 @@ export function currentValueForBet(
     }
   }
   if (b.kind === "outright") {
-    const fair = currentOdds[b.playerId];
+    const fair = currentOdds[resolvedPid || b.playerId];
     if (!Number.isFinite(fair) || fair <= 1) return null;
     return b.stake * (b.oddsTaken / fair);
   }
   if (b.kind === "top-finish") {
-    const prob = probForCutoff(b.cutoff, topFinishCurrent?.[b.playerId]);
+    const prob = probForCutoff(
+      b.cutoff,
+      topFinishCurrent?.[resolvedPid || b.playerId],
+    );
     if (prob == null) return null;
     if (prob >= 1) return b.stake * b.oddsTaken;
     if (prob <= 0) return 0;
@@ -874,7 +971,10 @@ export function currentValueForBet(
     if (ev.prob <= 0) return 0;
     return b.stake * ev.prob * b.oddsTaken;
   }
-  const ev = evaluateRoundScore(b, playerRoundStates[b.playerId]);
+  const ev = evaluateRoundScore(
+    b,
+    playerRoundStates[resolvedPid || (b as RoundScoreBet).playerId],
+  );
   if (!ev) return null;
   if (ev.kind === "not-started") return b.stake;
   if (ev.kind === "settled") return ev.won ? b.stake * b.oddsTaken : 0;
@@ -984,7 +1084,17 @@ export function reconstructHistory(
     draftkings: Record<string, OddsHistorySample[] | null>;
     fanduel: Record<string, OddsHistorySample[] | null>;
   },
+  leaderboard?: LeaderboardLike[],
 ): PnlSample[] {
+  // Resolve the bet's playerId before any state lookups — pre-
+  // tournament bets carry dg-* ids that need to be reconciled to the
+  // live orchestrator id once the leaderboard arrives. See
+  // resolveBetPlayerId for the matching rules.
+  const _resolvedPid = leaderboard
+    ? resolveBetPlayerId(bet, leaderboard)
+    : "playerId" in bet
+      ? (bet as { playerId: string }).playerId
+      : "";
   const series: PnlSample[] = [];
   // For settled bets the chart should stop at settlement, not at
   // "right now" — otherwise the x-axis stretches days into the
@@ -997,8 +1107,9 @@ export function reconstructHistory(
     // as fallback when Polymarket is thin (illiquid longshot market,
     // late-starting tracking, dedup collapsed everything). "Thin"
     // means < 3 distinct buffer samples for this player.
-    const pmSamples = oddsHistories?.[bet.playerId] ?? [];
-    const dgSamples = dgWinProbs?.[bet.playerId] ?? [];
+    const pid = _resolvedPid || bet.playerId;
+    const pmSamples = oddsHistories?.[pid] ?? [];
+    const dgSamples = dgWinProbs?.[pid] ?? [];
     const POLYMARKET_LIQUIDITY_THRESHOLD = 3;
     const usePolymarket =
       Array.isArray(pmSamples) && pmSamples.length >= POLYMARKET_LIQUIDITY_THRESHOLD;
@@ -1020,14 +1131,14 @@ export function reconstructHistory(
     // Merge DraftKings + FanDuel samples in regardless. Adds book
     // consensus alongside Polymarket / DataGolf — more data points
     // give the chart a smoother trajectory.
-    const dkSamples = bookOdds?.draftkings?.[bet.playerId];
+    const dkSamples = bookOdds?.draftkings?.[pid];
     if (Array.isArray(dkSamples)) {
       for (const s of dkSamples) {
         if (!Number.isFinite(s.p) || s.p <= 1) continue;
         pts.push({ t: s.ts, prob: 1 / s.p });
       }
     }
-    const fdSamples = bookOdds?.fanduel?.[bet.playerId];
+    const fdSamples = bookOdds?.fanduel?.[pid];
     if (Array.isArray(fdSamples)) {
       for (const s of fdSamples) {
         if (!Number.isFinite(s.p) || s.p <= 1) continue;
@@ -1088,7 +1199,10 @@ export function reconstructHistory(
     const sorted = [...snaps].sort((a, b) => a.ts - b.ts);
     for (const snap of sorted) {
       if (bet.settledAt != null && snap.ts > bet.settledAt) continue;
-      const prob = probForCutoff(bet.cutoff, snap.byPlayer[bet.playerId]);
+      const prob = probForCutoff(
+        bet.cutoff,
+        snap.byPlayer[_resolvedPid || bet.playerId],
+      );
       if (prob == null) continue;
       let v: number;
       if (prob >= 1) v = bet.stake * bet.oddsTaken;
@@ -1144,7 +1258,8 @@ export function reconstructHistory(
   }
 
   const probAtP = probAtPlacementFor(bet);
-  const state = playerRoundStates[bet.playerId];
+  const rsPid = _resolvedPid || bet.playerId;
+  const state = playerRoundStates[rsPid];
   const round = bet.round != null ? bet.round : state?.currentRound ?? null;
   if (round == null) {
     // No round context — fall back to a single placement-anchored sample.
@@ -1229,9 +1344,14 @@ export function reconstructHistory(
   } else if (roundSnap) {
     // No scorecard — degrade to the feed events list. We won't have
     // per-hole field stats so the projection falls back to a par +
-    // constant-variance baseline (no skill adjustment). We can't
-    // recover pre-placement holes here either, so we start the chart
-    // at placement.
+    // constant-variance baseline (no skill adjustment).
+    //
+    // Plot ALL completed holes of the round, not just the ones after
+    // placement (per CLAUDE.md "bet detail charts show today's full
+    // trajectory, not just from entry"). A user arriving mid-round
+    // still gets context for holes 1-6 before their bet went on at
+    // hole 7. We zero the running totals so the walk starts from a
+    // clean round-state — no placement-snapshot drift.
     series.push({
       t: bet.placedAt,
       v: bet.stake,
@@ -1242,18 +1362,17 @@ export function reconstructHistory(
       .filter(
         (r) =>
           r.event.type === "score" &&
-          r.event.playerId === bet.playerId &&
+          r.event.playerId === rsPid &&
           r.event.round === round &&
-          r.event.ts >= bet.placedAt &&
           typeof r.event.strokes === "number" &&
           typeof r.event.par === "number" &&
           typeof r.event.hole === "number",
       )
       .sort((a, b) => a.event.ts - b.event.ts);
-    let strokes = bet.placement?.strokes ?? 0;
-    let parPlayed = bet.placement?.parPlayed ?? 0;
-    let holesPlayed = bet.placement?.holesPlayed ?? 0;
-    const baselineHoles = holesPlayed;
+    let strokes = 0;
+    let parPlayed = 0;
+    let holesPlayed = 0;
+    const baselineHoles = 0;
     const roundPar = bet.placement?.roundPar ?? roundSnap.roundPar;
     for (const r of events) {
       strokes += r.event.strokes!;

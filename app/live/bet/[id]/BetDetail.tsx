@@ -17,6 +17,7 @@ import {
   patchLegacyPlacement,
   readBetById,
   reconstructHistory,
+  resolveBetPlayerId,
   resolveBetRound,
   writeBets,
   readBets,
@@ -332,9 +333,21 @@ export default function BetDetail({ betId }: { betId: string }) {
           data.tournament?.startDate ?? null,
         )
       : null;
+  // Resolve the bet's playerId against the live leaderboard before
+  // building the scorecard fetch URL. Pre-tournament bets saved via
+  // /api/field carry dg-* ids; the scorecard endpoint only knows
+  // orchestrator ids, so a dg- key fetches nothing and the chart
+  // falls back to the empty feed-events path.
+  const resolvedScorecardPlayerId =
+    bet?.kind === "round-score" && data
+      ? resolveBetPlayerId(bet, data.playerIndex ?? [])
+      : "";
   const scorecardKey =
-    bet?.kind === "round-score" && roundForBet != null && data != null
-      ? `${bet.playerId}:${roundForBet}`
+    bet?.kind === "round-score" &&
+    roundForBet != null &&
+    data != null &&
+    resolvedScorecardPlayerId
+      ? `${resolvedScorecardPlayerId}:${roundForBet}`
       : null;
 
   useEffect(() => {
@@ -609,6 +622,7 @@ export default function BetDetail({ betId }: { betId: string }) {
     data.tournamentProjections,
     data.topFinishCurrent,
     settled,
+    data.playerIndex,
   );
   const history = reconstructHistory(
     resolvedBet,
@@ -621,6 +635,7 @@ export default function BetDetail({ betId }: { betId: string }) {
     data.winningScoreHistory,
     data.topFinishHistory,
     data.bookOdds,
+    data.playerIndex,
   );
   // "What needs to happen" insight — only for live (unsettled) bets.
   // Settled bets already show the final result in the header PnL, so a
