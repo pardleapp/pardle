@@ -132,82 +132,11 @@ interface Comment {
   text: string;
 }
 
-const MOCK_COMMENTS_BY_BET: Record<string, Comment[]> = {
-  b1: [
-    {
-      author: "Theo",
-      initials: "TH",
-      sharp: "71%",
-      text: "called it — henley closes this out 🔒",
-    },
-    {
-      author: "Mia",
-      initials: "MI",
-      text: "my tail is printing rn",
-    },
-  ],
-  b2: [
-    {
-      author: "Jordan",
-      initials: "JO",
-      sharp: "64%",
-      text: "steadiest player all week, easy top 5",
-    },
-  ],
-  // Group-market chats are louder — they're the whole crew, not a
-  // single bettor's thread.
-  gb1: [
-    {
-      author: "Jordan",
-      initials: "JO",
-      sharp: "71%",
-      text: "4 of us on Henley — let's see this home",
-    },
-    {
-      author: "Dave",
-      initials: "DA",
-      text: "approach into 17 was filthy 🎯",
-    },
-    {
-      author: "Theo",
-      initials: "TH",
-      sharp: "71%",
-      text: "if he birdies 18 we all eat",
-    },
-  ],
-  gb2: [
-    {
-      author: "Mia",
-      initials: "MI",
-      text: "smalley's putter is hot rn",
-    },
-    {
-      author: "Paul",
-      initials: "PA",
-      text: "tailed this last night, ty whoever called it",
-    },
-  ],
-  gb3: [
-    {
-      author: "Sam",
-      initials: "SA",
-      text: "why did i back the under on a bomber 😮‍💨",
-    },
-    {
-      author: "Jordan",
-      initials: "JO",
-      sharp: "71%",
-      text: "hold strong lads — three pars and we're fine",
-    },
-  ],
-  gb4: [
-    {
-      author: "Mia",
-      initials: "MI",
-      text: "echavarria sneaking up the board nicely",
-    },
-  ],
-};
+// Demo comments — invented Jordan/Mia/Theo/Sam etc. Real bet-comment
+// wiring (Supabase + RLS) is a follow-up. Outside ?demo=1 the comment
+// thread renders empty so we don't show fake crew chatter under a
+// user's real bet during a live tournament.
+const MOCK_COMMENTS_BY_BET: Record<string, Comment[]> = {};
 
 export default function BetDetailClient({
   bet,

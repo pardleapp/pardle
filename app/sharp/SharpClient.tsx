@@ -84,7 +84,9 @@ export default function SharpClient() {
 
   const stats = MOCK_SHARP_STATS;
   const poll = MOCK_SHARP_POLL;
-  const deltaPositive = !stats.delta.startsWith("−");
+  const hasStats = stats.totalCalls > 0;
+  const hasPoll = poll.options.length > 0;
+  const deltaPositive = stats.delta && !stats.delta.startsWith("−");
   const accPct = Math.round(
     (stats.correctCalls / Math.max(1, stats.totalCalls)) * 100,
   );
@@ -92,75 +94,100 @@ export default function SharpClient() {
   return (
     <section className="sh-pv">
       <div className="sh-pv-body">
-        {/* Hero gauge */}
+        {/* Hero gauge — only shows numbers once the user has any real
+            call activity. Cold-start state shows an onboarding line. */}
         <div className="sh-gauge">
-          <div className="sh-gauge-num">{stats.score}</div>
+          <div className="sh-gauge-num">{hasStats ? stats.score : "—"}</div>
           <div className="sh-gauge-lbl">Your Sharp Score</div>
-          <div className="sh-gauge-sub">
-            {stats.rankLabel} · {stats.percentileLabel} ·{" "}
-            <span
-              className={
-                deltaPositive ? "sh-gauge-delta-up" : "sh-gauge-delta-down"
-              }
-            >
-              {deltaPositive ? "▲" : "▼"} {stats.delta.replace(/[+−]/g, "")}
-            </span>
-          </div>
-          <div className="sh-gauge-stats">
-            <span>
-              <b>{accPct}%</b> accuracy
-            </span>
-            <span className="sh-gauge-sep" aria-hidden="true">
-              ·
-            </span>
-            <span>
-              <b>
-                {stats.correctCalls}/{stats.totalCalls}
-              </b>{" "}
-              calls
-            </span>
-            {stats.currentStreak >= 2 && (
-              <>
+          {hasStats ? (
+            <>
+              <div className="sh-gauge-sub">
+                {[stats.rankLabel, stats.percentileLabel]
+                  .filter(Boolean)
+                  .join(" · ")}
+                {stats.delta && (
+                  <>
+                    {" "}·{" "}
+                    <span
+                      className={
+                        deltaPositive
+                          ? "sh-gauge-delta-up"
+                          : "sh-gauge-delta-down"
+                      }
+                    >
+                      {deltaPositive ? "▲" : "▼"}{" "}
+                      {stats.delta.replace(/[+−]/g, "")}
+                    </span>
+                  </>
+                )}
+              </div>
+              <div className="sh-gauge-stats">
+                <span>
+                  <b>{accPct}%</b> accuracy
+                </span>
                 <span className="sh-gauge-sep" aria-hidden="true">
                   ·
                 </span>
                 <span>
-                  🔥 <b>{stats.currentStreak}</b> in a row
+                  <b>
+                    {stats.correctCalls}/{stats.totalCalls}
+                  </b>{" "}
+                  calls
                 </span>
-              </>
-            )}
-          </div>
+                {stats.currentStreak >= 2 && (
+                  <>
+                    <span className="sh-gauge-sep" aria-hidden="true">
+                      ·
+                    </span>
+                    <span>
+                      🔥 <b>{stats.currentStreak}</b> in a row
+                    </span>
+                  </>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="sh-gauge-sub">
+              Vote on a putt-poll or settle a tracked bet to start
+              building your score.
+            </div>
+          )}
         </div>
 
-        {/* Open Putt-IQ poll */}
-        <section className="sh-section">
-          <div className="sh-section-label">{poll.eyebrow}</div>
-          <div className="sh-poll">
-            <div className="sh-poll-q">{poll.question}</div>
-            <div className="sh-poll-opts">
-              {poll.options.map((o, i) => (
-                <button
-                  type="button"
-                  key={i}
-                  className={`sh-poll-opt${voted !== null ? " sh-poll-opt-voted" : ""}${voted === i ? " sh-poll-opt-mine" : ""}`}
-                  style={{
-                    ["--pct" as string]: `${o.pct}%`,
-                  } as React.CSSProperties}
-                  onClick={() => setVoted(i)}
-                >
-                  <span className="sh-poll-fill" aria-hidden="true" />
-                  <span className="sh-poll-lab">{o.label}</span>
-                  <span className="sh-poll-pct">
-                    {voted !== null ? `${o.pct}%` : ""}
-                  </span>
-                </button>
-              ))}
+        {/* Open Putt-IQ poll — only when a real poll is live. The
+            mock "Does Henley hold on for the win?" question is gone;
+            real polls land via /api/feed.predictionPolls and the
+            in-feed PredictionPollCard. */}
+        {hasPoll && (
+          <section className="sh-section">
+            <div className="sh-section-label">{poll.eyebrow}</div>
+            <div className="sh-poll">
+              <div className="sh-poll-q">{poll.question}</div>
+              <div className="sh-poll-opts">
+                {poll.options.map((o, i) => (
+                  <button
+                    type="button"
+                    key={i}
+                    className={`sh-poll-opt${voted !== null ? " sh-poll-opt-voted" : ""}${voted === i ? " sh-poll-opt-mine" : ""}`}
+                    style={{
+                      ["--pct" as string]: `${o.pct}%`,
+                    } as React.CSSProperties}
+                    onClick={() => setVoted(i)}
+                  >
+                    <span className="sh-poll-fill" aria-hidden="true" />
+                    <span className="sh-poll-lab">{o.label}</span>
+                    <span className="sh-poll-pct">
+                      {voted !== null ? `${o.pct}%` : ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div className="sh-poll-foot">
+                {voted !== null ? poll.postVoteSub : poll.preVoteSub}
+              </div>
             </div>
-            <div className="sh-poll-foot">
-              {voted !== null ? poll.postVoteSub : poll.preVoteSub}
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* Open calls */}
         {MOCK_SHARP_OPEN_CALLS.length > 0 && (

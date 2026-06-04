@@ -27,61 +27,11 @@ export interface NotifRow {
   href?: string;
 }
 
-export const MOCK_NOTIFS: NotifRow[] = [
-  {
-    icon: "🚀",
-    tint: "up",
-    title: "Your Henley outright jumped to 60%",
-    subtitle: "Birdie on 18 — he grabs the lead",
-    time: "now",
-    unread: true,
-    href: "/bets/b1",
-  },
-  {
-    icon: "🎉",
-    tint: "up",
-    title: "Your Smalley Top 5 cashed · +£40",
-    subtitle: "Settled — booked to your day",
-    time: "2m",
-    unread: true,
-    href: "/bets?settle=s1",
-  },
-  {
-    icon: "📈",
-    tint: "blue",
-    title: "@golf-edge posted a new tip",
-    subtitle: "L. Åberg — Outright @ 12/1",
-    time: "8m",
-    unread: true,
-    href: "/",
-  },
-  {
-    icon: "👥",
-    tint: "tang",
-    title: "Jordan tailed your Smalley Top 5",
-    subtitle: "The Lads",
-    time: "12m",
-    unread: false,
-    href: "/groups",
-  },
-  {
-    icon: "⛳",
-    tint: "up",
-    title: "N. Echavarria — eagle on 17",
-    subtitle: "A player you follow",
-    time: "18m",
-    unread: false,
-    href: "/live/player/N.%20Echavarria",
-  },
-  {
-    icon: "🏆",
-    tint: "tang",
-    title: "You moved to 2nd in The Lads",
-    subtitle: "Today's P&L race",
-    time: "25m",
-    unread: false,
-    href: "/groups",
-  },
-];
+// Empty by default — the /notifications surface now renders the
+// onboarding empty state until the real push-fanout pipeline lands.
+// Previous demo rows ("Jordan tailed…", "You moved to 2nd in The
+// Lads", "@golf-edge posted") were invented and leaked into the
+// live experience on Memorial day one.
+export const MOCK_NOTIFS: NotifRow[] = [];
 
 export const UNREAD_COUNT = MOCK_NOTIFS.filter((n) => n.unread).length;

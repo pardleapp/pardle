@@ -2,11 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { BRAND } from "@/lib/brand";
-import {
-  HUB_GAMES,
-  HUB_CHALLENGE,
-  HUB_AVATAR_PALETTE,
-} from "../live/games-hub-data";
+import { HUB_GAMES } from "../live/games-hub-data";
 
 // Static — the game catalogue itself only changes on a deploy.
 export const dynamic = "force-static";
@@ -87,37 +83,10 @@ export default function GamesPage() {
             🪄 Blend yourself with a PGA pro →
           </Link>
         </div>
-        <section className="gh-sec">
-          <h4 className="gh-sec-title">Today&rsquo;s Pros · The Lads</h4>
-          <div className="gh-board">
-            {HUB_CHALLENGE.map((r, i) => (
-              <div
-                key={r.initials}
-                className={`racerow${r.name === "You" ? " racerow-you" : ""}`}
-              >
-                <span className="racerow-rk">{i + 1}</span>
-                <span
-                  className="gh-av"
-                  style={{ background: HUB_AVATAR_PALETTE[r.initials] }}
-                  aria-hidden="true"
-                >
-                  {r.initials}
-                </span>
-                <span className="racerow-nm">
-                  {r.name === "You" ? <b>You</b> : r.name}
-                </span>
-                <span
-                  className={`gh-score${r.score === "X" ? " gh-score-x" : ""}`}
-                >
-                  {r.score}
-                </span>
-              </div>
-            ))}
-          </div>
-          <button type="button" className="gh-challenge-btn">
-            Challenge your crew ↗
-          </button>
-        </section>
+        {/* "Today's Pros · The Lads" leaderboard board removed —
+            HUB_CHALLENGE was a mock with Jordan/Mia/Theo/You scores.
+            Real per-group puzzle leaderboard ships with the Tipster
+            channels work; until then we don't show invented scores. */}
       </div>
     </main>
   );

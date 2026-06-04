@@ -1,31 +1,27 @@
 "use client";
 
 /**
- * RaceSheet — drop-down sheet showing the full P&L race for The
- * Lads. Today / Season / All-time toggle. Matches the design-
- * handoff prototype's <RaceSheet>.
- *
- *   The Lads · P&L race
- *   9 members · live from your tracked bets
- *
- *   [ Today ]  [ Season ]  [ All-time ]
- *
- *   1  JO  Jordan 👑                       +£312
- *   2  YO  You                             +£186
- *   3  TH  Theo                            +£54
- *   4  SA  Sam                             −£20
- *   5  MI  Mia                             −£40
- *
- *   Tap a member to see their open bets · or
- *   🏆 = weekly group wins · all-time net  (alltime range only)
+ * RaceSheet — drop-down sheet showing the full P&L race for the
+ * current group. Reads real `getGroupStandings()` rows passed in
+ * from GroupsClient (same source the in-page rail uses). No mock
+ * data — pre-launch we only ship the event-level race; season /
+ * all-time tabs are deferred until the settled-bet ledger is rich
+ * enough for them to mean something.
  */
 
-import { useState } from "react";
-import { RACE } from "./mock-groups";
 import { useDismissibleOverlay } from "@/app/_hooks/useDismissibleOverlay";
+import {
+  formatBetCurrency,
+  normaliseBetCurrency,
+} from "@/lib/format/bet-currency";
+import type { GroupStandingsRow } from "@/lib/groups/server";
 
 interface Props {
+  groupName: string;
+  memberCount: number;
+  standings: GroupStandingsRow[];
   onClose: () => void;
+  onOpenMember?: (memberUserId: string) => void;
 }
 
 const PALETTE: Record<string, string> = {
@@ -34,17 +30,32 @@ const PALETTE: Record<string, string> = {
   TH: "linear-gradient(135deg,#6b7df2,#c659d8)",
   MI: "linear-gradient(135deg,#ed7a99,#7a274d)",
   YO: "linear-gradient(135deg,#ffb35a,#c4691a)",
+  DA: "linear-gradient(135deg,#85d4f7,#1f6b9e)",
+  NI: "linear-gradient(135deg,#7be0ad,#26795a)",
+  RO: "linear-gradient(135deg,#56b0e8,#3a4f9b)",
+  PA: "linear-gradient(135deg,#a070ff,#3b1f8a)",
 };
 function bgFor(initials: string): string {
   return PALETTE[initials] ?? "linear-gradient(135deg,#6b7df2,#3b1f8a)";
 }
 
-type RangeKey = "today" | "season" | "alltime";
+function fmt(n: number, currency: string): string {
+  const cur = normaliseBetCurrency(currency);
+  if (Math.abs(n) < 0.5) return formatBetCurrency(0, cur, { maximumFractionDigits: 0 });
+  const sign = n >= 0 ? "+" : "−";
+  return `${sign}${formatBetCurrency(Math.abs(n), cur, {
+    maximumFractionDigits: 0,
+  })}`;
+}
 
-export default function RaceSheet({ onClose }: Props) {
+export default function RaceSheet({
+  groupName,
+  memberCount,
+  standings,
+  onClose,
+  onOpenMember,
+}: Props) {
   useDismissibleOverlay(true, onClose);
-  const [range, setRange] = useState<RangeKey>("today");
-  const rows = RACE[range];
   return (
     <div
       className="race-sheet"
@@ -57,63 +68,55 @@ export default function RaceSheet({ onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
         role="document"
       >
-        <h3>The Lads · P&amp;L race</h3>
-        <div className="race-sub">9 members · live from your tracked bets</div>
-        <div className="race-range" role="tablist" aria-label="Range">
-          {(
-            [
-              ["today", "Today"],
-              ["season", "Season"],
-              ["alltime", "All-time"],
-            ] as Array<[RangeKey, string]>
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={range === key}
-              className={range === key ? "on" : ""}
-              onClick={() => setRange(key)}
-            >
-              {label}
-            </button>
-          ))}
+        <h3>{groupName} · P&amp;L race</h3>
+        <div className="race-sub">
+          {memberCount} {memberCount === 1 ? "member" : "members"} · live from
+          your tracked bets
         </div>
         <div className="race-list">
-          {rows.map((r, i) => (
-            <div
-              key={r.name}
-              className={`racerow${r.name === "You" ? " racerow-you" : ""}`}
-            >
-              <span className="racerow-rk">{i + 1}</span>
-              <span
-                className="crew-mini-av"
-                style={{
-                  width: 32,
-                  height: 32,
-                  fontSize: 11,
-                  background: bgFor(r.initials),
-                }}
-                aria-hidden="true"
-              >
-                {r.initials}
-              </span>
-              <span className="racerow-nm">
-                {r.name === "You" ? <b>You</b> : r.name}
-                {i === 0 && " 👑"}
-                {range === "alltime" && (r.trophies ?? 0) > 0 && (
-                  <span className="race-trophy">
-                    {"🏆".repeat(r.trophies ?? 0)}
-                  </span>
-                )}
-              </span>
-              <span className={`racerow-pl ${r.dir}`}>{r.pl}</span>
+          {standings.length === 0 ? (
+            <div className="race-empty">
+              The race lights up when bets start settling — track a bet to
+              start counting.
             </div>
-          ))}
+          ) : (
+            standings.map((r, i) => (
+              <button
+                key={r.user_id}
+                type="button"
+                className={`racerow${r.is_me ? " racerow-you" : ""}`}
+                onClick={() =>
+                  !r.is_me && onOpenMember ? onOpenMember(r.user_id) : undefined
+                }
+                disabled={r.is_me || !onOpenMember}
+              >
+                <span className="racerow-rk">{i + 1}</span>
+                <span
+                  className="crew-mini-av"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    fontSize: 11,
+                    background: bgFor(r.initials),
+                  }}
+                  aria-hidden="true"
+                >
+                  {r.initials}
+                </span>
+                <span className="racerow-nm">
+                  {r.is_me ? <b>{r.display_name}</b> : r.display_name}
+                  {i === 0 && r.net_pnl > 0.5 && " 👑"}
+                </span>
+                <span className={`racerow-pl ${r.dir}`}>
+                  {fmt(r.net_pnl, r.currency)}
+                </span>
+              </button>
+            ))
+          )}
         </div>
         <div className="race-foot">
-          {range === "alltime"
-            ? "🏆 = weekly group wins · all-time net"
+          {standings.length === 0
+            ? "Settled bets only — open bets count once they settle."
             : "Tap a member to see their open bets"}
         </div>
       </div>

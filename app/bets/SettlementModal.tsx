@@ -30,9 +30,11 @@ export interface SettlementData {
   currency: "£" | "$";
   stake: number;
   oddsLabel: string;
-  /** Stat strip — "+£226" or "−£40" daily P&L + rank string. */
-  bookedDailyPnl: string;
-  groupRank: string;
+  /** Stat strip — "+£226" or "−£40" daily P&L + rank string. Both
+   *  optional now; the live experience leaves them undefined until
+   *  the daily-pnl and group-rank wiring lands. */
+  bookedDailyPnl?: string;
+  groupRank?: string;
 }
 
 interface Props {
@@ -67,18 +69,18 @@ export default function SettlementModal({ data, onClose, onShare }: Props) {
           {data.stake} @ {data.oddsLabel}
           {win && data.returnedLabel ? ` · returned ${data.returnedLabel}` : ""}
         </div>
-        <div className="settle-book">
-          {win ? (
-            <>
-              Booked to your day · <b>{data.bookedDailyPnl}</b> ·{" "}
-              {data.groupRank}
-            </>
-          ) : (
-            <>
-              Your day · <b>{data.bookedDailyPnl}</b> · {data.groupRank}
-            </>
-          )}
-        </div>
+        {(data.bookedDailyPnl || data.groupRank) && (
+          <div className="settle-book">
+            {win ? "Booked to your day" : "Your day"}
+            {data.bookedDailyPnl && (
+              <>
+                {" · "}
+                <b>{data.bookedDailyPnl}</b>
+              </>
+            )}
+            {data.groupRank && <> · {data.groupRank}</>}
+          </div>
+        )}
         <div className="settle-btns">
           <button type="button" className="settle-done" onClick={onClose}>
             Done

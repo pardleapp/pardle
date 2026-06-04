@@ -340,6 +340,18 @@ export default function NotificationsClient() {
           </pre>
         )}
 
+        {rows.length === 0 && (
+          <div className="nf-empty">
+            <div className="nf-empty-emoji" aria-hidden="true">
+              🔔
+            </div>
+            <div className="nf-empty-title">No notifications yet</div>
+            <div className="nf-empty-sub">
+              You&rsquo;ll see your bet moves, follow shots, and group
+              activity here as the tournament plays out.
+            </div>
+          </div>
+        )}
         <ul className="nf-list">
           {rows.map((n, i) => (
             <li key={i}>

@@ -49,8 +49,12 @@ function buildSettlementData(b: MockBetSettled): SettlementData {
     currency: b.cur,
     stake: b.stake,
     oddsLabel: b.odds,
-    bookedDailyPnl: b.result === "WON" ? "+£226" : "−£40",
-    groupRank: b.result === "WON" ? "2nd in The Lads" : "3rd in The Lads",
+    // No demo "+£226 daily" or "2nd in The Lads" group rank — the
+    // settlement modal shows real-bet-only data. Real daily-pnl /
+    // group-rank wiring is a follow-up; until then the modal omits
+    // these two lines rather than show invented numbers.
+    bookedDailyPnl: undefined,
+    groupRank: undefined,
   };
 }
 
@@ -206,14 +210,18 @@ export default function BetsClient() {
             <div className="bets-summary">
               <div>
                 <div className="bets-summary-lab">Open stake</div>
-                <div className="bets-summary-big mono">{openStakeLabel}</div>
-                <div className="bets-summary-legs">all live</div>
+                <div className="bets-summary-big mono">
+                  {openStakeLabel || "—"}
+                </div>
+                <div className="bets-summary-legs">
+                  {bets.length > 0
+                    ? `${bets.length} live ${bets.length === 1 ? "bet" : "bets"}`
+                    : "no live bets yet"}
+                </div>
               </div>
-              <div className="bets-summary-r">
-                <div className="bets-summary-lab">Group rank</div>
-                <div className="bets-summary-big mono">#2/9</div>
-                <div className="bets-summary-legs">Jordan leads</div>
-              </div>
+              {/* Right tile — real group rank needs a Supabase join we
+                  don't ship yet. Hide entirely rather than show the
+                  demo "Jordan leads · #2/9" placeholder. */}
             </div>
             {bets.length === 0 ? (
               <div className="bets-empty">

@@ -85,8 +85,12 @@ export default function ShareCard({
         </div>
         <div className="share-meta">
           <span className="share-chip">Tracked shot-by-shot</span>
-          <span className="share-chip">{data.groupRank}</span>
-          <span className="share-chip">{data.bookedDailyPnl} today</span>
+          {data.groupRank && (
+            <span className="share-chip">{data.groupRank}</span>
+          )}
+          {data.bookedDailyPnl && (
+            <span className="share-chip">{data.bookedDailyPnl} today</span>
+          )}
         </div>
         <div className="share-foot">PARDLE.APP</div>
       </div>

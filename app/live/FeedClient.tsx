@@ -947,11 +947,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   for (const row of visibleRows) {
     timeline.push({ kind: "shot", ts: row.event.ts, row });
   }
-  // Mock crew posts — bet-as-post entries from fictional members so
-  // the Sweat Feed reads as a bet-driven stream until Groups is wired.
-  // Smart-feed mode hides them — keeps that filter honest to the
-  // user's own bets.
-  if (filterMode === "all") {
+  // Mock crew posts — fictional Jordan/Mia/Theo/Sam/Edge "is sweating"
+  // cards. Gated to ?demo=1 only. Outside demo, the live feed shows
+  // ONLY real shots + the user's own tracked bets — never demo crew.
+  // (CLAUDE.md: never inject demo data into the live experience.)
+  if (filterMode === "all" && demoMode) {
     const now = Date.now();
     for (const post of MOCK_CREW_POSTS) {
       timeline.push({ kind: "crew", ts: now + post.tsOffsetMs, post });

@@ -198,10 +198,7 @@ export const PLAYER_DATA: Record<string, PlayerMockEntry> = {
         note: "Hot putter all week; lost in a playoff.",
       },
     ],
-    groupBets: [
-      { initials: "JO", name: "Jordan", description: "Outright · £50" },
-      { initials: "MI", name: "Mia", description: "—" },
-    ],
+    groupBets: [],
   },
   "A. Smalley": {
     init: "AS",
@@ -305,10 +302,7 @@ export const PLAYER_DATA: Record<string, PlayerMockEntry> = {
         note: "Best ball-striking week of his season.",
       },
     ],
-    groupBets: [
-      { initials: "YO", name: "You", description: "Top 5 · £40" },
-      { initials: "MI", name: "Mia", description: "Top 5 (tail)" },
-    ],
+    groupBets: [],
   },
 };
 

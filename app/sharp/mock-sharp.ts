@@ -20,14 +20,18 @@ export interface MockSharpStats {
   currentStreak: number;
 }
 
+// Cold-start defaults — a brand-new user has no calls yet, so we
+// render the empty/onboarding state instead of inventing rank +
+// streak data. Real wiring (the sharp-score module + putt-iq
+// leaderboard) replaces these once a user has built any record.
 export const MOCK_SHARP_STATS: MockSharpStats = {
-  score: 72,
-  rankLabel: "#3 in The Lads",
-  percentileLabel: "top 9% on Pardle",
-  delta: "+4",
-  totalCalls: 31,
-  correctCalls: 22,
-  currentStreak: 5,
+  score: 0,
+  rankLabel: "",
+  percentileLabel: "",
+  delta: "",
+  totalCalls: 0,
+  correctCalls: 0,
+  currentStreak: 0,
 };
 
 export interface MockSharpPollOption {
@@ -46,14 +50,15 @@ export interface MockSharpPoll {
   preVoteSub: string;
 }
 
+// Empty open-poll placeholder — the Sharp page now reads the real
+// active prediction poll from /api/feed.predictionPolls when one
+// exists; until then it shows the empty/onboarding state rather
+// than a fictional "Does Henley hold on?" question.
 export const MOCK_SHARP_POLL: MockSharpPoll = {
-  eyebrow: "Putt-IQ · The Lads vote",
-  question: "Does Henley hold on for the win?",
-  options: [
-    { label: "Yes — Henley closes it out", pct: 61 },
-    { label: "No — the field reels him in", pct: 39 },
-  ],
-  postVoteSub: "6 of your crew voted Yes",
+  eyebrow: "",
+  question: "",
+  options: [],
+  postVoteSub: "",
   preVoteSub: "Tap to lock your read",
 };
 
@@ -72,56 +77,9 @@ export interface MockSharpCall {
   context: string;
 }
 
-export const MOCK_SHARP_OPEN_CALLS: MockSharpCall[] = [
-  {
-    id: "c-open-1",
-    question: "Does Henley hold on for the win?",
-    myPick: "Yes — Henley closes it out",
-    status: "pending",
-    time: "now",
-    context: "R4 · final 3 holes",
-  },
-  {
-    id: "c-open-2",
-    question: "Will Brennan break 68 in R4?",
-    myPick: "No — bombers don't break 68 here",
-    status: "pending",
-    time: "1h",
-    context: "Round-score · UNDER 67.5",
-  },
-];
-
-export const MOCK_SHARP_SETTLED_CALLS: MockSharpCall[] = [
-  {
-    id: "c-set-1",
-    question: "Smalley birdies 17?",
-    myPick: "Yes — 8 ft uphill",
-    status: "right",
-    time: "12m",
-    context: "Putt poll · made for birdie",
-  },
-  {
-    id: "c-set-2",
-    question: "Åberg keeps the lead after 16?",
-    myPick: "No — three-putt brewing",
-    status: "right",
-    time: "38m",
-    context: "Hold-the-lead · lost it",
-  },
-  {
-    id: "c-set-3",
-    question: "Will Echavarria's drop find dry land?",
-    myPick: "Yes — easy carry",
-    status: "wrong",
-    time: "2h",
-    context: "R3 · 12th hole",
-  },
-  {
-    id: "c-set-4",
-    question: "Top 5 lock by Friday?",
-    myPick: "Yes — Smalley shoots 67",
-    status: "right",
-    time: "yesterday",
-    context: "Pre-round pick",
-  },
-];
+// Empty by default — real user calls populate once they vote on a
+// putt-poll or settle a tracked bet. SharpClient renders the
+// onboarding empty state when both arrays are []. No invented
+// Henley / Brennan / Smalley calls in the live experience.
+export const MOCK_SHARP_OPEN_CALLS: MockSharpCall[] = [];
+export const MOCK_SHARP_SETTLED_CALLS: MockSharpCall[] = [];

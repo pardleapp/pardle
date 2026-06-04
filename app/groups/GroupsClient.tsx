@@ -406,7 +406,16 @@ export default function GroupsClient({
         );
       })()}
       {raceOpen && raceReady && (
-        <RaceSheet onClose={() => setRaceOpen(false)} />
+        <RaceSheet
+          groupName={group.name}
+          memberCount={group.member_count}
+          standings={standings}
+          onClose={() => setRaceOpen(false)}
+          onOpenMember={(uid) => {
+            setRaceOpen(false);
+            setMemberOpen(uid);
+          }}
+        />
       )}
     </section>
   );
