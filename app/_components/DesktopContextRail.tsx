@@ -2,42 +2,48 @@
 
 /**
  * DesktopContextRail — right context column at @media
- * (min-width: 1280px). Surfaces a stack of useful modules so the
- * extra horizontal space on wide desktop is genuinely used:
+ * (min-width: 1280px). Surfaces real Memorial-side data using the
+ * SAME components + helpers the working /live + /bets surfaces use,
+ * so the rail can never diverge from the canonical valuation /
+ * vote behaviour:
  *
- *   1. "Now playing" tournament strip + active prediction call
- *      (when /api/feed has an open poll)
- *   2. Leaderboard top 10
- *   3. Your live bets (real tracked bets from localStorage with
- *      live valuations from /api/feed)
- *   4. Shots of the day reel mini (top 3 highlights from
- *      /api/feed.bestReel when present)
+ *   • Now playing tournament strip
+ *   • Active prediction call — renders <PredictionPollCard> (the
+ *     same component the in-feed deck mounts) so the vote action
+ *     hits /api/predictions/vote and fills bars optimistically.
+ *   • Leaderboard top 10 (real /api/feed leaderboard rows).
+ *   • Your live bets — values via currentValueForBet (the same
+ *     helper that powers the inline tracker + bet detail chart);
+ *     prob derived from value / max-payout so a row's % matches
+ *     the live % shown on its bet detail page.
+ *   • Shots of the day mini (top 3 from /api/feed.bestReel).
  *
- * Real-data only — no demo crew or mock placeholders. The mobile
- * experience is unaffected (display: none below 1280px).
+ * Mobile (<1280) unchanged.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import PredictionPollCard from "@/app/live/PredictionPollCard";
+import { betKindShortLabel } from "@/app/live/bet-impact";
 import {
   BETS_CHANGED_EVENT,
+  currentValueForBet,
   readBets,
-  resolveBetPlayerId,
-  type OutrightBet,
   type PlayerRoundState,
-  type RoundScoreBet,
-  type TopFinishBet,
   type TopFinishProbs,
   type TournamentProjection,
   type TrackedBet,
-  evaluateRoundScore,
 } from "@/app/live/bet-shared";
 import {
   formatBetCurrency,
   normaliseBetCurrency,
 } from "@/lib/format/bet-currency";
+import type {
+  PredictionPoll,
+  PredictionPollCounts,
+} from "@/lib/feed/prediction-polls";
 
-interface FeedRow {
+interface FeedRowLike {
   event?: {
     playerId?: string;
     headline?: string;
@@ -58,18 +64,15 @@ interface FeedSnapshot {
   playerRoundStates: Record<string, PlayerRoundState>;
   tournamentProjections?: Record<string, TournamentProjection>;
   topFinishCurrent?: Record<string, TopFinishProbs>;
-  /** /api/feed wraps each poll in a `{ poll, counts, ... }` envelope.
-   *  The rail only consumes the inner poll's shape; counts/myVote
-   *  live in their own envelope fields and are read where needed. */
+  /** Each entry is the envelope returned by /api/feed —
+   *  { poll, counts, myVote, … }. We unwrap when passing into
+   *  <PredictionPollCard> below. */
   predictionPolls?: Array<{
-    poll?: {
-      id?: string;
-      type?: string;
-      question?: string;
-      options?: Array<{ key?: string; label?: string }>;
-    };
+    poll?: PredictionPoll;
+    counts?: PredictionPollCounts;
+    myVote?: string | null;
   }>;
-  bestReel?: FeedRow[];
+  bestReel?: FeedRowLike[];
 }
 
 const POLL_MS = 15_000;
@@ -80,79 +83,42 @@ function abbreviate(name: string): string {
   return `${parts[0][0]}. ${parts.slice(1).join(" ")}`;
 }
 
-function callTypeLabel(t: string): string {
-  if (t === "head-to-head") return "Head-to-head";
-  if (t === "round-over-under") return "Round call";
-  if (t === "hold-the-lead") return "Hold the lead";
-  return "Live call";
-}
-
-// Live valuation that mirrors the BetTracker but stays self-contained
-// so this rail can poll on its own cadence. Returns null if the bet
-// can't be valued from the current snapshot.
-function liveValue(bet: TrackedBet, snap: FeedSnapshot): {
-  prob: number | null;
-  value: number | null;
-} {
-  const leaderboardForResolve = snap.leaderboard.map((r) => ({
-    playerId: r.playerId,
-    displayName: r.displayName,
-  }));
-  const pid = resolveBetPlayerId(bet, leaderboardForResolve);
-  if (bet.kind === "outright") {
-    const fair = snap.currentOdds[pid || (bet as OutrightBet).playerId];
-    if (!Number.isFinite(fair) || fair <= 1) return { prob: null, value: null };
-    const prob = 1 / fair;
-    return { prob, value: bet.stake * (bet.oddsTaken / fair) };
-  }
-  if (bet.kind === "top-finish") {
-    const t = bet as TopFinishBet;
-    const snapPlayer =
-      snap.topFinishCurrent?.[pid || t.playerId];
-    if (!snapPlayer) return { prob: null, value: null };
-    const key = `top${t.cutoff}` as keyof TopFinishProbs;
-    const prob = snapPlayer[key];
-    if (typeof prob !== "number") return { prob: null, value: null };
-    return { prob, value: bet.stake * prob * bet.oddsTaken };
-  }
-  if (bet.kind === "round-score") {
-    const r = bet as RoundScoreBet;
-    const state = snap.playerRoundStates[pid || r.playerId];
-    const ev = evaluateRoundScore(r, state);
-    if (!ev) return { prob: null, value: null };
-    if (ev.kind === "not-started") {
-      return { prob: 1 / bet.oddsTaken, value: bet.stake };
-    }
-    if (ev.kind === "settled") {
-      return { prob: ev.won ? 1 : 0, value: ev.won ? bet.stake * bet.oddsTaken : 0 };
-    }
-    return { prob: ev.prob, value: bet.stake * ev.prob * bet.oddsTaken };
-  }
-  return { prob: null, value: null };
-}
-
-function marketLabel(bet: TrackedBet): string {
-  if (bet.kind === "outright") return "OUTRIGHT";
-  if (bet.kind === "top-finish") return `TOP ${bet.cutoff}`;
-  if (bet.kind === "round-score") {
-    const round = bet.round != null ? ` · R${bet.round}` : "";
-    return `${bet.side.toUpperCase()} ${bet.line}${round}`;
-  }
-  return `${bet.side.toUpperCase()} ${bet.line} · TOT`;
-}
-
 function playerLabel(bet: TrackedBet): string {
   if (bet.kind === "winning-score") return "Winner";
   return ("playerName" in bet && bet.playerName) || "Player";
 }
 
+/** Derive prob from canonical value:
+ *    value = stake * prob * oddsTaken  →  prob = value / maxPayout
+ *  (anchoredValue uses the same identity, so this recovers prob
+ *  cleanly across all bet kinds without re-deriving them inline.) */
+function probFromValue(bet: TrackedBet, value: number | null): number | null {
+  if (value == null) return null;
+  const maxPayout = bet.stake * bet.oddsTaken;
+  if (maxPayout <= 0) return null;
+  return Math.max(0, Math.min(1, value / maxPayout));
+}
+
 export default function DesktopContextRail() {
   const [feed, setFeed] = useState<FeedSnapshot | null>(null);
   const [bets, setBets] = useState<TrackedBet[]>([]);
+  // Optimistic vote state — mirrors FeedClient's myPredictionVotes
+  // so a tap fills the bars before the next /api/feed tick lands.
+  const [myVotes, setMyVotes] = useState<
+    Record<string, { myVote: string; counts: PredictionPollCounts }>
+  >({});
+  // Stable per-visitor author key (same source the feed uses for
+  // its votes / reactions). Read once on mount.
+  const authorKey = useRef<string>("");
 
-  // Local bet store (localStorage) — same source as /bets and the
-  // inline BetTracker. Re-reads on the BETS_CHANGED event so newly
-  // placed bets show up here within the same tick.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    authorKey.current =
+      window.localStorage.getItem("pardle_feed_author") ?? "";
+  }, []);
+
+  // Local bet store. Re-reads on BETS_CHANGED so a freshly tracked
+  // bet shows up here instantly.
   useEffect(() => {
     const sync = () => setBets(readBets());
     sync();
@@ -164,16 +130,17 @@ export default function DesktopContextRail() {
     };
   }, []);
 
-  // Poll /api/feed for the rail's snapshot.
+  // Poll /api/feed. The default response carries every field the
+  // rail needs (leaderboard, currentOdds, playerRoundStates,
+  // tournamentProjections, topFinishCurrent, predictionPolls,
+  // bestReel) — no ?include=charts required.
   useEffect(() => {
     let cancel = false;
     const tick = async () => {
       try {
         const r = await fetch("/api/feed?v=ctx-rail", { cache: "no-store" });
         if (!r.ok) return;
-        const j = (await r.json()) as Partial<FeedSnapshot> & {
-          leaderboard?: FeedSnapshot["leaderboard"];
-        };
+        const j = (await r.json()) as Partial<FeedSnapshot>;
         if (cancel) return;
         setFeed({
           tournament: j.tournament ?? null,
@@ -197,19 +164,76 @@ export default function DesktopContextRail() {
     };
   }, []);
 
+  // Same optimistic-vote flow as FeedClient.sendPredictionVote.
+  const sendVote = useCallback(
+    async (pollId: string, optionKey: string) => {
+      const entry = feed?.predictionPolls?.find(
+        (p) => p?.poll?.id === pollId,
+      );
+      if (!entry?.poll) return;
+      const base = myVotes[pollId];
+      const prevVote = base?.myVote ?? entry.myVote ?? null;
+      if (prevVote === optionKey) return;
+      const baseCounts: PredictionPollCounts =
+        base?.counts ?? entry.counts ?? {};
+      const nextCounts: PredictionPollCounts = { ...baseCounts };
+      if (prevVote && nextCounts[prevVote] != null) {
+        nextCounts[prevVote] = Math.max(0, nextCounts[prevVote] - 1);
+      }
+      nextCounts[optionKey] = (nextCounts[optionKey] ?? 0) + 1;
+      setMyVotes((m) => ({
+        ...m,
+        [pollId]: { myVote: optionKey, counts: nextCounts },
+      }));
+      try {
+        const res = await fetch("/api/predictions/vote", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            pollId,
+            authorKey: authorKey.current,
+            optionKey,
+          }),
+        });
+        if (!res.ok) {
+          setMyVotes((m) => {
+            const out = { ...m };
+            delete out[pollId];
+            return out;
+          });
+        }
+      } catch {
+        // Network blip — leave optimistic state; next /api/feed
+        // refresh resyncs.
+      }
+    },
+    [feed, myVotes],
+  );
+
   const liveTournament = feed?.tournament?.isLive;
-  // Unwrap the poll envelope safely — /api/feed returns
-  // [{ poll: { id, type, options, … }, counts, … }, …]. Old code
-  // assumed the items themselves had `.options` and crashed every
-  // route with `f.options.slice is not a function`.
-  const openPoll = feed?.predictionPolls?.[0]?.poll;
-  const openPollOptions = Array.isArray(openPoll?.options)
-    ? openPoll!.options!.slice(0, 2)
-    : [];
+
+  // Pick the first non-closed poll. The wrapper guards against
+  // malformed envelopes (this was the source of the production crash
+  // earlier — never trust the shape until it's unwrapped).
+  const openEntry = useMemo(() => {
+    const polls = feed?.predictionPolls;
+    if (!Array.isArray(polls)) return null;
+    return (
+      polls.find(
+        (p) =>
+          p?.poll?.id &&
+          p.poll.options &&
+          p.poll.options.length > 0 &&
+          p.poll.question,
+      ) ?? null
+    );
+  }, [feed]);
+
   const activeBets = useMemo(
     () => bets.filter((b) => b.settledAt == null),
     [bets],
   );
+
   const reelTop3 = Array.isArray(feed?.bestReel)
     ? feed!.bestReel!.slice(0, 3)
     : [];
@@ -232,34 +256,30 @@ export default function DesktopContextRail() {
         </div>
       </section>
 
-      {/* Active prediction call (mini) — null-guarded at every read
-          so a missing poll / options array never throws. */}
-      {openPoll && openPoll.question && (
-        <section className="desktop-ctx-block">
-          <div className="desktop-ctx-label desktop-ctx-label-row">
-            <span>{callTypeLabel(openPoll.type ?? "")}</span>
-            <Link href="/" className="desktop-ctx-link">
-              Vote →
-            </Link>
-          </div>
-          <div className="desktop-ctx-call">
-            <div className="desktop-ctx-call-q">{openPoll.question}</div>
-            {openPollOptions.length > 0 && (
-              <div className="desktop-ctx-call-opts">
-                {openPollOptions.map((o, i) => {
-                  const label = o?.label ?? "";
-                  return (
-                    <span
-                      key={o?.key ?? i}
-                      className="desktop-ctx-call-opt"
-                    >
-                      {label.length > 28 ? `${label.slice(0, 26)}…` : label}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+      {/* Active prediction call — uses the same component the feed
+          mounts, so the vote behaviour is identical (locks the
+          choice, fills the community bars, calls /api/predictions/
+          vote with the visitor's authorKey). */}
+      {openEntry?.poll && (
+        <section className="desktop-ctx-block desktop-ctx-poll-host">
+          <div className="desktop-ctx-label">Live call</div>
+          <PredictionPollCard
+            poll={openEntry.poll}
+            counts={
+              myVotes[openEntry.poll.id]?.counts ??
+              openEntry.counts ??
+              ({} as PredictionPollCounts)
+            }
+            myVote={
+              myVotes[openEntry.poll.id]?.myVote ??
+              openEntry.myVote ??
+              null
+            }
+            onVote={(opt) => {
+              if (openEntry.poll?.id) sendVote(openEntry.poll.id, opt);
+            }}
+            hideResultsUntilVote
+          />
         </section>
       )}
 
@@ -293,7 +313,9 @@ export default function DesktopContextRail() {
         )}
       </section>
 
-      {/* Your live bets */}
+      {/* Your live bets — uses currentValueForBet (the canonical
+          helper) so each row's % matches what /live/bet/[id] shows
+          for the same bet. */}
       <section className="desktop-ctx-block">
         <div className="desktop-ctx-label desktop-ctx-label-row">
           <span>Your live bets</span>
@@ -309,23 +331,34 @@ export default function DesktopContextRail() {
         ) : (
           <ul className="desktop-ctx-bets">
             {activeBets.slice(0, 5).map((b) => {
-              const lv = feed ? liveValue(b, feed) : { prob: null, value: null };
+              const value = feed
+                ? currentValueForBet(
+                    b,
+                    feed.currentOdds,
+                    feed.playerRoundStates,
+                    feed.tournamentProjections,
+                    feed.topFinishCurrent,
+                    null,
+                    feed.leaderboard,
+                  )
+                : null;
+              const prob = probFromValue(b, value);
               const cur = normaliseBetCurrency(b.currency);
               const placedProb =
                 Number.isFinite(b.oddsTaken) && b.oddsTaken > 1
                   ? 1 / b.oddsTaken
                   : null;
               const dir: "up" | "down" | "flat" =
-                lv.prob != null && placedProb != null
-                  ? Math.abs(lv.prob - placedProb) < 0.005
+                prob != null && placedProb != null
+                  ? Math.abs(prob - placedProb) < 0.005
                     ? "flat"
-                    : lv.prob > placedProb
+                    : prob > placedProb
                       ? "up"
                       : "down"
                   : "flat";
-              const pct = lv.prob != null ? Math.round(lv.prob * 100) : null;
+              const pct = prob != null ? Math.round(prob * 100) : null;
               const delta =
-                lv.value != null ? Math.round(lv.value - b.stake) : null;
+                value != null ? Math.round(value - b.stake) : null;
               return (
                 <li key={b.id} className="desktop-ctx-bet">
                   <Link
@@ -336,7 +369,8 @@ export default function DesktopContextRail() {
                       {playerLabel(b)}
                     </span>
                     <span className="desktop-ctx-bet-mk">
-                      {marketLabel(b)} · {formatBetCurrency(b.stake, cur, {
+                      {betKindShortLabel(b).toUpperCase()} ·{" "}
+                      {formatBetCurrency(b.stake, cur, {
                         maximumFractionDigits: 0,
                       })}
                     </span>
@@ -370,7 +404,7 @@ export default function DesktopContextRail() {
           <ul className="desktop-ctx-reel">
             {reelTop3.map((row, i) => (
               <li key={i} className="desktop-ctx-reel-row">
-                {row.event?.headline ?? ""}
+                {row?.event?.headline ?? ""}
               </li>
             ))}
           </ul>
