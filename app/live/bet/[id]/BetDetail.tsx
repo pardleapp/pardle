@@ -37,6 +37,7 @@ import {
 } from "../../bet-shared";
 import dynamic from "next/dynamic";
 import { computeBetInsight } from "@/lib/feed/bet-insights";
+import { formatWinPct } from "@/lib/format/win-pct";
 import { useToast } from "@/app/live/Toast";
 import { formatBetCurrency } from "@/lib/format/bet-currency";
 import OnThisBetThread from "./OnThisBetThread";
@@ -1424,12 +1425,10 @@ function OutrightDetailTable({
 /** Format a model probability as a compact percentage —
  *  1 decimal under 5%, integer otherwise. Used in the hole-by-
  *  hole tables across all bet kinds. */
-function formatWinPct(p: number): string {
-  if (!Number.isFinite(p) || p < 0) return "—";
-  const pct = p * 100;
-  if (pct > 0 && pct < 5) return `${pct.toFixed(1)}%`;
-  return `${Math.round(pct)}%`;
-}
+// formatWinPct moved to @/lib/format/win-pct so the desktop right-
+// rail bet rows can use the same string formatter as the bet detail
+// hole-by-hole table — keeps row % identical to detail % to the
+// last digit.
 
 /** Label a significant odds move that happened between two of the
  *  player's hole completions — usually overnight / between rounds /

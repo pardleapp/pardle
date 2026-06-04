@@ -38,6 +38,7 @@ import {
   formatBetCurrency,
   normaliseBetCurrency,
 } from "@/lib/format/bet-currency";
+import { formatWinPct } from "@/lib/format/win-pct";
 import type {
   PredictionPoll,
   PredictionPollCounts,
@@ -239,7 +240,12 @@ export default function DesktopContextRail() {
     : [];
 
   return (
-    <aside className="desktop-ctx" aria-label="Context">
+    // pv-theme class on the rail itself so any descendant component
+    // (notably <PredictionPollCard>) reads the light v2 tokens — the
+    // rail lives in app/layout.tsx outside the <main class="pv-theme">
+    // wrapper, so without this class the poll card paints the old
+    // dark v4 fallback (#0e0f12 bg, #f5f5f7 text).
+    <aside className="desktop-ctx pv-theme" aria-label="Context">
       {/* Tournament strip */}
       <section className="desktop-ctx-block">
         <div className="desktop-ctx-label">Now playing</div>
@@ -356,7 +362,12 @@ export default function DesktopContextRail() {
                       ? "up"
                       : "down"
                   : "flat";
-              const pct = prob != null ? Math.round(prob * 100) : null;
+              // formatWinPct is the shared helper bet detail uses
+              // for hole-by-hole + hero rows — keeps the rail row's
+              // string identical to the detail page's (sub-5% probs
+              // render with one decimal so a longshot reads "0.4%"
+              // rather than collapsing to "0%").
+              const pctText = formatWinPct(prob);
               const delta =
                 value != null ? Math.round(value - b.stake) : null;
               return (
@@ -377,7 +388,7 @@ export default function DesktopContextRail() {
                     <span
                       className={`desktop-ctx-bet-pct desktop-ctx-bet-${dir}`}
                     >
-                      {pct != null ? `${pct}%` : "—"}
+                      {pctText}
                     </span>
                     {delta != null && delta !== 0 && (
                       <span
