@@ -26655,13 +26655,14 @@ summary,
   /* ── Grid shell ──────────────────────────────────────────── */
   .desktop-shell {
     display: grid;
-    /* Two columns at 1024–1279: rail + content. The right context
-       rail joins at ≥1280px. minmax(0, ...) on the content column
-       prevents grid blowout when descendants overflow. */
+    /* Two columns at 1024–1279: rail + content (no right rail).
+       At ≥1280 the third column joins below. minmax(0, ...) on
+       the content column prevents grid blowout from overflowing
+       descendants. */
     grid-template-columns: 220px minmax(0, 640px);
     column-gap: 32px;
-    justify-content: center;   /* centre the row inside max-width */
-    max-width: 892px;          /* 220 + 32 + 640 = 892 */
+    justify-content: center;
+    max-width: 892px;
     margin: 0 auto;
     padding: 0 16px;
     align-items: start;
@@ -26760,18 +26761,25 @@ summary,
     margin: 0 auto;
     padding: 16px;
   }
-  /* +FAB — nudge inward so it sits over the content column edge
-     instead of the viewport's far-right corner. */
+  /* +FAB — nudge inward so it sits roughly over the content
+     column's right edge instead of the viewport's far-right
+     corner. The shell's max-width is 1480 on the 3-col layout
+     so this offset places the FAB just outside the content
+     column without overlapping the right rail. */
   .addbet-fab {
-    right: calc(50% - 416px) !important;
+    right: calc(50% - 240px) !important;
     bottom: 24px !important;
   }
 }
 
 @media (min-width: 1280px) {
+  /* Three-column shell — rail + content + context. Content stays
+     capped at 680px (readable) and the right rail expands with
+     the 1fr track so wide viewports use the width instead of
+     piling it into outer margins. */
   .desktop-shell {
-    grid-template-columns: 220px minmax(0, 640px) 320px;
-    max-width: 1280px;
+    grid-template-columns: 240px minmax(0, 680px) minmax(360px, 1fr);
+    max-width: 1480px;
   }
   .desktop-ctx {
     position: sticky;
@@ -26779,7 +26787,7 @@ summary,
     align-self: start;
     height: 100dvh;
     overflow-y: auto;
-    width: 320px;
+    width: 100%;
     padding: 22px 4px;
     display: flex;
     flex-direction: column;
@@ -26892,6 +26900,131 @@ summary,
     font-size: 12.5px;
     color: var(--pv-muted);
     line-height: 1.4;
+  }
+
+  /* Active prediction call mini card. */
+  .desktop-ctx-call {
+    background: var(--pv-card);
+    border: 1px solid var(--pv-line);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .desktop-ctx-call-q {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: var(--pv-ink);
+    line-height: 1.35;
+  }
+  .desktop-ctx-call-opts {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .desktop-ctx-call-opt {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: var(--pv-soft);
+    color: var(--pv-emerald-d);
+    font-weight: 700;
+  }
+
+  /* Your live bets list. */
+  .desktop-ctx-bets {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    background: var(--pv-card);
+    border: 1px solid var(--pv-line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .desktop-ctx-bet {
+    border-bottom: 1px solid var(--pv-line);
+  }
+  .desktop-ctx-bet:last-child {
+    border-bottom: none;
+  }
+  .desktop-ctx-bet-link {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    grid-template-rows: auto auto;
+    column-gap: 10px;
+    row-gap: 2px;
+    padding: 10px 12px;
+    text-decoration: none;
+    align-items: center;
+  }
+  .desktop-ctx-bet-link:hover {
+    background: var(--pv-soft);
+  }
+  .desktop-ctx-bet-nm {
+    grid-row: 1;
+    grid-column: 1;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--pv-ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .desktop-ctx-bet-mk {
+    grid-row: 2;
+    grid-column: 1;
+    font-size: 11px;
+    color: var(--pv-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .desktop-ctx-bet-pct {
+    grid-row: 1 / span 2;
+    grid-column: 2;
+    font-size: 14px;
+    font-weight: 900;
+    font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  }
+  .desktop-ctx-bet-d {
+    grid-row: 1 / span 2;
+    grid-column: 3;
+    font-size: 12px;
+    font-weight: 800;
+    font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+    min-width: 36px;
+    text-align: right;
+  }
+  .desktop-ctx-bet-up {
+    color: var(--pv-up);
+  }
+  .desktop-ctx-bet-down {
+    color: var(--pv-down);
+  }
+  .desktop-ctx-bet-flat {
+    color: var(--pv-muted);
+  }
+
+  /* Shots-of-the-day mini reel. */
+  .desktop-ctx-reel {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    background: var(--pv-card);
+    border: 1px solid var(--pv-line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .desktop-ctx-reel-row {
+    padding: 9px 12px;
+    font-size: 12.5px;
+    color: var(--pv-ink);
+    border-bottom: 1px solid var(--pv-line);
+    line-height: 1.35;
+  }
+  .desktop-ctx-reel-row:last-child {
+    border-bottom: none;
   }
 }
 
