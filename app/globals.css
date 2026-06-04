@@ -20154,10 +20154,19 @@ html.pv-theme-body .auth-chip-btn {
 .pv-theme .feed-live-pulse,
 .pv-theme .feed-live-pulse-inline {
   background: var(--pv-emerald);
+  color: #fff;
 }
-.pv-theme .feed-live-pulse::before,
+/* The pill uses ::before for the "Live" word and ::after for the
+   pulsing dot. Pre-pv-theme rules tinted them dark emerald against
+   the dark v4 bg — under pv-theme the pill background is solid
+   emerald, so both must be white to read. */
+.pv-theme .feed-live-pulse::before {
+  color: #fff;
+  background: transparent;
+}
 .pv-theme .feed-live-pulse::after {
-  background: var(--pv-emerald);
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.65);
 }
 
 /* feed list — cards on paper, separated by gap not borders */
@@ -20451,9 +20460,20 @@ html.pv-theme-body .auth-chip-btn {
 }
 .pv-theme .predpoll-eyebrow,
 .pv-theme .predpoll-tag {
+  /* Inline pill, not a full-width band. Matches the prototype's
+     .poll-tag (Pardle Social v2 line 527): compact blue-tinted chip
+     that sits to the left of the question, not a block painted
+     across the card top. */
+  display: inline-block;
   color: var(--pv-blue);
   background: oklch(0.93 0.05 245);
   border: none;
+  padding: 3px 7px;
+  border-radius: 5px;
+  letter-spacing: 0.1em;
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 .pv-theme .predpoll-question,
 .pv-theme .predpoll-q {

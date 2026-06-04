@@ -65,8 +65,18 @@ export default function PredictionPollCard({
     setTimeout(() => setPending(null), 1200);
   };
 
+  // Label the call by its actual type — not a single "Sunday call"
+  // catch-all. Round-over-under calls fire on Thursday R1 too, so
+  // "Sunday" was a calendar lie. Hold-the-lead is the Sunday-only
+  // type that originally inspired the catch-all phrasing.
   const eyebrow =
-    poll.type === "head-to-head" ? "Head-to-head" : "Sunday call";
+    poll.type === "head-to-head"
+      ? "Head-to-head"
+      : poll.type === "round-over-under"
+        ? "Round call"
+        : poll.type === "hold-the-lead"
+          ? "Hold the lead"
+          : "Live call";
   const variant =
     poll.type === "head-to-head" ? "predpoll-h2h" : "predpoll-lead";
 
