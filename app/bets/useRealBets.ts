@@ -373,6 +373,8 @@ export function useRealBets(): UseRealBetsResult {
     const liveOut: MockBetLive[] = [];
     const settledOut: MockBetSettled[] = [];
     const s = slice ?? buildSlice({});
+    const healed: TrackedBet[] = [];
+    let dirty = false;
     // Newest first.
     const sorted = [...bets].sort((a, b) => b.placedAt - a.placedAt);
     for (const b of sorted) {
@@ -380,9 +382,44 @@ export function useRealBets(): UseRealBetsResult {
         settledOut.push(adaptToSettled(b));
         continue;
       }
-      // Try one more detection pass in case the live engine has
-      // already decided settlement but the bet record isn't patched.
-      if (s.leaderboardById && b.kind !== "round-score") {
+      // Resolve the bet's playerId against the live leaderboard
+      // before any state lookups (dg-* ids from pre-tournament
+      // placements get reconciled here).
+      const leaderboardForResolve = Object.entries(s.leaderboardById).map(
+        ([playerId, info]) => ({
+          playerId,
+          displayName: info.displayName,
+        }),
+      );
+      const resolvedPid = resolveBetPlayerId(b, leaderboardForResolve);
+
+      // Round-score bets: if the round is complete, the bet is
+      // settled even though no cron has stamped settledAt yet.
+      // Move it to the Settled bucket and self-heal the local
+      // store so future loads see it directly.
+      if (b.kind === "round-score") {
+        const rb = b as RoundScoreBet;
+        const state = s.playerRoundStates[resolvedPid || rb.playerId];
+        const ev = evaluateRoundScore(rb, state);
+        if (ev?.kind === "settled") {
+          const patched = {
+            ...rb,
+            settledAt: Date.now(),
+            settledWon: ev.won,
+          } as TrackedBet;
+          settledOut.push(adaptToSettled(patched));
+          healed.push(patched);
+          dirty = true;
+          continue;
+        }
+        liveOut.push(adaptToLive(b, s));
+        continue;
+      }
+
+      // Outright / top-finish / winning-score: backstop with the
+      // canonical detectBetSettlement helper in case the cron
+      // hasn't run yet. Same self-heal as round-score.
+      if (s.leaderboardById) {
         const players = Object.entries(s.leaderboardById).map(
           ([playerId, info]) => ({
             playerId,
@@ -398,12 +435,32 @@ export function useRealBets(): UseRealBetsResult {
           s.tournamentProjections ?? {},
         );
         if (decision) {
-          const patched = { ...b, settledWon: decision.won } as TrackedBet;
+          const patched = {
+            ...b,
+            settledAt: Date.now(),
+            settledWon: decision.won,
+          } as TrackedBet;
           settledOut.push(adaptToSettled(patched));
+          healed.push(patched);
+          dirty = true;
           continue;
         }
       }
       liveOut.push(adaptToLive(b, s));
+    }
+    // Self-heal: persist any newly-detected settlements back to
+    // localStorage so the next render reads them directly via the
+    // settledAt+settledWon short-circuit at the top of the loop.
+    // Skip when nothing changed to avoid pointless writes.
+    if (dirty && typeof window !== "undefined") {
+      try {
+        const byId = new Map(healed.map((h) => [h.id, h]));
+        const next = bets.map((b) => byId.get(b.id) ?? b);
+        writeBets(next);
+      } catch {
+        // localStorage quota / private-mode — in-memory bucketing
+        // still works for this render; next tick retries.
+      }
     }
     return { live: liveOut, settled: settledOut };
   }, [bets, slice]);
