@@ -196,10 +196,15 @@ export async function GET(req: Request) {
       })
       .filter((x): x is NonNullable<typeof x> => x != null);
 
-    // Per-round SG totals for the four R1-R4 chips. We hit each round
-    // separately because DG bundles per-round stats under a round=N
-    // request. Each round's response is cached separately in Redis.
-    const perRound = await Promise.all(
+    // Per-round SG totals for the four R1-R4 chips.
+    //
+    // DataGolf's live-tournament-stats?round=N silently falls back to
+    // the most-recently-played round when asked for a round that
+    // hasn't started yet — symptom: R2/R3/R4 all return identical
+    // sgTotal mid-tournament. We dedup any later round whose sgTotal
+    // exactly matches the previous round's (DG would never
+    // legitimately produce identical per-round SG to 3 decimals).
+    const perRoundRaw = await Promise.all(
       [1, 2, 3, 4].map(async (rd) => {
         const rstats = await getLiveStatsCached(tournamentId, rd);
         const my = findStatsByName(rstats, row.displayName);
@@ -209,6 +214,20 @@ export async function GET(req: Request) {
         };
       }),
     );
+    const perRound: { label: string; value: number | null }[] = [];
+    let lastReal: number | null = null;
+    for (const r of perRoundRaw) {
+      const isDuplicate =
+        lastReal != null &&
+        r.value != null &&
+        Math.abs(lastReal - r.value) < 1e-9;
+      if (isDuplicate) {
+        perRound.push({ label: r.label, value: null });
+      } else {
+        perRound.push(r);
+        if (r.value != null) lastReal = r.value;
+      }
+    }
 
     // Header summary string for the live SG hero — "across 18 holes ·
     // 2nd of 71" matches the design-handoff prototype's caption format.
