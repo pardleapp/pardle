@@ -26867,16 +26867,15 @@ summary,
       clamp(340px, 26vw, 520px);
     column-gap: clamp(24px, 2.5vw, 48px);
     width: 100%;
-    /* 1920px cap so the most common large monitor (1920×1080) fills
-       edge-to-edge with no outer margin; wider monitors keep the
-       cluster at 1920 with proportional outer padding. */
-    max-width: 1920px;
+    /* No max-width — any cap creates a "stranded in white space"
+       void at viewports wider than the cap (1920 cap left 340px
+       voids at 2560). The middle column (1fr) absorbs all extra
+       viewport width; on ultrawide the feed grows wider rather
+       than leaving outer margins. */
     margin: 0 auto;
     /* Tight outer page padding so "Pardle" brand and the right
        rail's last column sit right against the viewport edge with
-       only a small breathing band. The previous max of 48px read
-       as a void on wide monitors; 20px is a thin gutter that lets
-       the eye rest at the edge without crowding. */
+       only a small breathing band. */
     padding: 0 clamp(8px, 1vw, 20px);
     align-items: start;
   }
@@ -26975,17 +26974,15 @@ summary,
     display: none !important;
   }
   body:has(.pv-theme) .site-footer {
-    max-width: 1920px;
+    /* Match the shell — fluid, no cap, tight outer padding. */
     margin: 0 auto;
     padding: 16px clamp(8px, 1vw, 20px);
   }
-  /* +FAB — anchored to the right edge of the centered shell so it
-     sits at the same spot relative to the content cluster, not the
-     viewport edge. On wide monitors the calc dominates and the FAB
-     stays glued to the cluster; on narrower viewports the
-     clamp-based padding wins so the FAB never slides off-screen. */
+  /* +FAB — anchored to the page's right edge with the same outer
+     padding the shell uses, so it sits in the same relative spot
+     at any viewport width. */
   .addbet-fab {
-    right: max(clamp(8px, 1vw, 20px), calc(50vw - 960px + 24px)) !important;
+    right: clamp(8px, 1vw, 20px) !important;
     bottom: 24px !important;
   }
 }
