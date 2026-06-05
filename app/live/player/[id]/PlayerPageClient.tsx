@@ -54,7 +54,30 @@ interface ScorecardRound {
   roundPar: number;
 }
 
+interface SeasonResponse {
+  found: boolean;
+  displayName?: string;
+  season?: {
+    sgTotal: number;
+    sgOtt: number;
+    sgApp: number;
+    sgArg: number;
+    sgPutt: number;
+  };
+}
+
 const POLL_MS = 15_000;
+
+function fmtSg(v: number): string {
+  if (!Number.isFinite(v)) return "—";
+  return `${v > 0 ? "+" : ""}${v.toFixed(2)}`;
+}
+
+function sgBarStyle(v: number): React.CSSProperties {
+  const w = Math.min(Math.abs(v) / 2.5, 1) * 50;
+  if (v < 0) return { left: `${50 - w}%`, width: `${w}%` };
+  return { left: "50%", width: `${w}%` };
+}
 
 function todayLabel(state: PlayerRoundState | undefined): string {
   if (!state) return "—";
@@ -93,6 +116,8 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
 
   const [feed, setFeed] = useState<FeedSnapshot | null>(null);
   const [rounds, setRounds] = useState<(ScorecardRound | null)[]>([null, null, null, null]);
+  const [season, setSeason] = useState<SeasonResponse | null>(null);
+  const [tab, setTab] = useState<"week" | "season">("week");
   const [imgFailed, setImgFailed] = useState(false);
   const [following, setFollowing] = useState(true);
   const [notifying, setNotifying] = useState(false);
@@ -127,6 +152,34 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
       window.clearInterval(id);
     };
   }, []);
+
+  // Season SG decomposition from DataGolf, fetched once on first
+  // mount per playerId. The skill-ratings endpoint refreshes weekly
+  // so there's no benefit to polling — one fetch is plenty.
+  useEffect(() => {
+    if (!playerId) return;
+    let cancel = false;
+    (async () => {
+      try {
+        const r = await fetch(
+          `/api/player/season?playerId=${encodeURIComponent(playerId)}`,
+          { cache: "no-store" },
+        );
+        if (!r.ok) {
+          if (!cancel) setSeason({ found: false });
+          return;
+        }
+        const j = (await r.json()) as SeasonResponse;
+        if (cancel) return;
+        setSeason(j);
+      } catch {
+        if (!cancel) setSeason({ found: false });
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [playerId]);
 
   // Fetch each round's hole-by-hole scorecard in parallel. Refetched
   // whenever playerId changes; the scorecard route returns the
@@ -252,35 +305,155 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
         </button>
       </section>
 
+      <nav className="pl-tabs" role="tablist" aria-label="Player view">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "week"}
+          className={tab === "week" ? "on" : ""}
+          onClick={() => setTab("week")}
+        >
+          This week
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "season"}
+          className={tab === "season" ? "on" : ""}
+          onClick={() => setTab("season")}
+        >
+          Season
+        </button>
+      </nav>
+
       <div className="pl-pv-body">
-        <section className="bd-sec" style={{ borderTop: "none" }}>
-          <h4 className="bd-sec-h">Scorecard · this week</h4>
-          {anyScorecardData ? (
-            <Scorecard rounds={roundStrokes} pars={parPerHole} />
-          ) : (
-            <div className="pl-empty">
-              No holes scored yet this week. Card fills in as the round
-              plays.
-            </div>
-          )}
-        </section>
+        {tab === "week" && (
+          <>
+            <section className="bd-sec" style={{ borderTop: "none" }}>
+              <h4 className="bd-sec-h">Scorecard · this week</h4>
+              {anyScorecardData ? (
+                <Scorecard rounds={roundStrokes} pars={parPerHole} />
+              ) : (
+                <div className="pl-empty">
+                  No holes scored yet this week. Card fills in as the
+                  round plays.
+                </div>
+              )}
+            </section>
 
-        <section className="bd-sec">
-          <h4 className="bd-sec-h">Strokes gained · this week</h4>
-          <div className="pl-empty">
-            Live strokes-gained for this player isn't wired into the
-            tracker yet. The leaderboard total above reflects the
-            current round in real time.
-          </div>
-        </section>
+            <section className="bd-sec">
+              <h4 className="bd-sec-h">Strokes gained · this week</h4>
+              <div className="pl-empty">
+                Live strokes-gained for this player isn't wired into
+                the tracker yet. The leaderboard total above reflects
+                the current round in real time.
+              </div>
+            </section>
 
-        <section className="bd-sec">
-          <h4 className="bd-sec-h">Advanced</h4>
-          <div className="pl-empty">
-            Field-rank stats (driving, GIR, scrambling, proximity) will
-            land alongside the full per-player SG feed.
-          </div>
-        </section>
+            <section className="bd-sec">
+              <h4 className="bd-sec-h">Advanced</h4>
+              <div className="pl-empty">
+                Field-rank stats (driving, GIR, scrambling, proximity)
+                will land alongside the full per-player SG feed.
+              </div>
+            </section>
+          </>
+        )}
+
+        {tab === "season" && (
+          <>
+            <section className="bd-sec" style={{ borderTop: "none" }}>
+              <h4 className="bd-sec-h">
+                Strokes gained · season{" "}
+                <span className="bd-sec-h-aux">
+                  per round vs the field
+                </span>
+              </h4>
+              {season == null ? (
+                <div className="pl-empty">Loading…</div>
+              ) : !season.found || !season.season ? (
+                <div className="pl-empty">
+                  Season SG isn&apos;t available for this player yet.
+                  Ratings refresh weekly and only cover players who
+                  have played enough recent rounds to estimate.
+                </div>
+              ) : (
+                <>
+                  {[
+                    { label: "Total", value: season.season.sgTotal, isTotal: true },
+                    { label: "Off the tee", value: season.season.sgOtt },
+                    { label: "Approach", value: season.season.sgApp },
+                    { label: "Around green", value: season.season.sgArg },
+                    { label: "Putting", value: season.season.sgPutt },
+                  ].map((row) => (
+                    <div
+                      className="sgrow"
+                      key={row.label}
+                      style={
+                        row.isTotal
+                          ? {
+                              marginBottom: 14,
+                              paddingBottom: 11,
+                              borderBottom: "1px solid var(--pv-line)",
+                            }
+                          : undefined
+                      }
+                    >
+                      <span
+                        className="sgrow-lbl"
+                        style={row.isTotal ? { fontWeight: 800 } : undefined}
+                      >
+                        {row.label}
+                      </span>
+                      <span className="sgrow-track">
+                        <i
+                          className={
+                            row.value < 0
+                              ? "sgrow-bar sgrow-bar-neg"
+                              : "sgrow-bar"
+                          }
+                          style={sgBarStyle(row.value)}
+                        />
+                      </span>
+                      <span
+                        className="sgrow-val"
+                        style={{
+                          color:
+                            row.value < 0
+                              ? "var(--pv-down)"
+                              : "var(--pv-up)",
+                        }}
+                      >
+                        {fmtSg(row.value)}
+                      </span>
+                    </div>
+                  ))}
+                  <p className="bd-sec-foot">
+                    Skill ratings refreshed weekly — the same numbers
+                    the bet tracker uses as its skill prior.
+                  </p>
+                </>
+              )}
+            </section>
+
+            <section className="bd-sec">
+              <h4 className="bd-sec-h">Season at a glance</h4>
+              <div className="pl-empty">
+                Events / wins / cuts / scoring average will fill in
+                once the historical feed is wired — next pass on this
+                surface.
+              </div>
+            </section>
+
+            <section className="bd-sec">
+              <h4 className="bd-sec-h">Recent form</h4>
+              <div className="pl-empty">
+                Per-event finishing history will land alongside the
+                Season-at-a-glance numbers — same data source.
+              </div>
+            </section>
+          </>
+        )}
       </div>
 
       <footer className="pl-pv-foot">

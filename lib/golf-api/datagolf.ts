@@ -330,6 +330,19 @@ export interface DGSkillRating {
   sgTotal: number;
 }
 
+/** Full season SG decomposition for one player — same source as
+ *  getSkillRatings() but exposing every category DG returns. Powers
+ *  the player profile's Season tab. */
+export interface DGSkillDecomposition {
+  dgId: string;
+  name: string;
+  sgTotal: number;
+  sgOtt: number;
+  sgApp: number;
+  sgArg: number;
+  sgPutt: number;
+}
+
 /**
  * DataGolf's current skill estimates — refreshed weekly. SG_total is
  * "expected strokes gained per round vs an average tour field" using
@@ -346,6 +359,28 @@ export async function getSkillRatings(): Promise<DGSkillRating[]> {
     dgId: String(r.dg_id),
     name: flipName(r.player_name),
     sgTotal: Number.isFinite(r.sg_total) ? Number(r.sg_total) : 0,
+  }));
+}
+
+/** Full SG decomposition for every player (Total + four buckets).
+ *  Same upstream endpoint as getSkillRatings(); we expose the full
+ *  shape here so the player profile can render an OTT/APP/ARG/PUTT
+ *  breakdown without re-fetching. */
+export async function getSkillDecompositions(): Promise<DGSkillDecomposition[]> {
+  const data = await fetchJson<DGSkillResponse>(
+    `/preds/skill-ratings?display=value`,
+  );
+  const rows = data.players ?? [];
+  const num = (v: unknown) =>
+    typeof v === "number" && Number.isFinite(v) ? v : 0;
+  return rows.map((r) => ({
+    dgId: String(r.dg_id),
+    name: flipName(r.player_name),
+    sgTotal: num(r.sg_total),
+    sgOtt: num(r.sg_ott),
+    sgApp: num(r.sg_app),
+    sgArg: num(r.sg_arg),
+    sgPutt: num(r.sg_putt),
   }));
 }
 
