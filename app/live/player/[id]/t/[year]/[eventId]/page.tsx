@@ -229,7 +229,7 @@ export default async function PlayerTournamentPage({
   const courseName = rounds.find((r) => r)?.course_name ?? "Course";
 
   return (
-    <main className="container container-wide v4-theme ptourn">
+    <main className="container container-wide v4-theme pv-theme ptourn">
       <header className="brand">
         <Link
           className="brand-back"

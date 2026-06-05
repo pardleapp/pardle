@@ -134,7 +134,7 @@ export default function LeaderboardClient() {
 
   if (error && !data) {
     return (
-      <section className="v4-theme" style={{ padding: 14 }}>
+      <section className="v4-theme pv-theme" style={{ padding: 14 }}>
         <p className="feed-empty">
           Couldn&apos;t load the leaderboard. Retrying automatically.
         </p>
@@ -146,7 +146,7 @@ export default function LeaderboardClient() {
   }
   if (!data.tournament || !data.leaderboard?.length) {
     return (
-      <section className="v4-theme lb-page">
+      <section className="v4-theme pv-theme lb-page">
         <div className="lb-offweek">
           <p className="lb-offweek-eyebrow">No live event</p>
           <h2 className="lb-offweek-title">
@@ -175,7 +175,7 @@ export default function LeaderboardClient() {
   }
 
   return (
-    <section className="v4-theme lb-page">
+    <section className="v4-theme pv-theme lb-page">
       <p className="lb-page-tournament">
         {data.tournament.isLive ? "Live · " : "Final · "}
         {data.tournament.name}
@@ -197,7 +197,7 @@ export default function LeaderboardClient() {
  */
 function LeaderboardSkeleton() {
   return (
-    <section className="v4-theme lb-page" aria-busy="true">
+    <section className="v4-theme pv-theme lb-page" aria-busy="true">
       <div className="skeleton-line skeleton-line-title" />
       <ul
         className="lb-skeleton-list"

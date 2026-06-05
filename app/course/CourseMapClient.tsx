@@ -208,7 +208,7 @@ export default function CourseMapClient() {
 
   if (error && !data) {
     return (
-      <section className="v4-theme" style={{ padding: 14 }}>
+      <section className="v4-theme pv-theme" style={{ padding: 14 }}>
         <p className="feed-empty">
           Couldn&apos;t load the course map. Retrying automatically.
         </p>
@@ -217,7 +217,7 @@ export default function CourseMapClient() {
   }
   if (!data) {
     return (
-      <section className="v4-theme course-map" aria-busy="true">
+      <section className="v4-theme pv-theme course-map" aria-busy="true">
         <div className="skeleton-line skeleton-line-title" />
         <div className="course-map-grid" style={{ marginTop: 14 }}>
           {Array.from({ length: 9 }).map((_, i) => (
@@ -233,7 +233,7 @@ export default function CourseMapClient() {
   }
   if (!data.tournament) {
     return (
-      <section className="v4-theme" style={{ padding: 14 }}>
+      <section className="v4-theme pv-theme" style={{ padding: 14 }}>
         <p className="feed-empty">
           No tournament on the schedule right now.
         </p>
@@ -242,7 +242,7 @@ export default function CourseMapClient() {
   }
   if (!data.tournament.isLive) {
     return (
-      <section className="v4-theme" style={{ padding: 14 }}>
+      <section className="v4-theme pv-theme" style={{ padding: 14 }}>
         <p className="feed-empty">
           {data.tournament.name} hasn&apos;t teed off yet — course map
           opens once the first group goes out.
