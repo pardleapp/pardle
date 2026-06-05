@@ -812,6 +812,7 @@ export default function BetDetail({ betId }: { betId: string }) {
             bet={resolvedBet}
             history={history}
             onPointSelect={handlePointSelect}
+            scorecard={bet.kind === "round-score" ? scorecard : null}
             headerRight={
               bet.kind === "round-score" ? (
                 <LiveRoundStatus

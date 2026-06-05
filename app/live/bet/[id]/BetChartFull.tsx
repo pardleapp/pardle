@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { PnlSample, TrackedBet } from "../../bet-shared";
+import type {
+  BetScorecard,
+  PnlSample,
+  TrackedBet,
+} from "../../bet-shared";
 import PastBetReplay from "./PastBetReplay";
 import { formatBetCurrency, type BetCurrency } from "@/lib/format/bet-currency";
 
@@ -19,6 +23,12 @@ interface Props {
    *  into view and briefly highlight it, connecting the chart to
    *  the table below. */
   onPointSelect?: (sample: PnlSample, index: number) => void;
+  /** Per-hole scorecard for the bet's player — round-score bets
+   *  pass this so the chart can label each sample with what actually
+   *  happened on the hole (e.g. "Eagle on 12"). Outright / top-
+   *  finish / winning-score bets leave it null; their swings come
+   *  from market movement, not the bet's player. */
+  scorecard?: BetScorecard | null;
 }
 
 type Mode = "pnl" | "prob";
@@ -93,6 +103,7 @@ function ChartInner({
   history,
   headerRight,
   onPointSelect,
+  scorecard,
   expanded,
   onExpand,
 }: InnerProps) {
@@ -271,8 +282,51 @@ function ChartInner({
   const peakPoint = points[peakIdx];
   const lowPoint = points[lowIdx];
 
+  /** Per-history-index hole-outcome lookup. Round-score history runs
+   *  [placement, after-hole-1, after-hole-2, …], so sample N (for
+   *  N ≥ 1) corresponds to the Nth completed hole on the player's
+   *  scorecard. We map "what happened on that hole" — birdie /
+   *  eagle / etc. — so the hero band and pins can label peaks /
+   *  lows with the editorial reason. */
+  function holeOutcomeAt(i: number):
+    | { hole: number; label: string }
+    | null {
+    if (!isRound || !scorecard) return null;
+    if (i < 1) return null;
+    const played = scorecard.holes[i - 1];
+    if (!played) return null;
+    const diff = played.strokes - played.par;
+    const verb = scoreVerb(diff);
+    if (!verb) return null;
+    return {
+      hole: played.holeNumber,
+      label: `${verb} on ${played.holeNumber}`,
+    };
+  }
+
   function holeOrTimeLabel(i: number): string {
     if (isRound) {
+      const ho = holeOutcomeAt(i);
+      if (ho) return ho.label;
+      const h = history[i]?.holesPlayed;
+      return h != null ? `H${h}` : `#${i + 1}`;
+    }
+    return new Date(history[i].t).toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  /** Short version of holeOrTimeLabel for tight spaces (chart pins
+   *  inside the SVG). Strips the verb so just "Eagle · 9" or "H9"
+   *  fits in the small label box. */
+  function holeOrTimeShort(i: number): string {
+    if (isRound) {
+      const ho = holeOutcomeAt(i);
+      if (ho) {
+        const verbShort = ho.label.split(" on ")[0];
+        return `${verbShort.toUpperCase()} · ${ho.hole}`;
+      }
       const h = history[i]?.holesPlayed;
       return h != null ? `H${h}` : `#${i + 1}`;
     }
@@ -549,7 +603,7 @@ function ChartInner({
               x={peakPoint.x}
               y={peakPoint.y}
               label={`PEAK ${formatPinValue(ys[peakIdx], mode, bet.currency)}`}
-              sub={holeOrTimeLabel(peakIdx)}
+              sub={holeOrTimeShort(peakIdx)}
               color="#2c7a28"
               chartW={W}
               chartH={H}
@@ -559,7 +613,7 @@ function ChartInner({
               x={lowPoint.x}
               y={lowPoint.y}
               label={`LOW ${formatPinValue(ys[lowIdx], mode, bet.currency)}`}
-              sub={holeOrTimeLabel(lowIdx)}
+              sub={holeOrTimeShort(lowIdx)}
               color="#b13838"
               chartW={W}
               chartH={H}
@@ -885,6 +939,20 @@ function ChartPin({
       </text>
     </g>
   );
+}
+
+/** Map strokes-vs-par to the colloquial scoring outcome — used in
+ *  the hero band + pin annotations so a peak / low / swing reads as
+ *  the actual moment ("Eagle on 9") rather than just a hole index. */
+function scoreVerb(diff: number): string | null {
+  if (diff <= -3) return "Albatross";
+  if (diff === -2) return "Eagle";
+  if (diff === -1) return "Birdie";
+  if (diff === 0) return "Par";
+  if (diff === 1) return "Bogey";
+  if (diff === 2) return "Double";
+  if (diff >= 3) return "Blow-up";
+  return null;
 }
 
 /** Format the big hero-band stat. Prob mode shows percentage, PnL
