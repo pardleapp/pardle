@@ -18,6 +18,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BRAND } from "@/lib/brand";
 import { getCachedHistoricalRounds } from "@/lib/feed/historical-cache";
+import { getActiveTournament } from "@/lib/golf-api/pgatour";
+import { getFeedBundle } from "@/lib/feed/store";
 import type {
   DGHistoricalRound,
   DGHistoricalScoreRow,
@@ -172,8 +174,28 @@ export default async function PlayerTournamentPage({
     );
   }
 
-  // Resolve player by URL query name; if absent, can't pick a player.
-  const player = name ? findPlayer(payload.scores, name) : null;
+  // Resolve player. The Recent-form links from the Season tab carry
+  // ?name=... as a hint, but if the leaderboard hadn't responded at
+  // click time the hint could be "Loading…" — useless for the
+  // historical lookup. Fall back to resolving the player's real name
+  // from the active leaderboard by orchestrator playerId, same pattern
+  // /api/player/season uses. Last resort: try fuzzy-matching the URL
+  // [id] against the historical scores (some routes carry display
+  // names instead of orchestrator ids).
+  let resolvedName: string | null = null;
+  if (name && name !== "Loading…" && !name.includes("Loading")) {
+    resolvedName = name;
+  } else {
+    const active = await getActiveTournament().catch(() => null);
+    if (active) {
+      const bundle = await getFeedBundle(active.tournament.id);
+      const row = bundle.leaderboard.find((r) => r.playerId === id);
+      if (row) resolvedName = row.displayName;
+    }
+  }
+  if (!resolvedName) resolvedName = id;
+
+  const player = findPlayer(payload.scores, resolvedName);
   if (!player) {
     return (
       <main className="container container-wide v4-theme pv-theme">
@@ -189,9 +211,8 @@ export default async function PlayerTournamentPage({
           <p className="subtitle">Player not found in event</p>
         </header>
         <p className="feed-empty">
-          {name
-            ? `Couldn't find "${name}" in this event's record.`
-            : "No player name provided in URL."}
+          Couldn&apos;t find &quot;{resolvedName}&quot; in this
+          event&apos;s record.
         </p>
       </main>
     );

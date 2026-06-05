@@ -536,7 +536,7 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
                       return (
                         <Link
                           key={f.eventId}
-                          href={`/live/player/${encodeURIComponent(playerId)}/t/${f.season}/${f.eventId}?name=${encodeURIComponent(displayName)}`}
+                          href={`/live/player/${encodeURIComponent(playerId)}/t/${f.season}/${f.eventId}?name=${encodeURIComponent(season?.displayName ?? displayName)}`}
                           className={`pl-formbar${f.pos == null ? " pl-formbar-mc" : ""}`}
                         >
                           <span
@@ -554,7 +554,7 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
                     {season.form.map((f) => (
                       <li key={f.eventId}>
                         <Link
-                          href={`/live/player/${encodeURIComponent(playerId)}/t/${f.season}/${f.eventId}?name=${encodeURIComponent(displayName)}`}
+                          href={`/live/player/${encodeURIComponent(playerId)}/t/${f.season}/${f.eventId}?name=${encodeURIComponent(season?.displayName ?? displayName)}`}
                           className="pl-formlist-row"
                         >
                           <span
