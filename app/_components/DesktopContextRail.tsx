@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import PredictionPollCard from "@/app/live/PredictionPollCard";
+import DesktopRailChat from "@/app/_components/DesktopRailChat";
 import { betKindShortLabel } from "@/app/live/bet-impact";
 import {
   BETS_CHANGED_EVENT,
@@ -407,6 +408,13 @@ export default function DesktopContextRail() {
           </ul>
         )}
       </section>
+
+      {/* Pardle Global chat — sits below the leaderboard / live bets
+          so the data-dense blocks read first; the chat is below them
+          but still in the user's eye-line on a 1080+ tall viewport.
+          Realtime + composer + sign-in gating all live inside
+          DesktopRailChat. */}
+      <DesktopRailChat />
 
       {/* Shots of the day mini reel */}
       {reelTop3.length > 0 && (
