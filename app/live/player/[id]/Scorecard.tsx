@@ -1,8 +1,12 @@
 "use client";
 
 /**
- * Scorecard — DataGolf-style four-round scorecard for the player
- * page. Matches the design-handoff prototype's <Scorecard>:
+ * Scorecard — four-round scorecard for the player page. Now driven
+ * by real props (rounds + pars + per-hole field averages) so it
+ * renders the actual player's strokes from the orchestrator, not the
+ * old mock data. When a player hasn't played a round yet (status =
+ * not-started), the round pill is disabled and the table shows par
+ * only.
  *
  *   R1 R2 R3 R4
  *   ┌──────────────────────────────────────────────┐
@@ -12,20 +16,31 @@
  *   │ SG   +0.5 ─0.1 …                                  │
  *   └──────────────────────────────────────────────┘
  *
- *   ○ under par
- *   □ over par
- *   ▣ eagle (filled emerald)
- *   ▣ double+ (filled red)
- *
- * SG cells are colored by score-vs-field-average for that hole
- * (not vs par), so a par on a hole averaging 4.2 reads positive.
+ *   ○ under par   □ over par   ▣ eagle (emerald)   ▣ double+ (red)
  */
 
 import { useState } from "react";
-import { PAR, HOLE_AVG, SC_ROUNDS } from "./mock-player-data";
 
 const FRONT = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 const BACK = [9, 10, 11, 12, 13, 14, 15, 16, 17];
+
+/** Strokes per hole for a round; null = not played yet. */
+export type RoundStrokes = (number | null)[];
+
+interface Props {
+  /** 4 rounds, each an 18-entry array (strokes per hole, null when
+   *  not yet played). Pass an array of 18 nulls for a round that
+   *  hasn't started. */
+  rounds: RoundStrokes[];
+  /** Par per hole, length 18. */
+  pars: number[];
+  /** Optional per-hole field average — drives the SG cell shading.
+   *  When absent, the SG row is hidden. */
+  holeAvg?: number[];
+  /** Defaults to the most recently started round (last non-null
+   *  round, or 1 if none have started). */
+  initialRound?: number;
+}
 
 function sumAt(arr: number[], idxs: number[]): number {
   return idxs.reduce((acc, i) => acc + arr[i], 0);
@@ -40,7 +55,7 @@ function parClass(par: number): string {
 function fmtToPar(n: number): string {
   if (n === 0) return "E";
   if (n > 0) return `+${n}`;
-  return `${n}`; // already has minus
+  return `${n}`;
 }
 
 function scoreCellClass(score: number, par: number): string {
@@ -53,50 +68,79 @@ function scoreCellClass(score: number, par: number): string {
 }
 
 function sgCellStyle(sgValue: number): React.CSSProperties | undefined {
-  // sg = HOLE_AVG - score; positive means player beat the field.
   const t = Math.max(-1, Math.min(1, sgValue / 1.3));
   if (Math.abs(t) < 0.04) return undefined;
   if (t > 0) {
-    return {
-      background: `oklch(0.62 0.16 150 / ${(t * 0.5).toFixed(2)})`,
-    };
+    return { background: `oklch(0.62 0.16 150 / ${(t * 0.5).toFixed(2)})` };
   }
-  return {
-    background: `oklch(0.6 0.2 28 / ${(Math.abs(t) * 0.5).toFixed(2)})`,
-  };
+  return { background: `oklch(0.6 0.2 28 / ${(Math.abs(t) * 0.5).toFixed(2)})` };
 }
 
 function fmtSg(v: number): string {
   return `${v > 0 ? "+" : ""}${v.toFixed(2)}`;
 }
 
-export default function Scorecard() {
-  const [rd, setRd] = useState(3);
-  const round = SC_ROUNDS[rd];
-  const sg = round.map((s, i) => HOLE_AVG[i] - s);
+function roundHasData(round: RoundStrokes): boolean {
+  return round.some((v) => v != null);
+}
 
-  const parFront = sumAt(PAR, FRONT);
-  const parBack = sumAt(PAR, BACK);
-  const tpFront = sumAt(round, FRONT) - parFront;
-  const tpBack = sumAt(round, BACK) - parBack;
-  const sgFront = sumAt(sg, FRONT);
-  const sgBack = sumAt(sg, BACK);
+export default function Scorecard({ rounds, pars, holeAvg, initialRound }: Props) {
+  // Default the open round to the latest one with data; otherwise R1.
+  const latestWithData = (() => {
+    for (let i = rounds.length - 1; i >= 0; i--) {
+      if (roundHasData(rounds[i])) return i;
+    }
+    return 0;
+  })();
+  const [rd, setRd] = useState(initialRound ?? latestWithData);
+
+  const round = rounds[rd] ?? new Array(18).fill(null);
+  const hasData = roundHasData(round);
+
+  // Numeric strokes array — for sums + cell rendering. Use NaN for
+  // unplayed holes so sums skip them.
+  const strokes: number[] = round.map((v) => (v == null ? NaN : v));
+  const sg: number[] = holeAvg
+    ? strokes.map((s, i) => (Number.isFinite(s) ? holeAvg[i] - s : NaN))
+    : [];
+
+  const parFront = sumAt(pars, FRONT);
+  const parBack = sumAt(pars, BACK);
+  const tpFront = FRONT.reduce(
+    (acc, i) => acc + (Number.isFinite(strokes[i]) ? strokes[i] - pars[i] : 0),
+    0,
+  );
+  const tpBack = BACK.reduce(
+    (acc, i) => acc + (Number.isFinite(strokes[i]) ? strokes[i] - pars[i] : 0),
+    0,
+  );
+  const sgFront = holeAvg
+    ? FRONT.reduce((acc, i) => acc + (Number.isFinite(sg[i]) ? sg[i] : 0), 0)
+    : 0;
+  const sgBack = holeAvg
+    ? BACK.reduce((acc, i) => acc + (Number.isFinite(sg[i]) ? sg[i] : 0), 0)
+    : 0;
 
   return (
     <>
       <div className="sc-rdpills" role="tablist" aria-label="Round">
-        {[0, 1, 2, 3].map((i) => (
-          <button
-            key={i}
-            type="button"
-            role="tab"
-            aria-selected={rd === i}
-            className={rd === i ? "on" : ""}
-            onClick={() => setRd(i)}
-          >
-            R{i + 1}
-          </button>
-        ))}
+        {rounds.map((r, i) => {
+          const has = roundHasData(r);
+          return (
+            <button
+              key={i}
+              type="button"
+              role="tab"
+              aria-selected={rd === i}
+              className={rd === i ? "on" : ""}
+              onClick={() => setRd(i)}
+              disabled={!has}
+              style={!has ? { opacity: 0.4 } : undefined}
+            >
+              R{i + 1}
+            </button>
+          );
+        })}
       </div>
       <div className="scard">
         <table className="sctable">
@@ -104,13 +148,13 @@ export default function Scorecard() {
             <tr>
               <th className="sctable-lbl">Hole</th>
               {FRONT.map((i) => (
-                <th key={i} className={parClass(PAR[i])}>
+                <th key={i} className={parClass(pars[i])}>
                   {i + 1}
                 </th>
               ))}
               <th className="sctable-tot">OUT</th>
               {BACK.map((i) => (
-                <th key={i} className={parClass(PAR[i])}>
+                <th key={i} className={parClass(pars[i])}>
                   {i + 1}
                 </th>
               ))}
@@ -122,64 +166,78 @@ export default function Scorecard() {
             <tr className="sctable-parrow">
               <td className="sctable-lbl">Par</td>
               {FRONT.map((i) => (
-                <td key={i}>{PAR[i]}</td>
+                <td key={i}>{pars[i]}</td>
               ))}
               <td className="sctable-tot">{parFront}</td>
               {BACK.map((i) => (
-                <td key={i}>{PAR[i]}</td>
+                <td key={i}>{pars[i]}</td>
               ))}
               <td className="sctable-tot">{parBack}</td>
-              <td className="sctable-tot sctable-grand">
-                {parFront + parBack}
-              </td>
+              <td className="sctable-tot sctable-grand">{parFront + parBack}</td>
             </tr>
             <tr className="sctable-rdrow">
               <td className="sctable-lbl">R{rd + 1}</td>
-              {FRONT.map((i) => (
-                <td key={i} className={scoreCellClass(round[i], PAR[i])}>
-                  <span className="sc-cell-v">{round[i]}</span>
-                </td>
-              ))}
-              <td className="sctable-tot">{fmtToPar(tpFront)}</td>
-              {BACK.map((i) => (
-                <td key={i} className={scoreCellClass(round[i], PAR[i])}>
-                  <span className="sc-cell-v">{round[i]}</span>
-                </td>
-              ))}
-              <td className="sctable-tot">{fmtToPar(tpBack)}</td>
+              {FRONT.map((i) => {
+                const s = strokes[i];
+                if (!Number.isFinite(s)) return <td key={i}>—</td>;
+                return (
+                  <td key={i} className={scoreCellClass(s, pars[i])}>
+                    <span className="sc-cell-v">{s}</span>
+                  </td>
+                );
+              })}
+              <td className="sctable-tot">{hasData ? fmtToPar(tpFront) : "—"}</td>
+              {BACK.map((i) => {
+                const s = strokes[i];
+                if (!Number.isFinite(s)) return <td key={i}>—</td>;
+                return (
+                  <td key={i} className={scoreCellClass(s, pars[i])}>
+                    <span className="sc-cell-v">{s}</span>
+                  </td>
+                );
+              })}
+              <td className="sctable-tot">{hasData ? fmtToPar(tpBack) : "—"}</td>
               <td className="sctable-tot sctable-grand">
-                {fmtToPar(tpFront + tpBack)}
+                {hasData ? fmtToPar(tpFront + tpBack) : "—"}
               </td>
             </tr>
-            <tr className="sctable-sgrow">
-              <td className="sctable-lbl">SG</td>
-              {FRONT.map((i) => (
-                <td key={i} style={sgCellStyle(sg[i])}>
-                  {fmtSg(sg[i])}
-                </td>
-              ))}
-              <td className="sctable-tot">{fmtSg(sgFront)}</td>
-              {BACK.map((i) => (
-                <td key={i} style={sgCellStyle(sg[i])}>
-                  {fmtSg(sg[i])}
-                </td>
-              ))}
-              <td className="sctable-tot">{fmtSg(sgBack)}</td>
-              <td className="sctable-tot sctable-grand">
-                {fmtSg(sgFront + sgBack)}
-              </td>
-            </tr>
+            {holeAvg && hasData && (
+              <tr className="sctable-sgrow">
+                <td className="sctable-lbl">SG</td>
+                {FRONT.map((i) =>
+                  Number.isFinite(sg[i]) ? (
+                    <td key={i} style={sgCellStyle(sg[i])}>{fmtSg(sg[i])}</td>
+                  ) : (
+                    <td key={i}>—</td>
+                  ),
+                )}
+                <td className="sctable-tot">{fmtSg(sgFront)}</td>
+                {BACK.map((i) =>
+                  Number.isFinite(sg[i]) ? (
+                    <td key={i} style={sgCellStyle(sg[i])}>{fmtSg(sg[i])}</td>
+                  ) : (
+                    <td key={i}>—</td>
+                  ),
+                )}
+                <td className="sctable-tot">{fmtSg(sgBack)}</td>
+                <td className="sctable-tot sctable-grand">{fmtSg(sgFront + sgBack)}</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
       <div className="sc-legend">
         <span>○ under par&nbsp;&nbsp;□ over par</span>
-        <span>
-          <i className="sc-legend-good" /> SG gained
-        </span>
-        <span>
-          <i className="sc-legend-lost" /> SG lost
-        </span>
+        {holeAvg && (
+          <>
+            <span>
+              <i className="sc-legend-good" /> SG gained
+            </span>
+            <span>
+              <i className="sc-legend-lost" /> SG lost
+            </span>
+          </>
+        )}
       </div>
     </>
   );

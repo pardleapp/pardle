@@ -21674,6 +21674,21 @@ html.pv-theme-body .auth-chip-btn {
   padding-bottom: 100px;
 }
 
+/* Empty-state copy block used inside the player page's "this week"
+   sections when a data source we can't fill live yet would otherwise
+   leave a blank rectangle (live SG decomposition, advanced field-
+   rank stats). Soft italic text in a dashed card matches the rest
+   of the v2 placeholder language. */
+.pl-empty {
+  border: 1px dashed var(--pv-line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--pv-muted);
+  font-style: italic;
+  line-height: 1.5;
+}
+
 /* SG row — centre-origin bar + rank pill */
 .sgrow {
   display: flex;

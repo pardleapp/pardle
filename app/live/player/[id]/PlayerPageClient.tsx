@@ -1,69 +1,88 @@
 "use client";
 
 /**
- * PlayerPageClient — redesigned player surface matching the design-
- * handoff prototype's <PlayerPage>. Replaces the older multi-component
- * player layout (PlayerHighlights / PlayerStats / PlayerSeasonView /
- * RecentHoles) for the broadcast theme.
+ * PlayerPageClient — real-data player surface.
  *
- * Header: pinned back-arrow + tournament caption.
- * Hero:   PGA Tour headshot (silhouette fallback) + name + hot/cold
- *         emoji + position line + Follow toggle.
- * Tabs:   This week / Season — only the body swaps, header stays.
+ * The page now fetches /api/feed for the live leaderboard + player
+ * round state, plus /api/bet/scorecard for each round's hole-by-hole
+ * strokes. We look the player up in the leaderboard by route id (the
+ * orchestrator player id) — no mock fallback. Hero, position line,
+ * tournament caption, and scorecard all reflect the actual player.
  *
- * This-week tab:
- *   - Strokes gained · today block (live SG + R1-R4 chips + 4 SG
- *     buckets with centre-origin bars + field-rank pills).
- *   - Scorecard · this week — <Scorecard /> child.
- *   - Advanced grid (2x3) — driving / GIR / scrambling / proximity.
- *   - In your group — % backing + crew members on him.
- *
- * Season tab:
- *   - Season at a glance — 6-up grid.
- *   - Strokes gained · season avg.
- *   - Recent form — bar chart + tappable list. Tap → EventDetail
- *     overlay.
- *
- * Footer: Notify-on-shots toggle + ＋ Bet on {player} (deep-link
- * pre-fills add-bet flow on /bets).
- *
- * All negatives use Unicode minus; pf() in mock-player-data.ts is
- * the gatekeeper.
+ * Sub-blocks that the live feed doesn't carry yet (live strokes-gained
+ * decomposition, advanced field-rank stats, season form/aggregates)
+ * render explicit "not available yet" placeholders rather than
+ * substituting another player's data.
  */
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import BackButton from "@/app/_components/BackButton";
-import {
-  PLAYER_DATA,
-  SEASON,
-  SEASON_SG,
-  resolvePlayerKey,
-  pf,
-  type PlayerFormEvent,
-} from "./mock-player-data";
-import Scorecard from "./Scorecard";
-import EventDetail from "./EventDetail";
+import Scorecard, { type RoundStrokes } from "./Scorecard";
 import { pgaTourHeadshotUrlById } from "@/lib/data/pga-tour-ids";
 
 interface Props {
-  /** Route id from the URL — used to fetch the PGA headshot. The
-   *  mock data is keyed by name; we use the route id only for the
-   *  photo lookup. */
   playerId: string;
-  /** Resolved display name when available (server passes from
-   *  leaderboard lookup) — falls back to the mock key. */
   initialName?: string | null;
 }
 
-function sgBarStyle(v: number): React.CSSProperties {
-  const w = Math.min(Math.abs(v) / 3, 1) * 50;
-  if (v < 0) return { left: `${50 - w}%`, width: `${w}%` };
-  return { left: "50%", width: `${w}%` };
+interface LeaderboardRow {
+  playerId: string;
+  displayName: string;
+  position: string;
+  total: string;
+  thru: string;
+  playerState?: string;
+}
+
+interface PlayerRoundState {
+  currentRound: number;
+  holesPlayed: number;
+  holesRemaining: number;
+  toPar: number;
+  rounds?: Record<number, { status?: string; strokes?: number; roundPar?: number; toPar?: number }>;
+}
+
+interface FeedSnapshot {
+  tournament: { name: string; isLive: boolean } | null;
+  leaderboard: LeaderboardRow[];
+  playerRoundStates: Record<string, PlayerRoundState>;
+}
+
+interface ScorecardRound {
+  holes: { holeNumber: number; par: number; strokes: number }[];
+  roundPar: number;
+}
+
+const POLL_MS = 15_000;
+
+function todayLabel(state: PlayerRoundState | undefined): string {
+  if (!state) return "—";
+  const round = state.currentRound;
+  const r = state.rounds?.[round];
+  if (!r) return "—";
+  if (typeof r.toPar !== "number" || !Number.isFinite(r.toPar)) return "—";
+  if (r.toPar === 0) return "E";
+  return r.toPar > 0 ? `+${r.toPar}` : String(r.toPar);
+}
+
+function thruLabel(row: LeaderboardRow | null, state: PlayerRoundState | undefined): string {
+  if (row && row.thru && row.thru !== "—") return row.thru;
+  if (state) {
+    if (state.holesRemaining === 0) return "F";
+    return String(state.holesPlayed);
+  }
+  return "—";
+}
+
+function positionLabel(row: LeaderboardRow | null): string {
+  if (!row) return "—";
+  if (row.position === "1") return "Leader";
+  if (row.position) return `Pos ${row.position}`;
+  return "—";
 }
 
 export default function PlayerPageClient({ playerId, initialName }: Props) {
-  // Stamp pv-theme-body on mount so brand bar / nav re-skin paper.
   useEffect(() => {
     if (typeof document === "undefined") return;
     document.documentElement.classList.add("pv-theme-body");
@@ -72,31 +91,119 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
     };
   }, []);
 
-  // Pick the mock data slot for this player. We try the URL id
-  // first (crew-post links encode the player name there), then
-  // initialName (server-resolved when wired), and finally fall
-  // back to Henley so the page never blanks. Real wiring replaces
-  // this with a server-fetched DataGolf + orchestrator merge.
-  const decodedId = (() => {
-    try {
-      return decodeURIComponent(playerId);
-    } catch {
-      return playerId;
-    }
-  })();
-  const key = resolvePlayerKey(decodedId in PLAYER_DATA ? decodedId : initialName ?? "");
-  const data = PLAYER_DATA[key];
-  const season = SEASON[key];
-  const seasonSg = SEASON_SG[key];
-  const displayName = decodedId in PLAYER_DATA ? decodedId : initialName ?? key;
-
-  const [tab, setTab] = useState<"week" | "season">("week");
+  const [feed, setFeed] = useState<FeedSnapshot | null>(null);
+  const [rounds, setRounds] = useState<(ScorecardRound | null)[]>([null, null, null, null]);
+  const [imgFailed, setImgFailed] = useState(false);
   const [following, setFollowing] = useState(true);
   const [notifying, setNotifying] = useState(false);
-  const [imgFailed, setImgFailed] = useState(false);
-  const [openEvent, setOpenEvent] = useState<PlayerFormEvent | null>(null);
+
+  // Poll /api/feed for the leaderboard + player round states. The
+  // player's hero numbers (position / total / thru / today) live
+  // here so they tick alongside the rest of the app.
+  useEffect(() => {
+    let cancel = false;
+    const tick = async () => {
+      try {
+        const r = await fetch(
+          "/api/feed?v=player&include=leaderboard,playerStates,tournament",
+          { cache: "no-store" },
+        );
+        if (!r.ok) return;
+        const j = (await r.json()) as Partial<FeedSnapshot>;
+        if (cancel) return;
+        setFeed({
+          tournament: j.tournament ?? null,
+          leaderboard: j.leaderboard ?? [],
+          playerRoundStates: j.playerRoundStates ?? {},
+        });
+      } catch {
+        /* swallow; next tick retries */
+      }
+    };
+    void tick();
+    const id = window.setInterval(tick, POLL_MS);
+    return () => {
+      cancel = true;
+      window.clearInterval(id);
+    };
+  }, []);
+
+  // Fetch each round's hole-by-hole scorecard in parallel. Refetched
+  // whenever playerId changes; the scorecard route returns the
+  // played-hole list for the orchestrator's tournament + round +
+  // playerId tuple, so rounds the player hasn't reached yet come
+  // back empty.
+  useEffect(() => {
+    if (!playerId) return;
+    let cancel = false;
+    (async () => {
+      try {
+        const results = await Promise.all(
+          [1, 2, 3, 4].map(async (round) => {
+            const r = await fetch(
+              `/api/bet/scorecard?playerId=${encodeURIComponent(playerId)}&round=${round}`,
+              { cache: "no-store" },
+            );
+            if (!r.ok) return null;
+            const j = (await r.json()) as ScorecardRound;
+            return j;
+          }),
+        );
+        if (cancel) return;
+        setRounds(results);
+      } catch {
+        /* leave as nulls */
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [playerId]);
+
+  const leaderboardRow =
+    feed?.leaderboard.find((r) => r.playerId === playerId) ?? null;
+  const state = feed?.playerRoundStates?.[playerId];
+  const displayName =
+    leaderboardRow?.displayName ?? initialName ?? "Loading…";
 
   const heroHeadshot = pgaTourHeadshotUrlById(playerId, 240);
+
+  // Build the par-per-hole array from the first round that returned
+  // hole data (par is fixed across rounds for a given course). The
+  // first round to play tees off Thursday → R1 is usually our best
+  // source, but if R1 didn't return for whatever reason fall back to
+  // whichever round did.
+  const parPerHole: number[] = (() => {
+    for (const r of rounds) {
+      if (!r || r.holes.length === 0) continue;
+      const arr = new Array(18).fill(4);
+      for (const h of r.holes) {
+        if (h.holeNumber >= 1 && h.holeNumber <= 18) {
+          arr[h.holeNumber - 1] = h.par;
+        }
+      }
+      return arr;
+    }
+    return new Array(18).fill(4);
+  })();
+
+  const roundStrokes: RoundStrokes[] = rounds.map((r) => {
+    const out: (number | null)[] = new Array(18).fill(null);
+    if (!r) return out;
+    for (const h of r.holes) {
+      if (h.holeNumber >= 1 && h.holeNumber <= 18) {
+        out[h.holeNumber - 1] = h.strokes;
+      }
+    }
+    return out;
+  });
+
+  const anyScorecardData = roundStrokes.some((r) => r.some((v) => v != null));
+  const tournamentCaption = feed?.tournament?.name ?? "Tournament";
+  const roundCaption =
+    state?.currentRound != null && state.currentRound > 0
+      ? ` · R${state.currentRound}`
+      : "";
 
   return (
     <div className="pl-pv">
@@ -105,7 +212,8 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
         <div className="bd-pv-title">
           <div className="bd-pv-title-nm">{displayName}</div>
           <div className="bd-pv-title-mk">
-            Charles Schwab Challenge · R4
+            {tournamentCaption}
+            {roundCaption}
           </div>
         </div>
       </header>
@@ -127,14 +235,12 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
           )}
         </span>
         <div className="pl-hero-body">
-          <div className="pl-hero-nm">
-            {displayName}
-            {data.hand === "hot" && <span aria-label="hot streak">🔥</span>}
-            {data.hand === "cold" && <span aria-label="cold streak">🥶</span>}
-          </div>
+          <div className="pl-hero-nm">{displayName}</div>
           <div className="pl-hero-pos">
-            {data.pos === "1" ? "Leader" : `Pos ${data.pos}`} ·{" "}
-            <b>{data.total}</b> · thru {data.thru} · today {data.today}
+            {positionLabel(leaderboardRow)} ·{" "}
+            <b>{leaderboardRow?.total ?? "—"}</b> · thru{" "}
+            {thruLabel(leaderboardRow, state)} · today{" "}
+            {todayLabel(state)}
           </div>
         </div>
         <button
@@ -146,292 +252,35 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
         </button>
       </section>
 
-      <nav className="pl-tabs" role="tablist" aria-label="Player view">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "week"}
-          className={tab === "week" ? "on" : ""}
-          onClick={() => setTab("week")}
-        >
-          This week
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "season"}
-          className={tab === "season" ? "on" : ""}
-          onClick={() => setTab("season")}
-        >
-          Season
-        </button>
-      </nav>
-
       <div className="pl-pv-body">
-        {tab === "week" && (
-          <>
-            {data.liveSg && (
-              <section className="bd-sec" style={{ borderTop: "none" }}>
-                <h4 className="bd-sec-h">
-                  Strokes gained · today{" "}
-                  <span className="pl-rank-pill pl-rank-pill-good">LIVE</span>
-                </h4>
-                <div className="pl-livesg">
-                  <div className="pl-livesg-top">
-                    <span
-                      className="pl-livesg-num"
-                      style={{
-                        color:
-                          pf(data.liveSg.num) < 0
-                            ? "var(--pv-down)"
-                            : "var(--pv-up)",
-                      }}
-                    >
-                      {data.liveSg.num}
-                    </span>
-                    <span className="pl-livesg-meta">{data.liveSg.meta}</span>
-                  </div>
-                  <div className="pl-livesg-rounds">
-                    {data.liveSg.rounds.map((r) => (
-                      <div className="pl-livesg-rd" key={r.label}>
-                        <div className="pl-livesg-rd-lbl">{r.label}</div>
-                        <div
-                          className="pl-livesg-rd-val"
-                          style={{
-                            color:
-                              pf(r.value) < 0
-                                ? "var(--pv-down)"
-                                : "var(--pv-up)",
-                          }}
-                        >
-                          {r.value}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="pl-sg-cats">
-                  {data.sg.map((row) => {
-                    const v = pf(row.value);
-                    return (
-                      <div className="sgrow" key={row.label}>
-                        <span className="sgrow-lbl">{row.label}</span>
-                        <span className="sgrow-track">
-                          <i
-                            className={
-                              v < 0
-                                ? "sgrow-bar sgrow-bar-neg"
-                                : "sgrow-bar"
-                            }
-                            style={sgBarStyle(v)}
-                          />
-                        </span>
-                        <span
-                          className="sgrow-val"
-                          style={{
-                            color: v < 0 ? "var(--pv-down)" : "var(--pv-up)",
-                          }}
-                        >
-                          {row.value}
-                        </span>
-                        <span className={`pl-rank-pill pl-rank-pill-${row.tier}`}>
-                          {row.rank}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
+        <section className="bd-sec" style={{ borderTop: "none" }}>
+          <h4 className="bd-sec-h">Scorecard · this week</h4>
+          {anyScorecardData ? (
+            <Scorecard rounds={roundStrokes} pars={parPerHole} />
+          ) : (
+            <div className="pl-empty">
+              No holes scored yet this week. Card fills in as the round
+              plays.
+            </div>
+          )}
+        </section>
 
-            <section className="bd-sec">
-              <h4 className="bd-sec-h">Scorecard · this week</h4>
-              <Scorecard />
-            </section>
+        <section className="bd-sec">
+          <h4 className="bd-sec-h">Strokes gained · this week</h4>
+          <div className="pl-empty">
+            Live strokes-gained for this player isn't wired into the
+            tracker yet. The leaderboard total above reflects the
+            current round in real time.
+          </div>
+        </section>
 
-            {data.advanced.length > 0 && (
-              <section className="bd-sec">
-                <h4 className="bd-sec-h">Advanced</h4>
-                <div className="pl-advgrid">
-                  {data.advanced.map((a) => (
-                    <div className="pl-advbox" key={a.label}>
-                      <div className="pl-advbox-v">{a.value}</div>
-                      <div className="pl-advbox-l">{a.label}</div>
-                      <div className={`pl-advbox-r pl-advbox-r-${a.tier}`}>
-                        {a.rank} in field
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            <section className="bd-sec">
-              <h4 className="bd-sec-h">
-                In your group
-                {data.backing != null &&
-                  ` · ${data.backing}% of Pardle backs him`}
-              </h4>
-              {data.groupBets.length > 0 ? (
-                data.groupBets.map((g) => (
-                  <div className="pl-gbet-row" key={g.name}>
-                    <span
-                      className="crew-mini-av"
-                      style={{
-                        width: 28,
-                        height: 28,
-                        fontSize: 11,
-                        background: "linear-gradient(135deg,#6b7df2,#3b1f8a)",
-                      }}
-                      aria-hidden="true"
-                    >
-                      {g.initials}
-                    </span>
-                    <span className="pl-gbet-nm">{g.name}</span>
-                    <span className="pl-gbet-desc">{g.description}</span>
-                  </div>
-                ))
-              ) : (
-                <div className="pl-gbet-empty">
-                  No one in your group is on him yet.
-                </div>
-              )}
-            </section>
-          </>
-        )}
-
-        {tab === "season" && (
-          <>
-            {season && (
-              <section className="bd-sec" style={{ borderTop: "none" }}>
-                <h4 className="bd-sec-h">Season at a glance · 2025</h4>
-                <div className="pl-seasongrid">
-                  <div className="pl-advbox">
-                    <div className="pl-advbox-v">{season.events}</div>
-                    <div className="pl-advbox-l">Events</div>
-                  </div>
-                  <div className="pl-advbox">
-                    <div className="pl-advbox-v">{season.wins}</div>
-                    <div className="pl-advbox-l">Wins</div>
-                  </div>
-                  <div className="pl-advbox">
-                    <div className="pl-advbox-v">{season.top10}</div>
-                    <div className="pl-advbox-l">Top 10s</div>
-                  </div>
-                  <div className="pl-advbox">
-                    <div className="pl-advbox-v">{season.cuts}</div>
-                    <div className="pl-advbox-l">Made cut</div>
-                  </div>
-                  <div className="pl-advbox">
-                    <div className="pl-advbox-v">{season.avg}</div>
-                    <div className="pl-advbox-l">Scoring avg</div>
-                  </div>
-                  <div className="pl-advbox">
-                    <div className="pl-advbox-v">{season.sg}</div>
-                    <div className="pl-advbox-l">SG / round</div>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {seasonSg && (
-              <section className="bd-sec">
-                <h4 className="bd-sec-h">Strokes gained · season avg</h4>
-                {seasonSg.map(([label, value], i) => {
-                  const v = pf(value);
-                  const isTotal = i === 0;
-                  return (
-                    <div
-                      className="sgrow"
-                      key={label}
-                      style={
-                        isTotal
-                          ? {
-                              marginBottom: 14,
-                              paddingBottom: 11,
-                              borderBottom: "1px solid var(--pv-line)",
-                            }
-                          : undefined
-                      }
-                    >
-                      <span
-                        className="sgrow-lbl"
-                        style={isTotal ? { fontWeight: 800 } : undefined}
-                      >
-                        {label}
-                      </span>
-                      <span className="sgrow-track">
-                        <i
-                          className={
-                            v < 0 ? "sgrow-bar sgrow-bar-neg" : "sgrow-bar"
-                          }
-                          style={sgBarStyle(v)}
-                        />
-                      </span>
-                      <span
-                        className="sgrow-val"
-                        style={{
-                          color: v < 0 ? "var(--pv-down)" : "var(--pv-up)",
-                        }}
-                      >
-                        {value}
-                      </span>
-                    </div>
-                  );
-                })}
-              </section>
-            )}
-
-            {data.form.length > 0 && (
-              <section className="bd-sec">
-                <h4 className="bd-sec-h">
-                  Recent form · last 6 starts
-                  <span className="bd-sec-h-aux">tap to drill in</span>
-                </h4>
-                <div className="pl-formrow">
-                  {data.form.map((f, i) => {
-                    const heightPct =
-                      f.pos === 0 ? 16 : Math.max(24, 100 - (f.pos - 1) * 2.4);
-                    return (
-                      <button
-                        key={i}
-                        type="button"
-                        className={`pl-formbar${f.pos === 0 ? " pl-formbar-mc" : ""}`}
-                        onClick={() => setOpenEvent(f)}
-                      >
-                        <span
-                          className="pl-formbar-fill"
-                          style={{ height: `${heightPct}%` }}
-                        />
-                        <span className="pl-formbar-lbl">{f.fin}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <ul className="pl-formlist">
-                  {data.form.map((f, i) => (
-                    <li key={i}>
-                      <button
-                        type="button"
-                        className="pl-formlist-row"
-                        onClick={() => setOpenEvent(f)}
-                      >
-                        <span
-                          className={`pl-formlist-fin${f.pos === 0 ? " pl-formlist-fin-mc" : ""}`}
-                        >
-                          {f.fin}
-                        </span>
-                        <span className="pl-formlist-tt">{f.t}</span>
-                        <span className="pl-formlist-yr">{f.season}</span>
-                        <span className="pl-formlist-chev">›</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-          </>
-        )}
+        <section className="bd-sec">
+          <h4 className="bd-sec-h">Advanced</h4>
+          <div className="pl-empty">
+            Field-rank stats (driving, GIR, scrambling, proximity) will
+            land alongside the full per-player SG feed.
+          </div>
+        </section>
       </div>
 
       <footer className="pl-pv-foot">
@@ -446,17 +295,9 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
           href={`/bets?addFor=${encodeURIComponent(displayName)}`}
           className="pl-bet"
         >
-          ＋ Bet on {displayName.split(" ").pop()}
+          ＋ Bet on {displayName.split(" ").pop() ?? displayName}
         </Link>
       </footer>
-
-      {openEvent && (
-        <EventDetail
-          ev={openEvent}
-          playerName={displayName}
-          onClose={() => setOpenEvent(null)}
-        />
-      )}
     </div>
   );
 }
