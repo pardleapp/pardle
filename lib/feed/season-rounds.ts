@@ -33,11 +33,37 @@ export interface SeasonRound {
   birdies: number;
   doubles: number;
   sgTotal: number | null;
+  sgOtt: number | null;
+  sgApp: number | null;
+  sgArg: number | null;
+  sgPutt: number | null;
+}
+
+/** Per-event roll-up — used by the player-page Recent form list +
+ *  Season-at-a-glance aggregates. SG fields are SUMS across all
+ *  rounds played that event (matching the per-tournament drill-down
+ *  page); divide by roundsPlayed for per-round averages. finText is
+ *  the DataGolf finish string ("1", "T4", "CUT", "WD", "MC", …). */
+export interface SeasonEvent {
+  season: number;
+  tournament: string;
+  date: string;
+  eventId: number;
+  finText: string | null;
+  roundsPlayed: number;
+  totalScore: number;
+  totalToPar: number;
+  sgTotal: number | null;
+  sgOtt: number | null;
+  sgApp: number | null;
+  sgArg: number | null;
+  sgPutt: number | null;
 }
 
 export interface SeasonRoundsEntry {
   name: string;
   rounds: SeasonRound[];
+  events: SeasonEvent[];
 }
 
 const DATA = seasonRoundsRaw as Record<string, SeasonRoundsEntry>;

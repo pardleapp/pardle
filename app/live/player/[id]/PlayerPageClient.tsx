@@ -63,7 +63,36 @@ interface SeasonResponse {
     sgApp: number;
     sgArg: number;
     sgPutt: number;
-  };
+  } | null;
+  glance?: {
+    eventsPlayed: number;
+    wins: number;
+    top10s: number;
+    cutsMade: number;
+    cutsMissed: number;
+    scoringAvgVsPar: number | null;
+    sgPerRound: number | null;
+  } | null;
+  form?: {
+    eventId: number;
+    season: number;
+    tournament: string;
+    date: string;
+    finText: string | null;
+    pos: number | null;
+    roundsPlayed: number;
+    totalScore: number;
+    totalToPar: number;
+    sgTotal: number | null;
+    sgPerRound: number | null;
+    keyStat: string;
+  }[];
+}
+
+function fmtVsPar(n: number | null): string {
+  if (n == null) return "—";
+  if (Math.abs(n) < 0.05) return "E";
+  return n > 0 ? `+${n.toFixed(1)}` : n.toFixed(1);
 }
 
 const POLL_MS = 15_000;
@@ -438,19 +467,112 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
 
             <section className="bd-sec">
               <h4 className="bd-sec-h">Season at a glance</h4>
-              <div className="pl-empty">
-                Events / wins / cuts / scoring average will fill in
-                once the historical feed is wired — next pass on this
-                surface.
-              </div>
+              {season?.glance == null ? (
+                <div className="pl-empty">
+                  No season events on file for this player yet.
+                </div>
+              ) : (
+                <div className="pl-seasongrid">
+                  <div className="pl-advbox">
+                    <div className="pl-advbox-v">
+                      {season.glance.eventsPlayed}
+                    </div>
+                    <div className="pl-advbox-l">Events</div>
+                  </div>
+                  <div className="pl-advbox">
+                    <div className="pl-advbox-v">{season.glance.wins}</div>
+                    <div className="pl-advbox-l">Wins</div>
+                  </div>
+                  <div className="pl-advbox">
+                    <div className="pl-advbox-v">
+                      {season.glance.top10s}
+                    </div>
+                    <div className="pl-advbox-l">Top 10s</div>
+                  </div>
+                  <div className="pl-advbox">
+                    <div className="pl-advbox-v">
+                      {season.glance.cutsMade}/
+                      {season.glance.eventsPlayed}
+                    </div>
+                    <div className="pl-advbox-l">Made cut</div>
+                  </div>
+                  <div className="pl-advbox">
+                    <div className="pl-advbox-v">
+                      {fmtVsPar(season.glance.scoringAvgVsPar)}
+                    </div>
+                    <div className="pl-advbox-l">Scoring avg</div>
+                  </div>
+                  <div className="pl-advbox">
+                    <div className="pl-advbox-v">
+                      {fmtSg(season.glance.sgPerRound ?? NaN)}
+                    </div>
+                    <div className="pl-advbox-l">SG / round</div>
+                  </div>
+                </div>
+              )}
             </section>
 
             <section className="bd-sec">
-              <h4 className="bd-sec-h">Recent form</h4>
-              <div className="pl-empty">
-                Per-event finishing history will land alongside the
-                Season-at-a-glance numbers — same data source.
-              </div>
+              <h4 className="bd-sec-h">
+                Recent form
+                {season?.form && season.form.length > 0 && (
+                  <span className="bd-sec-h-aux">
+                    last {season.form.length} starts · tap to drill in
+                  </span>
+                )}
+              </h4>
+              {!season?.form || season.form.length === 0 ? (
+                <div className="pl-empty">
+                  No completed events for this player yet this season.
+                </div>
+              ) : (
+                <>
+                  <div className="pl-formrow">
+                    {season.form.map((f) => {
+                      const heightPct =
+                        f.pos == null
+                          ? 16
+                          : Math.max(24, 100 - (f.pos - 1) * 2.4);
+                      return (
+                        <Link
+                          key={f.eventId}
+                          href={`/live/player/${encodeURIComponent(playerId)}/t/${f.season}/${f.eventId}?name=${encodeURIComponent(displayName)}`}
+                          className={`pl-formbar${f.pos == null ? " pl-formbar-mc" : ""}`}
+                        >
+                          <span
+                            className="pl-formbar-fill"
+                            style={{ height: `${heightPct}%` }}
+                          />
+                          <span className="pl-formbar-lbl">
+                            {f.finText ?? "—"}
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                  <ul className="pl-formlist">
+                    {season.form.map((f) => (
+                      <li key={f.eventId}>
+                        <Link
+                          href={`/live/player/${encodeURIComponent(playerId)}/t/${f.season}/${f.eventId}?name=${encodeURIComponent(displayName)}`}
+                          className="pl-formlist-row"
+                        >
+                          <span
+                            className={`pl-formlist-fin${f.pos == null ? " pl-formlist-fin-mc" : ""}`}
+                          >
+                            {f.finText ?? "—"}
+                          </span>
+                          <span className="pl-formlist-tt">
+                            {f.tournament}
+                          </span>
+                          <span className="pl-formlist-yr">{f.season}</span>
+                          <span className="pl-formlist-chev">›</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </section>
           </>
         )}

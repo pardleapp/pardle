@@ -102,9 +102,11 @@ async function main() {
       if (!key) continue;
       let entry = byPlayer.get(key);
       if (!entry) {
-        entry = { name: displayName, rounds: [] };
+        entry = { name: displayName, rounds: [], events: [] };
         byPlayer.set(key, entry);
       }
+      // Per-event finish + SG decomposition aggregate.
+      const evRounds = [];
       for (let r = 1; r <= 4; r++) {
         const rd = row[`round_${r}`];
         if (!rd) continue;
@@ -114,7 +116,7 @@ async function main() {
         ) {
           continue;
         }
-        entry.rounds.push({
+        const roundEntry = {
           season: SEASON,
           tournament: ev.event_name,
           date: ev.date,
@@ -127,6 +129,37 @@ async function main() {
           birdies: rd.birdies ?? 0,
           doubles: rd.doubles_or_worse ?? 0,
           sgTotal: rd.sg_total ?? null,
+          sgOtt: rd.sg_ott ?? null,
+          sgApp: rd.sg_app ?? null,
+          sgArg: rd.sg_arg ?? null,
+          sgPutt: rd.sg_putt ?? null,
+        };
+        entry.rounds.push(roundEntry);
+        evRounds.push(roundEntry);
+      }
+      if (evRounds.length > 0) {
+        const sumNum = (key) =>
+          evRounds.reduce(
+            (acc, x) => acc + (typeof x[key] === "number" ? x[key] : 0),
+            0,
+          );
+        const sgRounds = evRounds.filter((x) => x.sgTotal != null);
+        const totalScore = evRounds.reduce((acc, x) => acc + x.score, 0);
+        const totalPar = evRounds.reduce((acc, x) => acc + x.coursePar, 0);
+        entry.events.push({
+          season: SEASON,
+          tournament: ev.event_name,
+          date: ev.date,
+          eventId: ev.event_id,
+          finText: String(row.fin_text ?? "").trim() || null,
+          roundsPlayed: evRounds.length,
+          totalScore,
+          totalToPar: totalScore - totalPar,
+          sgTotal: sgRounds.length > 0 ? sumNum("sgTotal") : null,
+          sgOtt: sgRounds.length > 0 ? sumNum("sgOtt") : null,
+          sgApp: sgRounds.length > 0 ? sumNum("sgApp") : null,
+          sgArg: sgRounds.length > 0 ? sumNum("sgArg") : null,
+          sgPutt: sgRounds.length > 0 ? sumNum("sgPutt") : null,
         });
       }
     }
@@ -141,6 +174,9 @@ async function main() {
       seenEvents.add(r.eventId);
       return seenEvents.size <= KEEP_EVENTS_PER_PLAYER;
     });
+    // Same trim on the per-event list (newest first, keep last N).
+    entry.events.sort((a, b) => (a.date < b.date ? 1 : -1));
+    entry.events = entry.events.slice(0, KEEP_EVENTS_PER_PLAYER);
   }
 
   const out = {};
