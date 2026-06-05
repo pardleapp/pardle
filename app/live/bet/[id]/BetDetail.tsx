@@ -798,7 +798,14 @@ export default function BetDetail({ betId }: { betId: string }) {
 
       {bet.kind === "winning-score" ? (
         <>
-          <BetChartFull bet={resolvedBet} history={history} />
+          <BetChartFull
+            bet={resolvedBet}
+            history={history}
+            feedEvents={data.rows}
+            playerNameById={Object.fromEntries(
+              (data.playerIndex ?? []).map((r) => [r.playerId, r.displayName]),
+            )}
+          />
           {insight && <InsightCard insight={insight} />}
           <WinningScoreDetail
             bet={bet}
@@ -813,6 +820,19 @@ export default function BetDetail({ betId }: { betId: string }) {
             history={history}
             onPointSelect={handlePointSelect}
             scorecard={bet.kind === "round-score" ? scorecard : null}
+            feedEvents={
+              bet.kind === "round-score" ? undefined : data.rows
+            }
+            playerNameById={
+              bet.kind === "round-score"
+                ? undefined
+                : Object.fromEntries(
+                    (data.playerIndex ?? []).map((r) => [
+                      r.playerId,
+                      r.displayName,
+                    ]),
+                  )
+            }
             headerRight={
               bet.kind === "round-score" ? (
                 <LiveRoundStatus

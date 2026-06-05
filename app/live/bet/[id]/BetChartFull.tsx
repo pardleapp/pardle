@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type {
   BetScorecard,
+  FeedRowLike,
   PnlSample,
   TrackedBet,
 } from "../../bet-shared";
@@ -29,6 +30,16 @@ interface Props {
    *  finish / winning-score bets leave it null; their swings come
    *  from market movement, not the bet's player. */
   scorecard?: BetScorecard | null;
+  /** Recent feed events — used to attribute outright / top-finish /
+   *  winning-score swings to the scoring moments that caused them
+   *  ("Aberg eagles 9th"). Each entry's `event` carries playerId +
+   *  hole + par + strokes + ts so the chart can match a sample's
+   *  timestamp to the nearest impactful score event. */
+  feedEvents?: FeedRowLike[];
+  /** playerId → display name lookup so feed events can be rendered
+   *  with the player's last name ("Aberg eagles 9th"). Built from
+   *  the leaderboard / playerIndex on the bet detail page. */
+  playerNameById?: Record<string, string>;
 }
 
 type Mode = "pnl" | "prob";
@@ -104,6 +115,8 @@ function ChartInner({
   headerRight,
   onPointSelect,
   scorecard,
+  feedEvents,
+  playerNameById,
   expanded,
   onExpand,
 }: InnerProps) {
@@ -304,13 +317,74 @@ function ChartInner({
     };
   }
 
-  function holeOrTimeLabel(i: number): string {
+  /** Outright / top-finish / winning-score equivalent — these bets'
+   *  swings come from the field's scoring (the bet's player birdies
+   *  → their odds shorten → win% up; a leader doubles → their odds
+   *  drift → other contenders' win% up). We attribute a sample to
+   *  the most impactful score event in a ±5min window around it,
+   *  scored to prefer (a) the bet's own player and (b) high-magnitude
+   *  outcomes (eagles, doubles, etc.) over routine birdies/bogeys.
+   *  Returns "Aberg eagles 9th" or null when no nearby event scores
+   *  highly enough. */
+  function nearbyEventAt(i: number, direction: number):
+    | { label: string; short: string }
+    | null {
+    if (isRound) return null;
+    if (!feedEvents || feedEvents.length === 0) return null;
+    const sample = history[i];
+    if (!sample) return null;
+    const t = sample.t;
+    const winMs = 5 * 60 * 1000;
+    const betPlayerId =
+      "playerId" in bet ? (bet as { playerId?: string }).playerId : undefined;
+    let best: FeedRowLike | null = null;
+    let bestScore = -Infinity;
+    for (const row of feedEvents) {
+      const e = row.event;
+      if (e.type !== "score") continue;
+      if (e.ts < t - winMs || e.ts > t + 60 * 1000) continue;
+      if (typeof e.hole !== "number") continue;
+      if (typeof e.par !== "number" || typeof e.strokes !== "number") continue;
+      const diff = e.strokes - e.par;
+      const eventDir = diff < 0 ? 1 : diff > 0 ? -1 : 0;
+      let score = 0;
+      if (betPlayerId && e.playerId === betPlayerId) score += 50;
+      if (diff <= -3) score += 35;
+      else if (diff === -2) score += 30;
+      else if (diff === -1) score += 12;
+      else if (diff === 1) score += 8;
+      else if (diff === 2) score += 22;
+      else if (diff >= 3) score += 30;
+      if (direction !== 0 && eventDir === Math.sign(direction)) score += 12;
+      if (score > bestScore) {
+        bestScore = score;
+        best = row;
+      }
+    }
+    if (!best || bestScore < 14) return null;
+    const e = best.event;
+    const diff = (e.strokes ?? 0) - (e.par ?? 0);
+    const verb = scoreVerb(diff);
+    if (!verb || e.hole == null) return null;
+    const name =
+      (playerNameById && playerNameById[e.playerId]) || "Player";
+    const lastName = name.split(" ").pop() ?? name;
+    const verbed = thirdPersonVerb(verb);
+    return {
+      label: `${lastName} ${verbed} ${ordinalHole(e.hole)}`,
+      short: `${verb.toUpperCase()} · ${e.hole}`,
+    };
+  }
+
+  function holeOrTimeLabel(i: number, direction = 0): string {
     if (isRound) {
       const ho = holeOutcomeAt(i);
       if (ho) return ho.label;
       const h = history[i]?.holesPlayed;
       return h != null ? `H${h}` : `#${i + 1}`;
     }
+    const ev = nearbyEventAt(i, direction);
+    if (ev) return ev.label;
     return new Date(history[i].t).toLocaleTimeString(undefined, {
       hour: "2-digit",
       minute: "2-digit",
@@ -318,9 +392,8 @@ function ChartInner({
   }
 
   /** Short version of holeOrTimeLabel for tight spaces (chart pins
-   *  inside the SVG). Strips the verb so just "Eagle · 9" or "H9"
-   *  fits in the small label box. */
-  function holeOrTimeShort(i: number): string {
+   *  inside the SVG). */
+  function holeOrTimeShort(i: number, direction = 0): string {
     if (isRound) {
       const ho = holeOutcomeAt(i);
       if (ho) {
@@ -330,6 +403,8 @@ function ChartInner({
       const h = history[i]?.holesPlayed;
       return h != null ? `H${h}` : `#${i + 1}`;
     }
+    const ev = nearbyEventAt(i, direction);
+    if (ev) return ev.short;
     return new Date(history[i].t).toLocaleTimeString(undefined, {
       hour: "2-digit",
       minute: "2-digit",
@@ -407,19 +482,22 @@ function ChartInner({
           <HeroStat
             label="Now"
             value={formatHeroValue(ys[ys.length - 1], mode, bet.currency)}
-            sub={holeOrTimeLabel(ys.length - 1)}
+            sub={holeOrTimeLabel(
+              ys.length - 1,
+              ys.length > 1 ? Math.sign(ys[ys.length - 1] - ys[ys.length - 2]) : 0,
+            )}
             up={ys[ys.length - 1] >= baseline}
           />
           <HeroStat
             label="Peak"
             value={formatHeroValue(ys[peakIdx], mode, bet.currency)}
-            sub={holeOrTimeLabel(peakIdx)}
+            sub={holeOrTimeLabel(peakIdx, 1)}
             up={true}
           />
           <HeroStat
             label="Low"
             value={formatHeroValue(ys[lowIdx], mode, bet.currency)}
-            sub={holeOrTimeLabel(lowIdx)}
+            sub={holeOrTimeLabel(lowIdx, -1)}
             up={false}
           />
           <HeroStat
@@ -432,7 +510,10 @@ function ChartInner({
             sub={
               swingMag === 0
                 ? ""
-                : `${holeOrTimeLabel(swingFromIdx)} → ${holeOrTimeLabel(swingToIdx)}`
+                : holeOrTimeLabel(swingToIdx, Math.sign(swingDelta)) +
+                  (isRound
+                    ? ` (from ${holeOrTimeLabel(swingFromIdx)})`
+                    : "")
             }
             up={swingDelta >= 0}
           />
@@ -603,7 +684,7 @@ function ChartInner({
               x={peakPoint.x}
               y={peakPoint.y}
               label={`PEAK ${formatPinValue(ys[peakIdx], mode, bet.currency)}`}
-              sub={holeOrTimeShort(peakIdx)}
+              sub={holeOrTimeShort(peakIdx, 1)}
               color="#2c7a28"
               chartW={W}
               chartH={H}
@@ -613,7 +694,7 @@ function ChartInner({
               x={lowPoint.x}
               y={lowPoint.y}
               label={`LOW ${formatPinValue(ys[lowIdx], mode, bet.currency)}`}
-              sub={holeOrTimeShort(lowIdx)}
+              sub={holeOrTimeShort(lowIdx, -1)}
               color="#b13838"
               chartW={W}
               chartH={H}
@@ -953,6 +1034,44 @@ function scoreVerb(diff: number): string | null {
   if (diff === 2) return "Double";
   if (diff >= 3) return "Blow-up";
   return null;
+}
+
+/** 3rd-person verb for "Aberg eagles 9th" / "Schauffele doubles 12th". */
+function thirdPersonVerb(verb: string): string {
+  switch (verb) {
+    case "Eagle":
+      return "eagles";
+    case "Birdie":
+      return "birdies";
+    case "Bogey":
+      return "bogeys";
+    case "Double":
+      return "doubles";
+    case "Blow-up":
+      return "blows up on";
+    case "Par":
+      return "pars";
+    case "Albatross":
+      return "albatrosses";
+    default:
+      return verb.toLowerCase();
+  }
+}
+
+/** Hole number → "9th" / "11th" / "1st". */
+function ordinalHole(n: number): string {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
 }
 
 /** Format the big hero-band stat. Prob mode shows percentage, PnL
