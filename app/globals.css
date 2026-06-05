@@ -26848,22 +26848,31 @@ summary,
 }
 
 @media (min-width: 1024px) {
-  /* ── Grid shell ──────────────────────────────────────────── */
+  /* ── Fluid shell ─────────────────────────────────────────────
+     One desktop layout that scales continuously from 1024px to
+     ultrawide — no per-resolution step rules, no "in-between"
+     widths where the cluster gets stranded in a sea of white.
+     The middle column (the feed, 1fr) absorbs every pixel of
+     extra width; the rails flex within sensible min/max via
+     clamp(); the container's outer padding stays a small
+     proportional band via clamp(16px, 3vw, 48px).
+     A max-width of 1800 caps the cluster on 4K so the feed
+     doesn't grow past readability; any remaining space sits as
+     small even margins (proportional, not a 300px void). */
   .desktop-shell {
     display: grid;
-    /* Narrow desktop band (1024–1279): rail + content (no right
-       rail). At ≥1280 the third column joins below. The whole grid
-       is centered as a single block — any leftover viewport width
-       lands in equal OUTER margins, never as a void between
-       columns. The 40px column-gap matches the ≥1280 layout so
-       the rail-to-content distance reads identically as the
-       viewport grows. */
-    grid-template-columns: 230px minmax(0, 620px);
-    column-gap: 40px;
-    justify-content: center;
-    max-width: 900px;
+    grid-template-columns:
+      clamp(220px, 18vw, 300px)
+      minmax(0, 1fr)
+      clamp(340px, 26vw, 520px);
+    column-gap: clamp(24px, 2.5vw, 48px);
+    width: 100%;
+    /* 1920px cap so the most common large monitor (1920×1080) fills
+       edge-to-edge with no outer margin; wider monitors keep the
+       cluster at 1920 with proportional outer padding. */
+    max-width: 1920px;
     margin: 0 auto;
-    padding: 0 16px;
+    padding: 0 clamp(16px, 3vw, 48px);
     align-items: start;
   }
 
@@ -26871,14 +26880,15 @@ summary,
      sit inside the centered grid container as its first column,
      otherwise wide viewports pin it to the viewport's edge while
      the content lives in the middle, leaving a fat void between
-     them). ─────────────────────────────────────────────────── */
+     them). Width 100% so it always matches its grid track,
+     whatever clamp() resolved that track to at this viewport. */
   .desktop-rail {
     position: sticky;
     top: 0;
     align-self: start;
     height: 100dvh;
     overflow-y: auto;
-    width: 230px;
+    width: 100%;
     padding: 22px 0 22px 0;
     display: flex;
     flex-direction: column;
@@ -26960,43 +26970,28 @@ summary,
     display: none !important;
   }
   body:has(.pv-theme) .site-footer {
-    max-width: 900px;
+    max-width: 1920px;
     margin: 0 auto;
-    padding: 16px;
+    padding: 16px clamp(16px, 3vw, 48px);
   }
-  /* +FAB — nudge inward so it sits roughly over the content
-     column's right edge instead of the viewport's far-right
-     corner. The 3-col shell is 1320px max so half-width minus
-     ~320px puts the FAB just outside the content column without
-     overlapping the right rail. */
+  /* +FAB — anchored to the right edge of the centered shell so it
+     sits at the same spot relative to the content cluster, not the
+     viewport edge. On wide monitors the calc dominates and the FAB
+     stays glued to the cluster; on narrower viewports the
+     clamp-based padding wins so the FAB never slides off-screen. */
   .addbet-fab {
-    right: calc(50% - 320px) !important;
+    right: max(clamp(16px, 3vw, 48px), calc(50vw - 960px + 24px)) !important;
     bottom: 24px !important;
   }
 }
 
-@media (min-width: 1280px) {
-  /* Three-column shell. Fixed column widths (no 1fr) so the right
-     rail can't inflate to the viewport edge — leftover width lands
-     in equal outer margins. The cluster widens at three breakpoints
-     (1280 / 1600 / 1900) so 1440 / 1680 / 1920+ monitors use their
-     space instead of leaving 300px white gutters; the column
-     proportions stay constant, just bigger. The 1600 and 1900
-     overrides live in their own @media blocks below this one. */
-  .desktop-shell {
-    grid-template-columns: 250px minmax(0, 720px) 410px;
-    column-gap: 48px;
-    max-width: 1500px;
-  }
-  body:has(.pv-theme) .site-footer {
-    max-width: 1500px;
-  }
-  .desktop-rail {
-    width: 100%;
-  }
-  .addbet-fab {
-    right: calc(50% - 360px) !important;
-  }
+/* Right-rail container + chat dock — these live at the same
+   ≥1024px breakpoint as the shell so the rail appears for every
+   desktop width (the shell's third grid track is always present,
+   it just resolves narrower on smaller monitors via clamp()). No
+   per-resolution step rules: every width 1024+ shows the same
+   layout, scaled fluidly. */
+@media (min-width: 1024px) {
   .desktop-ctx {
     position: sticky;
     top: 0;
@@ -27329,35 +27324,7 @@ summary,
   }
 }
 
-/* Shell width step-ups for wider monitors. Each block only
-   overrides the things that change with viewport (column widths,
-   footer width, FAB anchor) — the .desktop-ctx / .rail-chat
-   styling above doesn't repeat because none of it is width-
-   dependent. */
-@media (min-width: 1600px) {
-  .desktop-shell {
-    grid-template-columns: 270px minmax(0, 800px) 460px;
-    column-gap: 52px;
-    max-width: 1640px;
-  }
-  body:has(.pv-theme) .site-footer {
-    max-width: 1640px;
-  }
-  .addbet-fab {
-    right: calc(50% - 400px) !important;
-  }
-}
-
-@media (min-width: 1900px) {
-  .desktop-shell {
-    grid-template-columns: 290px minmax(0, 880px) 500px;
-    column-gap: 56px;
-    max-width: 1780px;
-  }
-  body:has(.pv-theme) .site-footer {
-    max-width: 1780px;
-  }
-  .addbet-fab {
-    right: calc(50% - 440px) !important;
-  }
-}
+/* No further breakpoints: the shell uses clamp() + 1fr to scale
+   continuously from 1024px to ultrawide. Any per-resolution rule
+   added below this point will reintroduce the "blank-gap-at-an-
+   in-between-width" bug we just removed. */
