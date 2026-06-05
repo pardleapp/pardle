@@ -25651,13 +25651,24 @@ html.pv-theme-body .auth-chip-btn {
 .spost-hand {
   font-weight: 400;
 }
+/* Meta wrapper — groups tag + hole + score so they can be placed
+   together (desktop pulls them into the same grid cell as the
+   text; on mobile the inline-flex + margin-left:auto reproduces
+   the legacy "stick to the right edge of the top row" layout
+   byte-for-byte). */
+.spost-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
 .spost-tag {
   font-size: 9.5px;
   font-weight: 900;
   letter-spacing: 0.04em;
   padding: 3px 7px;
   border-radius: 5px;
-  margin-left: auto;
   text-transform: uppercase;
   flex-shrink: 0;
   font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
@@ -25741,6 +25752,74 @@ html.pv-theme-body .auth-chip-btn {
   background: var(--pv-soft);
   border-radius: 999px;
   padding: 5px 10px;
+}
+
+/* =============================================================
+   Desktop shot-card density. On phones the card stacks vertically
+   (name+meta row, text row, actions row) — that's the intentional
+   social-feed shape. On desktop the same stacked layout leaves a
+   big void between the name on the left and the tag pinned to the
+   right edge, with the shot text hanging on its own line below.
+   At ≥1024px we collapse the top two rows into a single grid row
+   (name · shot text fills the middle · meta sits next to the text)
+   and tighten vertical padding so the feed reads dense.
+   Mobile (<1024px) is intentionally untouched.
+   ============================================================= */
+@media (min-width: 1024px) {
+  .spost {
+    padding: 11px 14px;
+    gap: 10px;
+    align-items: center;
+  }
+  .spost-body {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name text meta"
+      "acts acts acts";
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 4px;
+  }
+  /* .spost-top still wraps name + meta in the JSX — make it
+     transparent to the grid so its two children get grid areas
+     directly. */
+  .spost-top {
+    display: contents;
+  }
+  .spost-name {
+    grid-area: name;
+  }
+  .spost-meta {
+    grid-area: meta;
+    margin-left: 0;
+  }
+  .pv-theme .spost-text,
+  .spost-text {
+    grid-area: text;
+    margin: 0;
+    /* Sentence sits inline with the name, so drop the leading cap
+       that mobile uses (mobile starts the sentence on its own line
+       and capitalises). On desktop "Birdies the 18th" reads as a
+       continuation of the name → keep mid-sentence casing intact
+       via the stripPlayerName helper's existing output. */
+  }
+  .pv-theme .spost-text-row,
+  .spost-text-row {
+    grid-area: text;
+    margin: 0;
+    align-items: center;
+  }
+  .pv-theme .spost-diagram,
+  .spost-diagram {
+    /* Smaller diagram so it lives comfortably alongside the
+       headline + meta in a single row. */
+    max-width: 84px;
+  }
+  .post-act-row {
+    grid-area: acts;
+    margin-top: 2px;
+  }
 }
 
 /* + Track-bet affordance lives in SweatHeader's icon row now — see

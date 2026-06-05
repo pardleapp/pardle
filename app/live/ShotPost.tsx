@@ -141,21 +141,23 @@ export default function ShotPost({
               </span>
             )}
           </Link>
-          {tag && (
-            <span className={`spost-tag ${tag.cls}`}>{tag.label}</span>
-          )}
-          {typeof event.hole === "number" && (
-            <span className="spost-hole mono">H{event.hole}</span>
-          )}
-          {event.toPar && (
-            <span
-              className={`spost-score mono${
-                event.toPar.startsWith("+") ? " over" : ""
-              }`}
-            >
-              {event.toPar}
-            </span>
-          )}
+          <div className="spost-meta">
+            {tag && (
+              <span className={`spost-tag ${tag.cls}`}>{tag.label}</span>
+            )}
+            {typeof event.hole === "number" && (
+              <span className="spost-hole mono">H{event.hole}</span>
+            )}
+            {event.toPar && (
+              <span
+                className={`spost-score mono${
+                  event.toPar.startsWith("+") ? " over" : ""
+                }`}
+              >
+                {event.toPar}
+              </span>
+            )}
+          </div>
         </div>
         {showDiagram ? (
           <div className="spost-text-row">
