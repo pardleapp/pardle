@@ -1,0 +1,240 @@
+import { NextResponse } from "next/server";
+import { getActiveTournament } from "@/lib/golf-api/pgatour";
+import { getFeedBundle } from "@/lib/feed/store";
+import {
+  fieldRank,
+  findStatsByName,
+  getLiveStatsCached,
+} from "@/lib/feed/live-stats-cache";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * GET /api/player/this-week?playerId=X
+ *
+ * Returns live strokes-gained breakdown + advanced field-rank stats
+ * for the player at the active tournament. Powers the "Strokes gained
+ * · this week" and "Advanced" blocks on /live/player/[id]'s This week
+ * tab.
+ *
+ * Data: DataGolf's live-tournament-stats endpoint (paid tier), cached
+ * field-wide in Redis at 5 min TTL via lib/feed/live-stats-cache.ts.
+ * We hit it once for `event_avg` (the SG decomp + advanced stats
+ * displayed in the hero blocks) and once per round 1-4 for the
+ * per-round chips. Field ranks are computed against the cached
+ * field-wide payload.
+ *
+ * Player resolution: orchestrator playerId → displayName via the
+ * active leaderboard → DG row via normalised name match (same
+ * pattern lib/feed/skill-cache.ts uses).
+ */
+
+const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+function tier(rank: number, outOf: number): "elite" | "good" | "mid" | "poor" {
+  if (outOf === 0) return "mid";
+  const pct = rank / outOf;
+  if (pct <= 0.1) return "elite";
+  if (pct <= 0.33) return "good";
+  if (pct <= 0.66) return "mid";
+  return "poor";
+}
+
+function ordinalSuffix(n: number): string {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return "th";
+  switch (n % 10) {
+    case 1:
+      return "st";
+    case 2:
+      return "nd";
+    case 3:
+      return "rd";
+    default:
+      return "th";
+  }
+}
+
+function fmtRank(r: { rank: number; outOf: number } | null): string {
+  if (!r) return "—";
+  return `${r.rank}${ordinalSuffix(r.rank)}`;
+}
+
+export async function GET(req: Request) {
+  try {
+    const url = new URL(req.url);
+    const playerId = url.searchParams.get("playerId");
+    if (!playerId || !ID_RE.test(playerId)) {
+      return NextResponse.json({ error: "bad-playerId" }, { status: 400 });
+    }
+
+    const active = await getActiveTournament().catch(() => null);
+    if (!active) {
+      return NextResponse.json({ found: false, reason: "no-tournament" });
+    }
+    const tournamentId = active.tournament.id;
+
+    const bundle = await getFeedBundle(tournamentId);
+    const row = bundle.leaderboard.find((r) => r.playerId === playerId);
+    if (!row) {
+      return NextResponse.json({ found: false, reason: "not-on-leaderboard" });
+    }
+
+    // Field-wide payload for the event-average view. Cached 5 min.
+    const eventStats = await getLiveStatsCached(tournamentId, "event_avg");
+    const me = findStatsByName(eventStats, row.displayName);
+    if (!me) {
+      return NextResponse.json({
+        found: false,
+        reason: "not-in-dg-live-stats",
+      });
+    }
+
+    const outOf = eventStats.length;
+
+    // SG decomposition + field rank per category. lowerIsBetter is
+    // false everywhere — DG returns SG as "strokes gained vs field",
+    // so positive = better, and higher rank pos = #1.
+    const sgCategories = [
+      { key: "sgTotal", label: "Total" },
+      { key: "sgOtt", label: "Off the tee" },
+      { key: "sgApp", label: "Approach" },
+      { key: "sgArg", label: "Around green" },
+      { key: "sgPutt", label: "Putting" },
+    ] as const;
+    const sg = sgCategories
+      .map((c) => {
+        const v = me[c.key];
+        if (v == null) return null;
+        const r = fieldRank(eventStats, (s) => s[c.key], v);
+        return r
+          ? {
+              key: c.key,
+              label: c.label,
+              value: v,
+              rank: r.rank,
+              outOf: r.outOf,
+              rankLabel: fmtRank(r),
+              tier: tier(r.rank, r.outOf),
+            }
+          : null;
+      })
+      .filter((x): x is NonNullable<typeof x> => x != null);
+
+    // Advanced — ball-striking + scoring metrics with field rank.
+    // Proximity is lower-is-better (closer = better).
+    const advanced = [
+      {
+        key: "drivingDist",
+        label: "Driving dist",
+        unit: " yd",
+        digits: 1,
+        lowerIsBetter: false,
+      },
+      {
+        key: "drivingAcc",
+        label: "Driving acc",
+        unit: "%",
+        digits: 0,
+        scale: 100,
+        lowerIsBetter: false,
+      },
+      {
+        key: "gir",
+        label: "GIR",
+        unit: "%",
+        digits: 0,
+        scale: 100,
+        lowerIsBetter: false,
+      },
+      {
+        key: "scrambling",
+        label: "Scrambling",
+        unit: "%",
+        digits: 0,
+        scale: 100,
+        lowerIsBetter: false,
+      },
+      {
+        key: "proxFw",
+        label: "Prox · fairway",
+        unit: " ft",
+        digits: 1,
+        lowerIsBetter: true,
+      },
+      {
+        key: "proxRgh",
+        label: "Prox · rough",
+        unit: " ft",
+        digits: 1,
+        lowerIsBetter: true,
+      },
+    ] as const;
+    const adv = advanced
+      .map((c) => {
+        const raw = me[c.key as keyof typeof me] as number | null;
+        if (raw == null) return null;
+        const scale = "scale" in c ? c.scale : 1;
+        const displayed = raw * scale;
+        const r = fieldRank(
+          eventStats,
+          (s) => s[c.key as keyof typeof s] as number | null,
+          raw,
+          c.lowerIsBetter,
+        );
+        return r
+          ? {
+              key: c.key,
+              label: c.label,
+              value: `${displayed.toFixed(c.digits)}${c.unit}`,
+              rank: r.rank,
+              outOf: r.outOf,
+              rankLabel: fmtRank(r),
+              tier: tier(r.rank, r.outOf),
+            }
+          : null;
+      })
+      .filter((x): x is NonNullable<typeof x> => x != null);
+
+    // Per-round SG totals for the four R1-R4 chips. We hit each round
+    // separately because DG bundles per-round stats under a round=N
+    // request. Each round's response is cached separately in Redis.
+    const perRound = await Promise.all(
+      [1, 2, 3, 4].map(async (rd) => {
+        const rstats = await getLiveStatsCached(tournamentId, rd);
+        const my = findStatsByName(rstats, row.displayName);
+        return {
+          label: `R${rd}`,
+          value: my?.sgTotal ?? null,
+        };
+      }),
+    );
+
+    // Header summary string for the live SG hero — "across 18 holes ·
+    // 2nd of 71" matches the design-handoff prototype's caption format.
+    // thru is reported by DG as the number of holes played in the
+    // current round; for an event-avg view we report rounds played.
+    const sgTotalRank = sg.find((s) => s.key === "sgTotal");
+    const sgHeroMeta = sgTotalRank
+      ? `event total · ${sgTotalRank.rankLabel} of ${sgTotalRank.outOf}`
+      : "";
+
+    return NextResponse.json({
+      found: true,
+      playerId,
+      displayName: row.displayName,
+      sgEvent: {
+        total: me.sgTotal,
+        meta: sgHeroMeta,
+      },
+      sg,
+      perRound,
+      advanced: adv,
+    });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "server-error" },
+      { status: 500 },
+    );
+  }
+}

@@ -54,6 +54,24 @@ interface ScorecardRound {
   roundPar: number;
 }
 
+interface ThisWeekRow {
+  key: string;
+  label: string;
+  value: number | string;
+  rank: number;
+  outOf: number;
+  rankLabel: string;
+  tier: "elite" | "good" | "mid" | "poor";
+}
+
+interface ThisWeekResponse {
+  found: boolean;
+  sgEvent?: { total: number | null; meta: string };
+  sg?: ThisWeekRow[];
+  perRound?: { label: string; value: number | null }[];
+  advanced?: ThisWeekRow[];
+}
+
 interface SeasonResponse {
   found: boolean;
   displayName?: string;
@@ -146,6 +164,7 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
   const [feed, setFeed] = useState<FeedSnapshot | null>(null);
   const [rounds, setRounds] = useState<(ScorecardRound | null)[]>([null, null, null, null]);
   const [season, setSeason] = useState<SeasonResponse | null>(null);
+  const [thisWeek, setThisWeek] = useState<ThisWeekResponse | null>(null);
   const [tab, setTab] = useState<"week" | "season">("week");
   const [imgFailed, setImgFailed] = useState(false);
   const [following, setFollowing] = useState(true);
@@ -181,6 +200,37 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
       window.clearInterval(id);
     };
   }, []);
+
+  // Live SG breakdown + advanced field-rank stats for the active
+  // tournament, polled every 30 s so the bars/ranks tick along with
+  // the round. Upstream is cached 5 min in Redis so this is cheap.
+  useEffect(() => {
+    if (!playerId) return;
+    let cancel = false;
+    const tick = async () => {
+      try {
+        const r = await fetch(
+          `/api/player/this-week?playerId=${encodeURIComponent(playerId)}`,
+          { cache: "no-store" },
+        );
+        if (!r.ok) {
+          if (!cancel) setThisWeek({ found: false });
+          return;
+        }
+        const j = (await r.json()) as ThisWeekResponse;
+        if (cancel) return;
+        setThisWeek(j);
+      } catch {
+        if (!cancel) setThisWeek({ found: false });
+      }
+    };
+    void tick();
+    const id = window.setInterval(tick, 30_000);
+    return () => {
+      cancel = true;
+      window.clearInterval(id);
+    };
+  }, [playerId]);
 
   // Season SG decomposition from DataGolf, fetched once on first
   // mount per playerId. The skill-ratings endpoint refreshes weekly
@@ -370,22 +420,122 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
               )}
             </section>
 
-            <section className="bd-sec">
-              <h4 className="bd-sec-h">Strokes gained · this week</h4>
-              <div className="pl-empty">
-                Live strokes-gained for this player isn't wired into
-                the tracker yet. The leaderboard total above reflects
-                the current round in real time.
-              </div>
-            </section>
+            {thisWeek?.found && thisWeek.sg && thisWeek.sg.length > 0 && (
+              <section className="bd-sec">
+                <h4 className="bd-sec-h">
+                  Strokes gained · this week{" "}
+                  <span className="pl-rank-pill pl-rank-pill-good">LIVE</span>
+                </h4>
+                <div className="pl-livesg">
+                  <div className="pl-livesg-top">
+                    <span
+                      className="pl-livesg-num"
+                      style={{
+                        color:
+                          (thisWeek.sgEvent?.total ?? 0) < 0
+                            ? "var(--pv-down)"
+                            : "var(--pv-up)",
+                      }}
+                    >
+                      {fmtSg(thisWeek.sgEvent?.total ?? NaN)}
+                    </span>
+                    <span className="pl-livesg-meta">
+                      {thisWeek.sgEvent?.meta}
+                    </span>
+                  </div>
+                  {thisWeek.perRound && (
+                    <div className="pl-livesg-rounds">
+                      {thisWeek.perRound.map((r) => (
+                        <div className="pl-livesg-rd" key={r.label}>
+                          <div className="pl-livesg-rd-lbl">{r.label}</div>
+                          <div
+                            className="pl-livesg-rd-val"
+                            style={{
+                              color:
+                                r.value == null
+                                  ? "var(--pv-muted)"
+                                  : r.value < 0
+                                    ? "var(--pv-down)"
+                                    : "var(--pv-up)",
+                            }}
+                          >
+                            {r.value == null ? "—" : fmtSg(r.value)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="pl-sg-cats">
+                  {thisWeek.sg
+                    .filter((row) => row.key !== "sgTotal")
+                    .map((row) => {
+                      const v = row.value as number;
+                      return (
+                        <div className="sgrow" key={row.key}>
+                          <span className="sgrow-lbl">{row.label}</span>
+                          <span className="sgrow-track">
+                            <i
+                              className={
+                                v < 0
+                                  ? "sgrow-bar sgrow-bar-neg"
+                                  : "sgrow-bar"
+                              }
+                              style={sgBarStyle(v)}
+                            />
+                          </span>
+                          <span
+                            className="sgrow-val"
+                            style={{
+                              color: v < 0 ? "var(--pv-down)" : "var(--pv-up)",
+                            }}
+                          >
+                            {fmtSg(v)}
+                          </span>
+                          <span
+                            className={`pl-rank-pill pl-rank-pill-${row.tier}`}
+                          >
+                            {row.rankLabel}
+                          </span>
+                        </div>
+                      );
+                    })}
+                </div>
+              </section>
+            )}
 
-            <section className="bd-sec">
-              <h4 className="bd-sec-h">Advanced</h4>
-              <div className="pl-empty">
-                Field-rank stats (driving, GIR, scrambling, proximity)
-                will land alongside the full per-player SG feed.
-              </div>
-            </section>
+            {thisWeek?.found &&
+              thisWeek.advanced &&
+              thisWeek.advanced.length > 0 && (
+                <section className="bd-sec">
+                  <h4 className="bd-sec-h">Advanced</h4>
+                  <div className="pl-advgrid">
+                    {thisWeek.advanced.map((a) => (
+                      <div className="pl-advbox" key={a.key}>
+                        <div className="pl-advbox-v">{a.value}</div>
+                        <div className="pl-advbox-l">{a.label}</div>
+                        <div className={`pl-advbox-r pl-advbox-r-${a.tier}`}>
+                          {a.rankLabel} in field
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+            {thisWeek != null &&
+              (!thisWeek.found ||
+                !thisWeek.sg ||
+                thisWeek.sg.length === 0) && (
+                <section className="bd-sec">
+                  <h4 className="bd-sec-h">Strokes gained · this week</h4>
+                  <div className="pl-empty">
+                    Live stats for this player aren&apos;t available
+                    yet — they fill in once the round produces enough
+                    holes to estimate.
+                  </div>
+                </section>
+              )}
           </>
         )}
 
