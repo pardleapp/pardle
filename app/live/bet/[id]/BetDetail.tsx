@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import BackButton from "@/app/_components/BackButton";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DEFAULT_ODDS_FORMAT,
   formatOdds,
@@ -435,6 +435,36 @@ export default function BetDetail({ betId }: { betId: string }) {
     "idle" | "sending" | "sent" | "err"
   >("idle");
 
+  // Connects the chart to the hole-by-hole table — when the user taps
+  // a point on the chart, find the row whose timestamp is nearest the
+  // selected sample, scroll it into view, and flash a highlight so
+  // the eye lands on it. Rows expose data-bd-ts={ts} for the lookup.
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  const handlePointSelect = useCallback((sample: PnlSample) => {
+    const root = tableWrapRef.current;
+    if (!root) return;
+    const els = root.querySelectorAll<HTMLElement>("[data-bd-ts]");
+    let best: HTMLElement | null = null;
+    let bestD = Infinity;
+    els.forEach((el) => {
+      const ts = Number(el.dataset.bdTs);
+      if (!Number.isFinite(ts)) return;
+      const d = Math.abs(ts - sample.t);
+      if (d < bestD) {
+        bestD = d;
+        best = el;
+      }
+    });
+    if (!best) return;
+    const target = best as HTMLElement;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.add("bd-table-row-flash");
+    window.setTimeout(
+      () => target.classList.remove("bd-table-row-flash"),
+      1400,
+    );
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     fetch("/api/channels/me", { cache: "no-store" })
@@ -781,6 +811,7 @@ export default function BetDetail({ betId }: { betId: string }) {
           <BetChartFull
             bet={resolvedBet}
             history={history}
+            onPointSelect={handlePointSelect}
             headerRight={
               bet.kind === "round-score" ? (
                 <LiveRoundStatus
@@ -791,32 +822,34 @@ export default function BetDetail({ betId }: { betId: string }) {
             }
           />
           {insight && <InsightCard insight={insight} />}
-          {bet.kind === "round-score" ? (
-            <RoundDetailTable
-              bet={resolvedBet as RoundScoreBet}
-              state={data.playerRoundStates[bet.playerId]}
-              history={history}
-              oddsFormat={oddsFormat}
-            />
-          ) : (
-            <OutrightDetailTable
-              bet={bet}
-              history={history}
-              feedEvents={data.rows ?? []}
-              snapshotHoles={data.snapshotHoles}
-              tournamentPars={data.tournamentPars}
-              playerThru={
-                bet.kind === "outright" || bet.kind === "top-finish"
-                  ? data.playerIndex?.find(
-                      (r) =>
-                        r.playerId ===
-                        (bet as { playerId: string }).playerId,
-                    )?.thru ?? null
-                  : null
-              }
-              oddsFormat={oddsFormat}
-            />
-          )}
+          <div ref={tableWrapRef}>
+            {bet.kind === "round-score" ? (
+              <RoundDetailTable
+                bet={resolvedBet as RoundScoreBet}
+                state={data.playerRoundStates[bet.playerId]}
+                history={history}
+                oddsFormat={oddsFormat}
+              />
+            ) : (
+              <OutrightDetailTable
+                bet={bet}
+                history={history}
+                feedEvents={data.rows ?? []}
+                snapshotHoles={data.snapshotHoles}
+                tournamentPars={data.tournamentPars}
+                playerThru={
+                  bet.kind === "outright" || bet.kind === "top-finish"
+                    ? data.playerIndex?.find(
+                        (r) =>
+                          r.playerId ===
+                          (bet as { playerId: string }).playerId,
+                      )?.thru ?? null
+                    : null
+                }
+                oddsFormat={oddsFormat}
+              />
+            )}
+          </div>
         </>
       )}
 
@@ -1039,7 +1072,7 @@ function RoundDetailTable({
                 ? Math.max(0, Math.min(1, s.v / (bet.stake * bet.oddsTaken)))
                 : 0;
           return (
-            <li key={i} className="bd-table-row">
+            <li key={i} className="bd-table-row" data-bd-ts={s.t}>
               <span className="bd-table-hole">
                 Hole {s.holesPlayed ?? i + 1}
               </span>
@@ -1402,6 +1435,7 @@ function OutrightDetailTable({
             <li
               key={r.key}
               className={`bd-table-row${r.kind === "gap" ? " bd-table-row-gap" : ""}`}
+              data-bd-ts={r.ts}
             >
               <span className="bd-table-hole">{r.label}</span>
               <span className="bd-table-val">

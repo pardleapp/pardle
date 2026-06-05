@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { PnlSample, TrackedBet } from "../../bet-shared";
 import PastBetReplay from "./PastBetReplay";
+import { formatBetCurrency, type BetCurrency } from "@/lib/format/bet-currency";
 
 interface Props {
   bet: TrackedBet;
@@ -13,25 +14,94 @@ interface Props {
    *  toggle, saving a full stacked row of vertical space on
    *  phones. */
   headerRight?: React.ReactNode;
+  /** Fires when the user touches/clicks a chart point. The bet
+   *  detail page uses it to scroll the matching hole-by-hole row
+   *  into view and briefly highlight it, connecting the chart to
+   *  the table below. */
+  onPointSelect?: (sample: PnlSample, index: number) => void;
 }
 
 type Mode = "pnl" | "prob";
 
-const PAD = { top: 28, right: 18, bottom: 36, left: 60 };
+const PAD = { top: 32, right: 18, bottom: 38, left: 60 };
 const W = 900;
-const H = 380;
+const H = 460;
 
-// Currency moved to lib/format/bet-currency. Formatters below take
-// the BetCurrency carried on each bet so US/EU users see their own
-// symbol throughout the chart.
-import { formatBetCurrency, type BetCurrency } from "@/lib/format/bet-currency";
+export default function BetChartFull(props: Props) {
+  const [expanded, setExpanded] = useState(false);
 
-export default function BetChartFull({ bet, history, headerRight }: Props) {
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setExpanded(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [expanded]);
+
+  return (
+    <>
+      <ChartInner
+        {...props}
+        expanded={false}
+        onExpand={() => setExpanded(true)}
+      />
+      {expanded && (
+        <div
+          className="bd-chart-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Expanded bet chart"
+          onClick={() => setExpanded(false)}
+        >
+          <div
+            className="bd-chart-modal-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="bd-chart-modal-close"
+              onClick={() => setExpanded(false)}
+              aria-label="Close expanded chart"
+            >
+              Close
+            </button>
+            <ChartInner
+              {...props}
+              expanded={true}
+              onExpand={null}
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+interface InnerProps extends Props {
+  expanded: boolean;
+  onExpand: (() => void) | null;
+}
+
+function ChartInner({
+  bet,
+  history,
+  headerRight,
+  onPointSelect,
+  expanded,
+  onExpand,
+}: InnerProps) {
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [mode, setMode] = useState<Mode>("prob");
 
   const isRound = bet.kind === "round-score";
   const winningValue = bet.stake * bet.oddsTaken;
+  const impliedEntry = 1 / bet.oddsTaken; // 0–1, what the user "bought in" at
 
   const data = useMemo(() => {
     if (history.length === 0) return null;
@@ -50,6 +120,8 @@ export default function BetChartFull({ bet, history, headerRight }: Props) {
           );
 
     const baseline = mode === "pnl" ? 0 : ys[0];
+    const entryY =
+      mode === "prob" ? clamp01(impliedEntry) * 100 : null;
 
     const xMin = xs[0];
     const xMaxRaw = xs[xs.length - 1];
@@ -57,11 +129,12 @@ export default function BetChartFull({ bet, history, headerRight }: Props) {
       ? Math.max(18, Math.ceil(xMaxRaw))
       : Math.max(xMaxRaw, xMin + 1);
 
-    const yMaxRaw = Math.max(baseline, ...ys);
-    const yMinRaw = Math.min(baseline, ...ys);
+    const allYs = entryY != null ? [...ys, entryY] : ys;
+    const yMaxRaw = Math.max(baseline, ...allYs);
+    const yMinRaw = Math.min(baseline, ...allYs);
     const minRange = mode === "pnl" ? Math.max(stake * 0.2, 2) : 6;
     const range = Math.max(yMaxRaw - yMinRaw, minRange);
-    const headroom = range * 0.15;
+    const headroom = range * 0.18;
     let yMax = yMaxRaw + headroom;
     let yMin = yMinRaw - headroom;
     if (mode === "prob") {
@@ -83,6 +156,7 @@ export default function BetChartFull({ bet, history, headerRight }: Props) {
     }));
 
     const baseY = yScale(baseline);
+    const entryYpx = entryY != null ? yScale(entryY) : null;
     const linePath = points
       .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`)
       .join(" ");
@@ -92,6 +166,8 @@ export default function BetChartFull({ bet, history, headerRight }: Props) {
       linePath,
       baseY,
       baseline,
+      entryY,
+      entryYpx,
       xMin,
       xMax,
       yMin,
@@ -99,8 +175,9 @@ export default function BetChartFull({ bet, history, headerRight }: Props) {
       xScale,
       yScale,
       latestY: ys[ys.length - 1],
+      ys,
     };
-  }, [history, isRound, bet.stake, mode, winningValue]);
+  }, [history, isRound, bet.stake, mode, winningValue, impliedEntry]);
 
   if (!data || history.length < 2) {
     // Settled bets with no live chart history (typically past-
@@ -112,7 +189,7 @@ export default function BetChartFull({ bet, history, headerRight }: Props) {
       return <PastBetReplay bet={bet} />;
     }
     return (
-      <div className="bd-chart">
+      <div className={`bd-chart${expanded ? " bd-chart-expanded" : ""}`}>
         <div className="bd-chart-header">
           <ChartToggle mode={mode} setMode={setMode} />
           {headerRight}
@@ -130,8 +207,21 @@ export default function BetChartFull({ bet, history, headerRight }: Props) {
     );
   }
 
-  const { points, linePath, baseY, baseline, xMin, xMax, yMin, yMax, xScale, latestY } =
-    data;
+  const {
+    points,
+    linePath,
+    baseY,
+    baseline,
+    entryY,
+    entryYpx,
+    xMin,
+    xMax,
+    yMin,
+    yMax,
+    xScale,
+    latestY,
+    ys,
+  } = data;
 
   const yTicks = buildYTicks(yMin, yMax, baseline, (v) =>
     formatY(v, mode, bet.currency),
@@ -148,13 +238,77 @@ export default function BetChartFull({ bet, history, headerRight }: Props) {
     .map((p) => `L${p.x.toFixed(2)},${p.y.toFixed(2)}`)
     .join(" ")} L${points[points.length - 1].x.toFixed(2)},${baseY.toFixed(2)} Z`;
 
-  const hover = hoverIdx != null ? points[hoverIdx] : null;
+  // Default the marker to the most recent sample so the chart loads
+  // with the "now" callout visible — invites the user to drag back to
+  // explore. On release the marker stays on the last touched point
+  // (sticky), giving the user a stable handle to discuss/share.
+  const activeIdx = hoverIdx ?? points.length - 1;
+  const active = points[activeIdx];
+
+  const prevSample = activeIdx > 0 ? history[activeIdx - 1] : null;
+  const prevValue = prevSample?.v;
+  const prevProb =
+    prevSample &&
+    (typeof prevSample.prob === "number"
+      ? prevSample.prob
+      : prevSample.v / winningValue);
+  const activeProb =
+    typeof active.raw.prob === "number"
+      ? active.raw.prob
+      : active.raw.v / winningValue;
+  const activePnl = active.raw.v - bet.stake;
+
+  const dPnl = prevValue != null ? active.raw.v - prevValue : null;
+  const dProb =
+    prevProb != null && Number.isFinite(prevProb) ? activeProb - prevProb : null;
+
+  function findClosestIdx(svgX: number, svgY: number | null): number {
+    // Distance is dominated by X (touching along the line), but a
+    // small Y tiebreaker lets the user lift their finger near a
+    // crossing point and land on the visually-nearest sample rather
+    // than a horizontally-adjacent but vertically-far one.
+    let best = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < points.length; i++) {
+      const dx = Math.abs(points[i].x - svgX);
+      const dy = svgY != null ? Math.abs(points[i].y - svgY) * 0.25 : 0;
+      const d = dx + dy;
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  function pickFromEvent(
+    e: React.MouseEvent<SVGSVGElement> | React.TouchEvent<SVGSVGElement>,
+    src: { clientX: number; clientY: number },
+  ): number {
+    const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+    const svgX = ((src.clientX - rect.left) / rect.width) * W;
+    const svgY = ((src.clientY - rect.top) / rect.height) * H;
+    return findClosestIdx(svgX, svgY);
+  }
 
   return (
-    <div className="bd-chart">
+    <div className={`bd-chart${expanded ? " bd-chart-expanded" : ""}`}>
       <div className="bd-chart-header">
         <ChartToggle mode={mode} setMode={setMode} />
-        {headerRight}
+        <div className="bd-chart-header-right">
+          {headerRight}
+          {onExpand && (
+            <button
+              type="button"
+              className="bd-chart-expand"
+              onClick={onExpand}
+              aria-label="Expand chart"
+              title="Expand"
+            >
+              <ExpandIcon />
+            </button>
+          )}
+        </div>
       </div>
 
       <svg
@@ -165,36 +319,42 @@ export default function BetChartFull({ bet, history, headerRight }: Props) {
         aria-label={mode === "pnl" ? "Profit/loss chart" : "Win probability chart"}
         onMouseLeave={() => setHoverIdx(null)}
         onMouseMove={(e) => {
-          const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
-          const svgX = ((e.clientX - rect.left) / rect.width) * W;
-          let best = 0;
-          let bestD = Infinity;
-          for (let i = 0; i < points.length; i++) {
-            const d = Math.abs(points[i].x - svgX);
-            if (d < bestD) {
-              bestD = d;
-              best = i;
-            }
-          }
-          setHoverIdx(best);
+          setHoverIdx(pickFromEvent(e, { clientX: e.clientX, clientY: e.clientY }));
+        }}
+        onClick={(e) => {
+          const idx = pickFromEvent(e, {
+            clientX: e.clientX,
+            clientY: e.clientY,
+          });
+          setHoverIdx(idx);
+          if (onPointSelect) onPointSelect(history[idx], idx);
+        }}
+        onTouchStart={(e) => {
+          const t = e.touches[0];
+          if (!t) return;
+          setHoverIdx(
+            pickFromEvent(e, { clientX: t.clientX, clientY: t.clientY }),
+          );
         }}
         onTouchMove={(e) => {
           const t = e.touches[0];
           if (!t) return;
-          const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
-          const svgX = ((t.clientX - rect.left) / rect.width) * W;
-          let best = 0;
-          let bestD = Infinity;
-          for (let i = 0; i < points.length; i++) {
-            const d = Math.abs(points[i].x - svgX);
-            if (d < bestD) {
-              bestD = d;
-              best = i;
-            }
-          }
-          setHoverIdx(best);
+          // Prevent the page from scrolling vertically while scrubbing
+          // — the chart's touch surface should "win" once the user has
+          // committed to dragging on it.
+          if (e.cancelable) e.preventDefault();
+          setHoverIdx(
+            pickFromEvent(e, { clientX: t.clientX, clientY: t.clientY }),
+          );
         }}
-        onTouchEnd={() => setHoverIdx(null)}
+        onTouchEnd={() => {
+          // Sticky: keep the marker on the last touched point so the
+          // tooltip stays visible. Fire onPointSelect so the parent
+          // can scroll the matching hole-by-hole row into view.
+          if (hoverIdx != null && onPointSelect) {
+            onPointSelect(history[hoverIdx], hoverIdx);
+          }
+        }}
       >
         {yTicks.map((t) => {
           const y = data.yScale(t);
@@ -224,6 +384,44 @@ export default function BetChartFull({ bet, history, headerRight }: Props) {
           );
         })}
 
+        {/* Entry baseline — the implied probability the user "bought
+            in" at (1 / oddsTaken). Distinct from the gridline baseline
+            so a user can see at a glance whether their current win %
+            is above or below what they paid for. Prob mode only. */}
+        {mode === "prob" && entryYpx != null && entryY != null && (
+          <g className="bd-chart-entry">
+            <line
+              x1={PAD.left}
+              x2={W - PAD.right}
+              y1={entryYpx}
+              y2={entryYpx}
+              stroke="#6b6c70"
+              strokeDasharray="4 5"
+              strokeWidth={1}
+              opacity={0.7}
+            />
+            <rect
+              x={W - PAD.right - 86}
+              y={entryYpx - 12}
+              width={84}
+              height={16}
+              rx={3}
+              fill="rgba(20,20,22,0.85)"
+            />
+            <text
+              x={W - PAD.right - 4}
+              y={entryYpx}
+              textAnchor="end"
+              fontSize="10.5"
+              fontWeight={800}
+              fill="#fafafa"
+              style={{ letterSpacing: "0.04em" }}
+            >
+              ENTRY {formatProbCompact(entryY / 100)}
+            </text>
+          </g>
+        )}
+
         {xTicks.map((tk) => (
           <g key={`x${tk.x}-${tk.label}`}>
             <line
@@ -251,7 +449,7 @@ export default function BetChartFull({ bet, history, headerRight }: Props) {
           d={linePath}
           fill="none"
           stroke={lineColor}
-          strokeWidth={2.2}
+          strokeWidth={2.4}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
@@ -261,69 +459,252 @@ export default function BetChartFull({ bet, history, headerRight }: Props) {
             key={i}
             cx={p.x}
             cy={p.y}
-            r={hoverIdx === i ? 4.5 : 2.2}
+            r={activeIdx === i ? 4.5 : 2.2}
             fill={lineColor}
-            opacity={hoverIdx === i ? 1 : 0.85}
+            opacity={activeIdx === i ? 1 : 0.85}
           />
         ))}
 
-        {hover && (
+        {/* Active marker — finger-tracking dot + vertical guide line.
+            Larger halo on the dot improves visibility under a
+            fingertip; the dashed guide makes the X position legible
+            against the gridlines. */}
+        <g className="bd-chart-marker">
           <line
-            x1={hover.x}
-            x2={hover.x}
+            x1={active.x}
+            x2={active.x}
             y1={PAD.top}
             y2={H - PAD.bottom}
-            stroke="var(--muted)"
+            stroke={lineColor}
             strokeDasharray="2 3"
-            strokeWidth={0.8}
+            strokeWidth={1.1}
+            opacity={0.55}
           />
-        )}
+          <circle
+            cx={active.x}
+            cy={active.y}
+            r={11}
+            fill={lineColor}
+            opacity={0.18}
+          />
+          <circle
+            cx={active.x}
+            cy={active.y}
+            r={5.5}
+            fill="#fff"
+            stroke={lineColor}
+            strokeWidth={2.4}
+          />
+        </g>
+
+        <ChartCallout
+          x={active.x}
+          y={active.y}
+          chartW={W}
+          chartH={H}
+          pad={PAD}
+          isRound={isRound}
+          activeRaw={active.raw}
+          activeXVal={active.xVal}
+          activeProb={activeProb}
+          activePnl={activePnl}
+          dPnl={dPnl}
+          dProb={dProb}
+          mode={mode}
+          currency={bet.currency}
+          lineColor={lineColor}
+        />
 
         <text
           x={W - PAD.right}
-          y={PAD.top - 10}
+          y={PAD.top - 14}
           textAnchor="end"
           fontSize="11"
           fill="var(--muted)"
           fontWeight={700}
         >
-          {isRound ? "Holes played" : "Time"} →{" "}
+          {isRound ? "Holes played" : "Time"} ·{" "}
           {mode === "pnl" ? "Profit / loss" : "Implied win chance"}
         </text>
       </svg>
 
       <div className="bd-chart-foot">
-        {hover ? (
-          <span className="bd-chart-hover">
-            <strong>
-              {isRound
-                ? `Hole ${hover.raw.holesPlayed ?? hover.xVal}`
-                : new Date(hover.raw.t).toLocaleString(undefined, {
-                    weekday: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-            </strong>{" "}
-            ·{" "}
-            <span className={tintFor(hover.yVal, baseline)}>
-              {formatHoverValue(hover.yVal, mode, bet.currency)}
-            </span>
-          </span>
-        ) : (
-          <span className="bd-chart-foot-hint">
-            {mode === "pnl"
-              ? isRound
-                ? "Each step = a completed hole. Baseline = break-even (stake)."
-                : "Profit/loss since bet placement, valued from live market odds."
-              : `Now ${formatProbForFoot(currentProbFor(history))} · pre-round ${formatProbForFoot(
-                  preRoundProbFor(history),
-                )} · your @ ${bet.oddsTakenLabel} = ${formatProbForFoot(
-                  1 / bet.oddsTaken,
-                )} implied`}
-          </span>
-        )}
+        <span className="bd-chart-foot-hint">
+          {hoverIdx != null
+            ? "Drag along the chart · tap to jump to that hole"
+            : "Drag along the chart to explore · tap a point to jump"}
+        </span>
       </div>
     </div>
+  );
+}
+
+/** SVG tooltip callout — rendered next to the active marker. The
+ *  position auto-flips horizontally and vertically to stay inside
+ *  the plot, so the user's fingertip never hides it. */
+function ChartCallout({
+  x,
+  y,
+  chartW,
+  chartH,
+  pad,
+  isRound,
+  activeRaw,
+  activeXVal,
+  activeProb,
+  activePnl,
+  dPnl,
+  dProb,
+  mode,
+  currency,
+  lineColor,
+}: {
+  x: number;
+  y: number;
+  chartW: number;
+  chartH: number;
+  pad: { top: number; right: number; bottom: number; left: number };
+  isRound: boolean;
+  activeRaw: PnlSample;
+  activeXVal: number;
+  activeProb: number;
+  activePnl: number;
+  dPnl: number | null;
+  dProb: number | null;
+  mode: Mode;
+  currency: BetCurrency | undefined;
+  lineColor: string;
+}) {
+  const titleText = isRound
+    ? `Hole ${activeRaw.holesPlayed ?? activeXVal}`
+    : new Date(activeRaw.t).toLocaleString(undefined, {
+        weekday: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+  const bigText =
+    mode === "prob"
+      ? `${formatProbCompact(activeProb)} win`
+      : `${activePnl >= 0 ? "+" : "−"}${formatBetCurrency(
+          Math.abs(activePnl),
+          currency,
+        )}`;
+
+  const secondaryText =
+    mode === "prob"
+      ? `${activePnl >= 0 ? "+" : "−"}${formatBetCurrency(
+          Math.abs(activePnl),
+          currency,
+        )}`
+      : `${formatProbCompact(activeProb)} win`;
+
+  const deltaParts: { text: string; up: boolean }[] = [];
+  if (mode === "prob" && dProb != null && Math.abs(dProb) >= 0.001) {
+    deltaParts.push({
+      text: `${dProb >= 0 ? "+" : "−"}${formatProbDeltaCompact(Math.abs(dProb))}`,
+      up: dProb >= 0,
+    });
+  } else if (mode === "pnl" && dPnl != null && Math.abs(dPnl) >= 0.005) {
+    deltaParts.push({
+      text: `${dPnl >= 0 ? "+" : "−"}${formatBetCurrency(
+        Math.abs(dPnl),
+        currency,
+      )}`,
+      up: dPnl >= 0,
+    });
+  }
+  const eventText = deriveEventText(dPnl, dProb);
+  if (eventText) deltaParts.push({ text: eventText, up: (dPnl ?? 0) >= 0 });
+
+  // Box geometry — picked so the long-form callout (two stacked
+  // lines + delta strip) sits comfortably without crowding the
+  // marker. Width is text-driven and rounded up to a stable size so
+  // the tooltip doesn't jitter as the active sample changes.
+  const boxW = 184;
+  const boxH = deltaParts.length > 0 ? 78 : 60;
+  const marginToMarker = 14;
+
+  // Horizontal flip: keep the box inside the plot.
+  let boxX = x + marginToMarker;
+  if (boxX + boxW > chartW - pad.right) boxX = x - marginToMarker - boxW;
+  if (boxX < pad.left) boxX = pad.left;
+
+  // Vertical flip: prefer above the marker, fall back to below.
+  let boxY = y - boxH - 12;
+  if (boxY < pad.top) boxY = y + 14;
+  if (boxY + boxH > chartH - pad.bottom) boxY = chartH - pad.bottom - boxH;
+
+  return (
+    <g className="bd-chart-callout" pointerEvents="none">
+      <rect
+        x={boxX}
+        y={boxY}
+        width={boxW}
+        height={boxH}
+        rx={8}
+        fill="rgba(20,20,22,0.96)"
+        stroke={lineColor}
+        strokeWidth={1.2}
+      />
+      <text
+        x={boxX + 12}
+        y={boxY + 18}
+        fontSize="10.5"
+        fontWeight={800}
+        fill="#e6e6ea"
+        style={{ letterSpacing: "0.08em", textTransform: "uppercase" }}
+      >
+        {titleText}
+      </text>
+      <text
+        x={boxX + 12}
+        y={boxY + 40}
+        fontSize="20"
+        fontWeight={900}
+        fill="#fff"
+        style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em" }}
+      >
+        {bigText}
+      </text>
+      <text
+        x={boxX + 12}
+        y={boxY + 56}
+        fontSize="11.5"
+        fontWeight={700}
+        fill="#b9bac0"
+        style={{ fontVariantNumeric: "tabular-nums" }}
+      >
+        {secondaryText}
+      </text>
+      {deltaParts.length > 0 && (
+        <text
+          x={boxX + 12}
+          y={boxY + 72}
+          fontSize="11"
+          fontWeight={800}
+          fill={deltaParts[0].up ? "#7ed273" : "#ff8b8b"}
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
+          {deltaParts.map((p) => p.text).join(" · ")}
+        </text>
+      )}
+    </g>
+  );
+}
+
+function ExpandIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width={14} height={14} aria-hidden="true">
+      <path
+        d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
@@ -358,28 +739,37 @@ function ChartToggle({
   );
 }
 
-function preRoundProbFor(history: PnlSample[]): number {
-  return history[0]?.prob ?? 0;
-}
-
-/** Latest model probability — last sample in the history series.
- *  Falls back through the chain so we always have something
- *  sensible to render in the footer summary. */
-function currentProbFor(history: PnlSample[]): number {
-  for (let i = history.length - 1; i >= 0; i--) {
-    const p = history[i]?.prob;
-    if (typeof p === "number" && Number.isFinite(p)) return p;
+/** Heuristic event label from the swing — we don't have hole-level
+ *  scoring data on every sample, so describe the move in plain
+ *  English ("big swing up", "small drop") rather than guessing
+ *  birdie/par/bogey we can't verify. */
+function deriveEventText(
+  dPnl: number | null,
+  dProb: number | null,
+): string | null {
+  if (dProb != null && Math.abs(dProb) >= 0.001) {
+    const abs = Math.abs(dProb);
+    if (abs >= 0.10) return dProb > 0 ? "big swing" : "big drop";
+    if (abs >= 0.03) return dProb > 0 ? "up" : "down";
+    return null;
   }
-  return history[0]?.prob ?? 0;
+  if (dPnl != null && Math.abs(dPnl) >= 0.005) {
+    return dPnl > 0 ? "up" : "down";
+  }
+  return null;
 }
 
-/** Compact win-prob format for the chart footer summary: 1
- *  decimal under 5 %, integer otherwise. */
-function formatProbForFoot(p: number): string {
-  if (!Number.isFinite(p) || p <= 0) return "—";
+function formatProbCompact(p: number): string {
+  if (!Number.isFinite(p) || p <= 0) return "0%";
   if (p >= 1) return "100%";
   const pct = p * 100;
   if (pct < 5) return `${pct.toFixed(1)}%`;
+  return `${Math.round(pct)}%`;
+}
+
+function formatProbDeltaCompact(absP: number): string {
+  const pct = absP * 100;
+  if (pct < 1) return `${pct.toFixed(1)}%`;
   return `${Math.round(pct)}%`;
 }
 
@@ -388,12 +778,6 @@ function clamp01(x: number): number {
   if (x < 0) return 0;
   if (x > 1) return 1;
   return x;
-}
-
-function tintFor(v: number, baseline: number): string {
-  if (v > baseline + 1e-6) return "bets-profit-up";
-  if (v < baseline - 1e-6) return "bets-profit-down";
-  return "";
 }
 
 function formatY(v: number, mode: Mode, currency?: BetCurrency): string {
@@ -409,16 +793,6 @@ function formatY(v: number, mode: Mode, currency?: BetCurrency): string {
   }
   const sign = v > 0 ? "+" : "−";
   return `${sign}${formatBetCurrency(Math.abs(v), currency, { maximumFractionDigits: 0 })}`;
-}
-
-function formatHoverValue(
-  v: number,
-  mode: Mode,
-  currency?: BetCurrency,
-): string {
-  if (mode === "prob") return `${v.toFixed(1)}% chance`;
-  const sign = v >= 0 ? "+" : "−";
-  return `${sign}${formatBetCurrency(Math.abs(v), currency)}`;
 }
 
 function buildYTicks(
