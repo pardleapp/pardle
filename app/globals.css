@@ -25767,19 +25767,27 @@ html.pv-theme-body .auth-chip-btn {
    ============================================================= */
 @media (min-width: 1024px) {
   .spost {
-    padding: 11px 14px;
+    padding: 9px 14px;
     gap: 10px;
     align-items: center;
   }
+  /* Top row collapses to ONE inline cluster: name · text · meta,
+     sitting tight together at the left of the card. Meta is NOT
+     pinned to the right edge — pinning it there is what creates
+     the dead-space middle on a short headline like "Bogeys the
+     4th". A trailing 1fr filler column absorbs leftover width on
+     the right (the empty space is on the right of the meta now,
+     i.e. card padding, instead of a 300px void in the middle).
+     The action row collapses to row 2 with a 3px top margin. */
   .spost-body {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, auto) auto 1fr;
     grid-template-areas:
-      "name text meta"
-      "acts acts acts";
+      "name text meta ."
+      "acts acts acts acts";
     align-items: center;
     column-gap: 10px;
-    row-gap: 4px;
+    row-gap: 3px;
   }
   /* .spost-top still wraps name + meta in the JSX — make it
      transparent to the grid so its two children get grid areas
@@ -25798,16 +25806,16 @@ html.pv-theme-body .auth-chip-btn {
   .spost-text {
     grid-area: text;
     margin: 0;
-    /* Sentence sits inline with the name, so drop the leading cap
-       that mobile uses (mobile starts the sentence on its own line
-       and capitalises). On desktop "Birdies the 18th" reads as a
-       continuation of the name → keep mid-sentence casing intact
-       via the stripPlayerName helper's existing output. */
+    min-width: 0;
+    /* Long headlines wrap (the auto grid track lets the column
+       size to content, so a one-liner is short and a long one
+       takes the room it needs). */
   }
   .pv-theme .spost-text-row,
   .spost-text-row {
     grid-area: text;
     margin: 0;
+    min-width: 0;
     align-items: center;
   }
   .pv-theme .spost-diagram,
@@ -26843,27 +26851,34 @@ summary,
   /* ── Grid shell ──────────────────────────────────────────── */
   .desktop-shell {
     display: grid;
-    /* Two columns at 1024–1279: rail + content (no right rail).
-       At ≥1280 the third column joins below. minmax(0, ...) on
-       the content column prevents grid blowout from overflowing
-       descendants. */
-    grid-template-columns: 220px minmax(0, 640px);
-    column-gap: 32px;
+    /* Narrow desktop band (1024–1279): rail + content (no right
+       rail). At ≥1280 the third column joins below. The whole grid
+       is centered as a single block — any leftover viewport width
+       lands in equal OUTER margins, never as a void between
+       columns. The 40px column-gap matches the ≥1280 layout so
+       the rail-to-content distance reads identically as the
+       viewport grows. */
+    grid-template-columns: 230px minmax(0, 620px);
+    column-gap: 40px;
     justify-content: center;
-    max-width: 892px;
+    max-width: 900px;
     margin: 0 auto;
     padding: 0 16px;
     align-items: start;
   }
 
-  /* ── Left rail (a grid item now, not fixed) ──────────────── */
+  /* ── Left rail (a grid item, NOT position: fixed — it must
+     sit inside the centered grid container as its first column,
+     otherwise wide viewports pin it to the viewport's edge while
+     the content lives in the middle, leaving a fat void between
+     them). ─────────────────────────────────────────────────── */
   .desktop-rail {
     position: sticky;
     top: 0;
     align-self: start;
     height: 100dvh;
     overflow-y: auto;
-    width: 220px;
+    width: 230px;
     padding: 22px 0 22px 0;
     display: flex;
     flex-direction: column;
@@ -26945,29 +26960,38 @@ summary,
     display: none !important;
   }
   body:has(.pv-theme) .site-footer {
-    max-width: 892px;
+    max-width: 900px;
     margin: 0 auto;
     padding: 16px;
   }
   /* +FAB — nudge inward so it sits roughly over the content
      column's right edge instead of the viewport's far-right
-     corner. The shell's max-width is 1480 on the 3-col layout
-     so this offset places the FAB just outside the content
-     column without overlapping the right rail. */
+     corner. The 3-col shell is 1320px max so half-width minus
+     ~320px puts the FAB just outside the content column without
+     overlapping the right rail. */
   .addbet-fab {
-    right: calc(50% - 240px) !important;
+    right: calc(50% - 320px) !important;
     bottom: 24px !important;
   }
 }
 
 @media (min-width: 1280px) {
-  /* Three-column shell — rail + content + context. Content stays
-     capped at 680px (readable) and the right rail expands with
-     the 1fr track so wide viewports use the width instead of
-     piling it into outer margins. */
+  /* Three-column shell — rail + content + context. Fixed column
+     widths (not 1fr) so the right rail can't absorb leftover
+     viewport width and inflate to the screen edge. Total =
+     230 + 40 + 620 + 40 + 380 = 1310px; max-width 1320 leaves a
+     small safety margin. On a 1440px viewport that's 60px outer
+     margins each side; on 1680 it's 180px each side — equal
+     gutters outside the cluster, never between the columns. */
   .desktop-shell {
-    grid-template-columns: 240px minmax(0, 680px) minmax(360px, 1fr);
-    max-width: 1480px;
+    grid-template-columns: 230px minmax(0, 620px) 380px;
+    column-gap: 40px;
+    max-width: 1320px;
+  }
+  /* Match the footer to the wider 3-col shell so it lines up with
+     the column cluster instead of looking off-center under it. */
+  body:has(.pv-theme) .site-footer {
+    max-width: 1320px;
   }
   .desktop-ctx {
     position: sticky;
