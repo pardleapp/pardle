@@ -245,6 +245,43 @@ function ChartInner({
   const activeIdx = hoverIdx ?? points.length - 1;
   const active = points[activeIdx];
 
+  // Highlights for the expanded deep-dive view: peak / low / biggest
+  // hole-to-hole swing. Each carries an index so we can pin a label
+  // to the matching point on the SVG.
+  const peakIdx = ys.reduce(
+    (best, v, i) => (v > ys[best] ? i : best),
+    0,
+  );
+  const lowIdx = ys.reduce(
+    (best, v, i) => (v < ys[best] ? i : best),
+    0,
+  );
+  let swingFromIdx = 0;
+  let swingToIdx = 0;
+  let swingMag = 0;
+  for (let i = 1; i < ys.length; i++) {
+    const m = Math.abs(ys[i] - ys[i - 1]);
+    if (m > swingMag) {
+      swingMag = m;
+      swingFromIdx = i - 1;
+      swingToIdx = i;
+    }
+  }
+  const swingDelta = ys[swingToIdx] - ys[swingFromIdx];
+  const peakPoint = points[peakIdx];
+  const lowPoint = points[lowIdx];
+
+  function holeOrTimeLabel(i: number): string {
+    if (isRound) {
+      const h = history[i]?.holesPlayed;
+      return h != null ? `H${h}` : `#${i + 1}`;
+    }
+    return new Date(history[i].t).toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
   const prevSample = activeIdx > 0 ? history[activeIdx - 1] : null;
   const prevValue = prevSample?.v;
   const prevProb =
@@ -310,6 +347,43 @@ function ChartInner({
           )}
         </div>
       </div>
+
+      {expanded && (
+        <div className="bd-chart-hero">
+          <HeroStat
+            label="Now"
+            value={formatHeroValue(ys[ys.length - 1], mode, bet.currency)}
+            sub={holeOrTimeLabel(ys.length - 1)}
+            up={ys[ys.length - 1] >= baseline}
+          />
+          <HeroStat
+            label="Peak"
+            value={formatHeroValue(ys[peakIdx], mode, bet.currency)}
+            sub={holeOrTimeLabel(peakIdx)}
+            up={true}
+          />
+          <HeroStat
+            label="Low"
+            value={formatHeroValue(ys[lowIdx], mode, bet.currency)}
+            sub={holeOrTimeLabel(lowIdx)}
+            up={false}
+          />
+          <HeroStat
+            label="Biggest swing"
+            value={
+              swingMag === 0
+                ? "—"
+                : `${swingDelta > 0 ? "+" : "−"}${formatSwingValue(Math.abs(swingDelta), mode, bet.currency)}`
+            }
+            sub={
+              swingMag === 0
+                ? ""
+                : `${holeOrTimeLabel(swingFromIdx)} → ${holeOrTimeLabel(swingToIdx)}`
+            }
+            up={swingDelta >= 0}
+          />
+        </div>
+      )}
 
       <svg
         viewBox={`0 0 ${W} ${H}`}
@@ -464,6 +538,35 @@ function ChartInner({
             opacity={activeIdx === i ? 1 : 0.85}
           />
         ))}
+
+        {/* Peak + Low pin annotations — only shown in the expanded
+            deep-dive view. They mark the most viral moments of the
+            bet's life so the user's eye lands on the narrative
+            without scrubbing for it. */}
+        {expanded && peakIdx !== lowIdx && (
+          <>
+            <ChartPin
+              x={peakPoint.x}
+              y={peakPoint.y}
+              label={`PEAK ${formatPinValue(ys[peakIdx], mode, bet.currency)}`}
+              sub={holeOrTimeLabel(peakIdx)}
+              color="#2c7a28"
+              chartW={W}
+              chartH={H}
+              direction="above"
+            />
+            <ChartPin
+              x={lowPoint.x}
+              y={lowPoint.y}
+              label={`LOW ${formatPinValue(ys[lowIdx], mode, bet.currency)}`}
+              sub={holeOrTimeLabel(lowIdx)}
+              color="#b13838"
+              chartW={W}
+              chartH={H}
+              direction="below"
+            />
+          </>
+        )}
 
         {/* Active marker — finger-tracking dot + vertical guide line.
             Larger halo on the dot improves visibility under a
@@ -691,6 +794,143 @@ function ChartCallout({
       )}
     </g>
   );
+}
+
+/** Single stat tile in the expanded modal's hero band — big bold
+ *  number + label + tiny sublabel (the hole / timestamp where the
+ *  number occurred). */
+function HeroStat({
+  label,
+  value,
+  sub,
+  up,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  up: boolean;
+}) {
+  return (
+    <div className="bd-chart-hero-stat">
+      <span className="bd-chart-hero-lbl">{label}</span>
+      <span className={`bd-chart-hero-val ${up ? "up" : "down"}`}>{value}</span>
+      {sub && <span className="bd-chart-hero-sub">{sub}</span>}
+    </div>
+  );
+}
+
+/** Small label pin drawn at a key point on the chart (PEAK / LOW).
+ *  Auto-flips above/below the marker so the label never overlaps the
+ *  line. */
+function ChartPin({
+  x,
+  y,
+  label,
+  sub,
+  color,
+  chartW,
+  chartH,
+  direction,
+}: {
+  x: number;
+  y: number;
+  label: string;
+  sub: string;
+  color: string;
+  chartW: number;
+  chartH: number;
+  direction: "above" | "below";
+}) {
+  const boxW = 92;
+  const boxH = 30;
+  let boxX = x - boxW / 2;
+  if (boxX < 8) boxX = 8;
+  if (boxX + boxW > chartW - 8) boxX = chartW - 8 - boxW;
+  const boxY =
+    direction === "above" ? Math.max(8, y - boxH - 10) : Math.min(chartH - boxH - 8, y + 12);
+
+  return (
+    <g pointerEvents="none" className="bd-chart-pin">
+      <circle cx={x} cy={y} r={5} fill={color} stroke="#fff" strokeWidth={1.5} />
+      <rect
+        x={boxX}
+        y={boxY}
+        width={boxW}
+        height={boxH}
+        rx={6}
+        fill={color}
+        opacity={0.95}
+      />
+      <text
+        x={boxX + boxW / 2}
+        y={boxY + 12}
+        textAnchor="middle"
+        fontSize="9.5"
+        fontWeight={900}
+        fill="#fff"
+        style={{ letterSpacing: "0.06em" }}
+      >
+        {label}
+      </text>
+      <text
+        x={boxX + boxW / 2}
+        y={boxY + 24}
+        textAnchor="middle"
+        fontSize="10"
+        fontWeight={700}
+        fill="#fff"
+        style={{ opacity: 0.9, fontVariantNumeric: "tabular-nums" }}
+      >
+        {sub}
+      </text>
+    </g>
+  );
+}
+
+/** Format the big hero-band stat. Prob mode shows percentage, PnL
+ *  mode shows signed currency. */
+function formatHeroValue(
+  v: number,
+  mode: Mode,
+  currency: BetCurrency | undefined,
+): string {
+  if (!Number.isFinite(v)) return "—";
+  if (mode === "prob") {
+    if (v <= 0) return "0%";
+    if (v >= 100) return "100%";
+    if (v < 5) return `${v.toFixed(1)}%`;
+    return `${Math.round(v)}%`;
+  }
+  const sign = v > 0 ? "+" : v < 0 ? "−" : "";
+  return `${sign}${formatBetCurrency(Math.abs(v), currency, { maximumFractionDigits: 0 })}`;
+}
+
+/** Format the magnitude of a swing (used in "Biggest swing" tile).
+ *  Sign is rendered separately by the caller. */
+function formatSwingValue(
+  absV: number,
+  mode: Mode,
+  currency: BetCurrency | undefined,
+): string {
+  if (mode === "prob") {
+    if (absV < 1) return `${absV.toFixed(1)}%`;
+    return `${Math.round(absV)}%`;
+  }
+  return formatBetCurrency(absV, currency, { maximumFractionDigits: 0 });
+}
+
+/** Compact value rendered inside a chart pin (PEAK 75% / LOW 8%). */
+function formatPinValue(
+  v: number,
+  mode: Mode,
+  currency: BetCurrency | undefined,
+): string {
+  if (mode === "prob") {
+    if (v < 5) return `${v.toFixed(1)}%`;
+    return `${Math.round(v)}%`;
+  }
+  const sign = v > 0 ? "+" : v < 0 ? "−" : "";
+  return `${sign}${formatBetCurrency(Math.abs(v), currency, { maximumFractionDigits: 0 })}`;
 }
 
 function ExpandIcon() {
