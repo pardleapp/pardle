@@ -45,7 +45,13 @@ interface PlayerRoundState {
 
 interface FeedSnapshot {
   tournament: { name: string; isLive: boolean } | null;
+  /** Top-30 leaderboard. Doesn't include players outside the cut
+   *  list — use playerIndex for any not-on-leaderboard lookups. */
   leaderboard: LeaderboardRow[];
+  /** Full field — every active player on the course, not just top 30.
+   *  Same shape as leaderboard. Used for player-profile lookups so a
+   *  T46 player still gets their name + position rendered. */
+  playerIndex: LeaderboardRow[];
   playerRoundStates: Record<string, PlayerRoundState>;
 }
 
@@ -187,6 +193,7 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
         setFeed({
           tournament: j.tournament ?? null,
           leaderboard: j.leaderboard ?? [],
+          playerIndex: j.playerIndex ?? [],
           playerRoundStates: j.playerRoundStates ?? {},
         });
       } catch {
@@ -292,8 +299,14 @@ export default function PlayerPageClient({ playerId, initialName }: Props) {
     };
   }, [playerId]);
 
+  // Look up the player by id. Prefer the full playerIndex (every
+  // active player in the field) over the leaderboard (top 30 only) —
+  // otherwise a player outside the cut list (e.g. T46) shows
+  // "Loading…" forever because their row isn't in leaderboard.
   const leaderboardRow =
-    feed?.leaderboard.find((r) => r.playerId === playerId) ?? null;
+    feed?.playerIndex?.find((r) => r.playerId === playerId) ??
+    feed?.leaderboard.find((r) => r.playerId === playerId) ??
+    null;
   const state = feed?.playerRoundStates?.[playerId];
   const displayName =
     leaderboardRow?.displayName ?? initialName ?? "Loading…";
