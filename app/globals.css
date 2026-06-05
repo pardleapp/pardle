@@ -26872,7 +26872,12 @@ summary,
        cluster at 1920 with proportional outer padding. */
     max-width: 1920px;
     margin: 0 auto;
-    padding: 0 clamp(16px, 3vw, 48px);
+    /* Tight outer page padding so "Pardle" brand and the right
+       rail's last column sit right against the viewport edge with
+       only a small breathing band. The previous max of 48px read
+       as a void on wide monitors; 20px is a thin gutter that lets
+       the eye rest at the edge without crowding. */
+    padding: 0 clamp(8px, 1vw, 20px);
     align-items: start;
   }
 
@@ -26972,7 +26977,7 @@ summary,
   body:has(.pv-theme) .site-footer {
     max-width: 1920px;
     margin: 0 auto;
-    padding: 16px clamp(16px, 3vw, 48px);
+    padding: 16px clamp(8px, 1vw, 20px);
   }
   /* +FAB — anchored to the right edge of the centered shell so it
      sits at the same spot relative to the content cluster, not the
@@ -26980,7 +26985,7 @@ summary,
      stays glued to the cluster; on narrower viewports the
      clamp-based padding wins so the FAB never slides off-screen. */
   .addbet-fab {
-    right: max(clamp(16px, 3vw, 48px), calc(50vw - 960px + 24px)) !important;
+    right: max(clamp(8px, 1vw, 20px), calc(50vw - 960px + 24px)) !important;
     bottom: 24px !important;
   }
 }
