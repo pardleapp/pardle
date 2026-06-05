@@ -745,9 +745,17 @@ const INACTIVE_LEADERBOARD_STATES = new Set([
 ]);
 
 /**
- * Has the tournament concluded according to the leaderboard alone?
- * Every active player must show thru="F" (or the orchestrator's "—"
- * placeholder for inactive states that slipped through the filter).
+ * Has the tournament concluded?
+ *
+ * thru="F" alone is NOT enough — at the end of R1/R2/R3 every player
+ * who finished that round shows thru="F" mid-tournament. Without the
+ * R4-completion check we'd flip outright/top-finish/winning-score
+ * bets to settled the moment R1 ended (the original Memorial bug).
+ *
+ * So we require, for every active player on the leaderboard, that
+ * their PlayerRoundState shows currentRound=4 AND holesRemaining=0.
+ * Players marked CUT/WD/MC/DQ/DNS (or thru="—" for placeholder
+ * inactive states) are skipped.
  *
  * Synchronous-safe mirror of pgatour.ts's isTournamentConcluded, but
  * without the 80h-since-start time gate — that gate is a server-side
@@ -755,13 +763,22 @@ const INACTIVE_LEADERBOARD_STATES = new Set([
  * notify-poll caller. The bet-row's last_notified_at + the cron's
  * own polling cadence give equivalent debouncing here.
  */
-function isLeaderboardFinal(players: PlayerForSettlement[]): boolean {
+function isLeaderboardFinal(
+  players: PlayerForSettlement[],
+  playerRoundStates: Record<string, PlayerRoundState>,
+): boolean {
   if (players.length === 0) return false;
+  let anyActive = false;
   for (const p of players) {
     if (p.playerState && INACTIVE_LEADERBOARD_STATES.has(p.playerState)) continue;
-    if (p.thru !== "F" && p.thru !== "—") return false;
+    if (p.thru === "—") continue;
+    if (p.thru !== "F") return false;
+    const s = playerRoundStates[p.playerId];
+    if (!s) return false;
+    if (s.currentRound !== 4 || s.holesRemaining !== 0) return false;
+    anyActive = true;
   }
-  return true;
+  return anyActive;
 }
 
 /**
@@ -791,30 +808,22 @@ export function findOutrightWinner(
   players: PlayerForSettlement[],
   playerRoundStates: Record<string, PlayerRoundState>,
 ): string | null {
-  // Orchestrator labels ties as "T1" and a sole leader as "1".
-  // Match both — the sole-vs-tied logic branches below.
+  // Gate everything on a genuinely-final leaderboard (every active
+  // player thru "F" of R4) so an "F" at the end of R1/R2/R3 can never
+  // trigger settlement. Both the sole-leader and the tied-T1 case
+  // share this gate now — the previous sole-leader fast path could
+  // settle before all R4 strokes were in, and the tied path relied
+  // on an isLeaderboardFinal that ignored which round players had
+  // finished. See the comment on isLeaderboardFinal for the bug
+  // history.
+  if (!isLeaderboardFinal(players, playerRoundStates)) return null;
   const leaders = players.filter(
     (p) => (p.position === "1" || p.position === "T1") && p.thru === "F",
   );
   if (leaders.length === 0) return null;
-
-  // Sole-winner fast path: R4 finished for the leader, no tie.
-  if (leaders.length === 1 && leaders[0].position === "1") {
-    const winner = leaders[0];
-    const state = playerRoundStates[winner.playerId];
-    if (!state) return null;
-    if (state.currentRound !== 4) return null;
-    if (state.holesRemaining !== 0) return null;
-    return winner.playerId;
-  }
-
-  // Tied at position 1: only settle once every other active player
-  // on the leaderboard has also finished. Otherwise we'd flip a
-  // playoff bet as settled the second R4 ended, before the playoff
-  // resolved. Once the board is genuinely final, return the first
-  // leader — downstream settlement reads the actual position string,
-  // so any backer of a co-winner still settles as won.
-  if (!isLeaderboardFinal(players)) return null;
+  // For tied finishes, downstream settlement reads the actual
+  // position string on the bet's player row — any backer of a
+  // co-winner still settles as won (dead-heat).
   return leaders[0].playerId;
 }
 

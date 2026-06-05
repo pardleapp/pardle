@@ -127,6 +127,47 @@ function liveProbFor(bet: TrackedBet, slice: FeedSlice): number | null {
   return null; // winning-score live prob would need extra plumbing; falls back below
 }
 
+/**
+ * Repair a previously-mis-settled non-round-score bet. Returns the
+ * un-settled bet (with settlement fields cleared) when:
+ *   - bet is outright / top-finish / winning-score
+ *   - the (corrected) tournament-final detector says it shouldn't be
+ *     settled yet
+ *   - we have enough leaderboard data to make that call confidently
+ *
+ * Round-score bets are never un-settled — once a round is complete
+ * the result is final. The original mis-settle bug was confined to
+ * the tournament-level bet kinds.
+ *
+ * Returns null when the bet should stay settled (genuinely concluded
+ * tournament, or insufficient data to make a call — leaving it alone
+ * is the safe fallback).
+ */
+function maybeUnsettleNonRoundScore(
+  bet: TrackedBet,
+  slice: FeedSlice,
+): TrackedBet | null {
+  if (bet.kind === "round-score") return null;
+  if (!slice.leaderboardById) return null;
+  const players = Object.entries(slice.leaderboardById).map(
+    ([playerId, info]) => ({
+      playerId,
+      position: info.position,
+      thru: info.thru,
+      playerState: info.playerState,
+    }),
+  );
+  if (players.length === 0) return null;
+  const decision = detectBetSettlement(
+    bet as OutrightBet | TopFinishBet | WinningScoreBet,
+    players,
+    slice.playerRoundStates,
+    slice.tournamentProjections ?? {},
+  );
+  if (decision) return null; // tournament really is final
+  return { ...bet, settledAt: null, settledWon: null } as TrackedBet;
+}
+
 function playerIdOf(bet: TrackedBet): string | null {
   return "playerId" in bet ? (bet as { playerId: string }).playerId : null;
 }
@@ -378,10 +419,6 @@ export function useRealBets(): UseRealBetsResult {
     // Newest first.
     const sorted = [...bets].sort((a, b) => b.placedAt - a.placedAt);
     for (const b of sorted) {
-      if (b.settledAt != null && b.settledWon != null) {
-        settledOut.push(adaptToSettled(b));
-        continue;
-      }
       // Resolve the bet's playerId against the live leaderboard
       // before any state lookups (dg-* ids from pre-tournament
       // placements get reconciled here).
@@ -392,6 +429,29 @@ export function useRealBets(): UseRealBetsResult {
         }),
       );
       const resolvedPid = resolveBetPlayerId(b, leaderboardForResolve);
+
+      if (b.settledAt != null && b.settledWon != null) {
+        // Repair mis-settled bets — an earlier build of
+        // isLeaderboardFinal flipped outright / top-finish /
+        // winning-score to settled the second R1 ended, before any
+        // winner was determined. Re-run the (now corrected)
+        // detector against the live leaderboard; if it disagrees
+        // (a previously-settled bet now reads as not-yet-settled)
+        // wipe the settlement fields, persist the repair, and put
+        // the bet back in the Live bucket.
+        const unsettled = maybeUnsettleNonRoundScore(b, s);
+        if (unsettled) {
+          healed.push(unsettled);
+          dirty = true;
+          liveOut.push(adaptToLive(unsettled, s));
+          continue;
+        }
+        // Round-score bets that are settled stay settled — once the
+        // round is complete the result is final regardless of the
+        // wider tournament.
+        settledOut.push(adaptToSettled(b));
+        continue;
+      }
 
       // Round-score bets: if the round is complete, the bet is
       // settled even though no cron has stamped settledAt yet.

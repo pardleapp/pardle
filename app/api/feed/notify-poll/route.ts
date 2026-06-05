@@ -57,6 +57,7 @@ export const maxDuration = 60;
 const SWING_PP = 15;
 const SWING_VALUE_REL = 0.4;
 const COOLDOWN_MS = 30 * 60 * 1000;
+const BET_PAGE_SIZE_REPAIR = 1000;
 /** Don't push events older than this when the cron catches a backlog.
  *  A birdie 8 minutes old is a confusing notification — the user
  *  already saw it (or didn't care). */
@@ -371,6 +372,69 @@ async function handle(req: Request) {
   }
 
   const admin = getSupabaseAdmin();
+
+  // Repair pass: an earlier build of isLeaderboardFinal returned true
+  // the second every player reached thru="F" of any round (so it
+  // flipped outright / top-finish / winning-score bets to settled at
+  // the end of R1). Re-run the now-corrected detector against every
+  // already-settled tournament-level bet for the active tournament —
+  // when it disagrees, clear the settlement fields so the bet returns
+  // to live. Round-score settlements are NEVER reversed here (a
+  // completed round's result is final regardless of tournament).
+  let unsettled = 0;
+  {
+    const settledRows: Array<{ id: string; kind: string; data: Record<string, unknown> }> = [];
+    let pageStart = 0;
+    for (;;) {
+      const { data: pageRows, error: pageErr } = await admin
+        .from("bets")
+        .select("id, kind, data")
+        .is("removed_at", null)
+        .not("settled_at", "is", null)
+        .in("kind", ["outright", "top-finish", "winning-score"])
+        .range(pageStart, pageStart + BET_PAGE_SIZE_REPAIR - 1);
+      if (pageErr) break;
+      const arr = (pageRows ?? []) as typeof settledRows;
+      if (arr.length === 0) break;
+      settledRows.push(...arr);
+      if (arr.length < BET_PAGE_SIZE_REPAIR) break;
+      pageStart += BET_PAGE_SIZE_REPAIR;
+    }
+    for (const r of settledRows) {
+      const d = r.data as { tournamentId?: string };
+      if (d?.tournamentId !== tournamentId) continue;
+      const bet = rowToBet({
+        id: r.id,
+        user_id: "",
+        kind: r.kind,
+        data: r.data,
+        placed_at: new Date().toISOString(),
+        author_key: null,
+        last_notified_prob: null,
+        last_notified_value: null,
+        last_notified_at: null,
+        notif_mode: "all",
+        notif_crossed_50_up: false,
+        notif_crossed_50_down: false,
+        notif_crossed_80: false,
+        notif_crossed_20: false,
+      });
+      if (!bet || bet.kind === "round-score") continue;
+      const decision = detectBetSettlement(
+        bet,
+        bundle.leaderboard,
+        playerRoundStates,
+        tournamentProjections,
+      );
+      if (decision) continue; // tournament really IS final
+      await admin
+        .from("bets")
+        .update({ settled_at: null, settled_won: null } as never)
+        .eq("id", r.id);
+      unsettled++;
+    }
+  }
+
   // Pull every candidate bet across users — paginated since
   // Supabase JS silently caps at 1000 rows per response.
   const BET_PAGE_SIZE = 1000;
@@ -612,6 +676,7 @@ async function handle(req: Request) {
     followNotified,
     predPollsSettled,
     gonePruned,
+    unsettled,
   });
 }
 
