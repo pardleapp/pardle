@@ -26976,22 +26976,26 @@ summary,
 }
 
 @media (min-width: 1280px) {
-  /* Three-column shell — rail + content + context. Fixed column
-     widths (not 1fr) so the right rail can't absorb leftover
-     viewport width and inflate to the screen edge. Total =
-     230 + 40 + 620 + 40 + 380 = 1310px; max-width 1320 leaves a
-     small safety margin. On a 1440px viewport that's 60px outer
-     margins each side; on 1680 it's 180px each side — equal
-     gutters outside the cluster, never between the columns. */
+  /* Three-column shell. Fixed column widths (no 1fr) so the right
+     rail can't inflate to the viewport edge — leftover width lands
+     in equal outer margins. The cluster widens at three breakpoints
+     (1280 / 1600 / 1900) so 1440 / 1680 / 1920+ monitors use their
+     space instead of leaving 300px white gutters; the column
+     proportions stay constant, just bigger. The 1600 and 1900
+     overrides live in their own @media blocks below this one. */
   .desktop-shell {
-    grid-template-columns: 230px minmax(0, 620px) 380px;
-    column-gap: 40px;
-    max-width: 1320px;
+    grid-template-columns: 250px minmax(0, 720px) 410px;
+    column-gap: 48px;
+    max-width: 1500px;
   }
-  /* Match the footer to the wider 3-col shell so it lines up with
-     the column cluster instead of looking off-center under it. */
   body:has(.pv-theme) .site-footer {
-    max-width: 1320px;
+    max-width: 1500px;
+  }
+  .desktop-rail {
+    width: 100%;
+  }
+  .addbet-fab {
+    right: calc(50% - 360px) !important;
   }
   .desktop-ctx {
     position: sticky;
@@ -27325,5 +27329,35 @@ summary,
   }
 }
 
+/* Shell width step-ups for wider monitors. Each block only
+   overrides the things that change with viewport (column widths,
+   footer width, FAB anchor) — the .desktop-ctx / .rail-chat
+   styling above doesn't repeat because none of it is width-
+   dependent. */
+@media (min-width: 1600px) {
+  .desktop-shell {
+    grid-template-columns: 270px minmax(0, 800px) 460px;
+    column-gap: 52px;
+    max-width: 1640px;
+  }
+  body:has(.pv-theme) .site-footer {
+    max-width: 1640px;
+  }
+  .addbet-fab {
+    right: calc(50% - 400px) !important;
+  }
+}
 
-
+@media (min-width: 1900px) {
+  .desktop-shell {
+    grid-template-columns: 290px minmax(0, 880px) 500px;
+    column-gap: 56px;
+    max-width: 1780px;
+  }
+  body:has(.pv-theme) .site-footer {
+    max-width: 1780px;
+  }
+  .addbet-fab {
+    right: calc(50% - 440px) !important;
+  }
+}
