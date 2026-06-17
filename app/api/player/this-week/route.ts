@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Redis } from "@upstash/redis";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
 import { getFeedBundle } from "@/lib/feed/store";
 import {
@@ -8,6 +9,30 @@ import {
 } from "@/lib/feed/live-stats-cache";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Two-layer cache:
+ *
+ *   CDN (s-maxage=20, swr=60)  — repeat polls served from the edge
+ *     without invoking the function. Twenty seconds is well inside
+ *     DataGolf's own ~2 min upstream lag, so it costs no perceived
+ *     freshness.
+ *
+ *   Redis (45 s TTL, key by playerId + tournament id) — catches
+ *     cache misses across cold starts and edge regions. The
+ *     underlying live-stats cache already holds the field-wide DG
+ *     payload for 5 min, so the only work this saves is the
+ *     name lookup + 11 field-rank loops per request. Cheap, but
+ *     multiplied across every poll for every viewer it adds up.
+ */
+const redis = Redis.fromEnv();
+const CACHE_TTL_S = 45;
+const CDN_HEADERS = {
+  "Cache-Control": "public, s-maxage=20, stale-while-revalidate=60",
+};
+function cacheKey(playerId: string, tournamentId: string): string {
+  return `route:player:this-week:v1:${tournamentId}:${playerId}`;
+}
 
 /**
  * GET /api/player/this-week?playerId=X
@@ -73,6 +98,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ found: false, reason: "no-tournament" });
     }
     const tournamentId = active.tournament.id;
+
+    // Route-layer cache check before any work.
+    const key = cacheKey(playerId, tournamentId);
+    const cached = await redis.get<Record<string, unknown>>(key).catch(() => null);
+    if (cached) {
+      return NextResponse.json(cached, { headers: CDN_HEADERS });
+    }
 
     const bundle = await getFeedBundle(tournamentId);
     const row = bundle.leaderboard.find((r) => r.playerId === playerId);
@@ -238,7 +270,7 @@ export async function GET(req: Request) {
       ? `event total · ${sgTotalRank.rankLabel} of ${sgTotalRank.outOf}`
       : "";
 
-    return NextResponse.json({
+    const payload = {
       found: true,
       playerId,
       displayName: row.displayName,
@@ -249,7 +281,9 @@ export async function GET(req: Request) {
       sg,
       perRound,
       advanced: adv,
-    });
+    };
+    await redis.set(key, payload, { ex: CACHE_TTL_S }).catch(() => undefined);
+    return NextResponse.json(payload, { headers: CDN_HEADERS });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "server-error" },

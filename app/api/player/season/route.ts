@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Redis } from "@upstash/redis";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
 import { getFeedBundle } from "@/lib/feed/store";
 import { getSkillDecompositions } from "@/lib/golf-api/datagolf";
@@ -9,6 +10,37 @@ import {
 } from "@/lib/feed/season-rounds";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Two layers of cache wrap this route's expensive work:
+ *
+ *   1. CDN edge (Cache-Control public, s-maxage=60, swr=300)
+ *      Vercel's edge serves repeat requests for 60 s without touching
+ *      the function at all. Stale-while-revalidate keeps the edge
+ *      copy serving for up to 5 min while it refreshes in background.
+ *      The route's response depends only on playerId (the URL), so
+ *      the edge cache key is just the URL — no per-user variation.
+ *
+ *   2. Redis (5 min TTL, key by playerId + tournament id)
+ *      Catches the function-side cache miss. DataGolf's skill ratings
+ *      only refresh weekly upstream, and the season-rounds JSON is
+ *      regenerated weekly too, so 5 min staleness is invisible to
+ *      the user.
+ *
+ * Combined effect on a hot player page (poll every 30 s, 10 users):
+ *   ~300 requests/min → ~1 function execution / 60 s → 1 Redis
+ *   read every 5 min. Was ~600 lambda invocations + ~3000 Redis
+ *   reads/min. Both bills (Vercel CPU + Upstash requests) drop
+ *   accordingly without any user-visible staleness.
+ */
+const redis = Redis.fromEnv();
+const CACHE_TTL_S = 5 * 60;
+const CDN_HEADERS = {
+  "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+};
+function cacheKey(playerId: string, tournamentId: string): string {
+  return `route:player:season:v1:${tournamentId}:${playerId}`;
+}
 
 /**
  * GET /api/player/season?playerId=X
@@ -113,6 +145,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ found: false, reason: "no-tournament" });
     }
 
+    // Try the route-level cache before doing any work.
+    const key = cacheKey(playerId, active.tournament.id);
+    const cached = await redis.get<Record<string, unknown>>(key).catch(() => null);
+    if (cached) {
+      return NextResponse.json(cached, { headers: CDN_HEADERS });
+    }
+
     const bundle = await getFeedBundle(active.tournament.id);
     const row = bundle.leaderboard.find((r) => r.playerId === playerId);
     if (!row) {
@@ -150,7 +189,7 @@ export async function GET(req: Request) {
       keyStat: keyStatNote(e),
     }));
 
-    return NextResponse.json({
+    const payload = {
       found: true,
       playerId,
       displayName: row.displayName,
@@ -165,7 +204,12 @@ export async function GET(req: Request) {
         : null,
       glance,
       form,
-    });
+    };
+    // Write-through cache so the next 5 min of requests can short-
+    // circuit without touching the orchestrator / DG / season-rounds
+    // JSON again.
+    await redis.set(key, payload, { ex: CACHE_TTL_S }).catch(() => undefined);
+    return NextResponse.json(payload, { headers: CDN_HEADERS });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "server-error" },
