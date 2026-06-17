@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import { getActiveTournament } from "@/lib/golf-api/pgatour";
+import { getActiveTournament, getLeaderboard } from "@/lib/golf-api/pgatour";
 import { getFeedBundle } from "@/lib/feed/store";
 import {
   fieldRank,
@@ -95,7 +95,10 @@ export async function GET(req: Request) {
 
     const active = await getActiveTournament().catch(() => null);
     if (!active) {
-      return NextResponse.json({ found: false, reason: "no-tournament" });
+      return NextResponse.json(
+        { found: false, reason: "no-tournament" },
+        { headers: CDN_HEADERS },
+      );
     }
     const tournamentId = active.tournament.id;
 
@@ -107,19 +110,43 @@ export async function GET(req: Request) {
     }
 
     const bundle = await getFeedBundle(tournamentId);
-    const row = bundle.leaderboard.find((r) => r.playerId === playerId);
+    // Same orchestrator-fallback as /api/player/season — covers the
+    // pre-tournament / off-week window when bundle.leaderboard is
+    // empty but DG live stats may already have field data.
+    let row = bundle.leaderboard.find((r) => r.playerId === playerId) ?? null;
     if (!row) {
-      return NextResponse.json({ found: false, reason: "not-on-leaderboard" });
+      try {
+        const fresh = await getLeaderboard(tournamentId);
+        const f = fresh.find((r) => r.playerId === playerId);
+        if (f) {
+          row = {
+            playerId: f.playerId,
+            displayName: f.displayName,
+            position: f.position,
+            total: f.total,
+            thru: f.thru,
+            playerState: f.playerState,
+          };
+        }
+      } catch {
+        /* leave row null */
+      }
+    }
+    if (!row) {
+      return NextResponse.json(
+        { found: false, reason: "not-on-leaderboard" },
+        { headers: CDN_HEADERS },
+      );
     }
 
     // Field-wide payload for the event-average view. Cached 5 min.
     const eventStats = await getLiveStatsCached(tournamentId, "event_avg");
     const me = findStatsByName(eventStats, row.displayName);
     if (!me) {
-      return NextResponse.json({
-        found: false,
-        reason: "not-in-dg-live-stats",
-      });
+      return NextResponse.json(
+        { found: false, reason: "not-in-dg-live-stats" },
+        { headers: CDN_HEADERS },
+      );
     }
 
     const outOf = eventStats.length;

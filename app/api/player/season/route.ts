@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import { getActiveTournament } from "@/lib/golf-api/pgatour";
+import { getActiveTournament, getLeaderboard } from "@/lib/golf-api/pgatour";
 import { getFeedBundle } from "@/lib/feed/store";
 import { getSkillDecompositions } from "@/lib/golf-api/datagolf";
 import {
@@ -142,7 +142,10 @@ export async function GET(req: Request) {
 
     const active = await getActiveTournament().catch(() => null);
     if (!active) {
-      return NextResponse.json({ found: false, reason: "no-tournament" });
+      return NextResponse.json(
+        { found: false, reason: "no-tournament" },
+        { headers: CDN_HEADERS },
+      );
     }
 
     // Try the route-level cache before doing any work.
@@ -153,9 +156,34 @@ export async function GET(req: Request) {
     }
 
     const bundle = await getFeedBundle(active.tournament.id);
-    const row = bundle.leaderboard.find((r) => r.playerId === playerId);
+    // Pre-tournament / off-week: bundle.leaderboard is empty. Fall
+    // back to a direct orchestrator fetch so player-profile pages
+    // still resolve a name between events (same priority order
+    // /api/feed's playerIndex builder uses).
+    let row = bundle.leaderboard.find((r) => r.playerId === playerId) ?? null;
     if (!row) {
-      return NextResponse.json({ found: false, reason: "not-on-leaderboard" });
+      try {
+        const fresh = await getLeaderboard(active.tournament.id);
+        const f = fresh.find((r) => r.playerId === playerId);
+        if (f) {
+          row = {
+            playerId: f.playerId,
+            displayName: f.displayName,
+            position: f.position,
+            total: f.total,
+            thru: f.thru,
+            playerState: f.playerState,
+          };
+        }
+      } catch {
+        /* leave row null */
+      }
+    }
+    if (!row) {
+      return NextResponse.json(
+        { found: false, reason: "not-on-leaderboard" },
+        { headers: CDN_HEADERS },
+      );
     }
 
     // Per-round DG skill ratings (refreshed weekly upstream).
