@@ -5,6 +5,10 @@ import { Fragment, useCallback, useEffect, useRef, useState, type JSX } from "re
 import type { Burst, CachedLeaderboardRow } from "@/lib/feed/store";
 import type { FeedRow } from "@/lib/feed/types";
 import {
+  buildSmartImpactSet,
+  isMaterialEvent,
+} from "@/lib/feed/smart-filter";
+import {
   DEFAULT_ODDS_FORMAT,
   formatOdds,
   ODDS_FORMAT_STORAGE_KEY,
@@ -906,22 +910,22 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     if (ev.type !== "putt-poll") return true;
     return ev.pollId != null && ev.pollId === _latestOpenPollIdForFilter;
   });
-  // Bet-relevance set — player ids the user has an active tracked bet
-  // on. Drives the Smart-feed filter: when active, only show shots
-  // that touch one of these players, plus any bet posts themselves.
-  const trackedPlayerIds = new Set<string>();
-  for (const b of trackedBets) {
-    if (b.settledAt != null) continue;
-    if ("playerId" in b && b.playerId) trackedPlayerIds.add(b.playerId);
-  }
-  // Smart mode filters to shots that touch a tracked-bet player;
-  // everything else stays in the regular interleaved stream.
-  // Best/Worst-of-day live in the inline ShotsReel further down,
-  // not as feed filters anymore.
+  // Smart-feed impact set — Tier 1 per-kind heuristic:
+  //   - round-score  → owned player only, every shot
+  //   - outright     → owned + top-5 by current odds, notable only
+  //   - top-finish   → owned + bubble around cutoff, notable only
+  //   - winning-score→ top-10 by leaderboard, notable only
+  // Built once per render from the current feed slice; the filter then
+  // gates each row through isMaterialEvent().
+  const smartImpact = buildSmartImpactSet({
+    bets: trackedBets,
+    leaderboard: data.leaderboard,
+    currentOdds: data.currentOdds,
+  });
   const visibleRows = (() => {
     if (filterMode === "smart") {
       return rowsAfterPollFilter.filter((r) =>
-        trackedPlayerIds.has(r.event.playerId),
+        isMaterialEvent(r.event, smartImpact),
       );
     }
     return rowsAfterPollFilter;
@@ -1039,10 +1043,12 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       <main className="feed-main">
 
       {/* Filter row — All / ✦ Smart. Smart only renders when the
-          user has a tracked bet (no point offering bet-relevance
-          when there's nothing to be relevant to). Best/Worst lives
-          inline in the ShotsReel further down. */}
-      {trackedPlayerIds.size > 0 && (
+          user has at least one active tracked bet. We test bets
+          directly (not trackedPlayerIds.size) because winning-score
+          bets have no playerId but DO drive the Smart feed via the
+          top-of-leaderboard contender set. Best/Worst lives inline
+          in the ShotsReel further down. */}
+      {trackedBets.some((b) => b.settledAt == null) && (
         <div className="feed-filter-row">
           <button
             type="button"
