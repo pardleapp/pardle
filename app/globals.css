@@ -26956,20 +26956,27 @@ summary,
      small even margins (proportional, not a 300px void). */
   .desktop-shell {
     display: grid;
-    /* Three fixed-ish tracks — feed capped at ~480px (cards fill
-       it edge-to-edge with no right-side hollow), right rail at
-       ~440px (it carries the bulk of the rich content — leaderboard,
-       Now Playing, bets, chat — and earns the room), nav at 240px.
-       Outer viewport overflow lands in `margin:0 auto` outer
-       gutters, not between columns. */
+    /* Three tracks — nav fixed-ish (~240), feed capped at ~520 so
+       cards stay readable, right rail is 1fr so it ABSORBS the
+       leftover viewport width instead of letting it dump as a
+       trailing void. The previous (all-fixed) layout left ~340px
+       trailing void on a 1537px viewport because grid put all
+       slack after the last fixed track. With 1fr on the rail the
+       container has no internal slack at all; the rail expands to
+       hold the wider leaderboard / chat. A max-width cap stops
+       the rail growing past readability on 4K — beyond the cap,
+       `margin: 0 auto` splits the remainder into balanced
+       left+right gutters (never a one-sided void). */
     grid-template-columns:
-      clamp(200px, 16vw, 240px)
-      clamp(420px, 32vw, 480px)
-      clamp(360px, 28vw, 440px);
+      clamp(180px, 16vw, 240px)
+      clamp(400px, 32vw, 520px)
+      minmax(340px, 1fr);
     column-gap: clamp(20px, 2vw, 32px);
     width: 100%;
+    max-width: 1800px;
     margin: 0 auto;
     padding: 0 clamp(8px, 1vw, 20px);
+    justify-content: center;
     align-items: start;
   }
 
