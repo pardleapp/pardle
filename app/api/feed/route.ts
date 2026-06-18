@@ -213,7 +213,7 @@ async function handle(req: Request) {
     const gotLock = await acquirePollLock(tournament.id);
     if (gotLock) {
       try {
-        await pollAndDiff(tournament.id);
+        await pollAndDiff(tournament.id, tournament.name);
         polled = true;
       } catch (err) {
         console.error("[feed] pollAndDiff failed", err);

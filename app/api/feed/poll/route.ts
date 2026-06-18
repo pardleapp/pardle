@@ -50,7 +50,10 @@ export async function GET(req: Request) {
   }
 
   try {
-    const result = await pollAndDiff(active.tournament.id);
+    const result = await pollAndDiff(
+      active.tournament.id,
+      active.tournament.name,
+    );
     return NextResponse.json({
       polled: true,
       tournament: active.tournament.id,

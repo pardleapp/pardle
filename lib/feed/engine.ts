@@ -66,6 +66,7 @@ import {
 import { seasonFormTag } from "./season-form";
 import { samplePositions } from "./position-trajectory";
 import { openPredictionPoll } from "./prediction-polls";
+import { fieldOverParForTournament } from "./round-defaults";
 
 /** Player states we don't poll scorecards for. */
 const INACTIVE_STATES = new Set([
@@ -143,6 +144,7 @@ export interface PollResult {
 
 export async function pollAndDiff(
   tournamentId: string,
+  tournamentName?: string | null,
 ): Promise<PollResult> {
   const leaderboard = await getLeaderboard(tournamentId);
   if (leaderboard.length === 0) {
@@ -190,7 +192,7 @@ export async function pollAndDiff(
   // Open prediction polls when their triggers fire. Each call is
   // idempotent via a per-tournament dedup flag, so calling on
   // every pollAndDiff tick is cheap.
-  await maybeOpenPredictionPolls(tournamentId, leaderboard).catch((err) => {
+  await maybeOpenPredictionPolls(tournamentId, tournamentName ?? null, leaderboard).catch((err) => {
     console.error("[engine] maybeOpenPredictionPolls failed", err);
   });
 
@@ -830,6 +832,7 @@ function toParOf(total: string): number | null {
  */
 async function maybeOpenPredictionPolls(
   tournamentId: string,
+  tournamentName: string | null,
   leaderboard: Array<{
     playerId: string;
     displayName: string;
@@ -987,7 +990,13 @@ async function maybeOpenPredictionPolls(
         if (!parsForRound) continue;
         const roundPar = sumRoundPars(parsForRound);
         if (roundPar == null) continue;
-        const expected = roundPar - sg;
+        // Include the tournament's pre-data field-over-par default
+        // so US Open R1 lines anchor near the player's actual
+        // expected (Scheffler ≈ 72) instead of a par-anchored 67.
+        // Same intuition the round-score model uses: field default
+        // + course par − DataGolf skill.
+        const fieldOverPar = fieldOverParForTournament(tournamentName);
+        const expected = roundPar + fieldOverPar - sg;
         const line = roundToHalfStrokeUnder(expected);
         await openPredictionPoll({
           type: "round-over-under",
