@@ -25832,8 +25832,26 @@ html.pv-theme-body .auth-chip-btn {
 .spost-diagram-col > * {
   width: 100%;
 }
-.post-act-row {
+/* Inside a shot card, the action row stays tight on the LEFT
+   directly under the headline — none of the global flex:1 / margin:
+   auto spreading that the bet-card / bp-foot two-row layouts use.
+   The score anchor is the right edge; nothing else floats. */
+.spost .post-act-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 3px;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+}
+.spost .rxn-group,
+.spost .rxn-pills {
+  flex: 0 1 auto;
+}
+.spost .post-act-ctx {
+  margin-left: 0;
+  max-width: none;
 }
 .spost-act {
   display: inline-flex;
