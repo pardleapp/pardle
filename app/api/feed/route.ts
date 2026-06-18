@@ -35,6 +35,7 @@ import {
   type TopFinishSnapshot,
 } from "@/lib/feed/top-finish-cache";
 import { ensurePlayerSkill } from "@/lib/feed/skill-cache";
+import { fallbackHoleMean } from "@/lib/feed/round-defaults";
 import { findOddsShift } from "@/lib/feed/odds-store";
 import { getInPlayTopFinish } from "@/lib/golf-api/datagolf";
 import { getLiveStatsCached } from "@/lib/feed/live-stats-cache";
@@ -663,6 +664,7 @@ async function handle(req: Request) {
       bundle.pars,
       fieldStats,
       playerSkill,
+      fallbackHoleMean(tournament.name),
       leaderboard,
       null,
     );
@@ -1061,6 +1063,7 @@ function computePlayerRoundStates(
   pars: import("@/lib/feed/store").FeedBundle["pars"],
   fieldStats: FieldHoleStats,
   playerSkill: PlayerSkillMap,
+  fallbackMean: number,
   leaderboard: import("@/lib/feed/store").CachedLeaderboardRow[],
   fieldDrift: FieldDrift | null,
 ): {
@@ -1093,7 +1096,12 @@ function computePlayerRoundStates(
 
   /** Per-hole (mean, variance). Walks fall-back hierarchy if the
    *  current-round sample for this hole is too thin: try every prior
-   *  round of the same hole; fail over to par + constant variance. */
+   *  round of the same hole; fail over to the tournament's
+   *  pre-data field-over-par default (so US Open R1 doesn't assume
+   *  par scoring before any holes are in — see
+   *  lib/feed/round-defaults.ts). The DataGolf skill prior still
+   *  subtracts off this default, so a +3 SG player on a +5 field
+   *  default projects course par + 2. */
   function holeStat(
     round: number,
     hole: number,
@@ -1106,7 +1114,7 @@ function computePlayerRoundStates(
         return { mean: prior.mean, variance: prior.variance };
       }
     }
-    return { mean: 0, variance: FALLBACK_VAR };
+    return { mean: fallbackMean, variance: FALLBACK_VAR };
   }
 
   for (const [pid, byRound] of Object.entries(snap.holes)) {

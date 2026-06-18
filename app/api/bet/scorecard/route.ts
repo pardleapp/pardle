@@ -5,6 +5,7 @@ import {
   getFeedBundle,
 } from "@/lib/feed/store";
 import { ensurePlayerSkill } from "@/lib/feed/skill-cache";
+import { fallbackHoleMean } from "@/lib/feed/round-defaults";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,7 @@ export async function GET(req: Request) {
     }
 
     let tournamentId: string;
+    let tournamentName: string | null = null;
     if (tournamentIdOverride) {
       tournamentId = tournamentIdOverride;
     } else {
@@ -65,6 +67,7 @@ export async function GET(req: Request) {
         return NextResponse.json({ holes: [], roundPar: 0 });
       }
       tournamentId = active.tournament.id;
+      tournamentName = active.tournament.name;
     }
 
     const cards = await getScorecards(tournamentId, [playerId]);
@@ -123,6 +126,7 @@ export async function GET(req: Request) {
     type HoleStat = { mean: number; variance: number };
     const MIN_SAMPLE = 10;
     const FALLBACK_VAR = 0.65;
+    const fallbackMean = fallbackHoleMean(tournamentName);
     const holeStats: Record<number, HoleStat> = {};
     for (const h of all) {
       const s = fieldStats[round]?.[h.holeNumber];
@@ -143,7 +147,7 @@ export async function GET(req: Request) {
         }
       }
       if (!resolved) {
-        holeStats[h.holeNumber] = { mean: 0, variance: FALLBACK_VAR };
+        holeStats[h.holeNumber] = { mean: fallbackMean, variance: FALLBACK_VAR };
       }
     }
 
