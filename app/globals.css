@@ -26969,11 +26969,10 @@ summary,
        left+right gutters (never a one-sided void). */
     grid-template-columns:
       clamp(180px, 16vw, 240px)
-      clamp(400px, 32vw, 520px)
-      minmax(340px, 1fr);
+      clamp(440px, 36vw, 580px)
+      clamp(320px, 30vw, 460px);
     column-gap: clamp(20px, 2vw, 32px);
     width: 100%;
-    max-width: 1800px;
     margin: 0 auto;
     padding: 0 clamp(8px, 1vw, 20px);
     justify-content: center;
