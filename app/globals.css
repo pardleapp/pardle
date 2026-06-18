@@ -21251,8 +21251,10 @@ html.pv-theme-body .auth-chip-btn {
   .bets-pv {
     padding: 0;
   }
-  /* Mobile summary slab → hidden; the stat strip carries it now. */
-  .bets-summary-mobile {
+  /* Mobile summary slab → hidden; the stat strip carries it now.
+     Specificity needs to beat the base `.bets-summary { display:flex }`
+     rule that sits after this in the cascade. */
+  .bets-pv .bets-summary-mobile {
     display: none;
   }
 
