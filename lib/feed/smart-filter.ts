@@ -72,13 +72,18 @@ export function buildSmartImpactSet({
   const everyShot = new Set<string>();
   const notableOnly = new Set<string>();
 
-  // Pre-rank players for outright top-K (descending current prob).
+  // Pre-rank players for outright top-K. `currentOdds` is DECIMAL
+  // ODDS (api/feed: `1 / dgProb` or Polymarket's `p` field — both
+  // decimal-odds-equivalent), so the favourites are the SMALLEST
+  // numbers — Scheffler ~3.5, not Tosti at 200+. Sort ascending,
+  // and gate on odds > 1 to drop garbage values (broken data /
+  // illiquid markets that report 0 or 1.0 as "no signal").
   let topByOddsIds: string[] | null = null;
   const getTopByOdds = () => {
     if (topByOddsIds !== null) return topByOddsIds;
     topByOddsIds = Object.entries(currentOdds)
-      .filter(([, p]) => typeof p === "number" && p > 0)
-      .sort((a, b) => b[1] - a[1])
+      .filter(([, odds]) => typeof odds === "number" && odds > 1)
+      .sort((a, b) => a[1] - b[1])
       .slice(0, OUTRIGHT_TOP_K)
       .map(([pid]) => pid);
     return topByOddsIds;
