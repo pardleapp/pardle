@@ -20663,6 +20663,12 @@ html.pv-theme-body .auth-chip-btn {
   background: var(--pv-soft);
   border: 1px solid var(--pv-line);
   color: var(--pv-ink);
+  /* Tighter than the dark-theme defaults (12px 14px / 48px) — the
+     Yes/No rows were carrying generous internal padding that read
+     hollow next to the denser shot cards below. */
+  padding: 9px 12px;
+  min-height: 38px;
+  font-size: 13.5px;
 }
 .pv-theme .predpoll-option.mine,
 .pv-theme .predpoll-opt.mine {
@@ -25737,14 +25743,14 @@ html.pv-theme-body .auth-chip-btn {
   margin-left: 4px;
 }
 .spost-body {
-  /* flex:1 was leaving a wide hollow band on desktop between
-     left-packed content and the right-edge anchor. fit-content
-     keeps the body sized to its 3-line stack so the anchor abuts
-     it directly — any remaining card width sits to the right of
-     the anchor as edge padding, not an internal void. */
-  flex: 0 1 auto;
+  /* Left block: grows to absorb all slack. The action row + headline
+     stay left-packed (action row is width:fit-content via the .spost
+     scoped override) so the empty right portion of the body is just
+     the absorbed slack — the anchor that follows it is pinned to the
+     row's right edge. With the feed column at 480px the slack is
+     narrow enough that the card reads as one tight unit. */
+  flex: 1 1 0;
   min-width: 0;
-  max-width: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -25794,7 +25800,9 @@ html.pv-theme-body .auth-chip-btn {
   justify-content: center;
   gap: 4px;
   min-width: 52px;
-  margin-left: 4px;
+  /* margin-left:auto belt-and-braces: even if the body ever stops
+     growing, the anchor stays flush to the card's right edge. */
+  margin-left: auto;
 }
 .spost-tag {
   font-size: 9.5px;
@@ -26948,21 +26956,19 @@ summary,
      small even margins (proportional, not a 300px void). */
   .desktop-shell {
     display: grid;
+    /* Three fixed-ish tracks — feed capped at ~480px (cards fill
+       it edge-to-edge with no right-side hollow), right rail at
+       ~440px (it carries the bulk of the rich content — leaderboard,
+       Now Playing, bets, chat — and earns the room), nav at 240px.
+       Outer viewport overflow lands in `margin:0 auto` outer
+       gutters, not between columns. */
     grid-template-columns:
-      clamp(220px, 18vw, 300px)
-      minmax(0, 1fr)
-      clamp(340px, 26vw, 520px);
-    column-gap: clamp(24px, 2.5vw, 48px);
+      clamp(200px, 16vw, 240px)
+      clamp(420px, 32vw, 480px)
+      clamp(360px, 28vw, 440px);
+    column-gap: clamp(20px, 2vw, 32px);
     width: 100%;
-    /* No max-width — any cap creates a "stranded in white space"
-       void at viewports wider than the cap (1920 cap left 340px
-       voids at 2560). The middle column (1fr) absorbs all extra
-       viewport width; on ultrawide the feed grows wider rather
-       than leaving outer margins. */
     margin: 0 auto;
-    /* Tight outer page padding so "Pardle" brand and the right
-       rail's last column sit right against the viewport edge with
-       only a small breathing band. */
     padding: 0 clamp(8px, 1vw, 20px);
     align-items: start;
   }
@@ -27054,6 +27060,14 @@ summary,
      foot of every page. Override down to 24px. */
   body:has(.desktop-shell) {
     padding-bottom: 24px !important;
+  }
+  /* Tighter card gap on desktop — feed reads as a continuous
+     stream rather than discrete posts. Mobile (<1024px) keeps the
+     13px gap from .pv-theme .feed-list above. */
+  .pv-theme .feed-list,
+  body:has(.pv-theme) .feed-list {
+    gap: 8px;
+    padding: 10px 6px 24px;
   }
   /* Hide the redundant mobile pv-head bar — left rail covers nav,
      +FAB covers Track-a-bet. */
