@@ -25737,8 +25737,14 @@ html.pv-theme-body .auth-chip-btn {
   margin-left: 4px;
 }
 .spost-body {
-  flex: 1 1 0;
+  /* flex:1 was leaving a wide hollow band on desktop between
+     left-packed content and the right-edge anchor. fit-content
+     keeps the body sized to its 3-line stack so the anchor abuts
+     it directly — any remaining card width sits to the right of
+     the anchor as edge padding, not an internal void. */
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
