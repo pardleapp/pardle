@@ -27211,13 +27211,32 @@ summary,
   body:has(.desktop-shell) {
     padding-bottom: 24px !important;
   }
-  /* Tighter card gap on desktop — feed reads as a continuous
-     stream rather than discrete posts. Mobile (<1024px) keeps the
-     13px gap from .pv-theme .feed-list above. */
+  /* Sweats feed — widen the middle column so the 2-up card wall
+     has room (≥760px is needed for two ~380px cards + gap). Right
+     rail tightens to compensate. Scoped to body:has(.feed-wrap)
+     so /bets / /leaders etc. keep their own column shape. */
+  body:has(.feed-wrap) .desktop-shell {
+    grid-template-columns:
+      clamp(180px, 16vw, 240px)
+      minmax(640px, 1fr)
+      clamp(320px, 24vw, 400px);
+  }
+  /* Feed list goes 2-up (3-up on ultrawide) using auto-fill grid
+     so the desktop column reads as a live wall of action instead
+     of one squashed stream. Newest cards still enter top-left and
+     flow right→down. The Shots-of-the-day reel and any future
+     full-bleed sections span both columns via :has() selector. */
   .pv-theme .feed-list,
   body:has(.pv-theme) .feed-list {
-    gap: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 10px;
     padding: 10px 6px 24px;
+    align-items: start;
+  }
+  .pv-theme .feed-list > li:has(.shots-reel),
+  body:has(.pv-theme) .feed-list > li:has(.shots-reel) {
+    grid-column: 1 / -1;
   }
   /* Hide the redundant mobile pv-head bar — left rail covers nav,
      +FAB covers Track-a-bet. */
