@@ -167,6 +167,45 @@ export async function openPredictionPoll(
   return poll;
 }
 
+/**
+ * Flush every currently-open round-over-under poll for a tournament
+ * so the engine reopens them on the next pollAndDiff tick with the
+ * latest line formula. Used as a one-shot admin after a model
+ * change (e.g. the field-over-par fix that moved Scheffler's line
+ * from 66.5 to 71.5). Idempotent — safe to call multiple times.
+ *
+ * Does NOT touch head-to-head or hold-the-lead polls since those
+ * don't depend on the round-score model. Votes on the deleted
+ * round-over-under polls are lost; callers should warn users.
+ * Returns the number of polls actually deleted so the admin route
+ * can report.
+ */
+export async function flushRoundOverUnderPolls(
+  tournamentId: string,
+): Promise<number> {
+  const ids = (await redis.smembers(openSetKey(tournamentId))) as string[];
+  if (!ids || ids.length === 0) return 0;
+  let flushed = 0;
+  for (const id of ids) {
+    const poll = await getPredictionPoll(id);
+    if (!poll || poll.type !== "round-over-under") continue;
+    const playerId = poll.settle?.player?.id;
+    const round = poll.settle?.round;
+    if (!playerId || round == null) continue;
+    const dedupKey = `round-ou:p${playerId}:r${round}`;
+    // Voted-by keys are author-specific and TTL'd; let them age out
+    // naturally rather than scanning Redis for every author key.
+    const pipe = redis.pipeline();
+    pipe.srem(openSetKey(tournamentId), id);
+    pipe.del(pollKey(id));
+    pipe.del(countsKey(id));
+    pipe.del(openedFlagKey(tournamentId, dedupKey));
+    await pipe.exec();
+    flushed++;
+  }
+  return flushed;
+}
+
 /** Read a single poll by id. */
 export async function getPredictionPoll(
   id: string,
