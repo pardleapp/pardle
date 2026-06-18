@@ -134,13 +134,32 @@ export async function settleBetFromHistory(
   // 2. Branch on bet kind — each path mirrors the live detector.
   if (bet.kind === "round-score") {
     const rs = bet as RoundScoreBet;
-    if (rs.round == null) {
-      return { settled: false, reason: "round-not-locked" };
+    // Resolve the target round. Preference order:
+    //   1. bet.round (explicitly locked at placement)
+    //   2. bet.placement.round (lock captured on the placement snap)
+    //   3. infer from placedAt: tournaments tee off Thursday, so the
+    //      day-of-week of placement maps to a round (Thu→1, Fri→2,
+    //      Sat→3, Sun→4); evening placements before a tee-off bake
+    //      into the next round.
+    let round = rs.round ?? rs.placement?.round ?? null;
+    if (round == null) {
+      const d = new Date(rs.placedAt);
+      const dow = d.getUTCDay(); // 0=Sun, 1=Mon, …, 6=Sat
+      // Wed evening / Thu / Fri / Sat / Sun → R1 / R1 / R2 / R3 / R4
+      if (dow === 4) round = 1;
+      else if (dow === 5) round = 2;
+      else if (dow === 6) round = 3;
+      else if (dow === 0) round = 4;
+      else round = 1; // Mon-Wed placements bet into the upcoming R1
     }
     const player = findPlayer(rows, rs.playerName);
-    if (!player) return { settled: false, reason: "player-not-in-event" };
+    if (!player) {
+      // Player not in the event = missed the field (WD'd / didn't
+      // tee off / wrong tour). Bet effectively lost.
+      return { settled: true, won: false, reason: "player-not-in-event" };
+    }
     const rd = (player as unknown as Record<string, DGHistoricalRound | undefined>)[
-      `round_${rs.round}`
+      `round_${round}`
     ];
     if (!rd || typeof rd.score !== "number") {
       // Player didn't complete the round (cut/withdrew before it).
