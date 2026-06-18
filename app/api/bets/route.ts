@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import {
+  getActiveTournament,
+  getSchedule,
+} from "@/lib/golf-api/pgatour";
+import { settleBetFromHistory } from "@/lib/feed/historical-settlement";
+import type { TrackedBet } from "@/app/live/bet-shared";
 
 export const dynamic = "force-dynamic";
 
@@ -97,6 +103,122 @@ function validateBet(bet: Record<string, unknown>): string | null {
 /**
  * GET /api/bets — list the signed-in user's bets (active only).
  */
+type BetRow = {
+  id: string;
+  kind: string;
+  data: Record<string, unknown>;
+  placed_at: string;
+  settled_at: string | null;
+  settled_won: boolean | null;
+  removed_at: string | null;
+};
+
+/** Run the tournamentId backfill + historical-settle pass on the
+ *  user's unsettled bets. Mirrors notify-poll's cron-side logic but
+ *  scoped to one user — so signed-in users self-heal on /bets load
+ *  without waiting for the next cron tick. Safe to call on every
+ *  GET: bets already stamped + bets matching the active tournament
+ *  short-circuit immediately. */
+async function selfHealUserBets(
+  supabase: Awaited<ReturnType<typeof getSupabaseServer>>,
+  userId: string,
+  rows: BetRow[],
+): Promise<{
+  rows: BetRow[];
+  backfilled: number;
+  settled: number;
+}> {
+  let backfilled = 0;
+  let settled = 0;
+  const active = await getActiveTournament().catch(() => null);
+  const activeTournamentId = active?.tournament.id ?? null;
+  let schedule: Awaited<ReturnType<typeof getSchedule>> | null = null;
+  const inferTournament = (
+    placedAtMs: number,
+  ): { id: string; name: string } | null => {
+    if (!schedule) return null;
+    const all = [...schedule.completed, ...schedule.upcoming];
+    const WINDOW_MS = 5 * 24 * 60 * 60 * 1000;
+    let best: { id: string; name: string } | null = null;
+    let bestDiff = Infinity;
+    for (const t of all) {
+      const diff = Math.abs(placedAtMs - t.startDate);
+      if (diff < bestDiff && diff <= WINDOW_MS) {
+        bestDiff = diff;
+        best = { id: t.id, name: t.name };
+      }
+    }
+    return best;
+  };
+
+  const out: BetRow[] = [];
+  for (const row of rows) {
+    if (row.settled_at != null || row.removed_at != null) {
+      out.push(row);
+      continue;
+    }
+    const data = { ...(row.data as Record<string, unknown>) } as {
+      tournamentId?: string;
+      tournamentName?: string;
+    };
+
+    if (!data.tournamentId) {
+      if (!schedule) {
+        schedule = await getSchedule().catch(() => ({
+          upcoming: [],
+          completed: [],
+        }));
+      }
+      const inferred = inferTournament(new Date(row.placed_at).getTime());
+      if (inferred) {
+        data.tournamentId = inferred.id;
+        data.tournamentName = inferred.name;
+        await supabase
+          .from("bets")
+          .update({ data } as never)
+          .eq("id", row.id)
+          .eq("user_id", userId);
+        row.data = data;
+        backfilled++;
+      }
+    }
+
+    const betTournamentId = data.tournamentId;
+    if (!betTournamentId || betTournamentId === activeTournamentId) {
+      out.push(row);
+      continue;
+    }
+    // Off-tournament — settle from the DG historical archive.
+    const bet = {
+      ...data,
+      id: row.id,
+      kind: row.kind,
+      placedAt: new Date(row.placed_at).getTime(),
+    } as unknown as TrackedBet;
+    const result = await settleBetFromHistory(bet).catch(() => ({
+      settled: false as const,
+    }));
+    if (!result.settled) {
+      out.push(row);
+      continue;
+    }
+    const nowIso = new Date().toISOString();
+    await supabase
+      .from("bets")
+      .update({
+        settled_at: nowIso,
+        settled_won: result.won ?? false,
+      } as never)
+      .eq("id", row.id)
+      .eq("user_id", userId);
+    row.settled_at = nowIso;
+    row.settled_won = result.won ?? false;
+    out.push(row);
+    settled++;
+  }
+  return { rows: out, backfilled, settled };
+}
+
 export async function GET() {
   const supabase = await getSupabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
@@ -115,7 +237,24 @@ export async function GET() {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  const allRows = data ?? [];
+  // Self-heal pass before responding — backfills tournamentId on
+  // legacy bets + auto-settles any whose tournament has finished.
+  // Errors here are non-fatal: if the schedule fetch or historical
+  // archive call fails, the user still gets their bets back (just
+  // not freshly settled this tick).
+  const healed = await selfHealUserBets(
+    supabase,
+    user.id,
+    (data ?? []) as BetRow[],
+  ).catch((err) => {
+    console.error("[bets:get] self-heal failed", err);
+    return {
+      rows: (data ?? []) as BetRow[],
+      backfilled: 0,
+      settled: 0,
+    };
+  });
+  const allRows = healed.rows;
   const removedIds = allRows
     .filter((row) => row.removed_at != null)
     .map((row) => row.id as string);
@@ -126,17 +265,22 @@ export async function GET() {
       id: row.id,
       kind: row.kind,
       placedAt: new Date(row.placed_at).getTime(),
-      // Settlement state from notify-poll. The bet tracker reads these
-      // for bets from past tournaments — the client-side detector only
-      // works against the active leaderboard, so once the resolver
-      // rolls forward it loses sight of "did this PGA bet win?" without
-      // these columns.
+      // Settlement state from notify-poll OR the self-heal pass
+      // above. The bet tracker reads these for bets from past
+      // tournaments — the client-side detector only works against
+      // the active leaderboard, so once the resolver rolls forward
+      // it loses sight of "did this PGA bet win?" without these
+      // columns.
       settledAt: row.settled_at
         ? new Date(row.settled_at as string).getTime()
         : null,
       settledWon: (row.settled_won as boolean | null) ?? null,
     }));
-  return NextResponse.json({ bets, removedIds });
+  return NextResponse.json({
+    bets,
+    removedIds,
+    healed: { backfilled: healed.backfilled, settled: healed.settled },
+  });
 }
 
 /**

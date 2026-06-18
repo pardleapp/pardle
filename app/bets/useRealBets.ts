@@ -69,6 +69,12 @@ interface FeedSlice {
    *  server-side historical-settlement cron handle it). Null when
    *  the feed has no active event. */
   activeTournamentId: string | null;
+  /** Active tournament's startDate (epoch ms) — used to decide
+   *  whether a legacy bet (no tournamentId stamp) was placed before
+   *  the current event began. Bets older than the cutoff are
+   *  treated as off-tournament so we don't run the live detector
+   *  against the wrong field. Null when the feed has no event. */
+  activeTournamentStartDate: number | null;
 }
 
 const POLL_MS = 5_000;
@@ -311,7 +317,7 @@ function buildSlice(json: unknown): FeedSlice {
       thru: string;
       playerState?: string;
     }>;
-    tournament?: { id?: string } | null;
+    tournament?: { id?: string; startDate?: number } | null;
   };
   const recentByPlayer: FeedSlice["recentByPlayer"] = {};
   for (const row of j.rows ?? []) {
@@ -340,6 +346,7 @@ function buildSlice(json: unknown): FeedSlice {
     recentByPlayer,
     leaderboardById,
     activeTournamentId: j.tournament?.id ?? null,
+    activeTournamentStartDate: j.tournament?.startDate ?? null,
   };
 }
 
@@ -460,17 +467,31 @@ export function useRealBets(): UseRealBetsResult {
       // bets we render whatever settledAt/settledWon the server has
       // already written and skip the live detector entirely;
       // notify-poll's historical-settlement pass takes care of the
-      // settle on its next tick. Bets without a tournamentId stamp
-      // (legacy, placed before this field landed) are treated as
-      // matching the current event — same behaviour they had before.
+      // settle on its next tick.
+      //
+      // Legacy bets without a tournamentId stamp: assume they're
+      // for the active event only if placedAt is within ~36h of the
+      // current tournament's startDate. Anything older is a bet
+      // from a finished tournament that hasn't been backfilled yet
+      // — park as off-tournament so the live detector doesn't run
+      // against the wrong leaderboard. The 36h window covers
+      // Tuesday-night placements ahead of a Thursday-morning tee-off
+      // without being so wide it catches last week's leftovers.
       const betTournament =
         "tournamentId" in b && typeof b.tournamentId === "string"
           ? b.tournamentId
           : null;
+      const LEGACY_CUTOFF_MS = 36 * 60 * 60 * 1000;
+      const legacyLooksCurrent =
+        betTournament == null &&
+        (s.activeTournamentStartDate == null ||
+          b.placedAt >=
+            s.activeTournamentStartDate - LEGACY_CUTOFF_MS);
       const isForActiveTournament =
         s.activeTournamentId == null ||
-        betTournament == null ||
-        betTournament === s.activeTournamentId;
+        (betTournament == null
+          ? legacyLooksCurrent
+          : betTournament === s.activeTournamentId);
 
       if (b.settledAt != null && b.settledWon != null) {
         // Repair mis-settled bets — an earlier build of

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/feed/notify-poll",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}
