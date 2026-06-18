@@ -142,6 +142,13 @@ export default function AddBetSheet({
   const [round, setRound] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  /** Active tournament captured from /api/feed at sheet-open time —
+   *  baked onto every placed bet so settlement always targets the
+   *  right event even after the active tournament rolls forward. */
+  const [tournament, setTournament] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Reset state when the sheet opens (mirrors a fresh sheet each time).
   useEffect(() => {
@@ -160,7 +167,11 @@ export default function AddBetSheet({
 
   // Load the player list from the live leaderboard first; fall back
   // to the DataGolf field (pre-event). Both endpoints already exist
-  // (used by /leaderboard).
+  // (used by /leaderboard). We also capture the active tournament's
+  // id + name so we can stamp every placed bet — without that,
+  // unsettled bets implicitly retarget whichever tournament happens
+  // to be active when they're next read (the "my Memorial bets now
+  // show on US Open" bug).
   useEffect(() => {
     if (!open) return;
     let cancel = false;
@@ -170,11 +181,23 @@ export default function AddBetSheet({
         if (r.ok) {
           const j = (await r.json()) as {
             leaderboard?: Array<{ playerId: string; displayName: string }>;
+            playerIndex?: Array<{ playerId: string; displayName: string }>;
+            tournament?: { id?: string; name?: string } | null;
           };
-          if (j.leaderboard && j.leaderboard.length > 0) {
+          if (!cancel && j.tournament?.id) {
+            setTournament({
+              id: j.tournament.id,
+              name: j.tournament.name ?? "",
+            });
+          }
+          // Prefer playerIndex (full field — includes players outside
+          // the top 30 leaderboard slice and pre-tournament commits)
+          // so users can place a bet on anyone in the field.
+          const src = (j.playerIndex ?? j.leaderboard) ?? [];
+          if (src.length > 0) {
             if (!cancel) {
               setPlayers(
-                j.leaderboard.map((p) => ({
+                src.map((p) => ({
                   id: p.playerId,
                   name: p.displayName,
                 })),
@@ -188,8 +211,15 @@ export default function AddBetSheet({
         if (!f.ok) return;
         const fj = (await f.json()) as {
           field?: Array<{ dgId: string; name: string }>;
+          tournament?: { id?: string; name?: string } | null;
         };
         if (cancel) return;
+        if (fj.tournament?.id) {
+          setTournament({
+            id: fj.tournament.id,
+            name: fj.tournament.name ?? "",
+          });
+        }
         setPlayers(
           (fj.field ?? []).map((p) => ({ id: `dg-${p.dgId}`, name: p.name })),
         );
@@ -262,6 +292,21 @@ export default function AddBetSheet({
         .slice(2, 6)}`;
       const oddsTakenLabel = formatOdds(parsed.decimal, parsed.format);
 
+      // Guard: refuse to place a bet without a known tournament.
+      // The settlement layer keys off bet.tournamentId — placing one
+      // without it reintroduces the "bet implicitly retargets
+      // whichever event is next active" bug.
+      if (!tournament?.id) {
+        setErr(
+          "No active tournament available right now. Try again in a few moments.",
+        );
+        return;
+      }
+      const tournamentStamp = {
+        tournamentId: tournament.id,
+        tournamentName: tournament.name || undefined,
+      };
+
       let bet: TrackedBet;
       if (market.kind === "winning-score") {
         const line = Number(lineText);
@@ -279,6 +324,7 @@ export default function AddBetSheet({
           oddsTakenLabel,
           stake: stakeNum,
           currency: cur.code,
+          ...tournamentStamp,
         } satisfies WinningScoreBet;
       } else if (market.kind === "top-finish") {
         bet = {
@@ -292,6 +338,7 @@ export default function AddBetSheet({
           oddsTakenLabel,
           stake: stakeNum,
           currency: cur.code,
+          ...tournamentStamp,
         } satisfies TopFinishBet;
       } else if (market.kind === "round-score") {
         const line = Number(lineText);
@@ -312,6 +359,7 @@ export default function AddBetSheet({
           oddsTakenLabel,
           stake: stakeNum,
           currency: cur.code,
+          ...tournamentStamp,
         } satisfies RoundScoreBet;
       } else {
         bet = {
@@ -324,6 +372,7 @@ export default function AddBetSheet({
           oddsTakenLabel,
           stake: stakeNum,
           currency: cur.code,
+          ...tournamentStamp,
         } satisfies OutrightBet;
       }
 

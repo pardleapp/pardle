@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getActiveTournament } from "@/lib/golf-api/pgatour";
+import { getActiveTournament, getSchedule } from "@/lib/golf-api/pgatour";
+import { settleBetFromHistory } from "@/lib/feed/historical-settlement";
 import {
   computeFieldStats,
   getFeedBundle,
@@ -459,6 +460,100 @@ async function handle(req: Request) {
     betPageStart += BET_PAGE_SIZE;
   }
 
+  // Historical-settlement + tournament-stamp backfill pass. Walks
+  // every unsettled bet and, when the bet refers to a tournament
+  // that's NOT currently active (or has no tournamentId at all),
+  // resolves the outcome from the DG historical-rounds archive and
+  // writes settled_at / settled_won to Supabase. Bets matching the
+  // active tournament are skipped here and handled by the existing
+  // live-settlement path below.
+  //
+  // For legacy bets without a tournamentId stamp: infer it from
+  // placed_at by finding the tournament whose start_date falls
+  // within ±5 days of placement (covers anyone who bet the night
+  // before a Thursday tee-off, or right at the end of a Sunday).
+  // The stamp is written back to bets.data so future ticks
+  // short-circuit immediately.
+  let historicallySettled = 0;
+  let tournamentBackfilled = 0;
+  let schedule: { upcoming: Array<{ id: string; name: string; startDate: number }>; completed: Array<{ id: string; name: string; startDate: number }> } | null = null;
+  async function ensureSchedule() {
+    if (!schedule) {
+      schedule = await getSchedule().catch(() => ({
+        upcoming: [],
+        completed: [],
+      }));
+    }
+    return schedule;
+  }
+  function inferTournament(
+    placedAtMs: number,
+  ): { id: string; name: string } | null {
+    if (!schedule) return null;
+    const all = [...schedule.completed, ...schedule.upcoming];
+    const WINDOW_MS = 5 * 24 * 60 * 60 * 1000;
+    let best: { id: string; name: string } | null = null;
+    let bestDiff = Infinity;
+    for (const t of all) {
+      const diff = Math.abs(placedAtMs - t.startDate);
+      if (diff < bestDiff && diff <= WINDOW_MS) {
+        bestDiff = diff;
+        best = { id: t.id, name: t.name };
+      }
+    }
+    return best;
+  }
+
+  // Iterate a snapshot of the candidate rows. We mutate row.data
+  // when stamping a tournamentId so the live loop below sees the
+  // up-to-date shape.
+  const stillLive: BetRow[] = [];
+  for (const row of rows) {
+    const bet = rowToBet(row);
+    if (!bet) {
+      stillLive.push(row);
+      continue;
+    }
+    const data = row.data as { tournamentId?: string; tournamentName?: string };
+    let needsBackfill = !data.tournamentId;
+    if (needsBackfill) {
+      await ensureSchedule();
+      const inferred = inferTournament(new Date(row.placed_at).getTime());
+      if (inferred) {
+        data.tournamentId = inferred.id;
+        data.tournamentName = inferred.name;
+        (bet as { tournamentId?: string; tournamentName?: string }).tournamentId = inferred.id;
+        (bet as { tournamentId?: string; tournamentName?: string }).tournamentName = inferred.name;
+        await admin.from("bets").update({ data } as never).eq("id", row.id);
+        tournamentBackfilled++;
+        needsBackfill = false;
+      }
+    }
+    const betTournamentId = data.tournamentId;
+    if (!betTournamentId || betTournamentId === tournamentId) {
+      stillLive.push(row);
+      continue;
+    }
+    // Off-tournament bet — settle from the DG historical archive.
+    const result = await settleBetFromHistory(bet);
+    if (!result.settled) {
+      stillLive.push(row);
+      continue;
+    }
+    await admin
+      .from("bets")
+      .update({
+        settled_at: new Date().toISOString(),
+        settled_won: result.won ?? false,
+      } as never)
+      .eq("id", row.id);
+    historicallySettled++;
+  }
+  // Replace the candidate list with the bets still live for THIS
+  // tournament so the rest of notify-poll only walks them.
+  rows.length = 0;
+  rows.push(...stillLive);
+
   // Subscriptions: fetch in one query for the set of users involved.
   const userIds = Array.from(new Set(rows.map((r) => r.user_id)));
   let subsByUser = new Map<string, SubscriptionLike[]>();
@@ -677,6 +772,8 @@ async function handle(req: Request) {
     predPollsSettled,
     gonePruned,
     unsettled,
+    historicallySettled,
+    tournamentBackfilled,
   });
 }
 

@@ -39,6 +39,21 @@ export interface BetSettlementFields {
    *  members (excluded from standings P&L, most-backed aggregation,
    *  and the member's profile). Defaults to undefined / false. */
   isPrivate?: boolean;
+  /** Orchestrator tournament id stamped at placement time. Optional
+   *  here only so legacy bets (placed before this field landed)
+   *  still type-check; new placements must populate it. The
+   *  settlement layer uses this to route bets to the LIVE detector
+   *  (when the active tournament matches) vs the HISTORICAL detector
+   *  (when the bet's tournament has finished and another's running).
+   *  Without it, every unsettled bet implicitly retargets whichever
+   *  tournament happens to be active when it's read — the bug that
+   *  surfaced as "my Memorial bets are showing on US Open." */
+  tournamentId?: string;
+  /** Display name captured at placement so the UI can show e.g.
+   *  "the Memorial Tournament" without a feed lookup, even after
+   *  the active event has rolled forward. Optional for legacy
+   *  back-compat. */
+  tournamentName?: string;
 }
 
 

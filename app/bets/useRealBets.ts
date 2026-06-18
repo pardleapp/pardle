@@ -63,6 +63,12 @@ interface FeedSlice {
     string,
     { displayName: string; position: string; thru: string; playerState?: string }
   >;
+  /** Active tournament from this slice — used to decide whether a
+   *  bet's tournamentId stamp matches "now" (run the live detector)
+   *  or refers to a finished tournament (skip live, let the
+   *  server-side historical-settlement cron handle it). Null when
+   *  the feed has no active event. */
+  activeTournamentId: string | null;
 }
 
 const POLL_MS = 5_000;
@@ -149,6 +155,20 @@ function maybeUnsettleNonRoundScore(
 ): TrackedBet | null {
   if (bet.kind === "round-score") return null;
   if (!slice.leaderboardById) return null;
+  // Only un-settle when the live slice is for THIS bet's tournament.
+  // A settled Memorial bet must not flip back to live just because
+  // the US Open hasn't concluded — they're different events.
+  const betTournament =
+    "tournamentId" in bet && typeof bet.tournamentId === "string"
+      ? bet.tournamentId
+      : null;
+  if (
+    betTournament != null &&
+    slice.activeTournamentId != null &&
+    betTournament !== slice.activeTournamentId
+  ) {
+    return null;
+  }
   const players = Object.entries(slice.leaderboardById).map(
     ([playerId, info]) => ({
       playerId,
@@ -291,6 +311,7 @@ function buildSlice(json: unknown): FeedSlice {
       thru: string;
       playerState?: string;
     }>;
+    tournament?: { id?: string } | null;
   };
   const recentByPlayer: FeedSlice["recentByPlayer"] = {};
   for (const row of j.rows ?? []) {
@@ -318,6 +339,7 @@ function buildSlice(json: unknown): FeedSlice {
     topFinishCurrent: j.topFinishCurrent,
     recentByPlayer,
     leaderboardById,
+    activeTournamentId: j.tournament?.id ?? null,
   };
 }
 
@@ -430,6 +452,26 @@ export function useRealBets(): UseRealBetsResult {
       );
       const resolvedPid = resolveBetPlayerId(b, leaderboardForResolve);
 
+      // Tournament scoping — the active feed slice only describes
+      // ONE tournament. Bets stamped with a different tournamentId
+      // must NOT run any live detector against it (otherwise a
+      // Memorial bet evaluates against the US Open leaderboard and
+      // either mis-settles or hangs in Live forever). For those
+      // bets we render whatever settledAt/settledWon the server has
+      // already written and skip the live detector entirely;
+      // notify-poll's historical-settlement pass takes care of the
+      // settle on its next tick. Bets without a tournamentId stamp
+      // (legacy, placed before this field landed) are treated as
+      // matching the current event — same behaviour they had before.
+      const betTournament =
+        "tournamentId" in b && typeof b.tournamentId === "string"
+          ? b.tournamentId
+          : null;
+      const isForActiveTournament =
+        s.activeTournamentId == null ||
+        betTournament == null ||
+        betTournament === s.activeTournamentId;
+
       if (b.settledAt != null && b.settledWon != null) {
         // Repair mis-settled bets — an earlier build of
         // isLeaderboardFinal flipped outright / top-finish /
@@ -450,6 +492,16 @@ export function useRealBets(): UseRealBetsResult {
         // round is complete the result is final regardless of the
         // wider tournament.
         settledOut.push(adaptToSettled(b));
+        continue;
+      }
+
+      // Off-tournament bets: park as live-pending until the server
+      // settles them via the historical-settlement cron. We don't
+      // run ANY local detector here — the live slice is for a
+      // different event, so its leaderboard / round states are
+      // meaningless against this bet's player and rounds.
+      if (!isForActiveTournament) {
+        liveOut.push(adaptToLive(b, s));
         continue;
       }
 
