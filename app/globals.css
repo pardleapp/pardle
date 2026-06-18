@@ -21224,6 +21224,148 @@ html.pv-theme-body .auth-chip-btn {
   gap: 12px;
 }
 
+/* Desktop /bets dashboard — hidden on mobile so the existing
+   single-column tracker stays byte-for-byte unchanged. On desktop
+   the middle column also widens (see body:has(.bets-pv) shell
+   override below) so the dashboard + 2-up bet grid have room. */
+.bets-dash {
+  display: none;
+}
+.bets-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+@media (min-width: 1024px) {
+  /* Widen the /bets middle column at the expense of the right rail
+     — the bets surface is a dashboard, the rail-as-is-elsewhere
+     stays mounted but tighter. */
+  body:has(.bets-pv) .desktop-shell {
+    grid-template-columns:
+      clamp(180px, 16vw, 240px)
+      minmax(560px, 1fr)
+      clamp(320px, 24vw, 400px);
+  }
+  /* Strip the page's mobile horizontal padding — the column itself
+     is the gutter on desktop. */
+  .bets-pv {
+    padding: 0;
+  }
+  /* Mobile summary slab → hidden; the stat strip carries it now. */
+  .bets-summary-mobile {
+    display: none;
+  }
+
+  .bets-dash {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 16px 0 6px;
+  }
+  .bets-stat-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+  }
+  .bets-stat-tile {
+    background: var(--pv-card);
+    border: 1px solid var(--pv-line);
+    border-radius: 13px;
+    padding: 11px 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+  .bets-stat-lab {
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--pv-muted);
+    font-weight: 800;
+  }
+  .bets-stat-val {
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1.1;
+    color: var(--pv-ink);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .bets-stat-val.stat-up {
+    color: var(--pv-up);
+  }
+  .bets-stat-val.stat-down {
+    color: var(--pv-down);
+  }
+  .bets-stat-sub {
+    font-size: 10.5px;
+    color: var(--pv-muted);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bets-chart-card {
+    background: var(--pv-card);
+    border: 1px solid var(--pv-line);
+    border-radius: 14px;
+    padding: 14px 16px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .bets-chart-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .bets-chart-title {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: var(--pv-ink);
+    letter-spacing: -0.005em;
+  }
+  .bets-chart-sub {
+    font-size: 11px;
+    color: var(--pv-muted);
+  }
+  .pnl-chart {
+    width: 100%;
+    height: 220px;
+    display: block;
+  }
+  .pnl-chart svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .pnl-chart-empty {
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--pv-muted);
+    font-size: 13px;
+    border: 1px dashed var(--pv-line);
+    border-radius: 10px;
+  }
+
+  /* Bet cards / settled rows → responsive 2-up (3-up at wide). */
+  .bets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 10px;
+  }
+  .bets-empty {
+    /* Centred empty card sized to look intentional inside the wider
+       middle column instead of stretching across the dashboard. */
+    max-width: 520px;
+    margin: 12px auto;
+  }
+}
+
 /* Summary card — emerald-d slab with two stat columns */
 .bets-summary {
   background: var(--pv-emerald-d);
