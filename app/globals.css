@@ -23766,22 +23766,6 @@ html.pv-theme-body .auth-chip-btn {
   display: block;
 }
 
-/* When a shot card carries a diagram, the headline shares a row
-   with the thumbnail to the right. */
-.pv-theme .spost-text-row {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  margin: 6px 0 9px;
-}
-.pv-theme .spost-text-flex {
-  flex: 1;
-  margin: 0;
-}
-.pv-theme .spost-diagram {
-  flex-shrink: 0;
-}
-
 /* Reel */
 .shots-reel {
   background: var(--pv-card);
@@ -25693,46 +25677,82 @@ html.pv-theme-body .auth-chip-btn {
 }
 
 /* =============================================================
-   ShotPost — primary shot row in the Sweat Feed. Matches
-   social-v2.css .spost shape: avatar | body, body has top
-   (name+tag+hole+score), text, react row.
+   ShotPost — broadcast-style shot card.
+   Layout (responsive, single design from mobile up):
+
+     ┃[avatar]  Name · 8th             ┃ BOGEY
+     ┃         Bogeys the 8th          ┃  +4
+     ┃         ＋  💬 0  · chip        ┃
+
+   Left accent stripe carries the emotion (good/bad/neutral). Right
+   anchor stacks the tag pill above the player's current to-par,
+   colour-matched to the stripe, as the hero number. The body is a
+   tight three-line block (name+hole · headline · action-row) with
+   no floating gaps. Shot-diagram, when present, slots as its own
+   column between body and anchor.
+
+   The outer .spost rule has to fight .pv-theme .post { display:block }
+   (specificity 0,2,0). We match that with `.pv-theme .spost` and place
+   it later in the cascade.
    ============================================================= */
+.pv-theme .spost,
 .spost {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 9px 12px 9px 0;
   background: var(--pv-card);
   border: 1px solid var(--pv-line);
   border-radius: 17px;
-  padding: 14px 16px;
-  display: flex;
-  align-items: flex-start;
-  gap: 11px;
-  position: relative;
   overflow: hidden;
   transition: box-shadow 0.16s ease, transform 0.16s ease;
 }
 @media (hover: hover) {
+  .pv-theme .spost:hover,
   .spost:hover {
     box-shadow: 0 10px 26px oklch(0.4 0.06 145 / 0.14);
     transform: translateY(-2px);
   }
 }
+.spost-stripe {
+  width: 4px;
+  flex-shrink: 0;
+  background: var(--pv-line);
+  border-radius: 4px 0 0 4px;
+  align-self: stretch;
+}
+.spost[data-emotion="good"] .spost-stripe {
+  background: var(--pv-emerald);
+}
+.spost[data-emotion="bad"] .spost-stripe {
+  background: var(--pv-down);
+}
 .spost-avatar {
   flex-shrink: 0;
   text-decoration: none;
   color: inherit;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
 }
 .spost-body {
   flex: 1 1 0;
   min-width: 0;
-}
-.spost-top {
   display: flex;
-  align-items: center;
-  gap: 7px;
-  flex-wrap: nowrap;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 2px 0;
+}
+.spost-line1 {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
   min-width: 0;
 }
 .spost-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   color: var(--pv-ink);
   text-decoration: none;
@@ -25744,22 +25764,36 @@ html.pv-theme-body .auth-chip-btn {
 .spost-hand {
   font-weight: 400;
 }
-/* Meta wrapper — groups tag + hole + score so they can be placed
-   together (desktop pulls them into the same grid cell as the
-   text; on mobile the inline-flex + margin-left:auto reproduces
-   the legacy "stick to the right edge of the top row" layout
-   byte-for-byte). */
-.spost-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin-left: auto;
+.spost-hole-mini {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pv-muted);
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
   flex-shrink: 0;
+  letter-spacing: 0.01em;
+}
+.spost-headline {
+  font-size: 14.5px;
+  line-height: 1.25;
+  color: var(--pv-ink);
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.005em;
+}
+.spost-anchor {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  min-width: 52px;
+  margin-left: 4px;
 }
 .spost-tag {
   font-size: 9.5px;
   font-weight: 900;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   padding: 3px 7px;
   border-radius: 5px;
   text-transform: uppercase;
@@ -25775,32 +25809,31 @@ html.pv-theme-body .auth-chip-btn {
   background: oklch(0.93 0.05 28);
   color: var(--pv-down);
 }
-.spost-hole {
-  font-size: 11px;
-  font-weight: 700;
+.spost-delta {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
   color: var(--pv-muted);
-  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
-.spost-score {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--pv-up);
-  flex-shrink: 0;
+.spost[data-emotion="good"] .spost-delta {
+  color: var(--pv-emerald-d);
 }
-.spost-score.over {
+.spost[data-emotion="bad"] .spost-delta {
   color: var(--pv-down);
 }
-.spost-text {
-  font-size: 13.5px;
-  line-height: 1.4;
-  color: var(--pv-ink);
-  margin: 6px 0 9px;
+.spost-diagram-col {
+  flex-shrink: 0;
+  align-self: center;
+  width: 78px;
 }
-.spost-react {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+.spost-diagram-col > * {
+  width: 100%;
+}
+.post-act-row {
+  margin-top: 3px;
 }
 .spost-act {
   display: inline-flex;
@@ -25810,8 +25843,8 @@ html.pv-theme-body .auth-chip-btn {
   background: var(--pv-card);
   color: var(--pv-muted);
   border-radius: 999px;
-  padding: 6px 11px;
-  font-size: 13px;
+  padding: 4px 9px;
+  font-size: 12px;
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
@@ -25834,97 +25867,29 @@ html.pv-theme-body .auth-chip-btn {
   background: oklch(0.94 0.05 150);
 }
 .spost-act svg {
-  width: 15px;
-  height: 15px;
-}
-.spost-ctx {
-  margin-left: auto;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--pv-muted);
-  background: var(--pv-soft);
-  border-radius: 999px;
-  padding: 5px 10px;
+  width: 14px;
+  height: 14px;
 }
 
-/* =============================================================
-   Desktop shot-card density. On phones the card stacks vertically
-   (name+meta row, text row, actions row) — that's the intentional
-   social-feed shape. On desktop the same stacked layout leaves a
-   big void between the name on the left and the tag pinned to the
-   right edge, with the shot text hanging on its own line below.
-   At ≥1024px we collapse the top two rows into a single grid row
-   (name · shot text fills the middle · meta sits next to the text)
-   and tighten vertical padding so the feed reads dense.
-   Mobile (<1024px) is intentionally untouched.
-   ============================================================= */
+/* Slightly larger headline + delta on desktop where there's room
+   for the broadcast feel to breathe. */
 @media (min-width: 1024px) {
-  /* Specificity bump: .pv-theme .post sets display:block on every
-     card, which would otherwise win against the .spost rule and
-     leave the avatar stacked above the body on its own line — that
-     was the ~40px of dead vertical space. */
   .pv-theme .spost,
   .spost {
-    display: flex;
-    padding: 6px 12px;
-    gap: 10px;
-    align-items: center;
+    padding: 10px 14px 10px 0;
+    gap: 12px;
   }
-  /* Top row collapses to ONE inline cluster: name · text · meta,
-     sitting tight together at the left of the card. The action
-     row sits on row 2 immediately under the text — row-gap alone
-     handles the spacing, no margin-top. */
-  .spost-body {
-    display: grid;
-    grid-template-columns: auto minmax(0, auto) auto 1fr;
-    grid-template-areas:
-      "name text meta ."
-      "acts acts acts acts";
-    align-items: center;
-    column-gap: 10px;
-    row-gap: 2px;
+  .spost-headline {
+    font-size: 15.5px;
   }
-  /* .spost-top still wraps name + meta in the JSX — make it
-     transparent to the grid so its two children get grid areas
-     directly. */
-  .spost-top {
-    display: contents;
+  .spost-delta {
+    font-size: 26px;
   }
-  .spost-name {
-    grid-area: name;
+  .spost-anchor {
+    min-width: 60px;
   }
-  .spost-meta {
-    grid-area: meta;
-    margin-left: 0;
-  }
-  .pv-theme .spost-text,
-  .spost-text {
-    grid-area: text;
-    margin: 0;
-    min-width: 0;
-  }
-  .pv-theme .spost-text-row,
-  .spost-text-row {
-    grid-area: text;
-    margin: 0;
-    min-width: 0;
-    align-items: center;
-  }
-  .pv-theme .spost-diagram,
-  .spost-diagram {
-    max-width: 84px;
-  }
-  .post-act-row {
-    grid-area: acts;
-    margin-top: 0;
-  }
-  .spost-act {
-    padding: 3px 9px;
-    font-size: 12px;
-  }
-  .post-act-cmt {
-    padding: 3px 9px;
-    font-size: 12px;
+  .spost-diagram-col {
+    width: 88px;
   }
 }
 

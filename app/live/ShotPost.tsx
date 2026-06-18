@@ -1,17 +1,19 @@
 "use client";
 
 /**
- * ShotPost — primary shot-row in the Sweat Feed. Matches the
- * design-handoff prototype's .spost shape:
+ * ShotPost — broadcast-style shot card in the Sweat Feed.
  *
- *   [avatar] [name] [BIRDIE tag] [H18] [-12]
- *            [action sentence text]
- *            [reaction pills · ＋   💬 N  · context]
+ *   ┃[avatar]  P. Harrington · 8th       ┃ BOGEY
+ *   ┃         Bogeys the 8th             ┃  +4
+ *   ┃         ＋  💬 0  · 3rd bogey…     ┃
  *
- * The thumbs-up has been retired: every reaction is just another
- * emoji now. The single action row pins the comment count + the
- * context tag on the right while the reaction pills scroll
- * horizontally on the left when there are many.
+ * Left accent stripe colours by shot result (emerald good / down
+ * bad / muted par) so the feed is scannable in peripheral vision.
+ * Right anchor stacks the tag pill above the player's current
+ * to-par as the hero number — large mono, colour-matched to the
+ * stripe. Centre block is name+hole · headline · action-row, with
+ * no floating gaps. Shot-diagrams slot as a separate column
+ * between body and anchor.
  */
 
 import Link from "next/link";
@@ -73,6 +75,36 @@ function tagFor(event: FeedEvent): { label: string; cls: string } | null {
   }
 }
 
+/** Bucket the shot result into the three emotional colour bands
+ *  used by the accent stripe + delta number. */
+function emotionFor(event: FeedEvent): "good" | "bad" | "neutral" {
+  if (event.ace) return "good";
+  switch (event.result) {
+    case "albatross":
+    case "eagle":
+    case "birdie":
+      return "good";
+    case "bogey":
+    case "double":
+    case "triple-plus":
+      return "bad";
+    default:
+      return "neutral";
+  }
+}
+
+/** Friendly suffix for hole number — "8th", "21st", etc. */
+function ordinal(n: number): string {
+  const last2 = n % 100;
+  if (last2 >= 11 && last2 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1: return `${n}st`;
+    case 2: return `${n}nd`;
+    case 3: return `${n}rd`;
+    default: return `${n}th`;
+  }
+}
+
 /** Strip the leading player name from an engine-generated headline
  *  so the row can render the name in its own slot. Falls back to
  *  the full headline when the name isn't a prefix. */
@@ -106,9 +138,18 @@ export default function ShotPost({
     onTap: onShare ? () => onShare(event) : undefined,
   });
 
+  const emotion = emotionFor(event);
+  const holeLabel = typeof event.hole === "number" ? ordinal(event.hole) : null;
+
   return (
     <>
-    <article className="post spost" data-event-id={event.id} {...surfaceProps}>
+    <article
+      className="post spost"
+      data-event-id={event.id}
+      data-emotion={emotion}
+      {...surfaceProps}
+    >
+      <span className="spost-stripe" aria-hidden="true" />
       <Link
         href={`/live/player/${event.playerId}`}
         className="spost-avatar"
@@ -122,7 +163,7 @@ export default function ShotPost({
         />
       </Link>
       <div className="spost-body">
-        <div className="spost-top">
+        <div className="spost-line1">
           <Link
             href={`/live/player/${event.playerId}`}
             className="spost-name"
@@ -141,38 +182,13 @@ export default function ShotPost({
               </span>
             )}
           </Link>
-          <div className="spost-meta">
-            {tag && (
-              <span className={`spost-tag ${tag.cls}`}>{tag.label}</span>
-            )}
-            {typeof event.hole === "number" && (
-              <span className="spost-hole mono">H{event.hole}</span>
-            )}
-            {event.toPar && (
-              <span
-                className={`spost-score mono${
-                  event.toPar.startsWith("+") ? " over" : ""
-                }`}
-              >
-                {event.toPar}
-              </span>
-            )}
-          </div>
+          {holeLabel && (
+            <span className="spost-hole-mini">· {holeLabel}</span>
+          )}
         </div>
-        {showDiagram ? (
-          <div className="spost-text-row">
-            <p className="spost-text spost-text-flex">
-              {stripPlayerName(event.headline ?? "", event.playerName)}
-            </p>
-            <div className="spost-diagram">
-              <ShotDiagram event={event} size="thumb" />
-            </div>
-          </div>
-        ) : (
-          <p className="spost-text">
-            {stripPlayerName(event.headline ?? "", event.playerName)}
-          </p>
-        )}
+        <p className="spost-headline">
+          {stripPlayerName(event.headline ?? "", event.playerName)}
+        </p>
         {onToggleReaction && (
           <div className="post-act-row">
             <ReactionChips
@@ -193,8 +209,8 @@ export default function ShotPost({
                 strokeWidth="1.9"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                width="15"
-                height="15"
+                width="14"
+                height="14"
               >
                 <path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
               </svg>
@@ -202,6 +218,19 @@ export default function ShotPost({
             </button>
             {contextTag && <span className="post-act-ctx">{contextTag}</span>}
           </div>
+        )}
+      </div>
+      {showDiagram && (
+        <div className="spost-diagram-col">
+          <ShotDiagram event={event} size="thumb" />
+        </div>
+      )}
+      <div className="spost-anchor">
+        {tag && (
+          <span className={`spost-tag ${tag.cls}`}>{tag.label}</span>
+        )}
+        {event.toPar && (
+          <span className="spost-delta mono">{event.toPar}</span>
         )}
       </div>
     </article>
