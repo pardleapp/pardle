@@ -25859,19 +25859,21 @@ html.pv-theme-body .auth-chip-btn {
    Mobile (<1024px) is intentionally untouched.
    ============================================================= */
 @media (min-width: 1024px) {
+  /* Specificity bump: .pv-theme .post sets display:block on every
+     card, which would otherwise win against the .spost rule and
+     leave the avatar stacked above the body on its own line — that
+     was the ~40px of dead vertical space. */
+  .pv-theme .spost,
   .spost {
-    padding: 9px 14px;
+    display: flex;
+    padding: 6px 12px;
     gap: 10px;
     align-items: center;
   }
   /* Top row collapses to ONE inline cluster: name · text · meta,
-     sitting tight together at the left of the card. Meta is NOT
-     pinned to the right edge — pinning it there is what creates
-     the dead-space middle on a short headline like "Bogeys the
-     4th". A trailing 1fr filler column absorbs leftover width on
-     the right (the empty space is on the right of the meta now,
-     i.e. card padding, instead of a 300px void in the middle).
-     The action row collapses to row 2 with a 3px top margin. */
+     sitting tight together at the left of the card. The action
+     row sits on row 2 immediately under the text — row-gap alone
+     handles the spacing, no margin-top. */
   .spost-body {
     display: grid;
     grid-template-columns: auto minmax(0, auto) auto 1fr;
@@ -25880,7 +25882,7 @@ html.pv-theme-body .auth-chip-btn {
       "acts acts acts acts";
     align-items: center;
     column-gap: 10px;
-    row-gap: 3px;
+    row-gap: 2px;
   }
   /* .spost-top still wraps name + meta in the JSX — make it
      transparent to the grid so its two children get grid areas
@@ -25900,9 +25902,6 @@ html.pv-theme-body .auth-chip-btn {
     grid-area: text;
     margin: 0;
     min-width: 0;
-    /* Long headlines wrap (the auto grid track lets the column
-       size to content, so a one-liner is short and a long one
-       takes the room it needs). */
   }
   .pv-theme .spost-text-row,
   .spost-text-row {
@@ -25913,13 +25912,19 @@ html.pv-theme-body .auth-chip-btn {
   }
   .pv-theme .spost-diagram,
   .spost-diagram {
-    /* Smaller diagram so it lives comfortably alongside the
-       headline + meta in a single row. */
     max-width: 84px;
   }
   .post-act-row {
     grid-area: acts;
-    margin-top: 2px;
+    margin-top: 0;
+  }
+  .spost-act {
+    padding: 3px 9px;
+    font-size: 12px;
+  }
+  .post-act-cmt {
+    padding: 3px 9px;
+    font-size: 12px;
   }
 }
 
