@@ -8827,20 +8827,24 @@ footer {
   position: relative;
   background: var(--bg, #fff);
   border-radius: 16px;
-  padding: 56px 24px 20px;
-  /* Fill almost the full viewport on every screen size. On a 1440px
-     monitor that means ~1400 × 900, on phones it's edge-to-edge.
-     The whole chart, hero band, and meta footer should fit without
-     scrolling on a 1080p+ display. */
+  /* Mobile: tight padding so the chart gets every pixel it can.
+     Desktop bumps via min-width:640 below for breathing room. */
+  padding: 44px 12px 12px;
   width: 100%;
   max-width: 1440px;
   height: 100%;
   max-height: 96vh;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 8px;
   overflow: hidden;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+@media (min-width: 640px) {
+  .bd-chart-modal-card {
+    padding: 56px 24px 20px;
+    gap: 14px;
+  }
 }
 
 .bd-chart-modal-close {
@@ -8864,9 +8868,11 @@ footer {
   background: rgba(0, 0, 0, 0.04);
 }
 
-/* Inside the modal: the chart wrapper fills available vertical space
-   so the SVG renders as tall as it can while preserving its viewBox
-   aspect ratio. The hero stats band sits above. */
+/* Inside the modal: the chart is the hero. Header sits at top, the
+   SVG dominates the middle (flex:1, ~65–75% of the height), and
+   the four stats compress into a slim strip at the bottom.
+   Visual order is controlled by `order` so JSX can stay header →
+   hero → svg without restructuring. */
 .bd-chart-expanded {
   background: transparent;
   border: none;
@@ -8875,46 +8881,66 @@ footer {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+}
+.bd-chart-expanded .bd-chart-header {
+  order: 0;
+  flex: 0 0 auto;
 }
 .bd-chart-expanded .bd-chart-svg {
+  order: 1;
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
   height: 100%;
   max-height: none;
 }
+.bd-chart-expanded .bd-chart-hero {
+  order: 2;
+  flex: 0 0 auto;
+}
 
-/* Hero stats band above the chart in the modal — Current / Peak /
-   Low / Biggest swing. Numbers are big so it reads as a deep-dive
-   summary at a glance. */
+/* Slim 4-cell stats strip beneath the chart — Now / Peak / Low /
+   Biggest swing. Single horizontal row, mono values, colour-coded
+   +/− but compact: tiny label + value, no chunky tiles. Keeps the
+   stats readable without eating the chart's vertical real estate. */
 .bd-chart-hero {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  padding-bottom: 4px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 0;
 }
 .bd-chart-hero-stat {
-  background: rgba(0, 0, 0, 0.025);
+  background: rgba(0, 0, 0, 0.03);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px 14px;
+  border-radius: 8px;
+  padding: 5px 8px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 1px;
+  min-width: 0;
 }
 .bd-chart-hero-lbl {
-  font-size: 10.5px;
+  font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted);
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .bd-chart-hero-val {
-  font-size: 24px;
-  font-weight: 900;
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 14px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .bd-chart-hero-val.up {
   color: #2c7a28;
@@ -8923,10 +8949,34 @@ footer {
   color: #b13838;
 }
 .bd-chart-hero-sub {
-  font-size: 11.5px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
+}
+/* On wider modals (>=640px) the strip can breathe a touch — larger
+   value text without breaking the slim one-row shape. */
+@media (min-width: 640px) {
+  .bd-chart-hero {
+    gap: 8px;
+  }
+  .bd-chart-hero-stat {
+    padding: 7px 11px;
+    gap: 2px;
+  }
+  .bd-chart-hero-lbl {
+    font-size: 9.5px;
+  }
+  .bd-chart-hero-val {
+    font-size: 17px;
+  }
+  .bd-chart-hero-sub {
+    font-size: 11px;
+  }
 }
 
 /* Row flash — brief highlight applied to the hole-by-hole row that
