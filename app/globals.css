@@ -21225,6 +21225,50 @@ html.pv-theme-body .auth-chip-btn {
   border-color: var(--pv-emerald-d);
 }
 
+/* Header CTA — the obvious "Track a bet" action on the /bets page.
+   Mobile keeps relying on the FAB (thumb-reach territory); desktop
+   gets a real label since the corner FAB is too easy to miss. */
+.bets-track-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--pv-emerald);
+  color: #fff;
+  border: 1px solid var(--pv-emerald);
+  border-radius: 999px;
+  padding: 7px 14px 7px 11px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.12s, transform 0.08s, box-shadow 0.12s;
+  box-shadow: 0 2px 6px oklch(0.4 0.06 145 / 0.18);
+}
+.bets-track-cta:hover {
+  background: var(--pv-emerald-d);
+  border-color: var(--pv-emerald-d);
+  box-shadow: 0 4px 10px oklch(0.4 0.06 145 / 0.22);
+}
+.bets-track-cta:active {
+  transform: scale(0.97);
+}
+.bets-track-cta-plus {
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+  margin-top: -1px;
+}
+/* Mobile: hide the header CTA — the bottom-right FAB is thumb-
+   reach and the empty-state already points to it. Desktop keeps
+   the labelled button as the primary affordance. */
+@media (max-width: 767px) {
+  .bets-track-cta {
+    display: none;
+  }
+}
+
 /* Live / Settled segmented control */
 .lstog {
   display: flex;

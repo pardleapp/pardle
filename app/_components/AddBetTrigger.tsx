@@ -38,6 +38,16 @@ export default function AddBetTrigger() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Listen for `pardle:open-add-bet` window events so other surfaces
+  // (e.g. the prominent "Track a bet" CTA in /bets header) can open
+  // the sheet without re-implementing its state.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = () => setOpen(true);
+    window.addEventListener("pardle:open-add-bet", handler);
+    return () => window.removeEventListener("pardle:open-add-bet", handler);
+  }, []);
+
   const prefillPlayer = useMemo(() => {
     if (!prefillName) return null;
     // We don't have an orchestrator id at this point; the bet

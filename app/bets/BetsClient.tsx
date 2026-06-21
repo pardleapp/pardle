@@ -233,6 +233,22 @@ export default function BetsClient() {
               </button>
             ))}
           </div>
+          {/* Prominent header CTA — desktop primary affordance. The FAB
+              stays for mobile reach, but desktop users were missing the
+              bottom-right corner entirely. The button dispatches a
+              window event that AddBetTrigger listens for. */}
+          <button
+            type="button"
+            className="bets-track-cta"
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new Event("pardle:open-add-bet"));
+              }
+            }}
+          >
+            <span className="bets-track-cta-plus" aria-hidden="true">+</span>
+            <span>Track a bet</span>
+          </button>
         </div>
       </div>
 
