@@ -65,9 +65,9 @@ const PEAK_IDX = 14;
 const LOW_IDX = 6;
 const NOW_IDX = POINTS.length - 1;
 
-const CHART_W = 1072;
-const CHART_H = 290;
-const PAD = { top: 28, right: 32, bottom: 32, left: 64 };
+const CHART_W = 1080;
+const CHART_H = 230;
+const PAD = { top: 26, right: 28, bottom: 26, left: 60 };
 const X_MIN = 0;
 const X_MAX = 16;
 const Y_MIN = 0;
@@ -193,20 +193,12 @@ function buildChartSvg() {
       <text x="${(calloutX + 12).toFixed(1)}" y="${(calloutY + 51).toFixed(1)}" font-size="10" font-weight="800" fill="${EMERALD}" font-family="monospace" letter-spacing="0.4">+£140 · +19pp today</text>
     </g>`;
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CHART_W}" height="${CHART_H}" viewBox="0 0 ${CHART_W} ${CHART_H}">
-    ${yTickLines}
-    ${yTickLabels}
-    ${xTickLabels}
-    <path d="${areaPath}" fill="${EMERALD_TINT}"/>
-    <path d="${linePath}" stroke="${EMERALD}" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    ${swingHighlight}
-    ${shotDots}
-    ${entryPin}
-    ${peakPin}
-    ${lowPin}
-    ${callout}
-  </svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${CHART_W}" height="${CHART_H}" viewBox="0 0 ${CHART_W} ${CHART_H}">${yTickLines}${yTickLabels}${xTickLabels}<path d="${areaPath}" fill="${EMERALD_TINT}"/><path d="${linePath}" stroke="${EMERALD}" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>${swingHighlight}${shotDots}${entryPin}${peakPin}${lowPin}${callout}</svg>`;
+  // base64 encoding is the reliable path for Satori — encodeURIComponent
+  // produces a long URL with %-escapes that resvg sometimes truncates
+  // or rejects on edge runtimes. Buffer is available on Vercel edge.
+  const b64 = Buffer.from(svg, "utf-8").toString("base64");
+  return `data:image/svg+xml;base64,${b64}`;
 }
 
 interface MiniStat {
@@ -247,7 +239,7 @@ async function renderCard(chartSrc: string) {
           width: "100%",
           height: "100%",
           background: PAPER,
-          padding: 36,
+          padding: "28px 36px 24px",
           display: "flex",
           flexDirection: "column",
           fontFamily: "sans-serif",
