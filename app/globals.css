@@ -20201,7 +20201,13 @@ body:has(.v4-theme) {
    the unscoped feed rules above and ties+wins (last declaration)
    vs the .v4-theme rules.
    ============================================================= */
-.pv-theme {
+.pv-theme,
+.desktop-shell {
+  /* The desktop shell hosts the left nav rail + right context rail
+     which sit as SIBLINGS of the pv-theme'd main content, not
+     descendants — so pv-* tokens have to be defined here too or the
+     rail's `background: var(--pv-emerald)` selected state resolves
+     to `initial` (transparent) and disappears against paper. */
   /* surfaces */
   --pv-bg: oklch(0.972 0.009 95);
   --pv-card: oklch(0.995 0.004 95);
