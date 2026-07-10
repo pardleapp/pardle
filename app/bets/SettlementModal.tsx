@@ -27,7 +27,7 @@ export interface SettlementData {
   /** Settled bet shape for the bet-line. */
   player: string;
   market: string;
-  currency: "£" | "$";
+  currency: "£" | "$" | "u";
   stake: number;
   oddsLabel: string;
   /** Stat strip — "+£226" or "−£40" daily P&L + rank string. Both

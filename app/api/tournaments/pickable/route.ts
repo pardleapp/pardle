@@ -29,6 +29,30 @@ export const revalidate = 300;
 const RECENT_COMPLETED_N = 4;
 const UPCOMING_N = 2;
 
+/** Opposite-field / secondary events that run the same week as a
+ *  main tour stop. Users tracking bets almost always mean the main
+ *  event of the week, so we filter these out of the pickable list.
+ *  If someone genuinely bet on ISCO they can raise it — much rarer
+ *  case than the noise of two entries per week in the dropdown. */
+const OPPOSITE_FIELD_KEYWORDS = [
+  "isco championship",
+  "barracuda championship",
+  "barbasol championship",
+  "puerto rico open",
+  "corales puntacana",
+  "myrtle beach classic",
+  "butterfield bermuda",
+  "bank of utah",
+  "sanderson farms",
+  "black desert",
+  "world wide technology",
+];
+
+function isOppositeField(name: string): boolean {
+  const n = name.toLowerCase();
+  return OPPOSITE_FIELD_KEYWORDS.some((kw) => n.includes(kw));
+}
+
 interface PickableTournament {
   id: string;
   name: string;
@@ -43,7 +67,25 @@ export async function GET() {
       getSchedule().catch(() => ({ upcoming: [], completed: [] })),
       getActiveTournament().catch(() => null),
     ]);
-    const active = activeInfo?.tournament ?? null;
+    let active = activeInfo?.tournament ?? null;
+    // If the active resolver picked an opposite-field event, try to
+    // find a concurrent main event (started within ±3 days) and use
+    // that as "Live" for the dropdown instead. Falls through to null
+    // when no main exists in that window.
+    if (active && isOppositeField(active.name)) {
+      const WINDOW = 3 * 24 * 60 * 60 * 1000;
+      const concurrentMain = [
+        ...scheduleThis.upcoming,
+        ...scheduleThis.completed,
+      ]
+        .filter(
+          (t) =>
+            !isOppositeField(t.name) &&
+            Math.abs(t.startDate - active!.startDate) <= WINDOW,
+        )
+        .sort((a, b) => a.startDate - b.startDate)[0];
+      active = concurrentMain ?? null;
+    }
     const activeId = active?.id ?? null;
 
     // Recent completed events — bias to the last 4 by startDate so a
@@ -52,8 +94,8 @@ export async function GET() {
       (a, b) => b.startDate - a.startDate,
     );
     const recentCompleted: PickableTournament[] = completedSorted
+      .filter((t) => t.id !== activeId && !isOppositeField(t.name))
       .slice(0, RECENT_COMPLETED_N)
-      .filter((t) => t.id !== activeId)
       .map((t) => ({
         id: t.id,
         name: t.name,
@@ -67,8 +109,8 @@ export async function GET() {
       (a, b) => a.startDate - b.startDate,
     );
     const upcoming: PickableTournament[] = upcomingSorted
+      .filter((t) => t.id !== activeId && !isOppositeField(t.name))
       .slice(0, UPCOMING_N)
-      .filter((t) => t.id !== activeId)
       .map((t) => ({
         id: t.id,
         name: t.name,

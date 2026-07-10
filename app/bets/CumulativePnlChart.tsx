@@ -88,7 +88,11 @@ export default function CumulativePnlChart({ bets, cur = "£" }: Props) {
   const ticks = Array.from(new Set([max, 0, min].filter((t, i, a) => a.indexOf(t) === i)));
   const fmt = (v: number) => {
     const sign = v > 0 ? "+" : v < 0 ? "−" : "";
-    return `${sign}${cur}${Math.abs(Math.round(v)).toLocaleString("en-US")}`;
+    const isUnit = cur === "u";
+    const body = Math.abs(v).toLocaleString("en-US", {
+      maximumFractionDigits: isUnit ? 1 : 0,
+    });
+    return isUnit ? `${sign}${body}${cur}` : `${sign}${cur}${body}`;
   };
 
   return (

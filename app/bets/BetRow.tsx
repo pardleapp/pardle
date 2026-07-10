@@ -82,8 +82,10 @@ export default function BetRow({ bet, oddsFmt }: Props) {
           <div className="bets-row-chip">
             <span className="bp-bet-mkt">{bet.mkt}</span>
             <span className="bp-bet-stake">
-              {bet.cur}
-              {bet.stake} @ {odds}
+              {bet.cur === "u"
+                ? `${bet.stake}${bet.cur}`
+                : `${bet.cur}${bet.stake}`}{" "}
+              @ {odds}
             </span>
           </div>
         </div>

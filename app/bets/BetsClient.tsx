@@ -39,7 +39,9 @@ function buildSettlementData(b: MockBetSettled): SettlementData {
   const decOdds = parseFloat(b.odds) || 0;
   const returnedAmount = b.result === "WON" ? Math.round(b.stake * decOdds) : 0;
   const returnedLabel = returnedAmount
-    ? `${b.cur}${returnedAmount.toLocaleString("en-US")}`
+    ? b.cur === "u"
+      ? `${returnedAmount.toLocaleString("en-US")}${b.cur}`
+      : `${b.cur}${returnedAmount.toLocaleString("en-US")}`
     : undefined;
   return {
     win: b.result === "WON",
@@ -155,7 +157,10 @@ export default function BetsClient() {
     .map(([cur, n]) => {
       const abs = Math.abs(n);
       const sign = n >= 0 ? "+" : "−";
-      return `${sign}${cur}${abs.toLocaleString("en-US")}`;
+      const body = abs.toLocaleString("en-US", {
+        maximumFractionDigits: cur === "u" ? 1 : 0,
+      });
+      return cur === "u" ? `${sign}${body}${cur}` : `${sign}${cur}${body}`;
     })
     .join(" · ");
   const hitPct = wins + losses > 0
@@ -205,7 +210,13 @@ export default function BetsClient() {
   }
   const fmtMoney = (v: number, withSign = false) => {
     const sign = v > 0 && withSign ? "+" : v < 0 ? "−" : "";
-    return `${sign}${primaryCur}${Math.abs(Math.round(v)).toLocaleString("en-US")}`;
+    const isUnit = primaryCur === "u";
+    const body = Math.abs(v).toLocaleString("en-US", {
+      maximumFractionDigits: isUnit ? 1 : 0,
+    });
+    return isUnit
+      ? `${sign}${body}${primaryCur}`
+      : `${sign}${primaryCur}${body}`;
   };
   const fmtPct = (v: number) => {
     const sign = v > 0 ? "+" : v < 0 ? "−" : "";
@@ -410,8 +421,10 @@ export default function BetsClient() {
                       <div className="bets-settled-nm">{b.who}</div>
                       <div className="bets-settled-sub">
                         <span className="bets-settled-mkt">{b.mkt}</span> @{" "}
-                        {b.odds} · {b.cur}
-                        {b.stake}
+                        {b.odds} ·{" "}
+                        {b.cur === "u"
+                          ? `${b.stake}${b.cur}`
+                          : `${b.cur}${b.stake}`}
                       </div>
                     </div>
                     <div className="bets-settled-pl-col">

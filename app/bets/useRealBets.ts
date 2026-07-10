@@ -38,6 +38,7 @@ import {
   writeBets,
 } from "@/app/live/bet-shared";
 import {
+  formatBetCurrencySigned,
   normaliseBetCurrency,
   type BetCurrency,
 } from "@/lib/format/bet-currency";
@@ -79,8 +80,10 @@ interface FeedSlice {
 
 const POLL_MS = 5_000;
 
-function currencySymbol(c: BetCurrency): "£" | "$" {
-  return c === "USD" ? "$" : "£";
+function currencySymbol(c: BetCurrency): "£" | "$" | "u" {
+  if (c === "USD") return "$";
+  if (c === "UNIT") return "u";
+  return "£";
 }
 
 function oddsTriple(decimal: number): MockBetLiveOdds {
@@ -272,13 +275,17 @@ function adaptToLive(
 }
 
 function adaptToSettled(bet: TrackedBet): MockBetSettled {
-  const cur = currencySymbol(normaliseBetCurrency(bet.currency));
+  const currency = normaliseBetCurrency(bet.currency);
+  const cur = currencySymbol(currency);
   const oddsLabel = bet.oddsTakenLabel || formatOdds(bet.oddsTaken, "decimal");
   const won = bet.settledWon === true;
-  const winAmount = Math.round(bet.stake * (bet.oddsTaken - 1));
-  const pl = won
-    ? `+${cur}${winAmount.toLocaleString("en-US")}`
-    : `−${cur}${bet.stake.toLocaleString("en-US")}`;
+  // Round win amount to whole for currency, keep 1dp for units so
+  // "+2.5u" reads correctly for a 1u stake at +150.
+  const winAmount = bet.stake * (bet.oddsTaken - 1);
+  const displayAmount = won ? winAmount : -bet.stake;
+  const pl = formatBetCurrencySigned(displayAmount, currency, {
+    maximumFractionDigits: currency === "UNIT" ? 1 : 0,
+  });
   const playerName =
     "playerName" in bet && bet.playerName
       ? bet.playerName

@@ -103,9 +103,12 @@ const ROUND_OPTIONS: Array<{ value: number | null; label: string }> = [
   { value: 4, label: "R4" },
 ];
 
-const CURRENCIES: Array<{ symbol: "£" | "$"; code: BetCurrency }> = [
+const CURRENCIES: Array<{ symbol: string; code: BetCurrency }> = [
   { symbol: "£", code: "GBP" },
   { symbol: "$", code: "USD" },
+  // "u" for units — sizes bets by bankroll fraction. All P&L renders
+  // as "+2.5u" downstream via formatBetCurrency's UNIT branch.
+  { symbol: "u", code: "UNIT" },
 ];
 
 interface Props {
@@ -132,7 +135,7 @@ export default function AddBetSheet({
   const [marketIdx, setMarketIdx] = useState(0);
   const [oddsText, setOddsText] = useState(MARKETS[0].defaultOdds);
   const [stake, setStake] = useState("");
-  const [cur, setCur] = useState<{ symbol: "£" | "$"; code: BetCurrency }>(
+  const [cur, setCur] = useState<{ symbol: string; code: BetCurrency }>(
     CURRENCIES[0],
   );
   // Per-market extras — used only for round-score + winning-score.
@@ -681,9 +684,9 @@ export default function AddBetSheet({
               className="addbet-stake-input"
               value={stake}
               onChange={(e) => setStake(e.target.value)}
-              placeholder="0"
+              placeholder={cur.code === "UNIT" ? "1.0" : "0"}
               min="0"
-              step="1"
+              step={cur.code === "UNIT" ? "0.5" : "1"}
             />
           </div>
         </div>

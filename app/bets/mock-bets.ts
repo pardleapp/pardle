@@ -31,7 +31,7 @@ export interface MockBetLive {
   /** Market label — OUTRIGHT WIN, TOP 5, UNDER 69.5 R4, etc. */
   mkt: string;
   /** Currency symbol — £ or $ in the prototype. */
-  cur: "£" | "$";
+  cur: "£" | "$" | "u";
   stake: number;
   /** Odds expressed in all three formats so the on-page toggle can
    *  reformat without a separate parse step. */
@@ -51,7 +51,7 @@ export interface MockBetSettled {
   who: string;
   mkt: string;
   odds: string;
-  cur: "£" | "$";
+  cur: "£" | "$" | "u";
   stake: number;
   result: "WON" | "LOST";
   pl: string;
