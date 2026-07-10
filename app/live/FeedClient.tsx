@@ -1204,6 +1204,11 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
             // get an inline Share button + a small shot diagram.
             const isNotable =
               event.highlight === true || event.lowlight === true;
+            // Putt-poll rows only survive the earlier filter when
+            // they're the single latest OPEN poll — so the widget
+            // always has a votable poll to render.
+            const isPuttPoll =
+              event.type === "putt-poll" && event.pollId != null;
             return (
               <Fragment key={event.id}>
                 {reelHere}
@@ -1232,6 +1237,17 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                       toggleEmojiReaction(`shot:${event.id}`, emoji)
                     }
                   />
+                  {isPuttPoll && event.pollId && (
+                    <PuttPollWidget
+                      pollId={event.pollId}
+                      puttDistanceFt={event.puttDistanceFt}
+                      playerName={event.playerName}
+                      serverState={data.puttPolls?.[event.pollId]}
+                      optimisticVote={myPollVotes[event.pollId]}
+                      optimisticCounts={pollCounts[event.pollId]}
+                      onVote={(v) => sendPollVote(event.pollId!, v)}
+                    />
+                  )}
                 </li>
               </Fragment>
             );
