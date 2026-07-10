@@ -55,6 +55,7 @@ import { useNotifications } from "./notifications/useNotifications";
 import PlayerAvatar from "./PlayerAvatar";
 import PlayerSearch from "./PlayerSearch";
 import PuttPollWidget from "./PuttPollWidget";
+import { useToast } from "./Toast";
 import BetPost from "./BetPost";
 import BetPostErrorBoundary from "./BetPostErrorBoundary";
 import SweatHeader from "./SweatHeader";
@@ -374,6 +375,7 @@ function findEventIdForPoll(
 }
 
 export default function FeedClient({ forcedTournamentId }: FeedClientProps = {}) {
+  const toast = useToast();
   /** Read demo flag synchronously so initial state can seed
    *  DEMO_RESPONSE into `data` and the very first paint already
    *  shows stub cards — no flash to the off-week landing on
@@ -810,13 +812,31 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
         },
       );
       if (!res.ok) {
-        // Poll closed or rate-limited — revert.
+        // Revert the optimistic bump regardless of why the server said no.
         setMyPollVotes((m) => {
           const out = { ...m };
           delete out[pollId];
           return out;
         });
         setPollCounts((m) => ({ ...m, [pollId]: baseCounts }));
+        // 409 = poll already closed on the server (putt has been made or
+        // missed between the client's last feed refresh and this click).
+        // Tell the user their vote was too late, sync counts from the
+        // server response, and force-refresh the feed so the widget flips
+        // to its "Drained it / Missed" state on the next paint instead of
+        // silently disappearing.
+        if (res.status === 409) {
+          try {
+            const j = await res.json();
+            if (j?.counts) {
+              setPollCounts((m) => ({ ...m, [pollId]: j.counts }));
+            }
+          } catch {}
+          toast.info(
+            "Too late — putt already dropped or missed",
+          );
+          void load();
+        }
       }
     } catch {
       // Network blip — leave optimistic state; next refresh corrects.
