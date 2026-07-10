@@ -620,25 +620,15 @@ export async function pollAndDiff(
     if (tags.length > 0) ev.tags = tags.slice(0, 3);
   }
 
-  // Order events so the "most interesting" land last (= top of feed
-  // after LPUSH). Aces loudest, then albatross/eagle, blow-ups,
-  // stuffed approaches, penalties, birdies, drives.
-  const interestOf = (e: FeedEvent): number => {
-    if (e.ace) return 10;
-    if (e.result === "albatross") return 9;
-    if (e.result === "eagle") return 8;
-    if (e.type === "shot") {
-      if (e.highlight) return 6; // stuffed approach
-      if (e.lowlight) return 5; // penalty
-      return 2; // long drive
-    }
-    if (e.result === "triple-plus") return 4;
-    if (e.result === "double") return 3;
-    if (e.result === "birdie") return 2;
-    if (e.result === "bogey") return 1;
-    return 0;
-  };
-  events.sort((a, b) => interestOf(a) - interestOf(b));
+  // Order the batch chronologically (oldest first) so LPUSH lands the
+  // newest event at index 0 in Redis. The old code sorted by "interest"
+  // (aces loudest → land last → top of feed) so highlights bubbled up,
+  // but that broke the live-stream mental model: when a viewer opened
+  // the page mid-round, the top 80 events served from Redis mixed a
+  // 2-hour-old eagle above a 5-minute-old bogey, so the feed read as
+  // non-chronological. Interest-based highlighting still exists as the
+  // Shots-of-the-day reel — the top of the feed just needs to be time.
+  events.sort((a, b) => a.ts - b.ts);
 
   // ── Settle any open putt polls whose hole just completed ──────
   // Hole completions tell us the final strokes; if there was an

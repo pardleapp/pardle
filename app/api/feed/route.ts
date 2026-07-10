@@ -301,7 +301,16 @@ async function handle(req: Request) {
     }
   }
   const allEvents = bundle.events;
-  const feedEvents = allEvents.slice(0, 80);
+  // Redis-stored order is *supposed* to be newest-first, but for a
+  // long time the engine sorted the push batch by "interest" so an
+  // eagle from earlier in the tournament could sit ahead of very
+  // recent bogeys. Defensively re-sort by ts here so mid-round
+  // refreshes always show the freshest 80 events, in strict time
+  // order, regardless of what's still in the Redis tail.
+  const allEventsByTs = allEvents
+    .slice()
+    .sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0));
+  const feedEvents = allEventsByTs.slice(0, 80);
   const reelSource = allEvents.slice(0, 400);
   const bursts = bundle.bursts;
   const leaderboard = bundle.leaderboard;
