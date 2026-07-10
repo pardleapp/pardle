@@ -27037,7 +27037,8 @@ summary,
 }
 .addbet-search,
 .addbet-odds,
-.addbet-stake-input {
+.addbet-stake-input,
+.addbet-select {
   width: 100%;
   padding: 11px 12px;
   border-radius: 10px;
@@ -27048,9 +27049,17 @@ summary,
   font-family: inherit;
   outline: none;
 }
+.addbet-select {
+  /* Native select — matches the other form fields but keeps its
+     platform chevron so the affordance is obvious. */
+  appearance: auto;
+  cursor: pointer;
+  font-weight: 600;
+}
 .addbet-search:focus,
 .addbet-odds:focus,
-.addbet-stake-input:focus {
+.addbet-stake-input:focus,
+.addbet-select:focus {
   border-color: var(--pv-emerald, #1f8b6e);
 }
 .addbet-chiprow {

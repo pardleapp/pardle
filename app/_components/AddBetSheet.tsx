@@ -149,6 +149,25 @@ export default function AddBetSheet({
     id: string;
     name: string;
   } | null>(null);
+  /** Pickable tournaments — upcoming + live + last few completed.
+   *  Populated from /api/tournaments/pickable so the user can attach
+   *  a bet to a past or future event, not just the currently live
+   *  one. Fixes the "bet stuck live because it belonged to a past
+   *  tournament we couldn't identify" bug at source. */
+  const [pickable, setPickable] = useState<
+    Array<{
+      id: string;
+      name: string;
+      startDate: number;
+      state: "upcoming" | "live" | "completed";
+    }>
+  >([]);
+  /** The tournament the user picked from the dropdown. Falls back to
+   *  `tournament` (active) when unset — that's the default for the
+   *  common case: someone placing a bet mid-round on today's event. */
+  const [pickedTournamentId, setPickedTournamentId] = useState<string | null>(
+    null,
+  );
 
   // Reset state when the sheet opens (mirrors a fresh sheet each time).
   useEffect(() => {
@@ -163,7 +182,47 @@ export default function AddBetSheet({
     setRound(null);
     setErr(null);
     setSaving(false);
+    setPickedTournamentId(null);
   }, [open, prefillPlayer]);
+
+  // Load the curated list of tournaments the bet can be attached to
+  // (upcoming + live + last few completed). Keeps the AddBet flow
+  // self-contained — the dropdown is populated the moment the sheet
+  // opens so the user never sees an empty menu.
+  useEffect(() => {
+    if (!open) return;
+    let cancel = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/tournaments/pickable", { cache: "no-store" });
+        if (!r.ok) return;
+        const j = (await r.json()) as {
+          active: { id: string; name: string } | null;
+          options: Array<{
+            id: string;
+            name: string;
+            startDate: number;
+            state: "upcoming" | "live" | "completed";
+          }>;
+        };
+        if (cancel) return;
+        setPickable(j.options ?? []);
+        // Default the picker to the currently-live event if we know one
+        // — that's the >90% case for placement.
+        if (j.active?.id) {
+          setPickedTournamentId((prev) => prev ?? j.active!.id);
+        } else if ((j.options ?? [])[0]?.id) {
+          setPickedTournamentId((prev) => prev ?? j.options![0].id);
+        }
+      } catch {
+        // ignored — dropdown falls back to the active tournament from
+        // /api/feed, which the existing effect handles.
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [open]);
 
   // Load the player list from the live leaderboard first; fall back
   // to the DataGolf field (pre-event). Both endpoints already exist
@@ -292,19 +351,32 @@ export default function AddBetSheet({
         .slice(2, 6)}`;
       const oddsTakenLabel = formatOdds(parsed.decimal, parsed.format);
 
-      // Guard: refuse to place a bet without a known tournament.
+      // Resolve which tournament this bet targets. Priority order:
+      //   1. The user's explicit pick from the dropdown.
+      //   2. Whatever /api/feed reported as active (fallback for cases
+      //      where the pickable list hadn't loaded yet).
       // The settlement layer keys off bet.tournamentId — placing one
       // without it reintroduces the "bet implicitly retargets
       // whichever event is next active" bug.
-      if (!tournament?.id) {
+      const pickedFromList =
+        pickedTournamentId != null
+          ? pickable.find((t) => t.id === pickedTournamentId)
+          : undefined;
+      const targetTournament: { id: string; name?: string } | null =
+        pickedFromList
+          ? { id: pickedFromList.id, name: pickedFromList.name }
+          : tournament?.id
+            ? { id: tournament.id, name: tournament.name }
+            : null;
+      if (!targetTournament?.id) {
         setErr(
-          "No active tournament available right now. Try again in a few moments.",
+          "Pick a tournament for this bet — none is currently available.",
         );
         return;
       }
       const tournamentStamp = {
-        tournamentId: tournament.id,
-        tournamentName: tournament.name || undefined,
+        tournamentId: targetTournament.id,
+        tournamentName: targetTournament.name || undefined,
       };
 
       let bet: TrackedBet;
@@ -412,6 +484,38 @@ export default function AddBetSheet({
       <div className="addbet-sheet" role="dialog" aria-modal="true">
         <div className="addbet-grip" aria-hidden="true" />
         <h3 className="addbet-title">Track a bet</h3>
+
+        {/* Tournament — the primary settlement anchor. Defaults to the
+            currently-live event but the user can attach a bet to a
+            past event (e.g. one they forgot to log) or an upcoming
+            one (pre-tournament placement). Without an explicit pick,
+            settlement historically drifted to "whichever event is
+            active when read later", which stranded bets forever. */}
+        {pickable.length > 0 && (
+          <div className="addbet-field">
+            <div className="addbet-fl">Tournament</div>
+            <select
+              className="addbet-select"
+              value={pickedTournamentId ?? ""}
+              onChange={(e) => setPickedTournamentId(e.target.value)}
+            >
+              {pickable.map((t) => {
+                const suffix =
+                  t.state === "live"
+                    ? " · Live"
+                    : t.state === "upcoming"
+                      ? " · Upcoming"
+                      : " · Past";
+                return (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                    {suffix}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        )}
 
         {market.needsPlayer && (
           <div className="addbet-field">
