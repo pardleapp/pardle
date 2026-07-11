@@ -1,0 +1,10 @@
+# Recon artefacts — not useful in the repo, regenerated on demand.
+capture.json
+capture-raw.json
+ws-flat.json
+dom-tree.json
+candidate-selectors.json
+widget-screenshot.png
+findings.json
+bundles/
+js-urls.txt
