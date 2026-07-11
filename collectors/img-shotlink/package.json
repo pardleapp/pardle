@@ -1,0 +1,20 @@
+{
+  "name": "pardle-img-shotlink-collector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless-Chromium tap on the IMG Arena golf widget. Publishes shot events to the main app's Redis feed pipeline.",
+  "main": "collector.mjs",
+  "scripts": {
+    "start": "node collector.mjs",
+    "start:prototype": "node prototype.mjs",
+    "inspect": "node inspect-dom.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.34.0",
+    "playwright": "^1.48.0"
+  }
+}
