@@ -933,6 +933,25 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     if (ev.type !== "putt-poll") return true;
     return ev.pollId != null && ev.pollId === _latestOpenPollIdForFilter;
   });
+
+  // When an IMG collector is active for this tournament (past OR
+  // present — determined by whether any imgSourced event is in the
+  // window), IMG is the canonical shot/score source. Filter out
+  // orchestrator-sourced score/shot events entirely so we don't
+  // surface stale "Player birdies the Nth" cards that duplicate
+  // IMG's version. Non-shot/score events (putt-poll, position,
+  // milestone) still pass — those are engine-only and additive.
+  //
+  // On tournaments without an IMG collector, no imgSourced events
+  // exist → this filter no-ops and the feed behaves as before.
+  const hasImgEvents = data.rows.some((r) => r.event.imgSourced === true);
+  const rowsAfterImgPrimary = hasImgEvents
+    ? rowsAfterPollFilter.filter((r) => {
+        const ev = r.event;
+        if (ev.type !== "score" && ev.type !== "shot") return true;
+        return ev.imgSourced === true;
+      })
+    : rowsAfterPollFilter;
   // Smart-feed impact set — Tier 1 per-kind heuristic:
   //   - round-score  → owned player only, every shot
   //   - outright     → owned + top-5 by current odds, notable only
@@ -949,14 +968,14 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   const hotCtx = buildHotFilterCtx({ leaderboard: data.leaderboard });
   const visibleRows = (() => {
     if (filterMode === "smart") {
-      return rowsAfterPollFilter.filter((r) =>
+      return rowsAfterImgPrimary.filter((r) =>
         isMaterialEvent(r.event, smartImpact),
       );
     }
     if (filterMode === "hot") {
-      return rowsAfterPollFilter.filter((r) => isHotEvent(r.event, hotCtx));
+      return rowsAfterImgPrimary.filter((r) => isHotEvent(r.event, hotCtx));
     }
-    return rowsAfterPollFilter;
+    return rowsAfterImgPrimary;
   })();
 
   // Build interleaved timeline — tracked bets become first-class
