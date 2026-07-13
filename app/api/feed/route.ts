@@ -310,7 +310,15 @@ async function handle(req: Request) {
   const allEventsByTs = allEvents
     .slice()
     .sort((a, b) => (b.ts ?? 0) - (a.ts ?? 0));
-  const feedEvents = allEventsByTs.slice(0, 80);
+  // Live viewers get 80 for a tight render window. Replay viewers
+  // (tournamentIdOverride set) get the full buffer so they can scrub
+  // back with ?back=<hours> across the entire Redis-retained history
+  // — otherwise the 80-cap silently truncates IMG data that's still
+  // sitting in Redis.
+  const feedEvents = allEventsByTs.slice(
+    0,
+    tournamentIdOverride ? 1000 : 80,
+  );
   const reelSource = allEvents.slice(0, 400);
   const bursts = bundle.bursts;
   const leaderboard = bundle.leaderboard;
