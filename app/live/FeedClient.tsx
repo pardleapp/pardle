@@ -56,6 +56,7 @@ import PlayerAvatar from "./PlayerAvatar";
 import PlayerSearch from "./PlayerSearch";
 import PuttPollWidget from "./PuttPollWidget";
 import { useToast } from "./Toast";
+import { useFollowedPlayers } from "./useFollowedPlayers";
 import BetPost from "./BetPost";
 import BetPostErrorBoundary from "./BetPostErrorBoundary";
 import SweatHeader from "./SweatHeader";
@@ -376,6 +377,7 @@ function findEventIdForPoll(
 
 export default function FeedClient({ forcedTournamentId }: FeedClientProps = {}) {
   const toast = useToast();
+  const { followed: followedPlayerIds } = useFollowedPlayers();
   /** Read demo flag synchronously so initial state can seed
    *  DEMO_RESPONSE into `data` and the very first paint already
    *  shows stub cards — no flash to the off-week landing on
@@ -941,6 +943,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     bets: trackedBets,
     leaderboard: data.leaderboard,
     currentOdds: data.currentOdds,
+    followedPlayerIds,
   });
   const visibleRows = (() => {
     if (filterMode === "smart") {
@@ -1063,12 +1066,15 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
       <main className="feed-main">
 
       {/* Filter row — All / ✦ Smart. Smart only renders when the
-          user has at least one active tracked bet. We test bets
-          directly (not trackedPlayerIds.size) because winning-score
-          bets have no playerId but DO drive the Smart feed via the
-          top-of-leaderboard contender set. Best/Worst lives inline
-          in the ShotsReel further down. */}
-      {trackedBets.some((b) => b.settledAt == null) && (
+          user has at least one active tracked bet OR a followed
+          player. We test bets directly (not trackedPlayerIds.size)
+          because winning-score bets have no playerId but DO drive
+          the Smart feed via the top-of-leaderboard contender set.
+          Followed players (from the ★ Follow button on player rows)
+          count too. Best/Worst lives inline in the ShotsReel further
+          down. */}
+      {(trackedBets.some((b) => b.settledAt == null) ||
+        followedPlayerIds.length > 0) && (
         <div className="feed-filter-row">
           <button
             type="button"
@@ -1082,7 +1088,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
             className={`feed-filter-btn ${filterMode === "smart" ? "feed-filter-on" : ""}`}
             onClick={() => setFilterMode("smart")}
           >
-            ✦ Smart
+            ✦ Mine
           </button>
         </div>
       )}

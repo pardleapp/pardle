@@ -23,6 +23,7 @@ import { abbreviateName } from "@/lib/text/abbreviate";
 import ShotDiagram from "./ShotDiagram";
 import { useHoldReact } from "./useHoldReact";
 import ReactionChips, { type ReactionState } from "./ReactionChips";
+import { useFollowedPlayers } from "./useFollowedPlayers";
 
 interface Props {
   event: FeedEvent;
@@ -140,6 +141,8 @@ export default function ShotPost({
 
   const emotion = emotionFor(event);
   const holeLabel = typeof event.hole === "number" ? ordinal(event.hole) : null;
+  const { isFollowing, toggle: toggleFollow } = useFollowedPlayers();
+  const following = isFollowing(event.playerId);
 
   return (
     <>
@@ -185,6 +188,24 @@ export default function ShotPost({
           {holeLabel && (
             <span className="spost-hole-mini">· {holeLabel}</span>
           )}
+          <button
+            type="button"
+            className={`spost-follow ${following ? "spost-follow-on" : ""}`}
+            aria-label={
+              following
+                ? `Unfollow ${event.playerName}`
+                : `Follow ${event.playerName}`
+            }
+            title={following ? "Unfollow" : "Follow"}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              toggleFollow(event.playerId);
+            }}
+            data-no-hold
+          >
+            {following ? "★" : "☆"}
+          </button>
         </div>
         <p className="spost-headline">
           {stripPlayerName(event.headline ?? "", event.playerName)}

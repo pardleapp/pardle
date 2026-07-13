@@ -26028,6 +26028,32 @@ html.pv-theme-body .auth-chip-btn {
   flex-shrink: 0;
   letter-spacing: 0.01em;
 }
+.spost-follow {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--pv-muted);
+  border-radius: 999px;
+  transition: color 0.12s, background 0.12s, transform 0.08s;
+  flex-shrink: 0;
+}
+.spost-follow:hover {
+  color: var(--pv-ink);
+  background: var(--pv-soft);
+}
+.spost-follow:active {
+  transform: scale(0.9);
+}
+.spost-follow-on {
+  color: var(--pv-tang);
+}
+.spost-follow-on:hover {
+  color: var(--pv-tang);
+}
 .spost-headline {
   font-size: 14.5px;
   line-height: 1.25;

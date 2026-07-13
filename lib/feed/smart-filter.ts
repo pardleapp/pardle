@@ -57,20 +57,30 @@ function isNotableEvent(ev: FeedEvent): boolean {
   return ev.result !== "par";
 }
 
-/** Build the impact set from the user's bets + current snapshot. The
- *  caller passes only the slices it has (currentOdds may be empty
- *  pre-tournament; leaderboard may be empty before the first poll). */
+/** Build the impact set from the user's bets + followed players +
+ *  current snapshot. The caller passes only the slices it has
+ *  (currentOdds may be empty pre-tournament; leaderboard may be
+ *  empty before the first poll; followedPlayerIds may be empty for
+ *  a first-visit user). */
 export function buildSmartImpactSet({
   bets,
   leaderboard,
   currentOdds,
+  followedPlayerIds = [],
 }: {
   bets: TrackedBet[];
   leaderboard: CachedLeaderboardRow[];
   currentOdds: Record<string, number>;
+  followedPlayerIds?: string[];
 }): SmartImpactSet {
   const everyShot = new Set<string>();
   const notableOnly = new Set<string>();
+
+  // Followed players are treated as "everyShot" — user opted in, they
+  // want every shot from that player, not just notable ones.
+  for (const pid of followedPlayerIds) {
+    if (pid) everyShot.add(pid);
+  }
 
   // Pre-rank players for outright top-K. `currentOdds` is DECIMAL
   // ODDS (api/feed: `1 / dgProb` or Polymarket's `p` field — both
