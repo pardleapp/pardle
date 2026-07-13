@@ -12,7 +12,15 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  searchParams: Promise<{ replay?: string; tournament?: string }>;
+  searchParams: Promise<{
+    replay?: string;
+    tournament?: string;
+    /** Rewind cutoff — hours to subtract from "now" when filtering
+     *  events. e.g. `back=6` shows events ≤ 6 h before the latest
+     *  event in the buffer. Lets us test mid-round density instead
+     *  of being stuck at end-of-R4 where the field is compressed. */
+    back?: string;
+  }>;
 }
 
 export default async function HomeLive({ searchParams }: PageProps) {
@@ -20,9 +28,12 @@ export default async function HomeLive({ searchParams }: PageProps) {
   // ?replay=R2026541 or ?tournament=R2026541 — render the feed
   // from that tournament's cached events instead of the active one.
   // Used pre-tournament to iterate on the feed shape against real
-  // historical data (Scottish Open R4 sitting in Redis right now
-  // is a perfect stress-test dataset).
+  // historical data.
   const replayId = params.replay || params.tournament || undefined;
+  const backHours =
+    params.back != null && Number.isFinite(Number(params.back))
+      ? Number(params.back)
+      : undefined;
   return (
     <main className="container container-wide v4-theme pv-theme">
       {replayId && (
@@ -37,10 +48,11 @@ export default async function HomeLive({ searchParams }: PageProps) {
             letterSpacing: 0.4,
           }}
         >
-          REPLAY MODE · {replayId} · not live
+          REPLAY MODE · {replayId}
+          {backHours != null ? ` · rewound ${backHours}h` : ""} · not live
         </div>
       )}
-      <FeedClient forcedTournamentId={replayId} />
+      <FeedClient forcedTournamentId={replayId} replayBackHours={backHours} />
       <Suspense fallback={null}>
         <AddBetTrigger />
       </Suspense>

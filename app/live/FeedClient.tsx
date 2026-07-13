@@ -356,6 +356,11 @@ interface FeedClientProps {
    *  for rendering purposes — used by /replay/[id] for demo /
    *  screenshot work. */
   forcedTournamentId?: string;
+  /** Rewind cutoff in hours. When set, we filter the replay events
+   *  to those older than `latestEventTs - (backHours × 1h)`. Lets us
+   *  scrub back to mid-round density on tournaments that have already
+   *  finished — otherwise the buffer is pinned at end-of-R4. */
+  replayBackHours?: number;
 }
 
 /** Resolve a poll ID's matching event ID. Used by the deep-link
@@ -376,7 +381,10 @@ function findEventIdForPoll(
   return null;
 }
 
-export default function FeedClient({ forcedTournamentId }: FeedClientProps = {}) {
+export default function FeedClient({
+  forcedTournamentId,
+  replayBackHours,
+}: FeedClientProps = {}) {
   const toast = useToast();
   const { followed: followedPlayerIds } = useFollowedPlayers();
   /** Read demo flag synchronously so initial state can seed
@@ -934,6 +942,22 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     return ev.pollId != null && ev.pollId === _latestOpenPollIdForFilter;
   });
 
+  // Rewind cutoff — anchored to the LATEST event in the buffer, not
+  // wall-clock, because the buffer for a finished tournament is
+  // frozen at its end. `back=6` means "show events at least 6 hours
+  // before the last thing that happened."
+  const latestBufferTs = data.rows.reduce(
+    (max, r) => (r.event.ts > max ? r.event.ts : max),
+    0,
+  );
+  const rewoundRows =
+    replayBackHours != null && replayBackHours > 0 && latestBufferTs > 0
+      ? rowsAfterPollFilter.filter(
+          (r) =>
+            r.event.ts <= latestBufferTs - replayBackHours * 60 * 60 * 1000,
+        )
+      : rowsAfterPollFilter;
+
   // When an IMG collector is active for this tournament (past OR
   // present — determined by whether any imgSourced event is in the
   // window), IMG is the canonical shot/score source. Filter out
@@ -946,12 +970,12 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   // exist → this filter no-ops and the feed behaves as before.
   const hasImgEvents = data.rows.some((r) => r.event.imgSourced === true);
   const rowsAfterImgPrimary = hasImgEvents
-    ? rowsAfterPollFilter.filter((r) => {
+    ? rewoundRows.filter((r) => {
         const ev = r.event;
         if (ev.type !== "score" && ev.type !== "shot") return true;
         return ev.imgSourced === true;
       })
-    : rowsAfterPollFilter;
+    : rewoundRows;
   // Smart-feed impact set — Tier 1 per-kind heuristic:
   //   - round-score  → owned player only, every shot
   //   - outright     → owned + top-5 by current odds, notable only
