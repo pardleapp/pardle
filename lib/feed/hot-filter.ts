@@ -140,18 +140,32 @@ function isSgStandout(ev: FeedEvent): boolean {
   return false;
 }
 
+/** Results that qualify as "exceptional" — always in Hot regardless
+ *  of whether the player is a contender. Eagles, aces, and blow-ups
+ *  (triple bogey or worse) are moments TV would cut to. Routine
+ *  birdies and bogeys from a mid-pack player are not. */
+const EXCEPTIONAL_RESULTS = new Set([
+  "ace",
+  "albatross",
+  "eagle",
+  "triple-plus",
+]);
+
 /**
  * Should this event render in the Hot tab?
  *
- * Rules simplified to: contenders (top-5 leaderboard) + score events
- * + interactive polls + SG-standout shots. Everything else — routine
- * drives, safe layups, fairway approaches from mid-pack — drops.
+ * Rules:
+ *   • Contender (top-5 leaderboard) → every shot + every score
+ *   • Everyone else                 → only SG-standout shots + only
+ *                                     exceptional scores (eagle /
+ *                                     ace / albatross / triple+)
+ *   • Interactive polls             → always in (rare, high-signal)
+ *   • Position / milestone          → always in (engine-curated)
+ *
+ * A routine bogey from Nakajima at T14 doesn't make Hot; his eagle
+ * would. Every McIlroy shot makes Hot while he's on the leaderboard.
  */
 export function isHotEvent(ev: FeedEvent, ctx: HotFilterCtx): boolean {
-  // Score events — every non-par landing (orchestrator already
-  // filters pars out before emitting a score event).
-  if (ev.type === "score") return true;
-
   // Putt-poll — always interactive, always in.
   if (ev.type === "putt-poll") return true;
 
@@ -159,10 +173,21 @@ export function isHotEvent(ev: FeedEvent, ctx: HotFilterCtx): boolean {
   // signals from the engine — surface them.
   if (ev.type === "position" || ev.type === "milestone") return true;
 
+  const isContender =
+    typeof ev.playerId === "string" && ctx.contenderIds.has(ev.playerId);
+
+  // Score events
+  if (ev.type === "score") {
+    if (isContender) return true;
+    if (ev.ace) return true;
+    if (ev.result && EXCEPTIONAL_RESULTS.has(ev.result)) return true;
+    return false;
+  }
+
   if (ev.type !== "shot") return false;
 
-  // Contender action: every shot for a top-5 leaderboard player.
-  if (ev.playerId && ctx.contenderIds.has(ev.playerId)) return true;
+  // Contender action: every shot.
+  if (isContender) return true;
 
   // Big SG winner / loser.
   if (isSgStandout(ev)) return true;
