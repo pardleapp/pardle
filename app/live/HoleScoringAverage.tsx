@@ -37,6 +37,36 @@ interface HoleAgg {
   par: number;
   sumStrokes: number;
   count: number;
+  /** Result-type histogram — birdie / bogey / eagle etc.
+   *  Pars aren't emitted as score events by orchestrator, so we
+   *  derive their count from `sumStrokes` vs par + the non-par
+   *  bucket totals downstream. IMG-sourced score events also fire
+   *  on non-par outcomes only. */
+  dist: {
+    albatross: number;
+    eagle: number;
+    birdie: number;
+    par: number;
+    bogey: number;
+    double: number;
+    triplePlus: number;
+    ace: number;
+  };
+  lowest: number;
+  highest: number;
+}
+
+function emptyDist() {
+  return {
+    albatross: 0,
+    eagle: 0,
+    birdie: 0,
+    par: 0,
+    bogey: 0,
+    double: 0,
+    triplePlus: 0,
+    ace: 0,
+  };
 }
 
 function aggregateByHole(
@@ -51,17 +81,59 @@ function aggregateByHole(
     if (typeof ev.strokes !== "number") continue;
     if (typeof ev.par !== "number") continue;
     if (round !== "all" && ev.round !== round) continue;
-    const cur = map.get(ev.hole);
-    if (cur) {
-      cur.sumStrokes += ev.strokes;
-      cur.count += 1;
-    } else {
-      map.set(ev.hole, {
+    let cur = map.get(ev.hole);
+    if (!cur) {
+      cur = {
         hole: ev.hole,
         par: ev.par,
-        sumStrokes: ev.strokes,
-        count: 1,
-      });
+        sumStrokes: 0,
+        count: 0,
+        dist: emptyDist(),
+        lowest: Infinity,
+        highest: -Infinity,
+      };
+      map.set(ev.hole, cur);
+    }
+    cur.sumStrokes += ev.strokes;
+    cur.count += 1;
+    if (ev.strokes < cur.lowest) cur.lowest = ev.strokes;
+    if (ev.strokes > cur.highest) cur.highest = ev.strokes;
+    if (ev.ace) cur.dist.ace += 1;
+    switch (ev.result) {
+      case "albatross":
+        cur.dist.albatross += 1;
+        break;
+      case "eagle":
+        cur.dist.eagle += 1;
+        break;
+      case "birdie":
+        cur.dist.birdie += 1;
+        break;
+      case "par":
+        cur.dist.par += 1;
+        break;
+      case "bogey":
+        cur.dist.bogey += 1;
+        break;
+      case "double":
+        cur.dist.double += 1;
+        break;
+      case "triple-plus":
+        cur.dist.triplePlus += 1;
+        break;
+      default: {
+        // If result is missing (e.g. legacy IMG event without a
+        // result stamp), infer from strokes vs par so the histogram
+        // stays consistent.
+        const diff = ev.strokes - ev.par;
+        if (diff <= -3) cur.dist.albatross += 1;
+        else if (diff === -2) cur.dist.eagle += 1;
+        else if (diff === -1) cur.dist.birdie += 1;
+        else if (diff === 0) cur.dist.par += 1;
+        else if (diff === 1) cur.dist.bogey += 1;
+        else if (diff === 2) cur.dist.double += 1;
+        else cur.dist.triplePlus += 1;
+      }
     }
   }
   return map;
@@ -80,6 +152,7 @@ export default function HoleScoringAverage({ rows, pars, yards }: Props) {
   }, [rows]);
 
   const [round, setRound] = useState<number | "all" | null>(null);
+  const [hoveredHole, setHoveredHole] = useState<number | null>(null);
   const effectiveRound: number | "all" =
     round ?? roundsPresent[roundsPresent.length - 1] ?? "all";
 
@@ -92,12 +165,21 @@ export default function HoleScoringAverage({ rows, pars, yards }: Props) {
   const holes = Array.from({ length: 18 }, (_, i) => i + 1);
   const values = holes.map((h) => {
     const a = agg.get(h);
-    if (!a || a.count === 0) return { hole: h, avgVsPar: 0, par: null as number | null, count: 0 };
+    if (!a || a.count === 0) {
+      return {
+        hole: h,
+        avgVsPar: 0,
+        par: null as number | null,
+        count: 0,
+        agg: null as HoleAgg | null,
+      };
+    }
     return {
       hole: h,
       avgVsPar: a.sumStrokes / a.count - a.par,
       par: a.par,
       count: a.count,
+      agg: a,
     };
   });
 
@@ -194,8 +276,21 @@ export default function HoleScoringAverage({ rows, pars, yards }: Props) {
             typeof effectiveRound === "number"
               ? yards?.[effectiveRound]?.[h] ?? null
               : null;
+          const isHovered = hoveredHole === h;
           return (
-            <div className="hsa-col" key={h}>
+            <div
+              className={`hsa-col ${isHovered ? "hsa-col-hover" : ""}`}
+              key={h}
+              onMouseEnter={() => setHoveredHole(h)}
+              onMouseLeave={() =>
+                setHoveredHole((cur) => (cur === h ? null : cur))
+              }
+              onFocus={() => setHoveredHole(h)}
+              onBlur={() =>
+                setHoveredHole((cur) => (cur === h ? null : cur))
+              }
+              tabIndex={0}
+            >
               {/* Bar cell — top half for negative (easier), bottom for positive (harder). */}
               <div className="hsa-bar-cell">
                 <div className="hsa-baseline" aria-hidden="true" />
@@ -219,6 +314,17 @@ export default function HoleScoringAverage({ rows, pars, yards }: Props) {
                     </div>
                   </>
                 )}
+                {isHovered && v.agg && v.count > 0 && (
+                  <HoleTooltip
+                    hole={h}
+                    par={v.par ?? v.agg.par}
+                    yds={yds}
+                    avgVsPar={v.avgVsPar}
+                    count={v.count}
+                    agg={v.agg}
+                    isRightHalf={h > 9}
+                  />
+                )}
               </div>
               <div className="hsa-hole-lbl">
                 <span className="hsa-hole-num">{ordinalHole(h)}</span>
@@ -234,6 +340,77 @@ export default function HoleScoringAverage({ rows, pars, yards }: Props) {
         })}
       </div>
     </section>
+  );
+}
+
+interface HoleTooltipProps {
+  hole: number;
+  par: number | null;
+  yds: number | null;
+  avgVsPar: number;
+  count: number;
+  agg: HoleAgg;
+  isRightHalf: boolean;
+}
+
+function HoleTooltip({
+  hole,
+  par,
+  yds,
+  avgVsPar,
+  count,
+  agg,
+  isRightHalf,
+}: HoleTooltipProps) {
+  // Buckets rendered in TV-broadcast order. Aggregate the very-rare
+  // events (albatross / ace) into the eagle row so the tooltip stays
+  // compact. `triplePlus` catches the doubles+ tail.
+  const eaglesPlus = agg.dist.albatross + agg.dist.eagle + agg.dist.ace;
+  const rows: Array<{ label: string; count: number; tone: string }> = [
+    { label: "Eagle+", count: eaglesPlus, tone: "eagle" },
+    { label: "Birdie", count: agg.dist.birdie, tone: "birdie" },
+    { label: "Par", count: agg.dist.par, tone: "par" },
+    { label: "Bogey", count: agg.dist.bogey, tone: "bogey" },
+    { label: "Double+", count: agg.dist.double + agg.dist.triplePlus, tone: "blowup" },
+  ];
+  const maxCount = Math.max(1, ...rows.map((r) => r.count));
+
+  return (
+    <div className={`hsa-tip ${isRightHalf ? "hsa-tip-left" : "hsa-tip-right"}`} role="tooltip">
+      <div className="hsa-tip-head">
+        <span className="hsa-tip-hole">{ordinalHole(hole)}</span>
+        {par != null && <span className="hsa-tip-meta">par {par}</span>}
+        {yds != null && <span className="hsa-tip-meta">{yds} yds</span>}
+      </div>
+      <div className="hsa-tip-stats">
+        <div className="hsa-tip-stat">
+          <span className="hsa-tip-lbl">Scoring avg</span>
+          <span
+            className={`hsa-tip-val mono ${avgVsPar >= 0 ? "hsa-hard" : "hsa-easy"}`}
+          >
+            {formatToPar(avgVsPar)}
+          </span>
+        </div>
+        <div className="hsa-tip-stat">
+          <span className="hsa-tip-lbl">Players</span>
+          <span className="hsa-tip-val mono">{count}</span>
+        </div>
+      </div>
+      <div className="hsa-tip-dist">
+        {rows.map((r) => (
+          <div className="hsa-tip-row" key={r.label}>
+            <span className={`hsa-tip-row-lbl hsa-tip-tone-${r.tone}`}>{r.label}</span>
+            <div className="hsa-tip-row-bar-wrap">
+              <div
+                className={`hsa-tip-row-bar hsa-tip-tone-bg-${r.tone}`}
+                style={{ width: `${(r.count / maxCount) * 100}%` }}
+              />
+            </div>
+            <span className="hsa-tip-row-count mono">{r.count}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
