@@ -15,18 +15,14 @@
  *
  *   • Putt-poll — interactive "will it drop?" moments always show.
  *
- *   • Big drive — shot #1 with ≥ 300 yds carry.
- *
- *   • Close approach — landed within 15 ft of the pin (imgToPin
- *     reports as "Xft Yin to pin" once on the green; we parse and
- *     bucket).
- *
- *   • Trouble — landed in a hazard (bunker / rough / native area /
- *     waste). Drama, not calm play.
- *
- *   • Contender action — every shot from a top-10 leaderboard player,
+ *   • Contender action — every shot from a TOP-5 leaderboard player,
  *     regardless of its own notability. When Scheffler is leading,
  *     his routine drives are worth showing.
+ *
+ *   • SG-standout shot — a shot that gained (or lost) meaningfully
+ *     more than tour average. Not a real SG model — a set of
+ *     surface + distance + shot-num heuristics that approximate the
+ *     TV-highlight bar. See isSgStandout for the exact rules.
  *
  * Shots that are none of the above (routine par-4 drives to the
  * fairway from mid-tier players, safe layups, etc.) drop out.
@@ -35,11 +31,16 @@
 import type { FeedEvent } from "./types";
 import type { CachedLeaderboardRow } from "./store";
 
-const CLOSE_APPROACH_FEET = 15;
-const BIG_DRIVE_YDS = 300;
-const CONTENDER_TOP_N = 10;
+const CLOSE_APPROACH_FEET = 10;
+const TAP_IN_FEET = 5;
+const BIG_DRIVE_YDS = 320;
+const LONG_APPROACH_YDS = 200;
+const SHORT_MISS_MIN_YDS = 20;
+const SHORT_MISS_MAX_YDS = 130;
+const SHORT_MISS_MISS_FEET = 40;
+const CONTENDER_TOP_N = 5;
 
-const TROUBLE_RX = /bunker|sand|rough|native|waste|penalty/i;
+const TROUBLE_RX = /penalty|hazard|water/i;
 
 interface HotFilterInputs {
   leaderboard: CachedLeaderboardRow[];
@@ -87,8 +88,64 @@ function parseToPinFeet(toPin: string | undefined): number | null {
 }
 
 /**
- * Should this event render in the Hot tab? See file-level doc for
- * the rule matrix.
+ * "Strokes-gained standout" — approximates TV highlight-reel material
+ * from IMG's per-shot data. Rough proxy, not a real SG model.
+ *
+ * Positive standouts (TV would show):
+ *   • Approach from 100+ yds landed inside 10 ft
+ *   • Any shot landed inside 5 ft (tap-in territory)
+ *   • Very long drive (≥ 320 yds off the tee)
+ *   • Approach from 200+ yds landed on green
+ *
+ * Negative standouts:
+ *   • Shot from 20–130 yds ended > 40 ft from pin (bladed, chunked,
+ *     or bailed way wide)
+ *   • Landed in penalty area / hazard / water
+ */
+function isSgStandout(ev: FeedEvent): boolean {
+  if (ev.type !== "shot") return false;
+
+  const dist = ev.imgShotDistance ?? 0;
+  const shotNum = ev.imgShotNum ?? 0;
+  const surface = ev.imgSurface || "";
+  const feet = parseToPinFeet(ev.imgToPin);
+
+  // ── Positive ────────────────────────────────────────────────────
+  // Big drive off the tee.
+  if (shotNum === 1 && dist >= BIG_DRIVE_YDS) return true;
+
+  // Tap-in territory from any distance ≥ tee-shot range
+  if (feet != null && feet <= TAP_IN_FEET && dist >= 20) return true;
+
+  // Close approach from meaningful distance.
+  if (feet != null && feet <= CLOSE_APPROACH_FEET && dist >= 100) return true;
+
+  // Long approach that found the green.
+  if (dist >= LONG_APPROACH_YDS && /green/i.test(surface)) return true;
+
+  // ── Negative ────────────────────────────────────────────────────
+  // Landed in penalty area / hazard / water.
+  if (surface && TROUBLE_RX.test(surface)) return true;
+
+  // Short-range miss — took a short shot, ended nowhere near the pin.
+  if (
+    dist >= SHORT_MISS_MIN_YDS &&
+    dist <= SHORT_MISS_MAX_YDS &&
+    feet != null &&
+    feet > SHORT_MISS_MISS_FEET
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Should this event render in the Hot tab?
+ *
+ * Rules simplified to: contenders (top-5 leaderboard) + score events
+ * + interactive polls + SG-standout shots. Everything else — routine
+ * drives, safe layups, fairway approaches from mid-pack — drops.
  */
 export function isHotEvent(ev: FeedEvent, ctx: HotFilterCtx): boolean {
   // Score events — every non-par landing (orchestrator already
@@ -104,24 +161,11 @@ export function isHotEvent(ev: FeedEvent, ctx: HotFilterCtx): boolean {
 
   if (ev.type !== "shot") return false;
 
-  // Contender action: every shot for a top-10 leaderboard player.
+  // Contender action: every shot for a top-5 leaderboard player.
   if (ev.playerId && ctx.contenderIds.has(ev.playerId)) return true;
 
-  // Big drive: shot 1 with meaningful carry.
-  if (
-    (ev.imgShotNum ?? 0) === 1 &&
-    typeof ev.imgShotDistance === "number" &&
-    ev.imgShotDistance >= BIG_DRIVE_YDS
-  ) {
-    return true;
-  }
-
-  // Close approach: parsed feet ≤ threshold.
-  const feet = parseToPinFeet(ev.imgToPin);
-  if (feet != null && feet <= CLOSE_APPROACH_FEET) return true;
-
-  // Landed in trouble.
-  if (ev.imgSurface && TROUBLE_RX.test(ev.imgSurface)) return true;
+  // Big SG winner / loser.
+  if (isSgStandout(ev)) return true;
 
   // Engine-flagged highlights/lowlights (orchestrator's shot classifier).
   if (ev.highlight || ev.lowlight) return true;
