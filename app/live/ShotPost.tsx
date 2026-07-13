@@ -24,6 +24,11 @@ import ShotDiagram from "./ShotDiagram";
 import { useHoldReact } from "./useHoldReact";
 import ReactionChips, { type ReactionState } from "./ReactionChips";
 import { useFollowedPlayers } from "./useFollowedPlayers";
+import {
+  type EventBetImpact,
+  betKindShortLabel,
+  formatImpactCurrency,
+} from "./bet-impact";
 
 interface Props {
   event: FeedEvent;
@@ -51,6 +56,10 @@ interface Props {
   /** Toggle the caller's reaction for a given emoji. Fires when
    *  an existing chip is tapped. */
   onToggleReaction?: (emoji: string) => void;
+  /** When set, renders a bet-impact chip above the action row —
+   *  "🚀 +£4.20 · your outright" / "💀 −£12 · Top 10". Only fires
+   *  in the Mine tab; caller filters to avoid spamming All/Hot. */
+  impact?: EventBetImpact | null;
 }
 
 /** Map ScoreResult onto the prototype's tag class + label. The
@@ -126,6 +135,7 @@ export default function ShotPost({
   onCustomReact,
   reactionState,
   onToggleReaction,
+  impact,
 }: Props) {
   const tag = tagFor(event);
   // Whole-card press-and-hold → tray. Quick tap on the body opens
@@ -210,6 +220,26 @@ export default function ShotPost({
         <p className="spost-headline">
           {stripPlayerName(event.headline ?? "", event.playerName)}
         </p>
+        {impact && (
+          <div
+            className={`spost-impact ${
+              impact.deltaValue >= 0
+                ? "spost-impact-up"
+                : "spost-impact-down"
+            }`}
+            title={`${impact.source === "direct" ? "Your player's shot" : "A competitor's shot"} moved your ${betKindShortLabel(impact.bet)} by ${formatImpactCurrency(impact.deltaValue, impact.bet.currency)}`}
+          >
+            <span className="spost-impact-emoji" aria-hidden="true">
+              {impact.deltaValue >= 0 ? "🚀" : "💀"}
+            </span>
+            <span className="spost-impact-val mono">
+              {formatImpactCurrency(impact.deltaValue, impact.bet.currency)}
+            </span>
+            <span className="spost-impact-lbl">
+              · your {betKindShortLabel(impact.bet)}
+            </span>
+          </div>
+        )}
         {onToggleReaction && (
           <div className="post-act-row">
             <ReactionChips

@@ -8,6 +8,7 @@ import {
   buildSmartImpactSet,
   isMaterialEvent,
 } from "@/lib/feed/smart-filter";
+import { buildHotFilterCtx, isHotEvent } from "@/lib/feed/hot-filter";
 import {
   DEFAULT_ODDS_FORMAT,
   formatOdds,
@@ -525,8 +526,8 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
   // (Used to gate the bottom burst-bar's visibility on first
   // scroll. Bar removed in favour of the per-card hold-to-react
   // gesture; this scroll listener went with it.)
-  type FilterMode = "all" | "smart";
-  const [filterMode, setFilterMode] = useState<FilterMode>("all");
+  type FilterMode = "all" | "hot" | "smart";
+  const [filterMode, setFilterMode] = useState<FilterMode>("hot");
   /** Shot-detail overlay — opens when a notable shot is tapped
    *  (inline shot card OR a Shots-of-the-day reel card). The
    *  detail surface in turn has its own Share button that opens
@@ -945,11 +946,15 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
     currentOdds: data.currentOdds,
     followedPlayerIds,
   });
+  const hotCtx = buildHotFilterCtx({ leaderboard: data.leaderboard });
   const visibleRows = (() => {
     if (filterMode === "smart") {
       return rowsAfterPollFilter.filter((r) =>
         isMaterialEvent(r.event, smartImpact),
       );
+    }
+    if (filterMode === "hot") {
+      return rowsAfterPollFilter.filter((r) => isHotEvent(r.event, hotCtx));
     }
     return rowsAfterPollFilter;
   })();
@@ -1065,33 +1070,41 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
 
       <main className="feed-main">
 
-      {/* Filter row — All / ✦ Smart. Smart only renders when the
-          user has at least one active tracked bet OR a followed
-          player. We test bets directly (not trackedPlayerIds.size)
-          because winning-score bets have no playerId but DO drive
-          the Smart feed via the top-of-leaderboard contender set.
-          Followed players (from the ★ Follow button on player rows)
-          count too. Best/Worst lives inline in the ShotsReel further
-          down. */}
-      {(trackedBets.some((b) => b.settledAt == null) ||
-        followedPlayerIds.length > 0) && (
-        <div className="feed-filter-row">
-          <button
-            type="button"
-            className={`feed-filter-btn ${filterMode === "all" ? "feed-filter-on" : ""}`}
-            onClick={() => setFilterMode("all")}
-          >
-            All
-          </button>
+      {/* Filter row — Hot / All / (Mine).
+          Hot is the default landing: notable moments (birdies, close
+          approaches, big drives, trouble, top-10 contenders) without
+          the raw-firehose density of All. Mine is the personal
+          tab — bets + follows — and only surfaces when the user has
+          either an active bet OR a followed player. */}
+      <div className="feed-filter-row">
+        <button
+          type="button"
+          className={`feed-filter-btn ${filterMode === "hot" ? "feed-filter-on" : ""}`}
+          onClick={() => setFilterMode("hot")}
+          title="Notable moments only — birdies, close approaches, big drives, contenders"
+        >
+          🔥 Hot
+        </button>
+        <button
+          type="button"
+          className={`feed-filter-btn ${filterMode === "all" ? "feed-filter-on" : ""}`}
+          onClick={() => setFilterMode("all")}
+          title="Every shot from every player — the raw firehose"
+        >
+          All
+        </button>
+        {(trackedBets.some((b) => b.settledAt == null) ||
+          followedPlayerIds.length > 0) && (
           <button
             type="button"
             className={`feed-filter-btn ${filterMode === "smart" ? "feed-filter-on" : ""}`}
             onClick={() => setFilterMode("smart")}
+            title="Your bets + followed players only"
           >
             ✦ Mine
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {data.rows.length === 0 ? (
         <FeedWarmingUp leaderboard={data.leaderboard} />
@@ -1235,6 +1248,19 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
             // always has a votable poll to render.
             const isPuttPoll =
               event.type === "putt-poll" && event.pollId != null;
+            // Only compute impact for the Mine tab — for All/Hot we'd
+            // spam every user's feed with impact chips even when they
+            // haven't opted into bet-aware surfacing. Impact only
+            // renders when a user has an active bet AND the shot
+            // materially moves it.
+            const impact =
+              filterMode === "smart" &&
+              trackedBets.some((b) => b.settledAt == null)
+                ? headlineImpactForEvent(event, trackedBets, {
+                    currentOdds: data.currentOdds,
+                    leaderboard: data.leaderboard,
+                  })
+                : null;
             return (
               <Fragment key={event.id}>
                 {reelHere}
@@ -1247,6 +1273,7 @@ export default function FeedClient({ forcedTournamentId }: FeedClientProps = {})
                     commentCount={count}
                     contextTag={primaryContextTag}
                     handStatus={data.handStatus?.[event.playerId] ?? null}
+                    impact={impact}
                     onShare={
                       isNotable ? (ev) => setShotDetail(ev) : undefined
                     }

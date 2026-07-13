@@ -26054,6 +26054,39 @@ html.pv-theme-body .auth-chip-btn {
 .spost-follow-on:hover {
   color: var(--pv-tang);
 }
+.spost-impact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  width: fit-content;
+  max-width: 100%;
+}
+.spost-impact-up {
+  background: oklch(0.92 0.05 155);
+  color: var(--pv-emerald-d);
+}
+.spost-impact-down {
+  background: oklch(0.93 0.05 28);
+  color: var(--pv-down);
+}
+.spost-impact-emoji {
+  font-size: 13px;
+  line-height: 1;
+}
+.spost-impact-val {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.spost-impact-lbl {
+  font-weight: 600;
+  font-size: 11px;
+  opacity: 0.85;
+}
 .spost-headline {
   font-size: 14.5px;
   line-height: 1.25;
