@@ -26087,6 +26087,202 @@ html.pv-theme-body .auth-chip-btn {
   font-size: 11px;
   opacity: 0.85;
 }
+
+/* =============================================================
+   Hole-by-hole scoring average — DataGolf-style live-updating
+   bar chart mounted on the sweats page. Bars centre on a zero
+   baseline; below = easier than par (emerald), above = harder
+   than par (down/red).
+   ============================================================= */
+.hsa {
+  background: var(--pv-card);
+  border: 1px solid var(--pv-line);
+  border-radius: 15px;
+  padding: 14px 14px 10px;
+  margin-bottom: 12px;
+}
+.hsa-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.hsa-title {
+  font-size: 13.5px;
+  font-weight: 900;
+  letter-spacing: -0.005em;
+  color: var(--pv-ink);
+  flex: 1;
+  min-width: 160px;
+}
+.hsa-round-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 2px;
+  background: var(--pv-soft);
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.hsa-round-tab {
+  border: none;
+  background: transparent;
+  color: var(--pv-muted);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s, color 0.12s;
+}
+.hsa-round-tab-on {
+  background: var(--pv-card);
+  color: var(--pv-emerald-d);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.hsa-tot-block {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.hsa-tot-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-end;
+}
+.hsa-tot-lbl {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--pv-muted);
+}
+.hsa-tot-val {
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.hsa-tot-total {
+  font-size: 18px;
+}
+.hsa-hard {
+  color: var(--pv-down);
+}
+.hsa-easy {
+  color: var(--pv-emerald-d);
+}
+
+.hsa-chart {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(0, 1fr));
+  gap: 4px;
+  align-items: end;
+}
+.hsa-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hsa-bar-cell {
+  position: relative;
+  height: 140px;
+  min-height: 140px;
+  width: 100%;
+}
+.hsa-baseline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: var(--pv-line);
+}
+.hsa-bar {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  border-radius: 3px 3px 0 0;
+  min-height: 1px;
+}
+.hsa-bar-hard {
+  background: var(--pv-down);
+  border-radius: 0 0 3px 3px;
+}
+.hsa-bar-easy {
+  background: var(--pv-emerald);
+  border-radius: 3px 3px 0 0;
+}
+.hsa-bar-lbl {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 9px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  pointer-events: none;
+}
+.hsa-bar-lbl-hard {
+  color: var(--pv-down);
+}
+.hsa-bar-lbl-easy {
+  color: var(--pv-emerald-d);
+}
+.hsa-hole-lbl {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-top: 6px;
+  text-align: center;
+  min-width: 0;
+}
+.hsa-hole-num {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--pv-ink);
+  letter-spacing: -0.01em;
+}
+.hsa-hole-meta {
+  font-size: 8.5px;
+  color: var(--pv-muted);
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 640px) {
+  /* Mobile: horizontal scroll if 18 cols get too tight. */
+  .hsa-chart {
+    overflow-x: auto;
+    grid-auto-columns: minmax(30px, 1fr);
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    scrollbar-width: none;
+  }
+  .hsa-chart::-webkit-scrollbar {
+    display: none;
+  }
+  .hsa-col {
+    min-width: 30px;
+  }
+  .hsa-bar-cell {
+    height: 110px;
+    min-height: 110px;
+  }
+  .hsa-tot-block {
+    gap: 8px;
+  }
+  .hsa-tot-val {
+    font-size: 13px;
+  }
+  .hsa-tot-total {
+    font-size: 16px;
+  }
+}
 .spost-headline {
   font-size: 14.5px;
   line-height: 1.25;

@@ -58,6 +58,7 @@ import PlayerSearch from "./PlayerSearch";
 import PuttPollWidget from "./PuttPollWidget";
 import { useToast } from "./Toast";
 import { useFollowedPlayers } from "./useFollowedPlayers";
+import HoleScoringAverage from "./HoleScoringAverage";
 import BetPost from "./BetPost";
 import BetPostErrorBoundary from "./BetPostErrorBoundary";
 import SweatHeader from "./SweatHeader";
@@ -1112,6 +1113,14 @@ export default function FeedClient({
       )}
 
       <main className="feed-main">
+
+      {/* Live scoring-average chart — how each hole is playing, live
+          from IMG score events. Only mounts when the buffer has
+          score events to aggregate. Pars come off each score event
+          itself, so no separate pars map required. */}
+      {data.rows.some((r) => r.event.type === "score") && (
+        <HoleScoringAverage rows={data.rows} />
+      )}
 
       {/* Filter row — Hot / All / (Mine).
           Hot is the default landing: notable moments (birdies, close
