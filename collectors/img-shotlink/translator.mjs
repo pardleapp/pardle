@@ -17,6 +17,22 @@ function newEventId(ts = Date.now()) {
 }
 
 /**
+ * Convert IMG's "LASTNAME, First" to the canonical "First Last" the
+ * rest of Pardle expects. `abbreviateName` and downstream UIs are
+ * built for "First Last" — passing them "Ormond, Jesse" produces
+ * "O. Jesse" instead of "J. Ormond".
+ */
+function canonicaliseName(imgName) {
+  if (!imgName) return imgName;
+  const parts = imgName.split(",");
+  if (parts.length < 2) return imgName.trim();
+  const last = parts[0].trim();
+  const first = parts.slice(1).join(",").trim();
+  if (!first || !last) return imgName.trim();
+  return `${first} ${last}`;
+}
+
+/**
  * Result of a hole given strokes + par. Matches the ScoreResult union
  * in lib/feed/types.ts.
  */
@@ -54,27 +70,70 @@ function ordinalHole(hole) {
 function shotHeadline({
   playerName,
   shotDistance,
+  shotDistanceUnit,
   surface,
   toPin,
   shotNum,
   par,
+  startedOnGreen,
 }) {
-  const first = playerName.split(",")[1]?.trim() || playerName;
-  const dist = shotDistance ? `${shotDistance} yds` : "";
-
-  // Surface-aware phrasing. Prefer verbs that read like a broadcast.
+  // playerName arrives as canonical "First Last" — take the first
+  // whitespace-separated token as the broadcast-style short name.
+  const first = playerName.trim().split(/\s+/)[0] || playerName;
   const s = (surface || "").toLowerCase();
-  let verb;
-  if (shotNum === 1 && shotDistance && shotDistance >= 300) verb = "bombs";
-  else if (shotNum === 1) verb = "tees off";
-  else if (/bunker|sand/.test(s)) verb = "finds the bunker from";
-  else if (/rough/.test(s)) verb = "finds the rough from";
-  else if (/native|waste/.test(s)) verb = "finds the native area from";
-  else if (/green/.test(s)) verb = "approaches from";
-  else if (/fairway/.test(s)) verb = "finds the fairway from";
-  else verb = "hits from";
 
-  const distClause = dist ? `${verb} ${dist}` : verb;
+  // A shot is a putt if and only if the player was already on the
+  // green when they hit it. `startedOnGreen` is set by the publisher
+  // based on the PREVIOUS shot's landing surface — the authoritative
+  // signal. Without it, we fall back to a distance-based guess but
+  // it's brittle (a bunker shot landing 15 yds away on the green
+  // gets called a putt with just distance data).
+  const isPutt =
+    startedOnGreen === true ||
+    (startedOnGreen == null &&
+      /green/.test(s) &&
+      (shotDistanceUnit === "ft" ||
+        (typeof shotDistance === "number" && shotDistance < 30)));
+
+  let verb;
+  let distText = "";
+  if (isPutt) {
+    verb = "putts from";
+    if (shotDistance) {
+      // Convert yards → feet for the readout since a 21 ft putt reads
+      // more naturally than 7 yds. If widget already gave us ft, use
+      // as-is.
+      const ft =
+        shotDistanceUnit === "ft" ? shotDistance : Math.round(shotDistance * 3);
+      distText = `${ft} ft`;
+    }
+  } else if (shotNum === 1 && shotDistance && shotDistance >= 300) {
+    verb = "bombs";
+    distText = `${shotDistance} yds`;
+  } else if (shotNum === 1) {
+    verb = "tees off";
+    distText = shotDistance ? `${shotDistance} yds` : "";
+  } else if (/bunker|sand/.test(s)) {
+    verb = "finds the bunker from";
+    distText = shotDistance ? `${shotDistance} yds` : "";
+  } else if (/rough/.test(s)) {
+    verb = "finds the rough from";
+    distText = shotDistance ? `${shotDistance} yds` : "";
+  } else if (/native|waste/.test(s)) {
+    verb = "finds the native area from";
+    distText = shotDistance ? `${shotDistance} yds` : "";
+  } else if (/green/.test(s)) {
+    verb = "approaches from";
+    distText = shotDistance ? `${shotDistance} yds` : "";
+  } else if (/fairway/.test(s)) {
+    verb = "finds the fairway from";
+    distText = shotDistance ? `${shotDistance} yds` : "";
+  } else {
+    verb = "hits from";
+    distText = shotDistance ? `${shotDistance} yds` : "";
+  }
+
+  const distClause = distText ? `${verb} ${distText}` : verb;
   const pinClause = toPin ? ` — ${toPin} to pin` : "";
   return `${first} ${distClause}${pinClause}`;
 }
@@ -96,16 +155,20 @@ export function translateImgShot({
   surface,
   toPin,
   par,
+  startedOnGreen,
 }) {
   if (!playerId || !hole || !shotNum) return null;
   const ts = Date.now();
+  const canonicalName = canonicaliseName(playerName);
   const headline = shotHeadline({
-    playerName,
+    playerName: canonicalName,
     shotDistance,
+    shotDistanceUnit,
     surface,
     toPin,
     shotNum,
     par,
+    startedOnGreen,
   });
 
   return {
@@ -114,7 +177,7 @@ export function translateImgShot({
     ts,
     type: "shot",
     playerId,
-    playerName,
+    playerName: canonicalName,
     round,
     hole,
     par: par ?? undefined,
@@ -150,29 +213,31 @@ export function translateImgHoleOut({
   par,
 }) {
   if (!playerId || !hole || !strokes) return null;
+  const canonicalName = canonicaliseName(playerName);
   if (par == null) {
     // Without par we can't classify the result cleanly. Emit a
     // generic "score" event without a result field — the engine
     // will still show it, just without the birdie/bogey tag chip.
     const ts = Date.now();
+    const firstFallback = canonicalName.trim().split(/\s+/)[0] || canonicalName;
     return {
       id: newEventId(ts),
       tournamentId,
       ts,
       type: "score",
       playerId,
-      playerName,
+      playerName: canonicalName,
       round,
       hole,
       strokes,
       imgSourced: true,
       tournamentName: tournamentName || undefined,
-      headline: `${playerName.split(",")[1]?.trim() || playerName} scores ${strokes} on the ${ordinalHole(hole)}`,
+      headline: `${firstFallback} scores ${strokes} on the ${ordinalHole(hole)}`,
     };
   }
   const result = resultFor(strokes, par);
   const ace = strokes === 1;
-  const first = playerName.split(",")[1]?.trim() || playerName;
+  const first = canonicalName.trim().split(/\s+/)[0] || canonicalName;
   const headline = ace
     ? `${first} aces the ${ordinalHole(hole)}!`
     : (() => {
@@ -213,7 +278,7 @@ export function translateImgHoleOut({
     ts,
     type: "score",
     playerId,
-    playerName,
+    playerName: canonicalName,
     round,
     hole,
     par,

@@ -50,6 +50,17 @@ export interface FeedEvent {
   /** Distance of the approach, in yards. */
   shotYards?: number;
 
+  // ── IMG ShotLink enrichment (set by the Fly collector, not by
+  // pollAndDiff). Presence of `imgSourced: true` tells orchestrator to
+  // skip its own equivalent shot/score event for the same
+  // (playerId, round, hole). ──
+  imgSourced?: boolean;
+  imgShotDistance?: number;
+  imgShotDistanceUnit?: "yds" | "ft" | string;
+  imgSurface?: string;
+  imgToPin?: string;
+  imgShotNum?: number;
+
   // ── player overall context (set on score + position/milestone events) ──
   position?: string; // e.g. "1" | "T2"
   /** Player's tournament-overall to-par at the moment this event was

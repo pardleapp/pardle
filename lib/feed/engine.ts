@@ -247,6 +247,31 @@ export async function pollAndDiff(
   // Diff: every hole that went from unplayed → played is an event.
   const now = Date.now();
   const events: FeedEvent[] = [];
+
+  // IMG suppression set — if a Fly collector has already published a
+  // score/shot event for a (player, round, hole) within the last 30
+  // min, orchestrator should NOT emit its slower, less-detailed
+  // equivalent. Keeps the feed clean of duplicate coverage now that
+  // IMG is the primary shot source. Empty set on tournaments without
+  // an IMG collector running → orchestrator behaves as before.
+  const IMG_SUPPRESS_WINDOW_MS = 30 * 60 * 1000;
+  const imgScoreCovered = new Set<string>();
+  const imgShotCovered = new Set<string>();
+  try {
+    const recent = await getEvents(tournamentId, 300);
+    for (const e of recent) {
+      if (!e.imgSourced) continue;
+      if (now - e.ts > IMG_SUPPRESS_WINDOW_MS) continue;
+      if (e.type === "score" && e.playerId && e.hole != null) {
+        imgScoreCovered.add(`${e.playerId}:${e.round}:${e.hole}`);
+      }
+      if (e.type === "shot" && e.playerId && e.hole != null) {
+        imgShotCovered.add(`${e.playerId}:${e.round}:${e.hole}`);
+      }
+    }
+  } catch (err) {
+    console.error("[engine] IMG-suppression read failed", err);
+  }
   // Every hole completion this poll, including pars. Pars don't get
   // a feed event (they're not reaction-worthy), but they still close
   // out any open putt poll on that hole — a "putt for birdie" that
@@ -282,6 +307,10 @@ export async function pollAndDiff(
         // Pars are noise in a reaction feed — nobody shouts "what a par".
         // The feed is highlights only: birdies, eagles, bogeys, blow-ups.
         if (result === "par") continue;
+
+        // Skip if IMG has already published a score event for this
+        // (player, round, hole) recently. IMG is faster + richer.
+        if (imgScoreCovered.has(`${pid}:${round}:${h.holeNumber}`)) continue;
 
         const ace = strokes === 1;
         // Worst-of reel = doubles and worse (the blow-ups).
@@ -420,6 +449,12 @@ export async function pollAndDiff(
 
     const verdict = classifyShot(parsed, shotNumber, par);
     if (!verdict) continue;
+
+    // Skip if IMG has already published a shot event for this
+    // (player, round, hole) recently. IMG carries exact yardage
+    // and landing surface, whereas orchestrator's shot events are
+    // derived from playByPlay text — IMG's version wins.
+    if (imgShotCovered.has(`${pid}:${round}:${sc.currentHole}`)) continue;
 
     const playerName = nameById.get(pid) ?? "Unknown";
     events.push({
