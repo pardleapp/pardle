@@ -17,7 +17,23 @@
  */
 export function abbreviateName(full: string): string {
   if (!full) return full;
-  const parts = full.trim().split(/\s+/);
+  const trimmed = full.trim();
+  // IMG's shot pipeline sometimes stores names in "LASTNAME, First"
+  // format (e.g. "Fitzpatrick, Matt"). Handle that shape first —
+  // otherwise the standard "First Last" logic below would treat
+  // "Fitzpatrick," as the first name and produce "F. Matt". Older
+  // historical events already stored in Redis still carry this shape,
+  // so the fix has to live at display time not just emit time.
+  const commaIdx = trimmed.indexOf(",");
+  if (commaIdx > 0) {
+    const last = trimmed.slice(0, commaIdx).trim();
+    const first = trimmed.slice(commaIdx + 1).trim();
+    if (last && first) {
+      const initial = [...first][0] ?? "";
+      if (initial) return `${initial.toUpperCase()}. ${last}`;
+    }
+  }
+  const parts = trimmed.split(/\s+/);
   if (parts.length < 2) return full;
   const first = parts[0];
   const last = parts[parts.length - 1];
