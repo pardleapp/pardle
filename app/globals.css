@@ -26087,6 +26087,48 @@ html.pv-theme-body .auth-chip-btn {
   font-size: 11px;
   opacity: 0.85;
 }
+.spost-impact-prob {
+  font-size: 13.5px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+}
+.spost-impact-arrow {
+  opacity: 0.7;
+  font-weight: 700;
+  padding: 0 2px;
+}
+/* Big moves get a heavier, celebratory treatment. Larger prob font,
+   slight glow behind the chip, thicker emoji. Fires when the prob
+   delta is ≥ 3pp OR ≥ 30% relative. */
+.spost-impact-big {
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.spost-impact-big.spost-impact-up {
+  background: oklch(0.9 0.08 155);
+  border-color: oklch(0.72 0.13 155);
+  box-shadow: 0 0 0 3px oklch(0.9 0.08 155 / 0.4);
+}
+.spost-impact-big.spost-impact-down {
+  background: oklch(0.9 0.09 28);
+  border-color: oklch(0.72 0.14 28);
+  box-shadow: 0 0 0 3px oklch(0.9 0.09 28 / 0.4);
+}
+.spost-impact-big .spost-impact-emoji {
+  font-size: 15px;
+}
+.spost-impact-big .spost-impact-prob {
+  font-size: 15px;
+}
+.spost-impact-big .spost-impact-lbl {
+  opacity: 1;
+  font-weight: 700;
+}
 
 /* =============================================================
    Hole-by-hole scoring average — DataGolf-style live-updating

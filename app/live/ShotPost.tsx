@@ -30,6 +30,15 @@ import {
   formatImpactCurrency,
 } from "./bet-impact";
 
+/** Compact percentage — 10 → "10%", 6.3 → "6%", 0.85 → "1%". No
+ *  decimals to keep the chip tight; sub-1 % values still show as
+ *  a full "1 %" bucket which reads better than "0.8 %". */
+function formatProbPct(prob: number): string {
+  const pct = Math.max(0, Math.min(100, prob * 100));
+  const rounded = pct < 1 ? Math.max(1, Math.round(pct)) : Math.round(pct);
+  return `${rounded}%`;
+}
+
 interface Props {
   event: FeedEvent;
   commentCount: number;
@@ -226,18 +235,40 @@ export default function ShotPost({
               impact.deltaValue >= 0
                 ? "spost-impact-up"
                 : "spost-impact-down"
-            }`}
+            } ${impact.isBigMove ? "spost-impact-big" : ""}`}
             title={`${impact.source === "direct" ? "Your player's shot" : "A competitor's shot"} moved your ${betKindShortLabel(impact.bet)} by ${formatImpactCurrency(impact.deltaValue, impact.bet.currency)}`}
           >
             <span className="spost-impact-emoji" aria-hidden="true">
               {impact.deltaValue >= 0 ? "🚀" : "💀"}
             </span>
-            <span className="spost-impact-val mono">
-              {formatImpactCurrency(impact.deltaValue, impact.bet.currency)}
-            </span>
-            <span className="spost-impact-lbl">
-              · your {betKindShortLabel(impact.bet)}
-            </span>
+            {typeof impact.probBefore === "number" &&
+            typeof impact.probAfter === "number" ? (
+              <>
+                <span className="spost-impact-prob mono">
+                  {formatProbPct(impact.probBefore)}
+                  <span className="spost-impact-arrow" aria-hidden="true">
+                    {" → "}
+                  </span>
+                  {formatProbPct(impact.probAfter)}
+                  {impact.isBigMove && <span aria-hidden="true">!!</span>}
+                </span>
+                <span className="spost-impact-lbl">
+                  {" · your "}
+                  {betKindShortLabel(impact.bet)}
+                  {" · "}
+                  {formatImpactCurrency(impact.deltaValue, impact.bet.currency)}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="spost-impact-val mono">
+                  {formatImpactCurrency(impact.deltaValue, impact.bet.currency)}
+                </span>
+                <span className="spost-impact-lbl">
+                  · your {betKindShortLabel(impact.bet)}
+                </span>
+              </>
+            )}
           </div>
         )}
         {onToggleReaction && (

@@ -35,6 +35,34 @@ export interface EventBetImpact {
   /** Direct = event happened to the bet's player; indirect = event
    *  happened to a competitor whose result moved the bet's prob. */
   source: "direct" | "indirect";
+  /** Win prob BEFORE this event (0..1). Set whenever we can compute
+   *  it — outright + top-finish always have it via oddsBefore/topBefore
+   *  fields on the event; round-score gets it via the pre-shot
+   *  projection. Rendered as "12% → 18%" in the chip. */
+  probBefore?: number;
+  /** Win prob AFTER this event (0..1). See probBefore. */
+  probAfter?: number;
+  /** True when the prob move is BIG enough to warrant an emphasised
+   *  chip treatment (bigger type, "!!"). Threshold: |Δp| ≥ 3pp OR
+   *  |Δp/p_before| ≥ 30 %. */
+  isBigMove?: boolean;
+}
+
+/** Big-move thresholds — a chip is "loud" when either absolute or
+ *  relative movement crosses these. Tuned by feel; adjust if the
+ *  chip fires too often or feels too muted. */
+const BIG_ABS_PROB_DELTA = 0.03;
+const BIG_REL_PROB_DELTA = 0.3;
+
+function classifyBigMove(
+  probBefore: number | undefined,
+  probAfter: number | undefined,
+): boolean {
+  if (typeof probBefore !== "number" || typeof probAfter !== "number") return false;
+  const abs = Math.abs(probAfter - probBefore);
+  if (abs >= BIG_ABS_PROB_DELTA) return true;
+  if (probBefore > 0 && abs / probBefore >= BIG_REL_PROB_DELTA) return true;
+  return false;
 }
 
 /** Heuristic prob shift per stroke vs par on a round-score bet. A
@@ -100,7 +128,15 @@ function impactForOutright(
     const probAfter = 1 / event.oddsAfter;
     const deltaProb = probAfter - probBefore;
     const deltaValue = bet.stake * bet.oddsTaken * deltaProb;
-    return { bet, deltaProb, deltaValue, source: "direct" };
+    return {
+      bet,
+      deltaProb,
+      deltaValue,
+      source: "direct",
+      probBefore,
+      probAfter,
+      isBigMove: classifyBigMove(probBefore, probAfter),
+    };
   }
   // Indirect — the event player is a top-10 competitor. Estimate the
   // bet player's shift via field-redistribution: when player A's prob
@@ -125,7 +161,15 @@ function impactForOutright(
   const yourPreProb = yourPostProb * factor;
   const deltaProb = yourPostProb - yourPreProb;
   const deltaValue = bet.stake * bet.oddsTaken * deltaProb;
-  return { bet, deltaProb, deltaValue, source: "indirect" };
+  return {
+    bet,
+    deltaProb,
+    deltaValue,
+    source: "indirect",
+    probBefore: yourPreProb,
+    probAfter: yourPostProb,
+    isBigMove: classifyBigMove(yourPreProb, yourPostProb),
+  };
 }
 
 function impactForTopFinish(
@@ -142,9 +186,19 @@ function impactForTopFinish(
   ) {
     return null;
   }
-  const deltaProb = event.top10After - event.top10Before;
+  const probBefore = event.top10Before;
+  const probAfter = event.top10After;
+  const deltaProb = probAfter - probBefore;
   const deltaValue = bet.stake * bet.oddsTaken * deltaProb;
-  return { bet, deltaProb, deltaValue, source: "direct" };
+  return {
+    bet,
+    deltaProb,
+    deltaValue,
+    source: "direct",
+    probBefore,
+    probAfter,
+    isBigMove: classifyBigMove(probBefore, probAfter),
+  };
 }
 
 function impactForRoundScore(
@@ -251,6 +305,12 @@ export function computeBetImpact(
  * For one event, find the most-impactful bet across all of the
  * user's tracked bets. Returns null when nothing material happened.
  */
+/** Minimum prob move (in raw prob units, 0..1) that qualifies an
+ *  impact for chip display when we have prob-based data. 1 pp is the
+ *  floor — anything less is imperceptible; the £-based gate takes
+ *  over for events without direct probability data. */
+const MATERIAL_ABS_PROB_DELTA = 0.01;
+
 export function headlineImpactForEvent(
   event: FeedEvent,
   bets: TrackedBet[],
@@ -268,7 +328,18 @@ export function headlineImpactForEvent(
     if (bet.settledAt != null) continue;
     const imp = computeBetImpact(event, bet, data);
     if (!imp) continue;
-    if (!isMaterialImpact(bet, imp.deltaValue)) continue;
+    // Prob-based materiality when we have before/after. Falls back
+    // to the £-based gate for impacts without probability data.
+    if (
+      typeof imp.probBefore === "number" &&
+      typeof imp.probAfter === "number"
+    ) {
+      if (Math.abs(imp.probAfter - imp.probBefore) < MATERIAL_ABS_PROB_DELTA) {
+        continue;
+      }
+    } else if (!isMaterialImpact(bet, imp.deltaValue)) {
+      continue;
+    }
     if (!best || Math.abs(imp.deltaValue) > Math.abs(best.deltaValue)) {
       best = imp;
     }
