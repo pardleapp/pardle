@@ -1311,6 +1311,7 @@ export default function FeedClient({
                 ? headlineImpactForEvent(event, trackedBets, {
                     currentOdds: data.currentOdds,
                     leaderboard: data.leaderboard,
+                    contextRows: data.rows,
                   })
                 : null;
             return (
