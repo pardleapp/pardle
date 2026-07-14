@@ -10,7 +10,7 @@
  * leaderboard + market-redistribution maths.
  */
 
-import type { FeedEvent } from "@/lib/feed/types";
+import type { FeedEvent, FeedRow } from "@/lib/feed/types";
 import type { CachedLeaderboardRow } from "@/lib/feed/store";
 import type { TrackedBet } from "./bet-shared";
 import {
@@ -18,6 +18,10 @@ import {
   normaliseBetCurrency,
   type BetCurrency,
 } from "@/lib/format/bet-currency";
+import {
+  projectShotOnHole,
+  type PlayerSkill,
+} from "@/lib/bet-model/shot-projection";
 
 export interface EventBetImpact {
   /** Which bet this impact is for. Multiple bets can be impacted by
@@ -146,31 +150,61 @@ function impactForTopFinish(
 function impactForRoundScore(
   event: FeedEvent,
   bet: TrackedBet & { kind: "round-score" },
+  playerSkill?: PlayerSkill,
 ): EventBetImpact | null {
   // Round-score is direct-only by user instruction — a competitor's
   // shot doesn't affect your player's round total.
   if (event.playerId !== bet.playerId) return null;
-  // Only completed-hole events have a strokes-vs-par delta we can
-  // act on. Position / milestone / putt-poll events don't.
-  if (event.type !== "score") return null;
-  if (typeof event.strokes !== "number" || typeof event.par !== "number") {
-    return null;
-  }
   // Only score the event for the round this bet covers. Resolve the
   // bet's round from bet.round → placement.round; if neither is
   // set (very old legacy bet), don't apply impact at all rather
-  // than letting events from any round bleed in. Previously this
-  // check was skipped when bet.round was null, so a Novak R2 birdie
-  // would fire a chip on a settled Novak R1 bet from 2 days ago.
+  // than letting events from any round bleed in.
   const targetRound = bet.round ?? bet.placement?.round ?? null;
   if (targetRound == null) return null;
   if (event.round !== targetRound) return null;
-  const diff = event.strokes - event.par;
-  if (diff === 0) return null; // routine par — no swing
-  const sideMult = bet.side === "under" ? 1 : -1;
-  const deltaProb = -diff * sideMult * STROKE_PROB_DELTA;
-  const deltaValue = bet.stake * bet.oddsTaken * deltaProb;
-  return { bet, deltaProb, deltaValue, source: "direct" };
+
+  // Score events — hole completed. Compare actual result to expected
+  // (par + hole difficulty is a future refinement; par-anchored for
+  // now to match the existing STROKE_PROB_DELTA calibration).
+  if (event.type === "score") {
+    if (typeof event.strokes !== "number" || typeof event.par !== "number") {
+      return null;
+    }
+    const diff = event.strokes - event.par;
+    if (diff === 0) return null; // routine par — no swing
+    const sideMult = bet.side === "under" ? 1 : -1;
+    const deltaProb = -diff * sideMult * STROKE_PROB_DELTA;
+    const deltaValue = bet.stake * bet.oddsTaken * deltaProb;
+    return { bet, deltaProb, deltaValue, source: "direct" };
+  }
+
+  // NEW: shot events — IMG per-shot updates. Compute the projected
+  // hole total from the ball's landing position and score the delta
+  // against par (same calibration as score events use). This is what
+  // lets a bet chip fire on approach shots + putt lags mid-hole,
+  // not just when the hole completes.
+  if (event.type === "shot" && event.imgSourced) {
+    const proj = projectShotOnHole(event, playerSkill ?? {});
+    if (!proj) return null;
+    // No swing chip for terminal Ball Holed — the score event covers
+    // hole-completion signal to avoid double-firing.
+    if (proj.isHoled) return null;
+    // Convert projected vs-par into a probability delta using the
+    // same per-stroke sensitivity the hole-level path uses. This is
+    // NOT the projected vs par overall — it's the CHANGE from the
+    // hole's par baseline (i.e. how much better/worse the shot
+    // suggests this hole will play compared to routine par).
+    const projectedDiff = proj.expectedVsPar;
+    // Threshold: don't fire chips on tiny projection movements.
+    // A drop of 0.1 stroke on an approach isn't material.
+    if (Math.abs(projectedDiff) < 0.2) return null;
+    const sideMult = bet.side === "under" ? 1 : -1;
+    const deltaProb = -projectedDiff * sideMult * STROKE_PROB_DELTA;
+    const deltaValue = bet.stake * bet.oddsTaken * deltaProb;
+    return { bet, deltaProb, deltaValue, source: "direct" };
+  }
+
+  return null;
 }
 
 /**
@@ -186,6 +220,10 @@ export function computeBetImpact(
   data: {
     currentOdds: Record<string, number>;
     leaderboard: CachedLeaderboardRow[];
+    /** Optional player skill lookup (DG per-round SG). Used by the
+     *  round-score shot-projection path so a McIlroy approach benefits
+     *  from his sg_app numbers instead of tour-average defaults. */
+    playerSkill?: Record<string, PlayerSkill>;
   },
 ): EventBetImpact | null {
   if (bet.kind === "outright") {
@@ -200,7 +238,8 @@ export function computeBetImpact(
     return impactForTopFinish(event, bet);
   }
   if (bet.kind === "round-score") {
-    return impactForRoundScore(event, bet);
+    const skill = data.playerSkill?.[bet.playerId];
+    return impactForRoundScore(event, bet, skill);
   }
   // winning-score: skip for v1. A single event rarely has a clean
   // attributable impact on the full-field distribution, and the
@@ -218,6 +257,7 @@ export function headlineImpactForEvent(
   data: {
     currentOdds: Record<string, number>;
     leaderboard: CachedLeaderboardRow[];
+    playerSkill?: Record<string, PlayerSkill>;
   },
 ): EventBetImpact | null {
   let best: EventBetImpact | null = null;
