@@ -2,17 +2,18 @@
 
 /**
  * Player avatar — actual PGA Tour Cloudinary headshot when one exists
- * for the playerId, falling back to initials over a deterministic
- * gradient when the headshot 404s (legacy / DP World / amateur fields).
+ * for the playerId, falling back to a plain deterministic gradient
+ * when the headshot 404s (legacy / DP World / amateur fields).
  *
  * Used inside the v4 theme as the "social-app" replacement for the
  * emoji prefix that the old feed rows used (🐦 / 💥 / 🎯). The score
  * chip carries the type signal; the avatar carries the person.
  *
- * Implementation: render the gradient + initials as the backdrop;
- * layer an <img> on top via absolute positioning. If the image
- * errors (404, no headshot for this player), hide it and the
- * gradient shows through.
+ * Implementation: gradient as the backdrop; layer an <img> on top
+ * via absolute positioning. If the image errors (404, no headshot
+ * for this player), we just show the gradient — cleaner than the
+ * previous initials fallback which flashed underneath during image
+ * load on every avatar.
  */
 
 import { useState } from "react";
@@ -38,13 +39,6 @@ const GRADIENTS: Array<[string, string]> = [
   ["#ed7a99", "#7a274d"], // rose→burgundy
   ["#7be0ad", "#26795a"], // jade→pine
 ];
-
-function initialsFor(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
 
 function gradientFor(playerId: string): [string, string] {
   let h = 0;
@@ -94,9 +88,6 @@ export default function PlayerAvatar({
       }}
       aria-hidden="true"
     >
-      <span style={{ position: "relative", zIndex: 1 }}>
-        {initialsFor(playerName)}
-      </span>
       {!imgFailed && (
         <img
           src={headshotUrl}
@@ -108,7 +99,6 @@ export default function PlayerAvatar({
             width: "100%",
             height: "100%",
             objectFit: "cover",
-            zIndex: 2,
           }}
         />
       )}
