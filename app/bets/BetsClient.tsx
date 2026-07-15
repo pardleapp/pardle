@@ -138,7 +138,7 @@ export default function BetsClient() {
     openByCur[b.cur] = (openByCur[b.cur] ?? 0) + b.stake;
   }
   const openStakeLabel = Object.entries(openByCur)
-    .map(([cur, n]) => `${cur}${n}`)
+    .map(([cur, n]) => (cur === "u" ? `${n}${cur}` : `${cur}${n}`))
     .join("·");
 
   // Settled summary — net (per currency) + hit rate.

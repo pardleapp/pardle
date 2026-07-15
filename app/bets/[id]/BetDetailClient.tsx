@@ -216,8 +216,10 @@ export default function BetDetailClient({
             {!isGroupView && (
               <>
                 {" "}
-                · {bet.cur}
-                {bet.stake}
+                ·{" "}
+                {bet.cur === "u"
+                  ? `${bet.stake}${bet.cur}`
+                  : `${bet.cur}${bet.stake}`}
               </>
             )}
           </div>
