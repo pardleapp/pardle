@@ -28219,12 +28219,24 @@ summary,
   height: 55vh;
   bottom: 0;
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.15);
-  padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+  /* Flush to bottom — BottomNav + FAB hide when chat is open (see
+     the data-chat-open rules further down), so we only reserve the
+     iOS home-indicator safe-area, no nav clearance. */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .tchat-full {
   height: 100vh;
   bottom: 0;
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.15);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* When the chat sheet is open (half or full), collapse the two
+   bottom-anchored chrome elements that clash with the composer:
+   the mobile BottomNav and the Add-Bet FAB. */
+body[data-chat-open] .bottom-nav,
+body[data-chat-open] .addbet-fab {
+  display: none !important;
 }
 .tchat-peek-btn {
   display: flex;
@@ -28390,18 +28402,20 @@ summary,
 .tchat-composer {
   display: flex;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-top: 1px solid oklch(0.94 0.008 95);
   flex-shrink: 0;
   background: oklch(0.995 0.004 95);
+  align-items: center;
 }
 .tchat-input {
   flex: 1;
-  padding: 10px 12px;
+  padding: 7px 12px;
   border: 1px solid oklch(0.85 0.013 95);
-  border-radius: 20px;
+  border-radius: 18px;
   font: inherit;
   font-size: 14px;
+  line-height: 1.2;
   background: white;
 }
 .tchat-input:focus {
@@ -28410,18 +28424,19 @@ summary,
 }
 .tchat-send {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   background: oklch(0.50 0.13 155);
   color: white;
   border: none;
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  line-height: 1;
 }
 .tchat-send:disabled {
   background: oklch(0.80 0.02 155);

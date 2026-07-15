@@ -77,6 +77,21 @@ export default function TournamentChat({
     if (stored) setName(stored);
   }, []);
 
+  // Signal to global CSS that the chat sheet is open so the bottom
+  // nav + add-bet FAB can hide themselves (they clash with the
+  // composer's send button + eat the flush-to-bottom space).
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (state === "peek") {
+      document.body.removeAttribute("data-chat-open");
+    } else {
+      document.body.setAttribute("data-chat-open", state);
+    }
+    return () => {
+      document.body.removeAttribute("data-chat-open");
+    };
+  }, [state]);
+
   const load = useCallback(async () => {
     try {
       const res = await fetch(
