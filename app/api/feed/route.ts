@@ -63,6 +63,7 @@ import {
   type PredictionPoll,
   type PredictionPollCounts,
 } from "@/lib/feed/prediction-polls";
+import { maybeTickChatBots } from "@/lib/chat-bots/tick";
 
 export const dynamic = "force-dynamic";
 
@@ -800,6 +801,20 @@ async function handle(req: Request) {
       displayName: r.displayName,
     })),
   );
+
+  // Chat-bot tick — fire-and-forget populate the tournament chat
+  // room with ambient banter. Internally rate-limited to at most
+  // one message per 25s per tournament + a probability gate, so
+  // stays sparse even on heavy poll traffic. Fires whenever a
+  // tournament is on the schedule (including the Mon-Wed lead-in
+  // that renders OffWeekLanding) so the pre-tournament chat still
+  // has movement.
+  void maybeTickChatBots({
+    tournamentId: tournament.id,
+    events: allEvents,
+    leaderPlayerIds: leaderboard.slice(0, 5).map((r) => r.playerId),
+    isLive,
+  });
 
   // Edge-cache hint to Vercel's CDN. Per-visitor cache key (URL
    // includes ?v=<authorKey>), so this doesn't leak one user's
