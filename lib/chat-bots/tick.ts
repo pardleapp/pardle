@@ -15,7 +15,11 @@
 
 import "server-only";
 import { Redis } from "@upstash/redis";
-import { addChatMessage, type ChatMessage } from "@/lib/feed/store";
+import {
+  addChatMessage,
+  getChatMessages,
+  type ChatMessage,
+} from "@/lib/feed/store";
 import type { FeedEvent } from "@/lib/feed/types";
 import {
   CHAT_BOT_PERSONAS,
@@ -23,6 +27,7 @@ import {
   type ChatBotPersona,
 } from "./personas";
 import { pickTemplate, type Situation, type TemplateContext } from "./messages";
+import { isRecentBotDuplicate } from "./dedup";
 
 const redis = Redis.fromEnv();
 
@@ -154,7 +159,28 @@ export async function maybeTickChatBots(input: {
   const fallback: Situation = input.isLive ? "quiet" : "pre-tournament";
   const situation: Situation = reaction?.situation ?? fallback;
   const ctx: TemplateContext = reaction?.ctx ?? {};
-  const text = pickTemplate(situation, persona.style, ctx);
+
+  // Anti-repeat: fetch the last few bot messages and reject any
+  // candidate that already appeared within the dedup window. Retry
+  // up to 5 times with fresh template picks — templates per bucket
+  // are small (3-5 lines) so a handful of tries usually finds a
+  // fresh one. If everything's exhausted, skip the tick entirely
+  // rather than post an obvious repeat.
+  let history: ChatMessage[] = [];
+  try {
+    history = await getChatMessages(input.tournamentId, 40);
+  } catch {
+    /* dedup is best-effort — proceed even if fetch fails */
+  }
+  let text = "";
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const candidate = pickTemplate(situation, persona.style, ctx);
+    if (!candidate) continue;
+    if (!isRecentBotDuplicate(candidate, history)) {
+      text = candidate;
+      break;
+    }
+  }
   if (!text) return null;
 
   const msg: ChatMessage = {
