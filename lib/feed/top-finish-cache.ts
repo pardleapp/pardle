@@ -16,7 +16,14 @@ import type { TopFinishProbs } from "./top-finish-model";
 
 const redis = Redis.fromEnv();
 
-const HOT_TTL_S = 60;
+// TTL tightened from 60s → 15s so a shot on a top-N contender lands
+// in the client's top-finish figures within ~15s instead of ~60s.
+// The MC recompute costs ~5000 sims per player; at 15s cadence that's
+// ~4x/min max regardless of how many clients are connected (cache is
+// shared). We could push this lower still but 15s is well within the
+// window a user would notice between "player made eagle" landing on
+// the feed and the top-10 chip catching up.
+const HOT_TTL_S = 15;
 const HISTORY_MAX = 720;
 const HISTORY_MIN_GAP_MS = 55_000;
 

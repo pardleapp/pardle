@@ -54,6 +54,14 @@ export interface RoundProjection {
  * @param skill optional DG SG per-round stats
  * @param roundPar total par for the round (usually 70–72)
  * @param holePars per-hole pars (falls back to par 4 for missing entries)
+ * @param snapExpectedRemaining server-baked expected remaining strokes
+ *   for the snap's `snapHolesRemaining` holes (field-anchored + skill-
+ *   adjusted). When passed, the un-touched remaining holes borrow the
+ *   snap's per-hole average instead of falling back to raw par. Keeps
+ *   the projection consistent with what evaluateRoundScore returns
+ *   when we DON'T have shot data — so the swap to shot-aware only
+ *   revises the *current* hole, not the whole tail.
+ * @param snapHolesRemaining number of holes the snap projection covers.
  */
 export function projectRoundTotal({
   rows,
@@ -62,6 +70,8 @@ export function projectRoundTotal({
   skill = {},
   roundPar,
   holePars,
+  snapExpectedRemaining,
+  snapHolesRemaining,
 }: {
   rows: FeedRow[];
   playerId: string;
@@ -69,6 +79,8 @@ export function projectRoundTotal({
   skill?: PlayerSkill;
   roundPar: number;
   holePars?: Record<number, number>;
+  snapExpectedRemaining?: number;
+  snapHolesRemaining?: number;
 }): RoundProjection {
   // Filter to events for this player+round only.
   const events = rows
@@ -115,26 +127,43 @@ export function projectRoundTotal({
   const holesTouched = new Set<number>(completedByHole.keys());
   if (currentHoleNumber != null) holesTouched.add(currentHoleNumber);
 
-  // "Remaining" strokes budget for holes we haven't seen yet.
-  // Best-effort: use holePars if provided, otherwise assume par 4.
-  // Field-drift / course difficulty could layer on later.
+  // Per-hole baseline for un-touched remaining holes. Priority order:
+  //   1. Snap's field-anchored + skill-adjusted projection, spread
+  //      evenly across its holesRemaining. This matches what the
+  //      server-side round-score model uses (see pgatour projection
+  //      pipeline — DataGolf SG_total ÷ 18 × player skill applied
+  //      against field-anchored per-hole means).
+  //   2. Raw hole par, if we know it.
+  //   3. Par 4 as a last-resort fallback.
+  const snapPerHole =
+    typeof snapExpectedRemaining === "number" &&
+    typeof snapHolesRemaining === "number" &&
+    snapHolesRemaining > 0
+      ? snapExpectedRemaining / snapHolesRemaining
+      : null;
+
   let remainingExpected = 0;
   let remainingVariance = 0;
   for (let h = 1; h <= 18; h++) {
     if (holesTouched.has(h)) continue;
-    const p = holePars?.[h] ?? 4;
-    remainingExpected += p;
+    if (snapPerHole != null) {
+      remainingExpected += snapPerHole;
+    } else {
+      remainingExpected += holePars?.[h] ?? 4;
+    }
     remainingVariance += PER_HOLE_VAR;
   }
-  // If we somehow have no holePars and roundPar disagrees with the
-  // 18 × 4 = 72 default, rescale the remaining-holes expectation so
-  // the total lines up.
-  if (!holePars && Object.keys(completedByHole).length + (currentHoleNumber != null ? 1 : 0) < 18) {
+  // If we somehow have no holePars and no snap baseline, and roundPar
+  // disagrees with the 18 × 4 = 72 default, rescale the remaining-
+  // holes expectation so the total lines up.
+  if (
+    snapPerHole == null &&
+    !holePars &&
+    Object.keys(completedByHole).length + (currentHoleNumber != null ? 1 : 0) < 18
+  ) {
     const remainingCount = 18 - holesTouched.size;
     if (remainingCount > 0) {
       const targetSum = roundPar - (holesTouched.size * 4);
-      // Scale gently rather than hard-set so the variance still reflects
-      // per-hole spread.
       const ratio = targetSum / (remainingCount * 4);
       remainingExpected *= ratio;
     }

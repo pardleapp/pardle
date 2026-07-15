@@ -28191,3 +28191,267 @@ summary,
    continuously from 1024px to ultrawide. Any per-resolution rule
    added below this point will reintroduce the "blank-gap-at-an-
    in-between-width" bug we just removed. */
+
+/* ─────────────────────────────────────────────────────────────
+   TournamentChat — bottom-anchored peek + expandable sheet.
+   Sits above BottomNav (z-30) so tapping the peek doesn't clash
+   with the tab bar. Half-sheet keeps the feed visible; full sheet
+   takes the viewport for a dedicated chat session.
+   ───────────────────────────────────────────────────────────── */
+.tchat {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 32;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  background: oklch(0.995 0.004 95);
+  border-top: 1px solid oklch(0.90 0.013 95);
+  transition: height 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+.tchat-peek {
+  height: calc(44px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+}
+.tchat-half {
+  height: 55vh;
+  bottom: 0;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.15);
+  padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+}
+.tchat-full {
+  height: 100vh;
+  bottom: 0;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.15);
+}
+.tchat-peek-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  padding: 0 14px;
+  background: none;
+  border: none;
+  color: oklch(0.30 0.02 150);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tchat-peek-ic {
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.tchat-peek-preview {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  color: oklch(0.35 0.02 150);
+}
+.tchat-peek-when {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: oklch(0.62 0.018 150);
+  font-variant-numeric: tabular-nums;
+}
+.tchat-sheet-head {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px 8px;
+  border-bottom: 1px solid oklch(0.94 0.008 95);
+  gap: 10px;
+  flex-shrink: 0;
+}
+.tchat-handle {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tchat-handle-bar {
+  display: inline-block;
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: oklch(0.80 0.013 95);
+}
+.tchat-sheet-title {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.tchat-sheet-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: oklch(0.20 0.02 150);
+  line-height: 1.2;
+}
+.tchat-sheet-sub {
+  font-size: 11px;
+  color: oklch(0.55 0.018 150);
+  line-height: 1.2;
+}
+.tchat-sheet-expand {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid oklch(0.88 0.013 95);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: oklch(0.40 0.02 150);
+  cursor: pointer;
+}
+.tchat-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+.tchat-empty {
+  text-align: center;
+  color: oklch(0.55 0.018 150);
+  font-size: 13px;
+  margin: 20px 0;
+}
+.tchat-msg {
+  padding: 6px 10px;
+  background: oklch(0.98 0.006 95);
+  border-radius: 10px;
+  border: 1px solid oklch(0.94 0.008 95);
+  max-width: 88%;
+  align-self: flex-start;
+}
+.tchat-msg-mine {
+  background: oklch(0.93 0.06 155);
+  border-color: oklch(0.87 0.09 155);
+  align-self: flex-end;
+}
+.tchat-msg-meta {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 2px;
+}
+.tchat-msg-author {
+  font-size: 11px;
+  font-weight: 700;
+  color: oklch(0.40 0.02 150);
+}
+.tchat-msg-time {
+  font-size: 10px;
+  color: oklch(0.60 0.018 150);
+  font-variant-numeric: tabular-nums;
+}
+.tchat-msg-text {
+  font-size: 14px;
+  color: oklch(0.20 0.02 150);
+  line-height: 1.35;
+  word-wrap: break-word;
+}
+.tchat-name-row {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid oklch(0.94 0.008 95);
+  flex-shrink: 0;
+}
+.tchat-name-input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid oklch(0.85 0.013 95);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+}
+.tchat-name-save {
+  padding: 8px 14px;
+  background: oklch(0.50 0.13 155);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tchat-composer {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid oklch(0.94 0.008 95);
+  flex-shrink: 0;
+  background: oklch(0.995 0.004 95);
+}
+.tchat-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid oklch(0.85 0.013 95);
+  border-radius: 20px;
+  font: inherit;
+  font-size: 14px;
+  background: white;
+}
+.tchat-input:focus {
+  outline: none;
+  border-color: oklch(0.60 0.10 155);
+}
+.tchat-send {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: oklch(0.50 0.13 155);
+  color: white;
+  border: none;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tchat-send:disabled {
+  background: oklch(0.80 0.02 155);
+  cursor: not-allowed;
+}
+.tchat-err {
+  padding: 0 12px 6px;
+  color: oklch(0.50 0.16 25);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.tchat-name-edit {
+  padding: 6px 12px 10px;
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 11px;
+  color: oklch(0.55 0.018 150);
+  text-align: left;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.tchat-name-edit strong {
+  color: oklch(0.35 0.02 150);
+}
+
+/* Push the feed content up so the peek bar doesn't cover the last
+   row. BottomNav already reserves ~66px; add another 44px for the
+   peek. Pages that don't render the chat won't include this class,
+   but keeping the padding on-body is fine as a floor. */
+.tchat-content-pad {
+  padding-bottom: 44px !important;
+}

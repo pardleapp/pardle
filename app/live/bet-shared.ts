@@ -9,6 +9,10 @@
  * wasn't on the page.
  */
 
+import type { FeedRow } from "@/lib/feed/types";
+import { projectRoundTotal, roundScoreProb } from "@/lib/bet-model/bet-projection";
+import type { PlayerSkill } from "@/lib/bet-model/shot-projection";
+
 // ── Bet shapes ──────────────────────────────────────────────────────
 
 export interface PnlSample {
@@ -693,6 +697,13 @@ export function resolveBetRound(
 export function evaluateRoundScore(
   bet: RoundScoreBet,
   state: PlayerRoundState | undefined,
+  /** Optional live rows for shot-aware projection. When passed AND a
+   *  mid-hole IMG shot is available for (playerId, round), the projection
+   *  layers the shot-level model on top of the snap so the bet updates
+   *  on every shot rather than just on hole completions. */
+  contextRows?: FeedRow[],
+  /** Optional per-player SG skill inputs for the shot projection. */
+  playerSkill?: Record<string, PlayerSkill>,
 ): RoundScoreEval | null {
   if (!state) return null;
   const round = resolveBetRound(bet, state);
@@ -707,6 +718,46 @@ export function evaluateRoundScore(
     const won =
       bet.side === "under" ? r.strokes < bet.line : r.strokes > bet.line;
     return { kind: "settled", round, won, finalStrokes: r.strokes };
+  }
+  // Shot-aware path. Trust the shot projection only when it actually
+  // saw a mid-hole IMG shot — else the server snap is at least as
+  // current and carries the field-anchored, skill-adjusted baseline.
+  // For the un-touched *remaining* holes (all holes past the current
+  // one), pass the snap's expected-remaining through so those holes
+  // stay field-anchored / skill-adjusted instead of falling back to
+  // raw par. The shot-aware model then only revises the current hole.
+  if (contextRows) {
+    const holePars: Record<number, number> = {};
+    for (const row of contextRows) {
+      const ev = row.event;
+      if (
+        ev.playerId === bet.playerId &&
+        ev.round === round &&
+        typeof ev.hole === "number" &&
+        typeof ev.par === "number"
+      ) {
+        holePars[ev.hole] = ev.par;
+      }
+    }
+    const snap = projectionFromSnap(r);
+    const projection = projectRoundTotal({
+      rows: contextRows,
+      playerId: bet.playerId,
+      round,
+      skill: playerSkill?.[bet.playerId],
+      roundPar: r.roundPar,
+      holePars,
+      snapExpectedRemaining: snap.expectedRemaining,
+      snapHolesRemaining: r.holesRemaining,
+    });
+    if (projection.currentHole) {
+      const prob = roundScoreProb({
+        projection,
+        line: bet.line,
+        side: bet.side,
+      });
+      return { kind: "in-progress", round, prob, roundState: r };
+    }
   }
   const { expectedRemaining, variance } = projectionFromSnap(r);
   const prob = probFromProjection(
@@ -940,6 +991,106 @@ export function detectBetSettlement(
   return null;
 }
 
+/**
+ * Nudge each active player's TournamentProjection by the shot-aware
+ * delta on their in-progress round.
+ *
+ *   delta = shotAwareRoundTotal − snapRoundTotal   (current round only)
+ *   adjusted.mean = original.mean + delta
+ *   adjusted.variance ≈ original.variance − 0.4 · PER_HOLE_VAR
+ *     (mid-hole cuts uncertainty on the in-flight hole a bit)
+ *
+ * Only fires for players who have an IMG-sourced mid-hole shot in
+ * `rows` — everyone else stays on the server projection unchanged.
+ * The result is fed straight into evaluateWinningScore so a birdie
+ * hole-out on the leader shifts the "winner under X" prob within one
+ * client poll instead of waiting on the next server projection cycle.
+ */
+function adjustProjectionsForShots(
+  projections: Record<string, TournamentProjection>,
+  playerRoundStates: Record<string, PlayerRoundState>,
+  rows: FeedRow[],
+  playerSkill?: Record<string, PlayerSkill>,
+): Record<string, TournamentProjection> {
+  // Group shot events by (playerId, round) — take the newest per pair.
+  const latestShotByPlayerRound = new Map<
+    string,
+    { playerId: string; round: number; ts: number }
+  >();
+  for (const row of rows) {
+    const ev = row.event;
+    if (
+      ev.type !== "shot" ||
+      !ev.imgSourced ||
+      typeof ev.hole !== "number" ||
+      typeof ev.round !== "number"
+    ) {
+      continue;
+    }
+    const key = `${ev.playerId}:${ev.round}`;
+    const prior = latestShotByPlayerRound.get(key);
+    if (!prior || ev.ts > prior.ts) {
+      latestShotByPlayerRound.set(key, {
+        playerId: ev.playerId,
+        round: ev.round,
+        ts: ev.ts,
+      });
+    }
+  }
+  if (latestShotByPlayerRound.size === 0) return projections;
+
+  const adjusted: Record<string, TournamentProjection> = { ...projections };
+  for (const { playerId, round } of latestShotByPlayerRound.values()) {
+    const orig = adjusted[playerId];
+    if (!orig || !orig.active) continue;
+    const state = playerRoundStates[playerId];
+    if (!state) continue;
+    const rs = state.rounds?.[round];
+    if (!rs || rs.status !== "in-progress") continue;
+
+    const snap = projectionFromSnap(rs);
+    const snapRoundTotal = rs.strokes + snap.expectedRemaining;
+
+    const holePars: Record<number, number> = {};
+    for (const row of rows) {
+      const ev = row.event;
+      if (
+        ev.playerId === playerId &&
+        ev.round === round &&
+        typeof ev.hole === "number" &&
+        typeof ev.par === "number"
+      ) {
+        holePars[ev.hole] = ev.par;
+      }
+    }
+    const shotProjection = projectRoundTotal({
+      rows,
+      playerId,
+      round,
+      skill: playerSkill?.[playerId],
+      roundPar: rs.roundPar,
+      holePars,
+      snapExpectedRemaining: snap.expectedRemaining,
+      snapHolesRemaining: rs.holesRemaining,
+    });
+    if (!shotProjection.currentHole) continue;
+
+    const delta = shotProjection.expectedRoundTotal - snapRoundTotal;
+    // Shrink variance slightly to reflect knowing SOME shots this hole.
+    // Floor at half of PER_HOLE_VAR so the projection can't collapse.
+    const nudgedVar = Math.max(
+      orig.variance - 0.4 * PER_HOLE_VAR,
+      PER_HOLE_VAR * 0.5,
+    );
+    adjusted[playerId] = {
+      ...orig,
+      mean: orig.mean + delta,
+      variance: nudgedVar,
+    };
+  }
+  return adjusted;
+}
+
 export function currentValueForBet(
   b: TrackedBet,
   currentOdds: Record<string, number>,
@@ -954,6 +1105,11 @@ export function currentValueForBet(
    *  bets saved via /api/field have dg-* ids; resolve them to the
    *  orchestrator id by name before keying into the state maps. */
   leaderboard?: LeaderboardLike[],
+  /** Optional live rows + per-player skill for shot-aware round-score
+   *  projection. When passed, round-score bets update on every IMG
+   *  shot instead of only on hole completion. Ignored for other kinds. */
+  contextRows?: FeedRow[],
+  playerSkill?: Record<string, PlayerSkill>,
 ): number | null {
   const resolvedPid = leaderboard
     ? resolveBetPlayerId(b, leaderboard)
@@ -989,7 +1145,19 @@ export function currentValueForBet(
   }
   if (b.kind === "winning-score") {
     if (!tournamentProjections) return null;
-    const ev = evaluateWinningScore(b, tournamentProjections);
+    // Shot-aware layer: nudge every mid-hole active player's mean +
+    // variance by the shot-model delta so a birdie hole-out on the
+    // leader immediately shortens the winning-under line (etc.),
+    // without waiting on the server's per-poll projection refresh.
+    const projections = contextRows
+      ? adjustProjectionsForShots(
+          tournamentProjections,
+          playerRoundStates,
+          contextRows,
+          playerSkill,
+        )
+      : tournamentProjections;
+    const ev = evaluateWinningScore(b, projections);
     if (!ev) return null;
     if (ev.prob >= 1) return b.stake * b.oddsTaken;
     if (ev.prob <= 0) return 0;
@@ -998,6 +1166,8 @@ export function currentValueForBet(
   const ev = evaluateRoundScore(
     b,
     playerRoundStates[resolvedPid || (b as RoundScoreBet).playerId],
+    contextRows,
+    playerSkill,
   );
   if (!ev) return null;
   if (ev.kind === "not-started") return b.stake;
@@ -1009,8 +1179,15 @@ export function currentValueForBet(
 export function currentProbForBet(
   b: RoundScoreBet,
   playerRoundStates: Record<string, PlayerRoundState>,
+  contextRows?: FeedRow[],
+  playerSkill?: Record<string, PlayerSkill>,
 ): number | null {
-  const ev = evaluateRoundScore(b, playerRoundStates[b.playerId]);
+  const ev = evaluateRoundScore(
+    b,
+    playerRoundStates[b.playerId],
+    contextRows,
+    playerSkill,
+  );
   if (!ev) return null;
   if (ev.kind === "not-started") return probAtPlacementFor(b);
   if (ev.kind === "settled") return ev.won ? 1 : 0;
@@ -1092,6 +1269,129 @@ function trimTrailingFlat(series: PnlSample[]): PnlSample[] {
     series[series.length - 1].t - series[firstConstantIdx].t;
   if (tailSpan < 60 * 60 * 1000) return series;
   return series.slice(0, firstConstantIdx + 1);
+}
+
+/**
+ * For round-score bets, append one PnlSample per in-progress-hole
+ * IMG shot event. Sits after the hole-completion loop and only fires
+ * for shots on holes that haven't shown up as a completed score
+ * event yet. Uses projectRoundTotal + roundScoreProb — the exact
+ * same path currentValueForBet takes, so the chart is guaranteed
+ * to line up with the live card.
+ */
+function appendShotSamples(
+  series: PnlSample[],
+  bet: RoundScoreBet,
+  playerId: string,
+  round: number,
+  feedEvents: FeedRowLike[],
+  probAtP: number,
+  strokesPlayedTotal: number,
+  remainingHoleEntries: { holeNumber: number; par: number }[] | null,
+  holeStats: Record<number, FieldHoleStat> | null,
+  skillPerHole: number | null,
+): void {
+  // Which holes have already been reflected in `strokesPlayedTotal` /
+  // series samples? Anything on a completed hole is done — a shot
+  // that lands after the hole score event is redundant, skip.
+  const completedHoles = new Set<number>();
+  for (const r of feedEvents) {
+    const ev = r.event;
+    if (
+      ev.type === "score" &&
+      ev.playerId === playerId &&
+      ev.round === round &&
+      typeof ev.hole === "number"
+    ) {
+      completedHoles.add(ev.hole);
+    }
+  }
+  // Chronologically-ordered IMG shot events on holes still in flight.
+  const shotEvents = feedEvents
+    .filter((r) => {
+      const ev = r.event;
+      return (
+        ev.type === "shot" &&
+        ev.playerId === playerId &&
+        ev.round === round &&
+        typeof ev.hole === "number" &&
+        !completedHoles.has(ev.hole)
+      );
+    })
+    .sort((a, b) => a.event.ts - b.event.ts);
+  if (shotEvents.length === 0) return;
+
+  // The projection uses roundPar + holePars where available. Both
+  // paths (scorecard vs snap-fallback) can source these from the
+  // events list.
+  const holePars: Record<number, number> = {};
+  for (const r of feedEvents) {
+    const ev = r.event;
+    if (
+      ev.playerId === playerId &&
+      ev.round === round &&
+      typeof ev.hole === "number" &&
+      typeof ev.par === "number"
+    ) {
+      holePars[ev.hole] = ev.par;
+    }
+  }
+  const roundPar =
+    bet.placement?.roundPar ??
+    (Object.values(holePars).reduce((a, b) => a + b, 0) || 72);
+
+  // Precompute snap fallback for the tail — same shape evaluateRoundScore
+  // passes when the shot-aware path fires live. For the scorecard path
+  // (holeStats + skillPerHole provided), we use projectRemaining to get
+  // a matched projection for the un-touched tail. For the snap-fallback
+  // path, we let projectRoundTotal fall back to raw hole par (no field
+  // data available in that mode).
+  let snapExpectedRemaining: number | undefined;
+  let snapHolesRemaining: number | undefined;
+  if (remainingHoleEntries && holeStats && skillPerHole != null) {
+    const proj = projectRemaining(remainingHoleEntries, holeStats, skillPerHole);
+    snapExpectedRemaining = proj.expectedRemaining;
+    snapHolesRemaining = remainingHoleEntries.length;
+  }
+
+  for (const r of shotEvents) {
+    const upTo = feedEvents.filter((row) => row.event.ts <= r.event.ts);
+    // Type-widen upTo to the FeedRow shape projectRoundTotal expects.
+    // reconstructHistory takes FeedRowLike; at runtime these carry the
+    // full FeedEvent shape (see BetDetail's FeedResponse type).
+    const projection = projectRoundTotal({
+      rows: upTo as unknown as import("@/lib/feed/types").FeedRow[],
+      playerId,
+      round,
+      roundPar,
+      holePars,
+      snapExpectedRemaining,
+      snapHolesRemaining,
+    });
+    if (!projection.currentHole) continue;
+    const prob = roundScoreProb({
+      projection,
+      line: bet.line,
+      side: bet.side,
+    });
+    // Deduplicate against the tail sample so a shot arriving in the
+    // same second as its parent score event doesn't produce a
+    // near-zero-width chart spike.
+    const last = series[series.length - 1];
+    if (last && Math.abs(r.event.ts - last.t) < 500 && Math.abs(prob - (last.prob ?? 0)) < 0.005) {
+      continue;
+    }
+    series.push({
+      t: r.event.ts,
+      v: anchoredValue(prob, probAtP, bet.stake, bet.oddsTaken),
+      prob,
+    });
+  }
+  // Prevent silencing the unused-param lint for strokesPlayedTotal —
+  // kept in the signature so future calibration work (e.g. anchoring
+  // the shot-projection to the running strokes for auditability) has
+  // it available without another signature change.
+  void strokesPlayedTotal;
 }
 
 export function reconstructHistory(
@@ -1365,6 +1665,22 @@ export function reconstructHistory(
         prob,
       });
     }
+    // Shot-level tail: for each IMG shot event on holes NOT already in
+    // scorecard.holes (i.e. the current in-progress hole), emit a
+    // per-shot sample. This walks the same projectRoundTotal path the
+    // live model uses so the chart matches the live card.
+    appendShotSamples(
+      series,
+      bet,
+      rsPid,
+      round,
+      feedEvents,
+      probAtP,
+      strokes,
+      remaining.map((h) => ({ holeNumber: h.holeNumber, par: h.par })),
+      holeStats,
+      skillPerHole,
+    );
   } else if (roundSnap) {
     // No scorecard — degrade to the feed events list. We won't have
     // per-hole field stats so the projection falls back to a par +
@@ -1418,6 +1734,21 @@ export function reconstructHistory(
         prob,
       });
     }
+    // Shot-level tail on the fallback path too — no field stats, but
+    // projectRoundTotal + snap fallback still gives us shot-anchored
+    // movement on the current hole.
+    appendShotSamples(
+      series,
+      bet,
+      rsPid,
+      round,
+      feedEvents,
+      probAtP,
+      strokes,
+      null,
+      null,
+      null,
+    );
   } else {
     // No scorecard, no round snap — anchor sample only.
     series.push({

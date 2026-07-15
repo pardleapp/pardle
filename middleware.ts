@@ -30,6 +30,17 @@ export async function middleware(req: NextRequest) {
   }
 
   // Path 2: Supabase session refresh — canonical pattern.
+  // Skip when Supabase env vars are missing (local dev without a
+  // populated .env.local) or on demo-only routes that don't need
+  // auth. Prevents the middleware from crashing the whole app when
+  // creds aren't set up locally.
+  if (
+    pathname.startsWith("/demo/") ||
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ) {
+    return NextResponse.next({ request: req });
+  }
   let response = NextResponse.next({ request: req });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

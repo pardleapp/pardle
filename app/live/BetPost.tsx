@@ -10,7 +10,12 @@
 
 import Link from "next/link";
 import PlayerAvatar from "./PlayerAvatar";
-import type { TrackedBet } from "./bet-shared";
+import {
+  currentProbForBet,
+  type PlayerRoundState,
+  type RoundScoreBet,
+  type TrackedBet,
+} from "./bet-shared";
 import type { FeedRow } from "@/lib/feed/types";
 import {
   formatBetCurrency,
@@ -34,6 +39,13 @@ interface BetPostProps {
     string,
     { top5: number; top10: number; top20: number }
   >;
+  /** Server-side per-player round state — powers the round-score
+   *  live prob (fallback path when no mid-hole shot is available). */
+  playerRoundStates?: Record<string, PlayerRoundState>;
+  /** Full feed rows — used by the round-score projection to layer
+   *  IMG shot events on top of the hole-level snap so the prob moves
+   *  on every shot, not just on hole completion. */
+  contextRows?: FeedRow[];
   recentRowsForPlayer: FeedRow[];
   oddsHistory?: Array<{ ts: number; p: number }> | null;
 }
@@ -64,6 +76,8 @@ export default function BetPost({
   bet,
   currentOdds,
   topFinishCurrent,
+  playerRoundStates,
+  contextRows,
   recentRowsForPlayer,
   onCustomReact,
   reactionState,
@@ -133,6 +147,19 @@ export default function BetPost({
       const v = snap[k];
       if (typeof v === "number" && v >= 0 && v <= 1) liveProb = v;
     }
+  } else if (bet.kind === "round-score" && playerRoundStates) {
+    const p = safe(
+      "round-score live prob",
+      () =>
+        currentProbForBet(
+          bet as RoundScoreBet,
+          playerRoundStates,
+          contextRows,
+        ),
+      null,
+      betId,
+    );
+    if (typeof p === "number" && p >= 0 && p <= 1) liveProb = p;
   }
 
   const probPct =

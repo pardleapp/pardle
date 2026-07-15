@@ -44,6 +44,7 @@ import {
 } from "@/lib/format/bet-currency";
 import { formatOdds } from "@/lib/odds-format";
 import { useAuth } from "@/app/live/auth/useAuth";
+import type { FeedRow } from "@/lib/feed/types";
 import type {
   MockBetLive,
   MockBetSettled,
@@ -55,6 +56,10 @@ interface FeedSlice {
   playerRoundStates: Record<string, PlayerRoundState>;
   tournamentProjections?: Record<string, TournamentProjection>;
   topFinishCurrent?: Record<string, TopFinishProbs>;
+  /** Full feed rows (shot + score events) — powers the shot-aware
+   *  round-score projection so bet value updates on every IMG shot,
+   *  not only on hole completion. */
+  rows: FeedRow[];
   /** Recent feed events keyed by playerId — used for shot-by-shot. */
   recentByPlayer: Record<
     string,
@@ -130,6 +135,7 @@ function liveProbFor(bet: TrackedBet, slice: FeedSlice): number | null {
     const ev = evaluateRoundScore(
       bet as RoundScoreBet,
       slice.playerRoundStates[pid || (bet as RoundScoreBet).playerId],
+      slice.rows,
     );
     if (!ev) return null;
     if (ev.kind === "not-started") {
@@ -310,13 +316,7 @@ function buildSlice(json: unknown): FeedSlice {
     playerRoundStates?: Record<string, PlayerRoundState>;
     tournamentProjections?: Record<string, TournamentProjection>;
     topFinishCurrent?: Record<string, TopFinishProbs>;
-    rows?: Array<{
-      event?: {
-        playerId?: string;
-        headline?: string;
-        result?: string;
-      };
-    }>;
+    rows?: FeedRow[];
     leaderboard?: Array<{
       playerId: string;
       displayName: string;
@@ -326,8 +326,9 @@ function buildSlice(json: unknown): FeedSlice {
     }>;
     tournament?: { id?: string; startDate?: number } | null;
   };
+  const rows: FeedRow[] = j.rows ?? [];
   const recentByPlayer: FeedSlice["recentByPlayer"] = {};
-  for (const row of j.rows ?? []) {
+  for (const row of rows) {
     const pid = row?.event?.playerId;
     const headline = row?.event?.headline;
     if (!pid || !headline) continue;
@@ -350,6 +351,7 @@ function buildSlice(json: unknown): FeedSlice {
     playerRoundStates: j.playerRoundStates ?? {},
     tournamentProjections: j.tournamentProjections,
     topFinishCurrent: j.topFinishCurrent,
+    rows,
     recentByPlayer,
     leaderboardById,
     activeTournamentId: j.tournament?.id ?? null,

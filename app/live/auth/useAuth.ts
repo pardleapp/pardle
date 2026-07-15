@@ -25,6 +25,12 @@ export function useAuth(): AuthState {
 
   useEffect(() => {
     const supabase = getSupabaseBrowser();
+    // No Supabase creds in this environment (local dev with an
+    // unpopulated .env.local). Treat as signed-out and stop.
+    if (!supabase) {
+      setState({ loading: false, user: null });
+      return;
+    }
     let cancelled = false;
 
     supabase.auth.getUser().then((res: { data: { user: User | null } }) => {

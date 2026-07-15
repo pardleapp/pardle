@@ -888,3 +888,57 @@ export async function getCommentCountsBulk(
   });
   return out;
 }
+
+// ──────────────────────────────────────────────────────────────────
+// Tournament chat room — one shared chat per active tournament,
+// distinct from per-event comment threads. Populates the peek bar
+// + expandable sheet on /live so viewers can talk to the room
+// without anchoring to a specific shot. Newest-first LPUSH, LTRIM
+// cap keeps the buffer light. Presence isn't tracked yet (v1) —
+// callers derive "activity" from message count / recency instead.
+// ──────────────────────────────────────────────────────────────────
+
+export interface ChatMessage {
+  id: string;
+  tournamentId: string;
+  ts: number;
+  authorName: string;
+  authorKey: string;
+  text: string;
+}
+
+const CHAT_ROOM_CAP = 500;
+export const CHAT_MESSAGE_MAX_LEN = 280;
+
+function chatRoomKey(t: string) {
+  return `feed:chat:room:${t}`;
+}
+
+export async function addChatMessage(msg: ChatMessage): Promise<void> {
+  const key = chatRoomKey(msg.tournamentId);
+  await redis.lpush(key, JSON.stringify(msg));
+  await redis.ltrim(key, 0, CHAT_ROOM_CAP - 1);
+}
+
+export async function getChatMessages(
+  tournamentId: string,
+  limit: number = 60,
+): Promise<ChatMessage[]> {
+  const raw = await redis.lrange<string>(
+    chatRoomKey(tournamentId),
+    0,
+    limit - 1,
+  );
+  return raw
+    .map((r) => {
+      try {
+        return typeof r === "string"
+          ? (JSON.parse(r) as ChatMessage)
+          : (r as ChatMessage);
+      } catch {
+        return null;
+      }
+    })
+    .filter((m): m is ChatMessage => m !== null)
+    .reverse();
+}

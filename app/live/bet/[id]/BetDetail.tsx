@@ -654,6 +654,10 @@ export default function BetDetail({ betId }: { betId: string }) {
     data.topFinishCurrent,
     settled,
     data.playerIndex,
+    // /api/feed returns full FeedRow shape; the FeedResponse type
+    // here uses the lighter FeedRowLike alias for the surrounding
+    // props, so widen at the projection boundary.
+    data.rows as unknown as import("@/lib/feed/types").FeedRow[],
   );
   const history = reconstructHistory(
     resolvedBet,

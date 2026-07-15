@@ -66,6 +66,7 @@ import PnLTicker from "./PnLTicker";
 import ShotPost from "./ShotPost";
 import ShotsReel from "./ShotsReel";
 import ShotDetail from "./ShotDetail";
+import TournamentChat from "./TournamentChat";
 import type { FeedEvent } from "@/lib/feed/types";
 import { DEMO_RESPONSE, DEMO_EMOJI_REACTIONS } from "./demo-feed";
 import type { ReactionState } from "./ReactionChips";
@@ -1070,7 +1071,7 @@ export default function FeedClient({
     })?.event.pollId ?? null;
 
   return (
-    <section className="feed-wrap v4-theme pv-theme">
+    <section className="feed-wrap v4-theme pv-theme tchat-content-pad">
       <SweatHeader />
       {demoMode && (
         <div className="demo-banner" role="note" aria-live="polite">
@@ -1212,6 +1213,8 @@ export default function FeedClient({
                         bet={__bet}
                         currentOdds={data.currentOdds}
                         topFinishCurrent={data.topFinishCurrent}
+                        playerRoundStates={data.playerRoundStates}
+                        contextRows={data.rows}
                         recentRowsForPlayer={__rowsForPlayer}
                         oddsHistory={
                           data.oddsHistories?.[__playerId] ?? null
@@ -1400,6 +1403,14 @@ export default function FeedClient({
           Frees up the vertical space the sticky strip used to eat
           and ties the gesture to the specific shot the user is
           reacting to (not a global "this round" burst). */}
+
+      {/* Tournament chat — peek bar above BottomNav, expands to a
+          half-sheet on tap and full viewport on second expand. Only
+          shows during a live tournament (already gated above). */}
+      <TournamentChat
+        tournamentId={data.tournament.id}
+        tournamentName={data.tournament.name}
+      />
     </section>
   );
 }
