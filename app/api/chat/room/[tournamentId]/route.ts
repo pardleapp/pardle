@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { Redis } from "@upstash/redis";
 import {
   addChatMessage,
@@ -6,6 +6,7 @@ import {
   CHAT_MESSAGE_MAX_LEN,
   type ChatMessage,
 } from "@/lib/feed/store";
+import { scheduleBotReply } from "@/lib/chat-bots/reply";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,7 @@ export async function POST(req: Request, { params }: Params) {
     text?: string;
     authorName?: string;
     authorKey?: string;
+    tournamentName?: string;
   } = {};
   try {
     body = await req.json();
@@ -91,5 +93,22 @@ export async function POST(req: Request, { params }: Params) {
     text,
   };
   await addChatMessage(message);
+
+  // Fire-and-forget bot reply. `after` runs post-response so the
+  // user sees their own send instantly; the reply's internal
+  // delay lands ~5-15s later.
+  const tournamentName = clean(body.tournamentName ?? "", 80) || "the room";
+  after(async () => {
+    try {
+      await scheduleBotReply({
+        tournamentId,
+        tournamentName,
+        userMessage: message,
+      });
+    } catch {
+      /* chat is best-effort */
+    }
+  });
+
   return NextResponse.json({ ok: true, message });
 }

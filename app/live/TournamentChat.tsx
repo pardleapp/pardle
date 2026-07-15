@@ -152,6 +152,7 @@ export default function TournamentChat({
             text: trimmedText.slice(0, MSG_MAX),
             authorName: trimmedName,
             authorKey: authorKey.current,
+            tournamentName,
           }),
         },
       );
