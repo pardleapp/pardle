@@ -28377,32 +28377,33 @@ body[data-chat-open] .addbet-fab {
 }
 .tchat-name-row {
   display: flex;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: 5px;
+  padding: 4px 8px;
   border-top: 1px solid oklch(0.94 0.008 95);
   flex-shrink: 0;
 }
 .tchat-name-input {
   flex: 1;
-  padding: 8px 10px;
+  padding: 5px 8px;
   border: 1px solid oklch(0.85 0.013 95);
-  border-radius: 8px;
+  border-radius: 6px;
   font: inherit;
-  font-size: 14px;
+  font-size: 12px;
 }
 .tchat-name-save {
-  padding: 8px 14px;
+  padding: 5px 10px;
   background: oklch(0.50 0.13 155);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   font-weight: 700;
+  font-size: 12px;
   cursor: pointer;
 }
 .tchat-composer {
   display: flex;
-  gap: 6px;
-  padding: 6px 10px;
+  gap: 5px;
+  padding: 4px 8px;
   border-top: 1px solid oklch(0.94 0.008 95);
   flex-shrink: 0;
   background: oklch(0.995 0.004 95);
@@ -28410,11 +28411,11 @@ body[data-chat-open] .addbet-fab {
 }
 .tchat-input {
   flex: 1;
-  padding: 7px 12px;
+  padding: 5px 10px;
   border: 1px solid oklch(0.85 0.013 95);
-  border-radius: 18px;
+  border-radius: 14px;
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.2;
   background: white;
 }
@@ -28424,13 +28425,13 @@ body[data-chat-open] .addbet-fab {
 }
 .tchat-send {
   flex-shrink: 0;
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: oklch(0.50 0.13 155);
   color: white;
   border: none;
-  font-size: 17px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   display: flex;
@@ -28449,11 +28450,11 @@ body[data-chat-open] .addbet-fab {
   flex-shrink: 0;
 }
 .tchat-name-edit {
-  padding: 6px 12px 10px;
+  padding: 2px 10px 6px;
   background: none;
   border: none;
   font: inherit;
-  font-size: 11px;
+  font-size: 10px;
   color: oklch(0.55 0.018 150);
   text-align: left;
   cursor: pointer;
