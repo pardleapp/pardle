@@ -25,6 +25,8 @@ import {
   useState,
 } from "react";
 import type { ChatMessage } from "@/lib/feed/store";
+import { useAuth } from "./auth/useAuth";
+import { getSupabaseBrowser } from "@/lib/supabase/client";
 
 const NAME_STORAGE = "pardle_feed_name";
 const AUTHOR_KEY_STORAGE = "pardle_feed_author";
@@ -56,6 +58,47 @@ function timeAgo(ts: number): string {
   return `${Math.floor(m / 60)}h`;
 }
 
+/** 1-2 letter uppercase initials from a display name. Falls back to
+ *  "?" if the name is empty (should be impossible — POST validates
+ *  non-empty). */
+function initialsFor(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+/** Deterministic colour derivation from a stable seed (authorKey).
+ *  Signed-in users have a stable authorKey (user:<uuid>) so their
+ *  colour is stable across sessions; anonymous users' avatar colour
+ *  is stable per-cookie. */
+function colourFor(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (h * 31 + seed.charCodeAt(i)) | 0;
+  }
+  const hue = Math.abs(h) % 360;
+  return `oklch(0.60 0.14 ${hue})`;
+}
+
+function AvatarCircle({
+  seed,
+  initials,
+}: {
+  seed: string;
+  initials: string;
+}) {
+  return (
+    <span
+      className="tchat-avatar"
+      style={{ background: colourFor(seed) }}
+      aria-hidden="true"
+    >
+      {initials}
+    </span>
+  );
+}
+
 export default function TournamentChat({
   tournamentId,
   tournamentName,
@@ -70,12 +113,41 @@ export default function TournamentChat({
   const authorKey = useRef<string>("");
   const listRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLInputElement | null>(null);
+  const auth = useAuth();
+  const isSignedIn = !!auth.user;
 
   useEffect(() => {
     authorKey.current = getOrCreateAuthorKey();
     const stored = window.localStorage.getItem(NAME_STORAGE);
     if (stored) setName(stored);
   }, []);
+
+  // Signed-in users' display name is server-canonical — pull it
+  // from their profile and use it in the composer regardless of
+  // what's in localStorage. Rerun on sign-in/out so switching
+  // accounts updates the chat identity too.
+  useEffect(() => {
+    if (!auth.user) return;
+    const supabase = getSupabaseBrowser();
+    if (!supabase) return;
+    let cancelled = false;
+    supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("user_id", auth.user.id)
+      .maybeSingle()
+      .then((res: { data: { display_name?: string | null } | null }) => {
+        if (cancelled) return;
+        const dn = res.data?.display_name;
+        if (typeof dn === "string" && dn.trim()) {
+          setName(dn.trim());
+          setNameEditing(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [auth.user]);
 
   // Signal to global CSS that the chat sheet is open so the bottom
   // nav + add-bet FAB can hide themselves (they clash with the
@@ -244,23 +316,46 @@ export default function TournamentChat({
               </p>
             ) : (
               messages.map((m) => {
-                const mine = m.authorKey === authorKey.current;
+                const mine =
+                  m.authorKey === authorKey.current ||
+                  (auth.user && m.authorKey === `user:${auth.user.id}`);
                 return (
                   <div
                     key={m.id}
                     className={`tchat-msg ${mine ? "tchat-msg-mine" : ""}`}
                   >
-                    <div className="tchat-msg-meta">
-                      <span className="tchat-msg-author">{m.authorName}</span>
-                      <span className="tchat-msg-time">{timeAgo(m.ts)}</span>
+                    <div className="tchat-msg-side">
+                      <AvatarCircle
+                        seed={m.authorKey}
+                        initials={initialsFor(m.authorName)}
+                      />
                     </div>
-                    <div className="tchat-msg-text">{m.text}</div>
+                    <div className="tchat-msg-body">
+                      <div className="tchat-msg-meta">
+                        <span className="tchat-msg-author">
+                          {m.authorName}
+                        </span>
+                        {m.verified && (
+                          <span
+                            className="tchat-msg-verified"
+                            aria-label="Signed-in user"
+                            title="Signed in"
+                          >
+                            ✓
+                          </span>
+                        )}
+                        <span className="tchat-msg-time">
+                          {timeAgo(m.ts)}
+                        </span>
+                      </div>
+                      <div className="tchat-msg-text">{m.text}</div>
+                    </div>
                   </div>
                 );
               })
             )}
           </div>
-          {(nameEditing || !name) && (
+          {!isSignedIn && (nameEditing || !name) && (
             <div className="tchat-name-row">
               <input
                 type="text"
@@ -314,13 +409,26 @@ export default function TournamentChat({
           </form>
           {err && <div className="tchat-err">{err}</div>}
           {name && !nameEditing && (
-            <button
-              type="button"
-              className="tchat-name-edit"
-              onClick={() => setNameEditing(true)}
-            >
-              Chatting as <strong>{name}</strong> — change
-            </button>
+            isSignedIn ? (
+              <div className="tchat-name-edit">
+                Signed in as <strong>{name}</strong>{" "}
+                <span
+                  className="tchat-msg-verified"
+                  aria-label="Verified account"
+                  title="Signed in"
+                >
+                  ✓
+                </span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="tchat-name-edit"
+                onClick={() => setNameEditing(true)}
+              >
+                Chatting as <strong>{name}</strong> — change
+              </button>
+            )
           )}
         </>
       )}

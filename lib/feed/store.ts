@@ -905,6 +905,14 @@ export interface ChatMessage {
   authorName: string;
   authorKey: string;
   text: string;
+  /** True when the message was posted by a signed-in Supabase user
+   *  whose auth token was validated server-side. Anonymous cookie-
+   *  key posts are false/undefined. Powers the "✓" chip that signals
+   *  a real account to other viewers. */
+  verified?: boolean;
+  /** Optional URL to a user-uploaded avatar (Supabase Storage). Not
+   *  populated in step 1 — reserved for the upcoming upload flow. */
+  avatarUrl?: string;
 }
 
 const CHAT_ROOM_CAP = 500;

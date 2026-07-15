@@ -7,6 +7,7 @@ import {
   type ChatMessage,
 } from "@/lib/feed/store";
 import { scheduleBotReply } from "@/lib/chat-bots/reply";
+import { getSupabaseServer } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -60,8 +61,43 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
   const text = clean(body.text ?? "", CHAT_MESSAGE_MAX_LEN);
-  const authorName = clean(body.authorName ?? "", 30);
-  const authorKey = (body.authorKey ?? "").trim();
+  const rawAuthorName = clean(body.authorName ?? "", 30);
+  const rawAuthorKey = (body.authorKey ?? "").trim();
+
+  // Auth check — if a signed-in user is posting, the server pulls
+  // the canonical display_name from their profile and stamps
+  // verified=true. This means:
+  //   - Anonymous impersonators can't get the ✓ chip
+  //   - Signed-in users' name follows them across devices
+  //   - authorKey for signed-in users is user:<uuid> not the cookie
+  let authorName = rawAuthorName;
+  let authorKey = rawAuthorKey;
+  let verified = false;
+  try {
+    const supabase = await getSupabaseServer();
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const canonicalName = clean(
+        (profile as { display_name?: string | null } | null)?.display_name ??
+          "",
+        30,
+      );
+      if (canonicalName) {
+        authorName = canonicalName;
+        authorKey = `user:${user.id}`;
+        verified = true;
+      }
+    }
+  } catch {
+    // Auth lookup failed — fall through as anonymous. Chat is
+    // best-effort; a Supabase blip shouldn't lock people out.
+  }
 
   if (
     !text ||
@@ -91,6 +127,7 @@ export async function POST(req: Request, { params }: Params) {
     authorName,
     authorKey,
     text,
+    verified: verified || undefined,
   };
   await addChatMessage(message);
 

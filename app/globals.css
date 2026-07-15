@@ -28347,22 +28347,61 @@ body[data-chat-open] .addbet-fab {
   border: 1px solid oklch(0.94 0.008 95);
   max-width: 88%;
   align-self: flex-start;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
 }
 .tchat-msg-mine {
   background: oklch(0.93 0.06 155);
   border-color: oklch(0.87 0.09 155);
   align-self: flex-end;
 }
+.tchat-msg-side {
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+.tchat-msg-body {
+  flex: 1;
+  min-width: 0;
+}
+.tchat-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
 .tchat-msg-meta {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: baseline;
   margin-bottom: 2px;
+  flex-wrap: wrap;
 }
 .tchat-msg-author {
   font-size: 11px;
   font-weight: 700;
   color: oklch(0.40 0.02 150);
+}
+.tchat-msg-verified {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: oklch(0.55 0.13 235);
+  color: white;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
 }
 .tchat-msg-time {
   font-size: 10px;
