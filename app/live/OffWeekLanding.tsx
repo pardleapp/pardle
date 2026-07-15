@@ -28,6 +28,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import SweatHeader from "./SweatHeader";
+import TournamentChat from "./TournamentChat";
 import { readBets, type TrackedBet } from "./bet-shared";
 
 interface Tournament {
@@ -86,7 +87,7 @@ export default function OffWeekLanding({ tournament }: Props) {
   })();
 
   return (
-    <section className="ow-pv">
+    <section className={`ow-pv${tournament ? " tchat-content-pad" : ""}`}>
       <SweatHeader />
 
       <div className="ow-pv-body">
@@ -195,6 +196,12 @@ export default function OffWeekLanding({ tournament }: Props) {
           bets. 18+ only.
         </p>
       </div>
+      {tournament && (
+        <TournamentChat
+          tournamentId={tournament.id}
+          tournamentName={tournament.name}
+        />
+      )}
     </section>
   );
 }
