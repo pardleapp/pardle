@@ -1308,6 +1308,34 @@ function appendShotSamples(
       );
     })
     .sort((a, b) => a.event.ts - b.event.ts);
+  if (typeof console !== "undefined") {
+    const allShotsAnyone = feedEvents.filter((r) => r.event.type === "shot");
+    console.log("[bet-chart:shot-diag]", {
+      playerId,
+      round,
+      totalRows: feedEvents.length,
+      totalShotEventsInFeed: allShotsAnyone.length,
+      shotsForPlayer: shotEvents.length,
+      shotsForPlayerDetail: shotEvents.slice(-5).map((r) => {
+        const ev = r.event as {
+          hole?: number;
+          imgShotNum?: number;
+          imgSourced?: boolean;
+          par?: number;
+          imgSurface?: string;
+          imgToPin?: string;
+        };
+        return {
+          hole: ev.hole,
+          shotNum: ev.imgShotNum,
+          par: ev.par,
+          surface: ev.imgSurface,
+          toPin: ev.imgToPin,
+          imgSourced: ev.imgSourced,
+        };
+      }),
+    });
+  }
   if (shotEvents.length === 0) return;
 
   // The projection uses roundPar + holePars where available. Both
@@ -1343,6 +1371,9 @@ function appendShotSamples(
     snapHolesRemaining = remainingHoleEntries.length;
   }
 
+  let pushed = 0;
+  let skippedNoCurrentHole = 0;
+  let skippedDedup = 0;
   for (const r of shotEvents) {
     const ev = r.event as {
       hole?: number;
@@ -1361,7 +1392,10 @@ function appendShotSamples(
       snapExpectedRemaining,
       snapHolesRemaining,
     });
-    if (!projection.currentHole) continue;
+    if (!projection.currentHole) {
+      skippedNoCurrentHole++;
+      continue;
+    }
     const prob = roundScoreProb({
       projection,
       line: bet.line,
@@ -1385,6 +1419,7 @@ function appendShotSamples(
       Math.abs(holesPlayed - last.holesPlayed) < 0.02 &&
       Math.abs(prob - (last.prob ?? 0)) < 0.005
     ) {
+      skippedDedup++;
       continue;
     }
     series.push({
@@ -1392,6 +1427,15 @@ function appendShotSamples(
       v: anchoredValue(prob, probAtP, bet.stake, bet.oddsTaken),
       holesPlayed,
       prob,
+    });
+    pushed++;
+  }
+  if (typeof console !== "undefined") {
+    console.log("[bet-chart:shot-result]", {
+      shotsEvaluated: shotEvents.length,
+      pushed,
+      skippedNoCurrentHole,
+      skippedDedup,
     });
   }
   // Prevent silencing the unused-param lint for strokesPlayedTotal —
