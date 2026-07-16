@@ -1,8 +1,9 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
 import Chart from "./Chart";
 
-export const dynamic = "force-dynamic";
-
-interface Row {
+export interface Row {
   dgId: string;
   name: string;
   teeTime: string;
@@ -22,20 +23,33 @@ interface FetchResp {
   rows?: Row[];
 }
 
-async function loadRows(): Promise<FetchResp> {
-  // Fetch server-side from our own API route so the DataGolf key stays
-  // on the server. Absolute URL required inside a server component.
-  const base =
-    process.env.NEXT_PUBLIC_SITE_URL || "https://pardle.app";
-  const res = await fetch(`${base}/api/analysis/tee-time-scoring`, {
-    cache: "no-store",
-  });
-  if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
-  return (await res.json()) as FetchResp;
-}
+/** Poll cadence — 60 s is plenty for a golf round; players finish
+ *  at roughly 15 min intervals so refreshing more often is waste. */
+const POLL_MS = 60_000;
 
-export default async function Page() {
-  const data = await loadRows();
+export default function Page() {
+  const [data, setData] = useState<FetchResp | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/analysis/tee-time-scoring", {
+        cache: "no-store",
+      });
+      const json = (await res.json()) as FetchResp;
+      setData(json);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "network error");
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, POLL_MS);
+    return () => clearInterval(id);
+  }, [load]);
+
   return (
     <main
       style={{
@@ -51,22 +65,25 @@ export default async function Page() {
         Skill-adjusted score vs tee time — R1
       </h1>
       <p style={{ fontSize: 13, color: "oklch(0.5 0.02 150)", margin: 0 }}>
-        DataGolf field + skill ratings, live R1 score. Points below zero
-        outperformed their skill baseline; above zero underperformed. Cluster
-        near a tee-time band tells you conditions changed for that wave.
+        Players who have completed R1 only. Points below zero outperformed
+        their skill baseline; above zero underperformed. Graph updates on a
+        rolling 60-second poll as more players finish.
       </p>
-      {!data.ok ? (
+      {error || (data && !data.ok) ? (
         <p style={{ marginTop: 20, color: "oklch(0.5 0.16 25)" }}>
-          Couldn&apos;t load data: {data.error}
+          Couldn&apos;t load data: {error ?? data?.error}
         </p>
+      ) : !data ? (
+        <p style={{ marginTop: 20 }}>Loading…</p>
       ) : !data.rows || data.rows.length === 0 ? (
         <p style={{ marginTop: 20 }}>
-          No rows yet — R1 might not have live scores populated in DataGolf.
+          Nobody has finished R1 yet — check back after the first group is
+          done.
         </p>
       ) : (
         <>
           <p style={{ fontSize: 11, color: "oklch(0.55 0.02 150)", marginTop: 8 }}>
-            {data.count} players ·{" "}
+            {data.count} players finished ·{" "}
             {data.generatedAt
               ? `updated ${new Date(data.generatedAt).toLocaleTimeString()}`
               : ""}

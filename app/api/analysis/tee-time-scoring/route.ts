@@ -168,6 +168,17 @@ export async function GET() {
         noTeeTime++;
         continue;
       }
+      // Only include players who have COMPLETED R1. DataGolf returns
+      // `thru: 18` for finished rounds. The `thru: "F"` string form
+      // also crops up occasionally. Everyone else — still on course
+      // or waiting to tee off — is skipped and joins the graph as
+      // they finish on the next poll.
+      const thruDone =
+        (typeof l.thru === "number" && l.thru === 18) ||
+        (typeof l.thru === "string" && /^f/i.test(l.thru.trim()));
+      if (!thruDone) {
+        continue;
+      }
       // DataGolf's live-tournament-stats reuses the `round` field for
       // "score in that round". Pull whichever number is populated.
       const r1Score =
