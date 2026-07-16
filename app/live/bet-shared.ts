@@ -1319,6 +1319,26 @@ function appendShotSamples(
       );
     })
     .sort((a, b) => a.event.ts - b.event.ts);
+  // Diagnostic — temporary, remove once shot-aware chart is
+  // confirmed working live. Shows in browser devtools.
+  if (typeof console !== "undefined") {
+    const allShotsForPlayer = feedEvents.filter(
+      (r) =>
+        r.event.type === "shot" &&
+        r.event.playerId === playerId &&
+        r.event.round === round,
+    );
+    console.log("[bet-chart:shot-samples]", {
+      playerId,
+      round,
+      totalRows: feedEvents.length,
+      allShotsForPlayerRound: allShotsForPlayer.length,
+      allShotsHoles: allShotsForPlayer.map((r) => r.event.hole),
+      completedHoles: [...completedHoles],
+      afterCompletedFilter: shotEvents.length,
+      shotHoles: shotEvents.map((r) => r.event.hole),
+    });
+  }
   if (shotEvents.length === 0) return;
 
   // The projection uses roundPar + holePars where available. Both
@@ -1354,6 +1374,8 @@ function appendShotSamples(
     snapHolesRemaining = remainingHoleEntries.length;
   }
 
+  let pushed = 0;
+  let noCurrentHole = 0;
   for (const r of shotEvents) {
     const upTo = feedEvents.filter((row) => row.event.ts <= r.event.ts);
     // Type-widen upTo to the FeedRow shape projectRoundTotal expects.
@@ -1368,7 +1390,10 @@ function appendShotSamples(
       snapExpectedRemaining,
       snapHolesRemaining,
     });
-    if (!projection.currentHole) continue;
+    if (!projection.currentHole) {
+      noCurrentHole++;
+      continue;
+    }
     const prob = roundScoreProb({
       projection,
       line: bet.line,
@@ -1385,6 +1410,14 @@ function appendShotSamples(
       t: r.event.ts,
       v: anchoredValue(prob, probAtP, bet.stake, bet.oddsTaken),
       prob,
+    });
+    pushed++;
+  }
+  if (typeof console !== "undefined") {
+    console.log("[bet-chart:shot-samples-result]", {
+      shotsEvaluated: shotEvents.length,
+      noCurrentHole,
+      pushed,
     });
   }
   // Prevent silencing the unused-param lint for strokesPlayedTotal —
