@@ -168,14 +168,19 @@ export async function GET() {
         noTeeTime++;
         continue;
       }
-      // Only include players who have COMPLETED R1. DataGolf returns
-      // `thru: 18` for finished rounds. The `thru: "F"` string form
-      // also crops up occasionally. Everyone else — still on course
-      // or waiting to tee off — is skipped and joins the graph as
-      // they finish on the next poll.
-      const thruDone =
-        (typeof l.thru === "number" && l.thru === 18) ||
-        (typeof l.thru === "string" && /^f/i.test(l.thru.trim()));
+      // Only include players who have COMPLETED R1. DataGolf's
+      // `thru` field arrives as multiple shapes — 18 (number),
+      // "18" (string), "F" / "F*" (letter). Accept anything that
+      // parses to 18 as a number OR starts with F.
+      const thruNum =
+        typeof l.thru === "number"
+          ? l.thru
+          : typeof l.thru === "string"
+            ? Number(l.thru.trim())
+            : NaN;
+      const thruStr =
+        typeof l.thru === "string" ? l.thru.trim() : "";
+      const thruDone = thruNum === 18 || /^f/i.test(thruStr);
       if (!thruDone) {
         continue;
       }
@@ -206,6 +211,25 @@ export async function GET() {
     }
     rows.sort((a, b) => a.teeMinutes - b.teeMinutes);
 
+    // Diagnostic — for LATE-wave players (r1_teetime after 15:00),
+    // show their `thru` and `round` values so we can spot when the
+    // filter is dropping actually-finished ones.
+    const latePlayers = (live.live_stats ?? [])
+      .map((l) => ({ live: l, field: fieldMap.get(l.dg_id) }))
+      .filter((p) => {
+        const r1 = p.field ? r1Teetime(p.field) : null;
+        const mins = teeToMinutes(r1?.teetime);
+        return mins != null && mins >= 15 * 60;
+      })
+      .slice(0, 15)
+      .map((p) => ({
+        name: p.live.player_name,
+        r1_teetime: r1Teetime(p.field!)?.teetime,
+        thru: p.live.thru,
+        thruType: typeof p.live.thru,
+        round: p.live.round,
+      }));
+
     return NextResponse.json({
       ok: true,
       count: rows.length,
@@ -215,8 +239,7 @@ export async function GET() {
         skillRowsCount: skillRows.length,
         liveRowsCount: liveRows.length,
         drops: { noField, noSkill, noTeeTime, noScore, noSgTotal },
-        // A tiny sample of what each source returned so we can
-        // eyeball the shape without another endpoint.
+        latePlayers,
         fieldSample: fieldRows.slice(0, 2),
         skillSample: skillRows.slice(0, 2),
         liveSample: liveRows.slice(0, 2),
