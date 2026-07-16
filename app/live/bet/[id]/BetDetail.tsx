@@ -646,6 +646,26 @@ export default function BetDetail({ betId }: { betId: string }) {
     bet.kind === "round-score" && bet.round == null && roundForBet != null
       ? ({ ...bet, round: roundForBet } as TrackedBet)
       : bet;
+  // Map DataGolf SG breakdown (app / arg / putt per round) into the
+  // shot-projection's PlayerSkill shape. Without this, projectRoundTotal
+  // treats the player as tour-average while the snap already assumed
+  // their DG-adjusted pace — so a good drive can look "bad" (tour-
+  // average projection worse than skill-adjusted snap-per-hole).
+  const playerSkillMap = (() => {
+    const src = data.playerSgBreakdown ?? {};
+    const out: Record<
+      string,
+      { sgApp?: number; sgArg?: number; sgPutt?: number }
+    > = {};
+    for (const [pid, sg] of Object.entries(src)) {
+      out[pid] = {
+        sgApp: sg?.app ?? undefined,
+        sgArg: sg?.arg ?? undefined,
+        sgPutt: sg?.putt ?? undefined,
+      };
+    }
+    return out;
+  })();
   const nowValue = currentValueForBet(
     resolvedBet,
     data.currentOdds,
@@ -658,6 +678,7 @@ export default function BetDetail({ betId }: { betId: string }) {
     // here uses the lighter FeedRowLike alias for the surrounding
     // props, so widen at the projection boundary.
     data.rows as unknown as import("@/lib/feed/types").FeedRow[],
+    playerSkillMap,
   );
   const history = reconstructHistory(
     resolvedBet,
@@ -671,6 +692,7 @@ export default function BetDetail({ betId }: { betId: string }) {
     data.topFinishHistory,
     data.bookOdds,
     data.playerIndex,
+    playerSkillMap,
   );
   // "What needs to happen" insight — only for live (unsettled) bets.
   // Settled bets already show the final result in the header PnL, so a

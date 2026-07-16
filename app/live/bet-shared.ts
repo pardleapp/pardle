@@ -1329,6 +1329,7 @@ function appendShotSamples(
   remainingHoleEntries: { holeNumber: number; par: number }[] | null,
   holeStats: Record<number, FieldHoleStat> | null,
   skillPerHole: number | null,
+  playerSkill?: PlayerSkill,
 ): void {
   // Every IMG shot event for this (player, round), regardless of
   // whether the hole has since completed. Historical shot samples
@@ -1395,6 +1396,7 @@ function appendShotSamples(
       rows: upTo as unknown as import("@/lib/feed/types").FeedRow[],
       playerId,
       round,
+      skill: playerSkill,
       roundPar,
       holePars,
       snapExpectedRemaining,
@@ -1460,6 +1462,10 @@ export function reconstructHistory(
     fanduel: Record<string, OddsHistorySample[] | null>;
   },
   leaderboard?: LeaderboardLike[],
+  /** DataGolf-sourced per-shot-type SG for the bet's player, so the
+   *  shot-aware model matches the snap's skill-adjusted baseline
+   *  and a good drive doesn't spuriously look like a bad one. */
+  playerSkill?: Record<string, PlayerSkill>,
 ): PnlSample[] {
   // Resolve the bet's playerId before any state lookups — pre-
   // tournament bets carry dg-* ids that need to be reconciled to the
@@ -1731,6 +1737,7 @@ export function reconstructHistory(
       remaining.map((h) => ({ holeNumber: h.holeNumber, par: h.par })),
       holeStats,
       skillPerHole,
+      playerSkill?.[rsPid],
     );
   } else if (roundSnap) {
     // No scorecard — degrade to the feed events list. We won't have
@@ -1799,6 +1806,7 @@ export function reconstructHistory(
       null,
       null,
       null,
+      playerSkill?.[rsPid],
     );
   } else {
     // No scorecard, no round snap — anchor sample only.
