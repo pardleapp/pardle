@@ -1310,30 +1310,39 @@ function appendShotSamples(
     .sort((a, b) => a.event.ts - b.event.ts);
   if (typeof console !== "undefined") {
     const allShotsAnyone = feedEvents.filter((r) => r.event.type === "shot");
+    // Sample the shot stream so we can see WHICH playerIds are actually
+    // producing shot events. If our target playerId isn't in this list
+    // the shots aren't reaching the feed under his id.
+    const idCounts = new Map<string, number>();
+    const nameByPid = new Map<string, string>();
+    for (const r of allShotsAnyone) {
+      const ev = r.event as {
+        playerId: string;
+        playerName?: string;
+      };
+      idCounts.set(ev.playerId, (idCounts.get(ev.playerId) ?? 0) + 1);
+      if (ev.playerName && !nameByPid.has(ev.playerId)) {
+        nameByPid.set(ev.playerId, ev.playerName);
+      }
+    }
+    const shotByPlayerId = [...idCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([pid, n]) => ({
+        pid,
+        name: nameByPid.get(pid) ?? "?",
+        shots: n,
+        matchesTarget: pid === playerId,
+      }));
     console.log("[bet-chart:shot-diag]", {
       playerId,
       round,
       totalRows: feedEvents.length,
       totalShotEventsInFeed: allShotsAnyone.length,
       shotsForPlayer: shotEvents.length,
-      shotsForPlayerDetail: shotEvents.slice(-5).map((r) => {
-        const ev = r.event as {
-          hole?: number;
-          imgShotNum?: number;
-          imgSourced?: boolean;
-          par?: number;
-          imgSurface?: string;
-          imgToPin?: string;
-        };
-        return {
-          hole: ev.hole,
-          shotNum: ev.imgShotNum,
-          par: ev.par,
-          surface: ev.imgSurface,
-          toPin: ev.imgToPin,
-          imgSourced: ev.imgSourced,
-        };
-      }),
+      distinctShotPlayerCount: idCounts.size,
+      targetInStream: idCounts.has(playerId),
+      shotByPlayerId,
     });
   }
   if (shotEvents.length === 0) return;
