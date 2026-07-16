@@ -493,13 +493,12 @@ function ChartCore({
   // viewport (userViewport != null). Auto-fit state → not zoomed.
   const isZoomed = userViewport != null;
 
-  const visiblePoints = points.filter(
-    (p) =>
-      p.x >= viewport.xMin - 1 &&
-      p.x <= viewport.xMax + 1 &&
-      p.y >= viewport.yMin - 0.1 &&
-      p.y <= viewport.yMax + 0.1,
-  );
+  // Render EVERY point and let the SVG clip path hide anything
+  // outside the chart interior. The previous filter-then-render
+  // approach was hiding dots that should have been visible when the
+  // viewport had drifted or the padded extent boundary was applied
+  // ambiguously. Circles are cheap — 127 of them cost nothing.
+  const visiblePoints = points;
 
   const trendColor =
     trendAtCursor == null
