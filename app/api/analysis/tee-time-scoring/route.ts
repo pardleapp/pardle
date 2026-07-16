@@ -36,11 +36,17 @@ async function fetchJson<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+interface FieldTeetime {
+  round_num?: number;
+  start_hole?: number;
+  teetime?: string; // "YYYY-MM-DD HH:MM"
+  wave?: string;
+}
+
 interface FieldEntry {
   dg_id: number;
   player_name: string;
-  r1_teetime?: string;
-  start_hole?: number;
+  teetimes?: FieldTeetime[];
 }
 
 interface SkillEntry {
@@ -52,8 +58,10 @@ interface SkillEntry {
 interface LiveEntry {
   dg_id: number;
   player_name: string;
-  current_score?: number; // to par
+  /** DataGolf naming: `round` here is the SCORE for the requested
+   *  round, not the round number. −4 = shot 4 under par. */
   round?: number;
+  total?: number;
   thru?: number | string;
 }
 
@@ -69,15 +77,19 @@ interface OutRow {
   startHole: number;
 }
 
-/** Parse "HH:MM" (24h) or "H:MMam/pm" to minutes-since-midnight. */
+/** Parse DataGolf tee times to minutes-since-midnight. Handles:
+ *   - "YYYY-MM-DD HH:MM"   (field-updates format)
+ *   - "HH:MM"              (24h short form)
+ *   - "H:MMam/pm"          (12h clock)
+ */
 function teeToMinutes(t: string | undefined): number | null {
   if (!t) return null;
   const s = t.trim();
-  // 24h "07:15" or "13:45"
-  const h24 = s.match(/^(\d{1,2}):(\d{2})$/);
-  if (h24) {
-    const h = Number(h24[1]);
-    const m = Number(h24[2]);
+  // "YYYY-MM-DD HH:MM"
+  const dt = s.match(/(\d{2}):(\d{2})/);
+  if (dt) {
+    const h = Number(dt[1]);
+    const m = Number(dt[2]);
     if (h >= 0 && h < 24 && m >= 0 && m < 60) return h * 60 + m;
   }
   // 12h "7:15am" / "1:45pm"
@@ -91,6 +103,13 @@ function teeToMinutes(t: string | undefined): number | null {
     return h * 60 + m;
   }
   return null;
+}
+
+/** Pull the R1 tee time entry from DataGolf's teetimes array. */
+function r1Teetime(entry: FieldEntry): FieldTeetime | null {
+  const rows = entry.teetimes ?? [];
+  const r1 = rows.find((r) => r.round_num === 1);
+  return r1 ?? null;
 }
 
 /** Format minutes-since-midnight back to a clock display. */
@@ -143,12 +162,17 @@ export async function GET() {
         noSkill++;
         continue;
       }
-      const mins = teeToMinutes(f.r1_teetime);
+      const r1 = r1Teetime(f);
+      const mins = teeToMinutes(r1?.teetime);
       if (mins == null) {
         noTeeTime++;
         continue;
       }
-      if (typeof l.current_score !== "number") {
+      // DataGolf's live-tournament-stats reuses the `round` field for
+      // "score in that round". Pull whichever number is populated.
+      const r1Score =
+        typeof l.round === "number" ? l.round : undefined;
+      if (typeof r1Score !== "number") {
         noScore++;
         continue;
       }
@@ -163,10 +187,10 @@ export async function GET() {
         teeTime: minutesToClock(mins),
         teeMinutes: mins,
         sgTotal: s.sg_total,
-        toPar: l.current_score,
-        adjusted: l.current_score + s.sg_total,
+        toPar: r1Score,
+        adjusted: r1Score + s.sg_total,
         thru: l.thru ?? "-",
-        startHole: f.start_hole ?? 1,
+        startHole: r1?.start_hole ?? 1,
       });
     }
     rows.sort((a, b) => a.teeMinutes - b.teeMinutes);
