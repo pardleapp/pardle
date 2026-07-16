@@ -1328,10 +1328,25 @@ function appendShotSamples(
         r.event.playerId === playerId &&
         r.event.round === round,
     );
+    const allShotsAnyone = feedEvents.filter((r) => r.event.type === "shot");
+    const imgSourcedShots = feedEvents.filter(
+      (r) =>
+        r.event.type === "shot" &&
+        (r.event as { imgSourced?: boolean }).imgSourced === true,
+    );
+    const uniqueShotPlayers = new Set(
+      allShotsAnyone.map(
+        (r) =>
+          (r.event as { playerName?: string }).playerName ?? r.event.playerId,
+      ),
+    );
     console.log("[bet-chart:shot-samples]", {
       playerId,
       round,
       totalRows: feedEvents.length,
+      totalShotEventsInFeed: allShotsAnyone.length,
+      imgSourcedShotsInFeed: imgSourcedShots.length,
+      distinctShotPlayers: [...uniqueShotPlayers].slice(0, 10),
       allShotsForPlayerRound: allShotsForPlayer.length,
       allShotsHoles: allShotsForPlayer.map((r) => r.event.hole),
       completedHoles: [...completedHoles],
