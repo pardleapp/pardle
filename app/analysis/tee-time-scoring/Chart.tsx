@@ -18,23 +18,39 @@ interface ChartProps {
   rows: Row[];
 }
 
-/** Simple LOESS-ish rolling median in x — enough to eye a trend. */
+/** Gaussian-weighted rolling mean — smoother than a boxcar median
+ *  because points further from the target x contribute proportionally
+ *  less. Bandwidth (σ) in minutes controls how tight the smooth
+ *  hugs the raw scatter. Bigger σ = smoother line.
+ *
+ *  Then a second pass at half-σ to knock the last kinks out; this
+ *  turns a rough median-ish trace into a broadcast-style trend line. */
 function rollingSmooth(
   points: Array<{ x: number; y: number }>,
-  windowMins: number,
+  bandwidthMins: number,
 ): Array<{ x: number; y: number }> {
   if (points.length === 0) return [];
   const sorted = [...points].sort((a, b) => a.x - b.x);
-  return sorted.map((p) => {
-    const lo = p.x - windowMins;
-    const hi = p.x + windowMins;
-    const inWin = sorted.filter((q) => q.x >= lo && q.x <= hi);
-    const ys = inWin.map((q) => q.y).sort((a, b) => a - b);
-    const mid = Math.floor(ys.length / 2);
-    const median =
-      ys.length % 2 === 0 ? (ys[mid - 1] + ys[mid]) / 2 : ys[mid];
-    return { x: p.x, y: median };
-  });
+  const gaussPass = (
+    src: Array<{ x: number; y: number }>,
+    sigma: number,
+  ) => {
+    const twoSigmaSq = 2 * sigma * sigma;
+    return src.map((p) => {
+      let num = 0;
+      let den = 0;
+      for (const q of src) {
+        const dx = q.x - p.x;
+        const w = Math.exp(-(dx * dx) / twoSigmaSq);
+        num += w * q.y;
+        den += w;
+      }
+      return { x: p.x, y: den > 0 ? num / den : p.y };
+    });
+  };
+  const first = gaussPass(sorted, bandwidthMins);
+  const second = gaussPass(first, bandwidthMins * 0.5);
+  return second;
 }
 
 export default function Chart({ rows }: ChartProps) {
@@ -74,7 +90,7 @@ export default function Chart({ rows }: ChartProps) {
     () =>
       rollingSmooth(
         points.map((p) => ({ x: p.x, y: p.y })),
-        45,
+        60,
       ),
     [points],
   );
@@ -284,7 +300,7 @@ export default function Chart({ rows }: ChartProps) {
       >
         Adjusted = R1 to-par + SG total. Positive = under-performed skill
         (course was harder than expected for that player), negative =
-        outperformed. Blue line: 45-min rolling median.
+        outperformed. Blue line: Gaussian-smoothed trend across tee times.
       </p>
     </div>
   );
