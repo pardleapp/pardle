@@ -40,7 +40,7 @@ import { findOddsShift } from "@/lib/feed/odds-store";
 import { getInPlayTopFinish } from "@/lib/golf-api/datagolf";
 import { getLiveStatsCached } from "@/lib/feed/live-stats-cache";
 import { computeCommunityBacking } from "@/lib/feed/community-backing";
-import { eventPolarity, type FeedRow } from "@/lib/feed/types";
+import { eventPolarity, type FeedRow, type FeedEvent } from "@/lib/feed/types";
 import {
   getMyVotesBulk,
   getPuttPollBulk,
@@ -317,10 +317,31 @@ async function handle(req: Request) {
   // back with ?back=<hours> across the entire Redis-retained history
   // — otherwise the 80-cap silently truncates IMG data that's still
   // sitting in Redis.
-  const feedEvents = allEventsByTs.slice(
-    0,
-    tournamentIdOverride ? 1000 : 80,
-  );
+  //
+  // Bet-detail viewers (slimPlayerId set) always include EVERY event
+  // for the target player, then top up to a 200-cap with the
+  // freshest field-wide events. Without this, IMG shots for a player
+  // who is mid-walk between holes fall outside the 80-event window
+  // (which spans ~30-60 s at active-round shot rates), so the shot-
+  // aware chart samples never see them.
+  let feedEvents: FeedEvent[];
+  if (tournamentIdOverride) {
+    feedEvents = allEventsByTs.slice(0, 1000);
+  } else if (slimPlayerId) {
+    const CAP = 200;
+    const playerEvents: FeedEvent[] = [];
+    const otherEvents: FeedEvent[] = [];
+    for (const ev of allEventsByTs) {
+      if (ev.playerId === slimPlayerId) playerEvents.push(ev);
+      else otherEvents.push(ev);
+    }
+    const remaining = Math.max(0, CAP - playerEvents.length);
+    feedEvents = [...playerEvents, ...otherEvents.slice(0, remaining)].sort(
+      (a, b) => (b.ts ?? 0) - (a.ts ?? 0),
+    );
+  } else {
+    feedEvents = allEventsByTs.slice(0, 80);
+  }
   const reelSource = allEvents.slice(0, 400);
   const bursts = bundle.bursts;
   const leaderboard = bundle.leaderboard;
