@@ -64,6 +64,7 @@ import {
   type PredictionPollCounts,
 } from "@/lib/feed/prediction-polls";
 import { maybeTickChatBots } from "@/lib/chat-bots/tick";
+import { computeHoleAggregates } from "@/lib/feed/hole-aggregates";
 
 export const dynamic = "force-dynamic";
 
@@ -657,6 +658,12 @@ async function handle(req: Request) {
   // because the snapshot is already loaded from the bundle.
   const fieldStats = computeFieldStats(bundle.snapshot, bundle.pars);
 
+  // Per-hole scoring aggregates for the "hole-by-hole scoring avg"
+  // chart. Computed from the full snapshot (all players' scores on
+  // every played hole) so the mean isn't biased by the feed's par-
+  // suppression. Small payload — ~4 rounds × 18 holes.
+  const holeAggregates = computeHoleAggregates(bundle.snapshot, bundle.pars);
+
   // Per-player DataGolf SG_total (strokes-gained per round). 24h
   // cache; fetches lazily on miss. Returns {} on DataGolf failure so
   // the model degrades to "no skill adjustment" rather than blowing
@@ -850,6 +857,10 @@ async function handle(req: Request) {
     /** Per-player N(mean, variance) projection of final 4-round
      *  strokes. Powers the winning-score min-of-normals model. */
     tournamentProjections,
+    /** Per-round-per-hole scoring aggregates (all players, includes
+     *  pars). Drives the hole-by-hole scoring-average chart. Server-
+     *  side because par events are suppressed from the feed. */
+    holeAggregates,
     /** Per-player model probabilities for top-5 / top-10 / top-20.
      *  Source: server-side 5K-sim Monte Carlo with fractional
      *  dead-heat counting. Same projections as the winning-score model. */

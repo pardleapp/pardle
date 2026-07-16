@@ -155,6 +155,10 @@ interface FeedResponse {
     string,
     { top5: number; top10: number; top20: number }
   >;
+  /** Per-round-per-hole scoring aggregates (all players' completed
+   *  holes, includes pars). Used by HoleScoringAverage so the mean
+   *  isn't biased by the feed's par-suppression. */
+  holeAggregates?: import("@/lib/feed/hole-aggregates").HoleAggregates;
   topFinishHistory?: Array<{
     ts: number;
     byPlayer: Record<string, { top5: number; top10: number; top20: number }>;
@@ -1119,9 +1123,14 @@ export default function FeedClient({
           from IMG score events. Only mounts when the buffer has
           score events to aggregate. Pars come off each score event
           itself, so no separate pars map required. */}
-      {data.rows.some((r) => r.event.type === "score") && (
-        <HoleScoringAverage rows={data.rows} />
-      )}
+      {(data.holeAggregates &&
+        Object.keys(data.holeAggregates).length > 0) ||
+      data.rows.some((r) => r.event.type === "score") ? (
+        <HoleScoringAverage
+          rows={data.rows}
+          aggregates={data.holeAggregates}
+        />
+      ) : null}
 
       {/* Filter row — Hot / All / (Mine).
           Hot is the default landing: notable moments (birdies, close

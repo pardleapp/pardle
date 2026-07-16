@@ -23,9 +23,14 @@
 
 import { useMemo, useState } from "react";
 import type { FeedRow } from "@/lib/feed/types";
+import type { HoleAggregates } from "@/lib/feed/hole-aggregates";
 
 interface Props {
   rows: FeedRow[];
+  /** Server-computed per-round-per-hole aggregates over the full
+   *  snapshot (pars included). Prefer this when available so the
+   *  chart's mean isn't biased by the feed's par-suppression. */
+  aggregates?: HoleAggregates;
   /** Optional total-yards + par-map cache so we can render "par 4 · 424 yds"
    *  under each hole. When absent we skip the extra sub-line. */
   pars?: Record<number, Record<number, number>>; // round → hole → par
@@ -139,9 +144,70 @@ function aggregateByHole(
   return map;
 }
 
-export default function HoleScoringAverage({ rows, pars, yards }: Props) {
-  // Rounds present in the current data.
+/** Fold server-computed per-round aggregates into the flat map the
+ *  render loop expects. Merges across rounds when the user picks
+ *  the "all" scope. */
+function aggregateFromServer(
+  server: HoleAggregates,
+  round: number | "all",
+): Map<number, HoleAgg> {
+  const out = new Map<number, HoleAgg>();
+  const rounds =
+    round === "all"
+      ? Object.keys(server).map((r) => Number(r))
+      : [round];
+  for (const r of rounds) {
+    const byHole = server[r];
+    if (!byHole) continue;
+    for (const [holeStr, src] of Object.entries(byHole)) {
+      const hole = Number(holeStr);
+      let cur = out.get(hole);
+      if (!cur) {
+        cur = {
+          hole,
+          par: src.par,
+          sumStrokes: 0,
+          count: 0,
+          dist: emptyDist(),
+          lowest: Infinity,
+          highest: -Infinity,
+        };
+        out.set(hole, cur);
+      }
+      cur.sumStrokes += src.sumStrokes;
+      cur.count += src.count;
+      if (src.lowest < cur.lowest) cur.lowest = src.lowest;
+      if (src.highest > cur.highest) cur.highest = src.highest;
+      cur.dist.albatross += src.dist.albatross;
+      cur.dist.eagle += src.dist.eagle;
+      cur.dist.birdie += src.dist.birdie;
+      cur.dist.par += src.dist.par;
+      cur.dist.bogey += src.dist.bogey;
+      cur.dist.double += src.dist.double;
+      cur.dist.triplePlus += src.dist.triplePlus;
+      cur.dist.ace += src.dist.ace;
+    }
+  }
+  return out;
+}
+
+export default function HoleScoringAverage({
+  rows,
+  aggregates,
+  pars,
+  yards,
+}: Props) {
+  // Rounds present in the current data. When the server aggregates
+  // are available, drive the tabs off them (they include every
+  // played round for every player); otherwise fall back to scanning
+  // the event stream.
   const roundsPresent = useMemo(() => {
+    if (aggregates) {
+      return Object.keys(aggregates)
+        .map((r) => Number(r))
+        .filter((r) => Number.isFinite(r))
+        .sort((a, b) => a - b);
+    }
     const s = new Set<number>();
     for (const r of rows) {
       if (r.event.type === "score" && typeof r.event.round === "number") {
@@ -149,17 +215,23 @@ export default function HoleScoringAverage({ rows, pars, yards }: Props) {
       }
     }
     return [...s].sort((a, b) => a - b);
-  }, [rows]);
+  }, [rows, aggregates]);
 
   const [round, setRound] = useState<number | "all" | null>(null);
   const [hoveredHole, setHoveredHole] = useState<number | null>(null);
   const effectiveRound: number | "all" =
     round ?? roundsPresent[roundsPresent.length - 1] ?? "all";
 
-  const agg = useMemo(
-    () => aggregateByHole(rows, effectiveRound),
-    [rows, effectiveRound],
-  );
+  // Aggregate source: server if present (correct — includes pars),
+  // else fall back to the event-only aggregator (biased, but keeps
+  // the chart working during rollout / for cached responses that
+  // predate this field).
+  const agg = useMemo(() => {
+    if (aggregates) {
+      return aggregateFromServer(aggregates, effectiveRound);
+    }
+    return aggregateByHole(rows, effectiveRound);
+  }, [rows, aggregates, effectiveRound]);
 
   // 18 slots, always. Missing holes render as zero-height bars.
   const holes = Array.from({ length: 18 }, (_, i) => i + 1);
