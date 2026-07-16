@@ -824,7 +824,11 @@ function ChartCallout({
   lineColor: string;
 }) {
   const titleText = isRound
-    ? `Hole ${activeRaw.holesPlayed ?? activeXVal}`
+    ? (activeRaw.label
+        ?? (typeof activeRaw.holesPlayed === "number" &&
+              Number.isInteger(activeRaw.holesPlayed)
+          ? `Hole ${activeRaw.holesPlayed}`
+          : `Hole ${activeXVal}`))
     : new Date(activeRaw.t).toLocaleString(undefined, {
         weekday: "short",
         hour: "2-digit",
