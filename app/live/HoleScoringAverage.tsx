@@ -260,7 +260,12 @@ export default function HoleScoringAverage({
     ...values.map((v) => Math.abs(v.avgVsPar)),
   );
 
-  // Front + back nine + total aggregates.
+  // Front + back nine + total aggregates. TV-broadcast convention:
+  // the numbers shown are CUMULATIVE strokes-vs-par across the nine
+  // (or the round). So we sum each hole's field-average deviation
+  // rather than averaging them per player-hole. Field playing the
+  // front 9 at −1.2 means the average player scores 34.8 on a par 36
+  // front 9. Holes with no players yet contribute 0 (par).
   const totals = useMemo(() => {
     let sumF = 0;
     let cntF = 0;
@@ -269,18 +274,20 @@ export default function HoleScoringAverage({
     for (const v of values) {
       if (v.count === 0) continue;
       if (v.hole <= 9) {
-        sumF += v.avgVsPar * v.count;
-        cntF += v.count;
+        sumF += v.avgVsPar;
+        cntF += 1;
       } else {
-        sumB += v.avgVsPar * v.count;
-        cntB += v.count;
+        sumB += v.avgVsPar;
+        cntB += 1;
       }
     }
-    const avgF = cntF > 0 ? sumF / cntF : 0;
-    const avgB = cntB > 0 ? sumB / cntB : 0;
-    const avgT =
-      cntF + cntB > 0 ? (sumF + sumB) / (cntF + cntB) : 0;
-    return { avgF, avgB, avgT, hasF: cntF > 0, hasB: cntB > 0 };
+    return {
+      avgF: sumF,
+      avgB: sumB,
+      avgT: sumF + sumB,
+      hasF: cntF > 0,
+      hasB: cntB > 0,
+    };
   }, [values]);
 
   const showRoundTabs = roundsPresent.length > 1;
@@ -363,7 +370,8 @@ export default function HoleScoringAverage({
               }
               tabIndex={0}
             >
-              {/* Bar cell — top half for negative (easier), bottom for positive (harder). */}
+              {/* Bar cell — top half for positive (harder / over par),
+                  bottom half for negative (easier / under par). */}
               <div className="hsa-bar-cell">
                 <div className="hsa-baseline" aria-hidden="true" />
                 {v.count > 0 && (
@@ -371,15 +379,15 @@ export default function HoleScoringAverage({
                     <div
                       className={`hsa-bar ${isHard ? "hsa-bar-hard" : "hsa-bar-easy"}`}
                       style={{
-                        [isHard ? "top" : "bottom"]: "50%",
+                        [isHard ? "bottom" : "top"]: "50%",
                         height: `${heightPct / 2}%`,
                       }}
                     />
                     <div
                       className={`hsa-bar-lbl ${isHard ? "hsa-bar-lbl-hard" : "hsa-bar-lbl-easy"}`}
                       style={{
-                        [isHard ? "top" : "bottom"]:
-                          `calc(50% ${isHard ? "+" : "+"} ${heightPct / 2 + 2}%)`,
+                        [isHard ? "bottom" : "top"]:
+                          `calc(50% + ${heightPct / 2 + 2}%)`,
                       }}
                     >
                       {formatToPar(v.avgVsPar)}
