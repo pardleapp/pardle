@@ -156,12 +156,11 @@ interface CourseTrend {
   recentCount: number;
 }
 
-/** Anti-noise thresholds. Delta needs to be at least 0.20
- *  strokes/hole AND we need at least 25 recent events before we're
- *  willing to say the course has changed. Both are easily tuned. */
-const TREND_RECENT_TARGET = 50;
-const TREND_MIN_RECENT_FOR_SIGNAL = 25;
-const TREND_MIN_DELTA = 0.2;
+/** Delta needs at least 0.15 strokes/hole between the newer and
+ *  older halves, and each half needs at least 8 score events so
+ *  a couple of birdies don't move the chip. */
+const TREND_MIN_HALF_COUNT = 8;
+const TREND_MIN_DELTA = 0.15;
 
 function computeCourseTrend(
   rows: FeedRow[],
@@ -179,17 +178,25 @@ function computeCourseTrend(
   if (scoreEvents.length === 0) {
     return { delta: 0, hasSignal: false, recentCount: 0 };
   }
-  // Sort newest-first, slice the tail we care about.
+  // Split newest-half vs older-half. Comparing "newest 50 vs all"
+  // (previous approach) collapses to a zero delta when we have <50
+  // score events in the feed window, which is the common case for
+  // a live viewer. Split-half is signal-preserving at small N.
   scoreEvents.sort((a, b) => b.ts - a.ts);
-  const recent = scoreEvents.slice(0, TREND_RECENT_TARGET);
+  const midpoint = Math.floor(scoreEvents.length / 2);
+  const recent = scoreEvents.slice(0, midpoint);
+  const older = scoreEvents.slice(midpoint);
+  if (
+    recent.length < TREND_MIN_HALF_COUNT ||
+    older.length < TREND_MIN_HALF_COUNT
+  ) {
+    return { delta: 0, hasSignal: false, recentCount: recent.length };
+  }
   const recentMean =
     recent.reduce((a, s) => a + s.diff, 0) / recent.length;
-  const baselineMean =
-    scoreEvents.reduce((a, s) => a + s.diff, 0) / scoreEvents.length;
-  const delta = recentMean - baselineMean;
-  const hasSignal =
-    recent.length >= TREND_MIN_RECENT_FOR_SIGNAL &&
-    Math.abs(delta) >= TREND_MIN_DELTA;
+  const olderMean = older.reduce((a, s) => a + s.diff, 0) / older.length;
+  const delta = recentMean - olderMean;
+  const hasSignal = Math.abs(delta) >= TREND_MIN_DELTA;
   return { delta, hasSignal, recentCount: recent.length };
 }
 
