@@ -202,8 +202,11 @@ function ChartCore({
     }
     const xs = points.map((p) => p.x);
     const ys = points.map((p) => p.y);
-    const xMin = Math.min(...xs);
-    const xMax = Math.max(...xs);
+    // Small x-padding so the extreme tee times don't sit right on the
+    // axis and get half-clipped by the chart edge.
+    const xPad = Math.max(15, (Math.max(...xs) - Math.min(...xs)) * 0.03);
+    const xMin = Math.min(...xs) - xPad;
+    const xMax = Math.max(...xs) + xPad;
     const yPad = 0.5;
     const yRaw = Math.max(Math.abs(Math.min(...ys)), Math.abs(Math.max(...ys)));
     const yBound = yRaw + yPad;
@@ -211,14 +214,14 @@ function ChartCore({
   }, [points]);
 
   const [viewport, setViewport] = useState<Viewport>(extent);
+  // Track whether the user has manually zoomed / panned. When they
+  // haven't, we keep the viewport locked to the data extent so
+  // newly-finished players always fit on screen automatically.
+  const hasUserZoomedRef = useRef(false);
   useEffect(() => {
-    setViewport((prev) => {
-      const looksLikeReset =
-        Math.abs(prev.xMin - prev.xMax) < 1 ||
-        (Math.abs(prev.xMin) < 1 && Math.abs(prev.xMax) < 1);
-      if (looksLikeReset) return extent;
-      return prev;
-    });
+    if (!hasUserZoomedRef.current) {
+      setViewport(extent);
+    }
   }, [extent]);
 
   const xFor = useCallback(
@@ -389,6 +392,12 @@ function ChartCore({
       const o = dragOriginRef.current;
       const dxPx = p.x - o.pointerX;
       const dyPx = p.y - o.pointerY;
+      // Any meaningful drag counts as user zoom / pan — skip the
+      // "we haven't moved" no-op to keep auto-fit alive until the
+      // user actually shifts the chart.
+      if (Math.abs(dxPx) + Math.abs(dyPx) > 4) {
+        hasUserZoomedRef.current = true;
+      }
       const dxData = -(dxPx / iw) * (o.viewport.xMax - o.viewport.xMin);
       const dyData = (dyPx / ih) * (o.viewport.yMax - o.viewport.yMin);
       setViewport(
@@ -400,6 +409,7 @@ function ChartCore({
         }),
       );
     } else if (pts.length === 2 && pinchOriginRef.current) {
+      hasUserZoomedRef.current = true;
       const o = pinchOriginRef.current;
       const dxNow = pts[0].x - pts[1].x;
       const dyNow = pts[0].y - pts[1].y;
@@ -434,6 +444,7 @@ function ChartCore({
 
   const onWheel = (e: ReactWheelEvent<SVGSVGElement>) => {
     e.preventDefault();
+    hasUserZoomedRef.current = true;
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
@@ -453,6 +464,7 @@ function ChartCore({
   };
 
   const zoomBy = (factor: number) => {
+    hasUserZoomedRef.current = true;
     const cx = (viewport.xMin + viewport.xMax) / 2;
     const cy = (viewport.yMin + viewport.yMax) / 2;
     const newXSpan = (viewport.xMax - viewport.xMin) * factor;
@@ -465,6 +477,11 @@ function ChartCore({
         yMax: cy + newYSpan / 2,
       }),
     );
+  };
+
+  const resetZoom = () => {
+    hasUserZoomedRef.current = false;
+    setViewport(extent);
   };
 
   const isZoomed =
@@ -519,7 +536,7 @@ function ChartCore({
         </button>
         <button
           type="button"
-          onClick={() => setViewport(extent)}
+          onClick={resetZoom}
           style={{
             ...btnStyle,
             opacity: isZoomed ? 1 : 0.4,
