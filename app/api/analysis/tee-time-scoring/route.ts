@@ -75,6 +75,11 @@ interface OutRow {
   adjusted: number; // toPar + sgTotal
   thru: string | number;
   startHole: number;
+  /** True when the player has no DG skill rating (amateur, qualifier,
+   *  minor-tour). Their sgTotal defaults to 0 so their raw R1 score
+   *  IS their adjusted score. The chart draws them as outlined dots
+   *  so the visual distinguishes "skill-adjusted" from "raw score". */
+  noSkill: boolean;
 }
 
 /** Parse DataGolf tee times to minutes-since-midnight. Handles:
@@ -158,20 +163,14 @@ export async function GET() {
         noField++;
         continue;
       }
-      if (!s) {
-        noSkill++;
-        continue;
-      }
       const r1 = r1Teetime(f);
       const mins = teeToMinutes(r1?.teetime);
       if (mins == null) {
         noTeeTime++;
         continue;
       }
-      // Only include players who have COMPLETED R1. DataGolf's
-      // `thru` field arrives as multiple shapes — 18 (number),
-      // "18" (string), "F" / "F*" (letter). Accept anything that
-      // parses to 18 as a number OR starts with F.
+      // Only include players who have COMPLETED R1. Accept 18 / "18"
+      // (either number or string) or "F" / "F*" letter forms.
       const thruNum =
         typeof l.thru === "number"
           ? l.thru
@@ -184,29 +183,32 @@ export async function GET() {
       if (!thruDone) {
         continue;
       }
-      // DataGolf's live-tournament-stats reuses the `round` field for
-      // "score in that round". Pull whichever number is populated.
       const r1Score =
         typeof l.round === "number" ? l.round : undefined;
       if (typeof r1Score !== "number") {
         noScore++;
         continue;
       }
-      if (typeof s.sg_total !== "number") {
-        noSgTotal++;
-        continue;
-      }
+
+      // Skill missing? Default to tour-average (0) and flag the row.
+      // The chart draws these with an outlined circle instead of a
+      // filled one so the visual distinguishes skill-adjusted from
+      // raw. Amateurs / qualifiers hit this branch.
+      const hasSkill = !!s && typeof s.sg_total === "number";
+      const sgTotal = hasSkill ? (s.sg_total as number) : 0;
+      if (!hasSkill) noSkill++;
 
       rows.push({
         dgId: String(l.dg_id),
         name: l.player_name,
         teeTime: minutesToClock(mins),
         teeMinutes: mins,
-        sgTotal: s.sg_total,
+        sgTotal,
         toPar: r1Score,
-        adjusted: r1Score + s.sg_total,
+        adjusted: r1Score + sgTotal,
         thru: l.thru ?? "-",
         startHole: r1?.start_hole ?? 1,
+        noSkill: !hasSkill,
       });
     }
     rows.sort((a, b) => a.teeMinutes - b.teeMinutes);

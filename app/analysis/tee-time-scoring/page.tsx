@@ -13,6 +13,7 @@ export interface Row {
   adjusted: number;
   thru: string | number;
   startHole: number;
+  noSkill?: boolean;
 }
 
 interface FetchResp {
