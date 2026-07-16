@@ -24,6 +24,7 @@
 import { useMemo, useState } from "react";
 import type { FeedRow } from "@/lib/feed/types";
 import type { HoleAggregates } from "@/lib/feed/hole-aggregates";
+import type { CourseTrend as ServerCourseTrend } from "@/lib/feed/course-trend";
 
 interface Props {
   rows: FeedRow[];
@@ -31,6 +32,11 @@ interface Props {
    *  snapshot (pars included). Prefer this when available so the
    *  chart's mean isn't biased by the feed's par-suppression. */
   aggregates?: HoleAggregates;
+  /** Server-computed course-trend chip signal. Wider window than
+   *  the client can see (full 1000-event buffer vs the ~80-event
+   *  slice we get in `rows`), so the trend actually catches real
+   *  shifts. */
+  trend?: ServerCourseTrend;
   /** Optional total-yards + par-map cache so we can render "par 4 · 424 yds"
    *  under each hole. When absent we skip the extra sub-line. */
   pars?: Record<number, Record<number, number>>; // round → hole → par
@@ -250,6 +256,7 @@ function aggregateFromServer(
 export default function HoleScoringAverage({
   rows,
   aggregates,
+  trend: serverTrend,
   pars,
   yards,
 }: Props) {
@@ -323,9 +330,18 @@ export default function HoleScoringAverage({
   // "recent" and "baseline" are computed over non-par events only —
   // that bias cancels out in the delta, giving an honest read on
   // whether the field's scoring has shifted lately.
+  // Prefer server-computed trend (full 1000-event buffer). Fall back
+  // to client-side for older API responses that predate the field.
   const trend = useMemo(() => {
+    if (serverTrend) {
+      return {
+        delta: serverTrend.delta,
+        hasSignal: serverTrend.hasSignal,
+        recentCount: serverTrend.recentCount,
+      };
+    }
     return computeCourseTrend(rows, effectiveRound);
-  }, [rows, effectiveRound]);
+  }, [serverTrend, rows, effectiveRound]);
 
   // Front + back nine + total aggregates. TV-broadcast convention:
   // the numbers shown are CUMULATIVE strokes-vs-par across the nine

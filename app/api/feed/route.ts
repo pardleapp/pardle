@@ -65,6 +65,7 @@ import {
 } from "@/lib/feed/prediction-polls";
 import { maybeTickChatBots } from "@/lib/chat-bots/tick";
 import { computeHoleAggregates } from "@/lib/feed/hole-aggregates";
+import { computeCourseTrend } from "@/lib/feed/course-trend";
 
 export const dynamic = "force-dynamic";
 
@@ -685,6 +686,16 @@ async function handle(req: Request) {
   // suppression. Small payload — ~4 rounds × 18 holes.
   const holeAggregates = computeHoleAggregates(bundle.snapshot, bundle.pars);
 
+  // Course-trend chip signal — computed here so we can use the FULL
+  // event buffer (~1000 events, ~10-30 min of activity) instead of
+  // the ~80-event window the client sees. Target round = the most
+  // recent round any player is in.
+  const trendRounds = Object.keys(holeAggregates)
+    .map((r) => Number(r))
+    .filter((r) => Number.isFinite(r));
+  const trendRound = trendRounds.length ? Math.max(...trendRounds) : null;
+  const courseTrend = computeCourseTrend(allEvents, trendRound);
+
   // Per-player DataGolf SG_total (strokes-gained per round). 24h
   // cache; fetches lazily on miss. Returns {} on DataGolf failure so
   // the model degrades to "no skill adjustment" rather than blowing
@@ -882,6 +893,10 @@ async function handle(req: Request) {
      *  pars). Drives the hole-by-hole scoring-average chart. Server-
      *  side because par events are suppressed from the feed. */
     holeAggregates,
+    /** Course-trend chip signal (newer half vs older half of the
+     *  full event buffer). Server-side so the trend covers ~10-30
+     *  min of play, not the 1-2 min the client's row window spans. */
+    courseTrend,
     /** Per-player model probabilities for top-5 / top-10 / top-20.
      *  Source: server-side 5K-sim Monte Carlo with fractional
      *  dead-heat counting. Same projections as the winning-score model. */

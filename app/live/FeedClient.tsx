@@ -159,6 +159,9 @@ interface FeedResponse {
    *  holes, includes pars). Used by HoleScoringAverage so the mean
    *  isn't biased by the feed's par-suppression. */
   holeAggregates?: import("@/lib/feed/hole-aggregates").HoleAggregates;
+  /** Course-trend chip signal — computed server-side over the full
+   *  event buffer so the window is wide enough to show real shifts. */
+  courseTrend?: import("@/lib/feed/course-trend").CourseTrend;
   topFinishHistory?: Array<{
     ts: number;
     byPlayer: Record<string, { top5: number; top10: number; top20: number }>;
@@ -1129,6 +1132,7 @@ export default function FeedClient({
         <HoleScoringAverage
           rows={data.rows}
           aggregates={data.holeAggregates}
+          trend={data.courseTrend}
         />
       ) : null}
 
