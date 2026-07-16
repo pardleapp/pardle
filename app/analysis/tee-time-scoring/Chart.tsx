@@ -122,7 +122,12 @@ export default function Chart({ rows }: ChartProps) {
               width: "100%",
               maxWidth: 1400,
               maxHeight: "94vh",
-              overflow: "auto",
+              // Only allow vertical scroll — horizontal scroll made
+              // the whole chart shift right of the viewport instead
+              // of fitting to width.
+              overflowX: "hidden",
+              overflowY: "auto",
+              boxSizing: "border-box",
             }}
           >
             <button
@@ -577,15 +582,22 @@ function ChartCore({
 
       <svg
         ref={svgRef}
-        width={width}
-        height={height}
+        // No fixed width/height attributes — viewBox handles the aspect
+        // ratio, and CSS width:100% makes the SVG shrink to fit whatever
+        // container it lands in (small chart, expanded modal, phone in
+        // landscape, etc). Prevents the horizontal scroll people were
+        // seeing when the fixed 1280px expanded width exceeded the
+        // viewport.
         viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
         style={{
           background: "white",
           border: "1px solid oklch(0.9 0.008 95)",
           borderRadius: 8,
-          maxWidth: "100%",
+          width: "100%",
           height: "auto",
+          maxHeight: expanded ? "80vh" : undefined,
+          display: "block",
           touchAction: "none",
           cursor: dragOriginRef.current ? "grabbing" : "crosshair",
         }}
