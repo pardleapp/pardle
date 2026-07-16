@@ -1291,22 +1291,12 @@ function appendShotSamples(
   holeStats: Record<number, FieldHoleStat> | null,
   skillPerHole: number | null,
 ): void {
-  // Which holes have already been reflected in `strokesPlayedTotal` /
-  // series samples? Anything on a completed hole is done — a shot
-  // that lands after the hole score event is redundant, skip.
-  const completedHoles = new Set<number>();
-  for (const r of feedEvents) {
-    const ev = r.event;
-    if (
-      ev.type === "score" &&
-      ev.playerId === playerId &&
-      ev.round === round &&
-      typeof ev.hole === "number"
-    ) {
-      completedHoles.add(ev.hole);
-    }
-  }
-  // Chronologically-ordered IMG shot events on holes still in flight.
+  // Every IMG shot event for this (player, round), regardless of
+  // whether the hole has since completed. Historical shot samples
+  // represent real mid-play predictions the model made and belong
+  // on the chart timeline between hole-completion ticks. Their
+  // fractional `holesPlayed` positions them between the surrounding
+  // integer hole ticks.
   const shotEvents = feedEvents
     .filter((r) => {
       const ev = r.event;
@@ -1314,46 +1304,10 @@ function appendShotSamples(
         ev.type === "shot" &&
         ev.playerId === playerId &&
         ev.round === round &&
-        typeof ev.hole === "number" &&
-        !completedHoles.has(ev.hole)
+        typeof ev.hole === "number"
       );
     })
     .sort((a, b) => a.event.ts - b.event.ts);
-  // Diagnostic — temporary, remove once shot-aware chart is
-  // confirmed working live. Shows in browser devtools.
-  if (typeof console !== "undefined") {
-    const allShotsForPlayer = feedEvents.filter(
-      (r) =>
-        r.event.type === "shot" &&
-        r.event.playerId === playerId &&
-        r.event.round === round,
-    );
-    const allShotsAnyone = feedEvents.filter((r) => r.event.type === "shot");
-    const imgSourcedShots = feedEvents.filter(
-      (r) =>
-        r.event.type === "shot" &&
-        (r.event as { imgSourced?: boolean }).imgSourced === true,
-    );
-    const uniqueShotPlayers = new Set(
-      allShotsAnyone.map(
-        (r) =>
-          (r.event as { playerName?: string }).playerName ?? r.event.playerId,
-      ),
-    );
-    console.log("[bet-chart:shot-samples]", {
-      playerId,
-      round,
-      totalRows: feedEvents.length,
-      totalShotEventsInFeed: allShotsAnyone.length,
-      imgSourcedShotsInFeed: imgSourcedShots.length,
-      distinctShotPlayers: [...uniqueShotPlayers].slice(0, 10),
-      allShotsForPlayerRound: allShotsForPlayer.length,
-      allShotsHoles: allShotsForPlayer.map((r) => r.event.hole),
-      completedHoles: [...completedHoles],
-      afterCompletedFilter: shotEvents.length,
-      shotHoles: shotEvents.map((r) => r.event.hole),
-    });
-  }
   if (shotEvents.length === 0) return;
 
   // The projection uses roundPar + holePars where available. Both
@@ -1389,9 +1343,11 @@ function appendShotSamples(
     snapHolesRemaining = remainingHoleEntries.length;
   }
 
-  let pushed = 0;
-  let noCurrentHole = 0;
   for (const r of shotEvents) {
+    const ev = r.event as {
+      hole?: number;
+      imgShotNum?: number;
+    };
     const upTo = feedEvents.filter((row) => row.event.ts <= r.event.ts);
     // Type-widen upTo to the FeedRow shape projectRoundTotal expects.
     // reconstructHistory takes FeedRowLike; at runtime these carry the
@@ -1405,34 +1361,37 @@ function appendShotSamples(
       snapExpectedRemaining,
       snapHolesRemaining,
     });
-    if (!projection.currentHole) {
-      noCurrentHole++;
-      continue;
-    }
+    if (!projection.currentHole) continue;
     const prob = roundScoreProb({
       projection,
       line: bet.line,
       side: bet.side,
     });
-    // Deduplicate against the tail sample so a shot arriving in the
-    // same second as its parent score event doesn't produce a
-    // near-zero-width chart spike.
+    // Fractional holesPlayed places the shot sample between the
+    // surrounding hole-completion ticks. Shot N on hole H → position
+    // is (H − 1) + min(0.85, N × 0.15). Capping at 0.85 means shot
+    // samples never overrun the hole's own completion tick.
+    const holeNum = ev.hole ?? 0;
+    const shotNum = typeof ev.imgShotNum === "number" ? ev.imgShotNum : 1;
+    const holesPlayed = holeNum - 1 + Math.min(0.85, shotNum * 0.15);
+    // Deduplicate: skip when the previous sample is at (nearly) the
+    // same x-position AND (nearly) the same prob. Prevents burst-
+    // publishing a shot event moments after a hole score event from
+    // producing a zero-width spike.
     const last = series[series.length - 1];
-    if (last && Math.abs(r.event.ts - last.t) < 500 && Math.abs(prob - (last.prob ?? 0)) < 0.005) {
+    if (
+      last &&
+      typeof last.holesPlayed === "number" &&
+      Math.abs(holesPlayed - last.holesPlayed) < 0.02 &&
+      Math.abs(prob - (last.prob ?? 0)) < 0.005
+    ) {
       continue;
     }
     series.push({
       t: r.event.ts,
       v: anchoredValue(prob, probAtP, bet.stake, bet.oddsTaken),
+      holesPlayed,
       prob,
-    });
-    pushed++;
-  }
-  if (typeof console !== "undefined") {
-    console.log("[bet-chart:shot-samples-result]", {
-      shotsEvaluated: shotEvents.length,
-      noCurrentHole,
-      pushed,
     });
   }
   // Prevent silencing the unused-param lint for strokesPlayedTotal —
@@ -1826,5 +1785,14 @@ export function reconstructHistory(
       };
     }
   }
+  // Sort by holesPlayed so shot samples fall between their surrounding
+  // hole-completion ticks. Without this the chart line would zig-zag
+  // when shot samples land in the array chronologically-by-ts (which
+  // ordering doesn't guarantee holesPlayed-monotonic).
+  series.sort((a, b) => {
+    const aH = a.holesPlayed ?? Infinity;
+    const bH = b.holesPlayed ?? Infinity;
+    return aH - bH;
+  });
   return series;
 }
