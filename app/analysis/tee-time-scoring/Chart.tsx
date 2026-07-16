@@ -26,7 +26,7 @@ interface ChartProps {
   rows: Row[];
 }
 
-/** Gaussian-weighted rolling mean (double pass) for a smooth trend line. */
+/** Gaussian-weighted rolling mean (double pass). */
 function rollingSmooth(
   points: Array<{ x: number; y: number }>,
   bandwidthMins: number,
@@ -53,6 +53,102 @@ function rollingSmooth(
   return gaussPass(gaussPass(sorted, bandwidthMins), bandwidthMins * 0.5);
 }
 
+/** Interpolate the smoothed line at an arbitrary x. */
+function interpolate(
+  smooth: Array<{ x: number; y: number }>,
+  x: number,
+): number | null {
+  if (smooth.length === 0) return null;
+  if (x <= smooth[0].x) return smooth[0].y;
+  if (x >= smooth[smooth.length - 1].x) return smooth[smooth.length - 1].y;
+  for (let i = 1; i < smooth.length; i++) {
+    if (smooth[i].x >= x) {
+      const a = smooth[i - 1];
+      const b = smooth[i];
+      const t = (x - a.x) / Math.max(0.001, b.x - a.x);
+      return a.y + (b.y - a.y) * t;
+    }
+  }
+  return null;
+}
+
+export default function Chart({ rows }: ChartProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setExpanded(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [expanded]);
+
+  return (
+    <>
+      <ChartCore
+        rows={rows}
+        expanded={false}
+        onExpand={() => setExpanded(true)}
+      />
+      {expanded && (
+        <div
+          onClick={() => setExpanded(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Expanded scoring chart"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.72)",
+            zIndex: 100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "16px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "white",
+              borderRadius: 10,
+              padding: 16,
+              width: "100%",
+              maxWidth: 1400,
+              maxHeight: "94vh",
+              overflow: "auto",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              style={{
+                float: "right",
+                border: "1px solid oklch(0.85 0.013 95)",
+                borderRadius: 6,
+                padding: "6px 12px",
+                fontSize: 13,
+                fontWeight: 700,
+                background: "white",
+                cursor: "pointer",
+              }}
+            >
+              Close ✕
+            </button>
+            <ChartCore rows={rows} expanded={true} onExpand={null} />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 interface Viewport {
   xMin: number;
   xMax: number;
@@ -60,18 +156,30 @@ interface Viewport {
   yMax: number;
 }
 
-const MIN_X_SPAN = 15; // 15-minute floor so you can't zoom past uselessness
+const MIN_X_SPAN = 15;
 const MIN_Y_SPAN = 0.5;
 const MAX_X_ZOOM_FACTOR = 8;
 const MAX_Y_ZOOM_FACTOR = 8;
 
-export default function Chart({ rows }: ChartProps) {
+function ChartCore({
+  rows,
+  expanded,
+  onExpand,
+}: {
+  rows: Row[];
+  expanded: boolean;
+  onExpand: (() => void) | null;
+}) {
   const [hover, setHover] = useState<Row | null>(null);
+  /** Cursor x in DATA space (tee-time minutes). Used to render the
+   *  vertical guide + trend-value readout. Null when not tracking. */
+  const [cursorX, setCursorX] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
-  const width = 820;
-  const height = 460;
-  const padL = 56;
+  // Dimensions scale up in expanded mode.
+  const width = expanded ? 1280 : 820;
+  const height = expanded ? 680 : 460;
+  const padL = 64;
   const padR = 20;
   const padT = 24;
   const padB = 46;
@@ -83,7 +191,6 @@ export default function Chart({ rows }: ChartProps) {
     [rows],
   );
 
-  // Data extent (used for the "reset" state + zoom clamps).
   const extent = useMemo(() => {
     if (points.length === 0) {
       return { xMin: 0, xMax: 60, yMin: -1, yMax: 1 };
@@ -99,11 +206,8 @@ export default function Chart({ rows }: ChartProps) {
   }, [points]);
 
   const [viewport, setViewport] = useState<Viewport>(extent);
-  // Whenever the data extent widens (players finish), keep the current
-  // zoom but expand the outer clamp accordingly.
   useEffect(() => {
     setViewport((prev) => {
-      // Snap-to-full when the previous viewport was the previous extent.
       const looksLikeReset =
         Math.abs(prev.xMin - prev.xMax) < 1 ||
         (Math.abs(prev.xMin) < 1 && Math.abs(prev.xMax) < 1);
@@ -144,7 +248,11 @@ export default function Chart({ rows }: ChartProps) {
     .map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(p.x)} ${yFor(p.y)}`)
     .join(" ");
 
-  // Adaptive tick spacing so ticks don't crowd when zoomed in.
+  const trendAtCursor = useMemo(() => {
+    if (cursorX == null) return null;
+    return interpolate(smooth, cursorX);
+  }, [cursorX, smooth]);
+
   const xSpan = viewport.xMax - viewport.xMin;
   const xStep =
     xSpan > 480 ? 60 : xSpan > 240 ? 30 : xSpan > 120 ? 15 : 5;
@@ -167,8 +275,7 @@ export default function Chart({ rows }: ChartProps) {
     return v > 0 ? `+${v.toFixed(1)}` : `−${Math.abs(v).toFixed(1)}`;
   };
 
-  // ── Interaction state ──────────────────────────────────────────
-  // Pointer drag pan + multi-pointer pinch zoom.
+  // ── Pointer interactions ────────────────────────────────────────
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   const dragOriginRef = useRef<{
     viewport: Viewport;
@@ -217,14 +324,17 @@ export default function Chart({ rows }: ChartProps) {
     [extent],
   );
 
-  const pointerCoords = useCallback((e: ReactPointerEvent<SVGSVGElement>) => {
-    const svg = svgRef.current;
-    if (!svg) return { x: 0, y: 0 };
-    const rect = svg.getBoundingClientRect();
-    const sx = (e.clientX - rect.left) * (width / rect.width);
-    const sy = (e.clientY - rect.top) * (height / rect.height);
-    return { x: sx, y: sy };
-  }, [width, height]);
+  const pointerCoords = useCallback(
+    (e: ReactPointerEvent<SVGSVGElement>) => {
+      const svg = svgRef.current;
+      if (!svg) return { x: 0, y: 0 };
+      const rect = svg.getBoundingClientRect();
+      const sx = (e.clientX - rect.left) * (width / rect.width);
+      const sy = (e.clientY - rect.top) * (height / rect.height);
+      return { x: sx, y: sy };
+    },
+    [width, height],
+  );
 
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
     (e.target as Element).setPointerCapture?.(e.pointerId);
@@ -252,8 +362,21 @@ export default function Chart({ rows }: ChartProps) {
   };
 
   const onPointerMove = (e: ReactPointerEvent<SVGSVGElement>) => {
-    if (!pointersRef.current.has(e.pointerId)) return;
     const p = pointerCoords(e);
+    // Always track cursor for the trend readout, whether or not
+    // we're dragging.
+    if (
+      p.x >= padL &&
+      p.x <= width - padR &&
+      p.y >= padT &&
+      p.y <= height - padB
+    ) {
+      setCursorX(dataXFor(p.x));
+    } else {
+      setCursorX(null);
+    }
+
+    if (!pointersRef.current.has(e.pointerId)) return;
     pointersRef.current.set(e.pointerId, p);
     const pts = [...pointersRef.current.values()];
 
@@ -311,13 +434,9 @@ export default function Chart({ rows }: ChartProps) {
     const rect = svg.getBoundingClientRect();
     const sx = (e.clientX - rect.left) * (width / rect.width);
     const sy = (e.clientY - rect.top) * (height / rect.height);
-    // Deltas from a trackpad are small; normalise so the same input
-    // gives similar zoom per event across devices.
     const scale = Math.exp(e.deltaY * 0.001);
     const cx = dataXFor(sx);
     const cy = dataYFor(sy);
-    const newXSpan = (viewport.xMax - viewport.xMin) * scale;
-    const newYSpan = (viewport.yMax - viewport.yMin) * scale;
     setViewport(
       clampViewport({
         xMin: cx - (cx - viewport.xMin) * scale,
@@ -326,12 +445,8 @@ export default function Chart({ rows }: ChartProps) {
         yMax: cy + (viewport.yMax - cy) * scale,
       }),
     );
-    // Silence unused warnings for locals only used for readability.
-    void newXSpan;
-    void newYSpan;
   };
 
-  // Zoom buttons — centre-scale by 1.5×.
   const zoomBy = (factor: number) => {
     const cx = (viewport.xMin + viewport.xMax) / 2;
     const cy = (viewport.yMin + viewport.yMax) / 2;
@@ -353,7 +468,6 @@ export default function Chart({ rows }: ChartProps) {
     Math.abs(viewport.yMin - extent.yMin) > 0.01 ||
     Math.abs(viewport.yMax - extent.yMax) > 0.01;
 
-  // Only render points inside the viewport (± small margin for edge cases).
   const visiblePoints = points.filter(
     (p) =>
       p.x >= viewport.xMin - 1 &&
@@ -362,13 +476,24 @@ export default function Chart({ rows }: ChartProps) {
       p.y <= viewport.yMax + 0.1,
   );
 
+  const trendColor =
+    trendAtCursor == null
+      ? "#334155"
+      : trendAtCursor < -0.3
+        ? "#059669"
+        : trendAtCursor > 0.3
+          ? "#dc2626"
+          : "#334155";
+
   return (
     <div style={{ marginTop: 12 }}>
       <div
         style={{
           display: "flex",
           gap: 6,
+          alignItems: "center",
           marginBottom: 8,
+          flexWrap: "wrap",
         }}
       >
         <button
@@ -400,17 +525,56 @@ export default function Chart({ rows }: ChartProps) {
         >
           Reset
         </button>
+        {onExpand && (
+          <button
+            type="button"
+            onClick={onExpand}
+            style={btnStyle}
+            aria-label="Expand chart"
+          >
+            ⛶ Expand
+          </button>
+        )}
         <span
           style={{
             fontSize: 11,
             color: "oklch(0.55 0.02 150)",
-            alignSelf: "center",
             marginLeft: 8,
           }}
         >
-          Drag to pan · scroll to zoom · pinch on mobile
+          Drag · scroll · pinch to zoom
         </span>
       </div>
+
+      {/* Trend readout — shows the smoothed-line value under cursor */}
+      <div
+        style={{
+          display: "flex",
+          gap: 20,
+          alignItems: "baseline",
+          fontSize: 13,
+          marginBottom: 6,
+          minHeight: 22,
+        }}
+      >
+        <span style={{ color: "oklch(0.5 0.02 150)" }}>
+          Trend average at{" "}
+          <strong style={{ fontFamily: "var(--font-mono, monospace)" }}>
+            {cursorX != null ? formatClock(cursorX) : "—"}
+          </strong>
+        </span>
+        <span
+          style={{
+            fontFamily: "var(--font-mono, monospace)",
+            fontWeight: 800,
+            fontSize: 16,
+            color: trendColor,
+          }}
+        >
+          {trendAtCursor != null ? formatSigned(trendAtCursor) : "—"}
+        </span>
+      </div>
+
       <svg
         ref={svgRef}
         width={width}
@@ -423,23 +587,24 @@ export default function Chart({ rows }: ChartProps) {
           maxWidth: "100%",
           height: "auto",
           touchAction: "none",
-          cursor: dragOriginRef.current ? "grabbing" : "grab",
+          cursor: dragOriginRef.current ? "grabbing" : "crosshair",
         }}
-        onMouseLeave={() => setHover(null)}
+        onMouseLeave={() => {
+          setHover(null);
+          setCursorX(null);
+        }}
         onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
-        {/* Clip the chart interior so panned points don't spill onto axes. */}
         <defs>
           <clipPath id="chart-clip">
             <rect x={padL} y={padT} width={iw} height={ih} />
           </clipPath>
         </defs>
 
-        {/* y-axis grid + labels */}
         {yTicks.map((y) => (
           <g key={y}>
             <line
@@ -488,9 +653,9 @@ export default function Chart({ rows }: ChartProps) {
         ))}
 
         <text
-          x={12}
+          x={16}
           y={padT + ih / 2}
-          transform={`rotate(-90 12 ${padT + ih / 2})`}
+          transform={`rotate(-90 16 ${padT + ih / 2})`}
           textAnchor="middle"
           fontSize={11}
           fill="#64748b"
@@ -513,7 +678,7 @@ export default function Chart({ rows }: ChartProps) {
             fill="none"
             stroke="#0284c7"
             strokeWidth={2.5}
-            opacity={0.7}
+            opacity={0.75}
           />
 
           {visiblePoints.map((p) => {
@@ -535,6 +700,31 @@ export default function Chart({ rows }: ChartProps) {
               />
             );
           })}
+
+          {/* Cursor guideline + trend dot */}
+          {cursorX != null && trendAtCursor != null && (
+            <>
+              <line
+                x1={xFor(cursorX)}
+                x2={xFor(cursorX)}
+                y1={padT}
+                y2={height - padB}
+                stroke="#94a3b8"
+                strokeWidth={1}
+                strokeDasharray="4 4"
+                pointerEvents="none"
+              />
+              <circle
+                cx={xFor(cursorX)}
+                cy={yFor(trendAtCursor)}
+                r={5}
+                fill={trendColor}
+                stroke="white"
+                strokeWidth={2}
+                pointerEvents="none"
+              />
+            </>
+          )}
         </g>
       </svg>
 
@@ -601,9 +791,9 @@ export default function Chart({ rows }: ChartProps) {
           marginTop: 10,
         }}
       >
-        Adjusted = R1 to-par + SG total. Positive = under-performed skill
-        (course was harder than expected for that player), negative =
-        outperformed. Blue line: Gaussian-smoothed trend across tee times.
+        Adjusted = R1 to-par + SG total. Positive = under-performed skill,
+        negative = outperformed. Blue line: Gaussian-smoothed trend across
+        tee times.
       </p>
     </div>
   );
