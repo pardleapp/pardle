@@ -380,8 +380,15 @@ function ChartInner({
     if (isRound) {
       const ho = holeOutcomeAt(i);
       if (ho) return ho.label;
-      const h = history[i]?.holesPlayed;
-      return h != null ? `H${h}` : `#${i + 1}`;
+      const s = history[i];
+      if (s?.label) return s.label;
+      const h = s?.holesPlayed;
+      // Only show H{n} for INTEGER holesPlayed (hole-completion
+      // samples). Fractional values are shot samples that fell
+      // through without a label — render as generic index rather
+      // than the confusing "H13.6".
+      if (typeof h === "number" && Number.isInteger(h)) return `H${h}`;
+      return `#${i + 1}`;
     }
     const ev = nearbyEventAt(i, direction);
     if (ev) return ev.label;
@@ -400,8 +407,11 @@ function ChartInner({
         const verbShort = ho.label.split(" on ")[0];
         return `${verbShort.toUpperCase()} · ${ho.hole}`;
       }
-      const h = history[i]?.holesPlayed;
-      return h != null ? `H${h}` : `#${i + 1}`;
+      const s = history[i];
+      if (s?.label) return s.label.toUpperCase();
+      const h = s?.holesPlayed;
+      if (typeof h === "number" && Number.isInteger(h)) return `H${h}`;
+      return `#${i + 1}`;
     }
     const ev = nearbyEventAt(i, direction);
     if (ev) return ev.short;

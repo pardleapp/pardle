@@ -23,6 +23,11 @@ export interface PnlSample {
   /** Model's win probability at this sample (0–1). Round-score only;
    *  outright uses live market prob so this is derivable from v. */
   prob?: number;
+  /** Chart-friendly label for the sample. Set on IMG shot samples
+   *  so hover tooltips read "14th · Drive" instead of "H13.6".
+   *  Undefined on hole-completion samples (which fall back to
+   *  H{holeNum} formatting). */
+  label?: string;
 }
 
 /** Server-side settlement fields written by notify-poll when a
@@ -1271,6 +1276,40 @@ function trimTrailingFlat(series: PnlSample[]): PnlSample[] {
   return series.slice(0, firstConstantIdx + 1);
 }
 
+/** Ordinal suffix for hole numbers ("14th", "3rd", "1st"). */
+function ordinal(n: number): string {
+  const rem10 = n % 10;
+  const rem100 = n % 100;
+  if (rem10 === 1 && rem100 !== 11) return `${n}st`;
+  if (rem10 === 2 && rem100 !== 12) return `${n}nd`;
+  if (rem10 === 3 && rem100 !== 13) return `${n}rd`;
+  return `${n}th`;
+}
+
+/** Chart-friendly label for an IMG shot sample. Heuristic mapping —
+ *  approximates the shot type from (shotNum, par) since we don't
+ *  have the full shot-start surface at this layer. */
+function shotLabel(hole: number, shotNum: number, par: number): string {
+  const holeLbl = ordinal(hole);
+  let shotType: string;
+  if (par === 3) {
+    if (shotNum === 1) shotType = "Tee shot";
+    else if (shotNum === 2) shotType = "Approach";
+    else shotType = "Putt";
+  } else if (par === 5) {
+    if (shotNum === 1) shotType = "Drive";
+    else if (shotNum === 2) shotType = "Layup";
+    else if (shotNum === 3) shotType = "Approach";
+    else shotType = "Putt";
+  } else {
+    // Par 4 (and defensive default for unusual pars).
+    if (shotNum === 1) shotType = "Drive";
+    else if (shotNum === 2) shotType = "Approach";
+    else shotType = "Putt";
+  }
+  return `${holeLbl} · ${shotType}`;
+}
+
 /**
  * For round-score bets, append one PnlSample per in-progress-hole
  * IMG shot event. Sits after the hole-completion loop and only fires
@@ -1308,43 +1347,6 @@ function appendShotSamples(
       );
     })
     .sort((a, b) => a.event.ts - b.event.ts);
-  if (typeof console !== "undefined") {
-    const allShotsAnyone = feedEvents.filter((r) => r.event.type === "shot");
-    // Sample the shot stream so we can see WHICH playerIds are actually
-    // producing shot events. If our target playerId isn't in this list
-    // the shots aren't reaching the feed under his id.
-    const idCounts = new Map<string, number>();
-    const nameByPid = new Map<string, string>();
-    for (const r of allShotsAnyone) {
-      const ev = r.event as {
-        playerId: string;
-        playerName?: string;
-      };
-      idCounts.set(ev.playerId, (idCounts.get(ev.playerId) ?? 0) + 1);
-      if (ev.playerName && !nameByPid.has(ev.playerId)) {
-        nameByPid.set(ev.playerId, ev.playerName);
-      }
-    }
-    const shotByPlayerId = [...idCounts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 20)
-      .map(([pid, n]) => ({
-        pid,
-        name: nameByPid.get(pid) ?? "?",
-        shots: n,
-        matchesTarget: pid === playerId,
-      }));
-    console.log("[bet-chart:shot-diag]", {
-      playerId,
-      round,
-      totalRows: feedEvents.length,
-      totalShotEventsInFeed: allShotsAnyone.length,
-      shotsForPlayer: shotEvents.length,
-      distinctShotPlayerCount: idCounts.size,
-      targetInStream: idCounts.has(playerId),
-      shotByPlayerId,
-    });
-  }
   if (shotEvents.length === 0) return;
 
   // The projection uses roundPar + holePars where available. Both
@@ -1380,9 +1382,6 @@ function appendShotSamples(
     snapHolesRemaining = remainingHoleEntries.length;
   }
 
-  let pushed = 0;
-  let skippedNoCurrentHole = 0;
-  let skippedDedup = 0;
   for (const r of shotEvents) {
     const ev = r.event as {
       hole?: number;
@@ -1401,10 +1400,7 @@ function appendShotSamples(
       snapExpectedRemaining,
       snapHolesRemaining,
     });
-    if (!projection.currentHole) {
-      skippedNoCurrentHole++;
-      continue;
-    }
+    if (!projection.currentHole) continue;
     const prob = roundScoreProb({
       projection,
       line: bet.line,
@@ -1428,23 +1424,18 @@ function appendShotSamples(
       Math.abs(holesPlayed - last.holesPlayed) < 0.02 &&
       Math.abs(prob - (last.prob ?? 0)) < 0.005
     ) {
-      skippedDedup++;
       continue;
     }
+    const parForHole =
+      typeof (r.event as { par?: number }).par === "number"
+        ? ((r.event as { par: number }).par)
+        : holePars[holeNum] ?? 4;
     series.push({
       t: r.event.ts,
       v: anchoredValue(prob, probAtP, bet.stake, bet.oddsTaken),
       holesPlayed,
       prob,
-    });
-    pushed++;
-  }
-  if (typeof console !== "undefined") {
-    console.log("[bet-chart:shot-result]", {
-      shotsEvaluated: shotEvents.length,
-      pushed,
-      skippedNoCurrentHole,
-      skippedDedup,
+      label: shotLabel(holeNum, shotNum, parForHole),
     });
   }
   // Prevent silencing the unused-param lint for strokesPlayedTotal —
