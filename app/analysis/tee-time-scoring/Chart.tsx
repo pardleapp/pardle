@@ -741,6 +741,43 @@ function ChartCore({
           Tee time
         </text>
 
+        {/* DEBUG: outline the clip area in red so we can see where
+            the chart interior boundaries are. Also mark expected
+            positions for extreme x values. Strip once verified. */}
+        <rect
+          x={padL}
+          y={padT}
+          width={iw}
+          height={ih}
+          fill="none"
+          stroke="red"
+          strokeWidth={2}
+          strokeDasharray="6 4"
+          pointerEvents="none"
+        />
+        {/* Guide crosses at 13:00 and 15:00 tee times */}
+        {[13 * 60, 14 * 60, 15 * 60].map((t) => (
+          <g key={`debug-${t}`} pointerEvents="none">
+            <line
+              x1={xFor(t)}
+              x2={xFor(t)}
+              y1={padT}
+              y2={height - padB}
+              stroke="orange"
+              strokeWidth={1}
+              strokeDasharray="2 4"
+            />
+            <text
+              x={xFor(t) + 4}
+              y={padT + 12}
+              fontSize={10}
+              fill="orange"
+            >
+              {formatClock(t)} @ x={Math.round(xFor(t))}
+            </text>
+          </g>
+        ))}
+
         <g clipPath="url(#chart-clip)">
           <path
             d={smoothPath}
