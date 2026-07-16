@@ -26216,6 +26216,38 @@ html.pv-theme-body .auth-chip-btn {
   color: oklch(0.52 0.13 155);
 }
 
+.hsa-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  margin-left: 6px;
+}
+.hsa-trend-hard {
+  background: oklch(0.94 0.06 28);
+  color: oklch(0.42 0.16 28);
+  border: 1px solid oklch(0.86 0.09 28);
+}
+.hsa-trend-easy {
+  background: oklch(0.93 0.06 155);
+  color: oklch(0.38 0.14 155);
+  border: 1px solid oklch(0.85 0.09 155);
+}
+.hsa-trend-arrow {
+  font-size: 8px;
+  line-height: 1;
+}
+.hsa-trend-val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
 .hsa-chart {
   display: grid;
   grid-template-columns: repeat(18, minmax(0, 1fr));

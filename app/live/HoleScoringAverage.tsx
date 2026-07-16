@@ -144,6 +144,55 @@ function aggregateByHole(
   return map;
 }
 
+interface CourseTrend {
+  /** Last-N events mean(strokes−par) minus round-baseline mean(strokes−par).
+   *  Positive → course is playing harder now; negative → easier. */
+  delta: number;
+  /** True when we have enough recent-event volume + delta magnitude
+   *  to justify flashing a chip. */
+  hasSignal: boolean;
+  /** Recent-event count actually used (may be less than the target
+   *  when the round has only just started). */
+  recentCount: number;
+}
+
+/** Anti-noise thresholds. Delta needs to be at least 0.20
+ *  strokes/hole AND we need at least 25 recent events before we're
+ *  willing to say the course has changed. Both are easily tuned. */
+const TREND_RECENT_TARGET = 50;
+const TREND_MIN_RECENT_FOR_SIGNAL = 25;
+const TREND_MIN_DELTA = 0.2;
+
+function computeCourseTrend(
+  rows: FeedRow[],
+  round: number | "all",
+): CourseTrend {
+  const scoreEvents: Array<{ ts: number; diff: number }> = [];
+  for (const r of rows) {
+    const ev = r.event;
+    if (ev.type !== "score") continue;
+    if (typeof ev.strokes !== "number") continue;
+    if (typeof ev.par !== "number") continue;
+    if (round !== "all" && ev.round !== round) continue;
+    scoreEvents.push({ ts: ev.ts, diff: ev.strokes - ev.par });
+  }
+  if (scoreEvents.length === 0) {
+    return { delta: 0, hasSignal: false, recentCount: 0 };
+  }
+  // Sort newest-first, slice the tail we care about.
+  scoreEvents.sort((a, b) => b.ts - a.ts);
+  const recent = scoreEvents.slice(0, TREND_RECENT_TARGET);
+  const recentMean =
+    recent.reduce((a, s) => a + s.diff, 0) / recent.length;
+  const baselineMean =
+    scoreEvents.reduce((a, s) => a + s.diff, 0) / scoreEvents.length;
+  const delta = recentMean - baselineMean;
+  const hasSignal =
+    recent.length >= TREND_MIN_RECENT_FOR_SIGNAL &&
+    Math.abs(delta) >= TREND_MIN_DELTA;
+  return { delta, hasSignal, recentCount: recent.length };
+}
+
 /** Fold server-computed per-round aggregates into the flat map the
  *  render loop expects. Merges across rounds when the user picks
  *  the "all" scope. */
@@ -260,6 +309,17 @@ export default function HoleScoringAverage({
     ...values.map((v) => Math.abs(v.avgVsPar)),
   );
 
+  // Course-trend chip — is the field playing harder or easier RIGHT
+  // NOW than they have been all round? Uses feed score events (which
+  // are ts-stamped) rather than the pars-inclusive server aggregates
+  // (which have no timing). The feed suppresses par outcomes, so both
+  // "recent" and "baseline" are computed over non-par events only —
+  // that bias cancels out in the delta, giving an honest read on
+  // whether the field's scoring has shifted lately.
+  const trend = useMemo(() => {
+    return computeCourseTrend(rows, effectiveRound);
+  }, [rows, effectiveRound]);
+
   // Front + back nine + total aggregates. TV-broadcast convention:
   // the numbers shown are CUMULATIVE strokes-vs-par across the nine
   // (or the round). So we sum each hole's field-average deviation
@@ -337,6 +397,22 @@ export default function HoleScoringAverage({
               {totals.hasF || totals.hasB ? formatToPar(totals.avgT) : "—"}
             </span>
           </span>
+          {trend.hasSignal && (
+            <span
+              className={`hsa-trend ${trend.delta > 0 ? "hsa-trend-hard" : "hsa-trend-easy"}`}
+              title={`Last ${trend.recentCount} completed holes vs round baseline`}
+            >
+              <span className="hsa-trend-arrow" aria-hidden="true">
+                {trend.delta > 0 ? "▲" : "▼"}
+              </span>
+              <span className="hsa-trend-lbl">
+                {trend.delta > 0 ? "COURSE HARDER" : "COURSE EASIER"}
+              </span>
+              <span className="hsa-trend-val mono">
+                {formatToPar(trend.delta)}
+              </span>
+            </span>
+          )}
         </div>
       </header>
       <div
