@@ -278,8 +278,9 @@ function ChartCore({
   for (let y = yBot; y <= yTop; y++) yTicks.push(y);
 
   const formatClock = (mins: number) => {
-    const h = Math.floor(mins / 60) % 24;
-    const m = mins % 60;
+    const rounded = Math.round(mins);
+    const h = Math.floor(rounded / 60) % 24;
+    const m = rounded % 60;
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
   };
   const formatSigned = (v: number) => {
@@ -612,6 +613,28 @@ function ChartCore({
           {formatClock(viewport.xMin)}–{formatClock(viewport.xMax)} · data{" "}
           {formatClock(extent.xMin)}–{formatClock(extent.xMax)}
         </span>
+      </div>
+      <div
+        style={{
+          fontFamily: "var(--font-mono, monospace)",
+          fontSize: 11,
+          color: "oklch(0.55 0.02 150)",
+          marginBottom: 6,
+        }}
+      >
+        <span>Points after 12:30 tee: </span>
+        <strong>
+          {points.filter((p) => p.x >= 12 * 60 + 30).length}
+        </strong>
+        {" — "}
+        <span>latest 5 tee times: </span>
+        <strong>
+          {[...points]
+            .sort((a, b) => b.x - a.x)
+            .slice(0, 5)
+            .map((p) => formatClock(p.x))
+            .join(", ") || "—"}
+        </strong>
       </div>
 
       <svg
