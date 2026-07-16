@@ -114,20 +114,48 @@ export async function GET() {
       ),
     ]);
 
+    const fieldRows = field.field ?? [];
+    const skillRows = skills.players ?? [];
+    const liveRows = live.live_stats ?? [];
+
     const fieldMap = new Map<number, FieldEntry>();
-    for (const f of field.field ?? []) fieldMap.set(f.dg_id, f);
+    for (const f of fieldRows) fieldMap.set(f.dg_id, f);
     const skillMap = new Map<number, SkillEntry>();
-    for (const s of skills.players ?? []) skillMap.set(s.dg_id, s);
+    for (const s of skillRows) skillMap.set(s.dg_id, s);
+
+    // Diagnostic counters — surfaced in the response so we can spot
+    // which step is dropping rows without adding a separate debug hop.
+    let noField = 0;
+    let noSkill = 0;
+    let noTeeTime = 0;
+    let noScore = 0;
+    let noSgTotal = 0;
 
     const rows: OutRow[] = [];
-    for (const l of live.live_stats ?? []) {
+    for (const l of liveRows) {
       const f = fieldMap.get(l.dg_id);
       const s = skillMap.get(l.dg_id);
-      if (!f || !s) continue;
+      if (!f) {
+        noField++;
+        continue;
+      }
+      if (!s) {
+        noSkill++;
+        continue;
+      }
       const mins = teeToMinutes(f.r1_teetime);
-      if (mins == null) continue;
-      if (typeof l.current_score !== "number") continue;
-      if (typeof s.sg_total !== "number") continue;
+      if (mins == null) {
+        noTeeTime++;
+        continue;
+      }
+      if (typeof l.current_score !== "number") {
+        noScore++;
+        continue;
+      }
+      if (typeof s.sg_total !== "number") {
+        noSgTotal++;
+        continue;
+      }
 
       rows.push({
         dgId: String(l.dg_id),
@@ -147,6 +175,17 @@ export async function GET() {
       ok: true,
       count: rows.length,
       generatedAt: Date.now(),
+      diag: {
+        fieldRowsCount: fieldRows.length,
+        skillRowsCount: skillRows.length,
+        liveRowsCount: liveRows.length,
+        drops: { noField, noSkill, noTeeTime, noScore, noSgTotal },
+        // A tiny sample of what each source returned so we can
+        // eyeball the shape without another endpoint.
+        fieldSample: fieldRows.slice(0, 2),
+        skillSample: skillRows.slice(0, 2),
+        liveSample: liveRows.slice(0, 2),
+      },
       rows,
     });
   } catch (err) {
