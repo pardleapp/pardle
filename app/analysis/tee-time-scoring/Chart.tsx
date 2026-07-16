@@ -213,16 +213,20 @@ function ChartCore({
     return { xMin, xMax, yMin: -yBound, yMax: yBound };
   }, [points]);
 
-  const [viewport, setViewport] = useState<Viewport>(extent);
-  // Track whether the user has manually zoomed / panned. When they
-  // haven't, we keep the viewport locked to the data extent so
-  // newly-finished players always fit on screen automatically.
+  // User-controlled viewport is stored separately from the auto-fit
+  // one. When userViewport is null, we DERIVE viewport from extent
+  // every render — so any data update (new finisher, new rows prop)
+  // immediately widens the visible range. When the user zooms or pans,
+  // userViewport is set and takes over until Reset clears it.
+  const [userViewport, setUserViewport] = useState<Viewport | null>(null);
+  const viewport = userViewport ?? extent;
+  const setViewport = useCallback((v: Viewport) => {
+    setUserViewport(v);
+  }, []);
   const hasUserZoomedRef = useRef(false);
   useEffect(() => {
-    if (!hasUserZoomedRef.current) {
-      setViewport(extent);
-    }
-  }, [extent]);
+    hasUserZoomedRef.current = userViewport != null;
+  }, [userViewport]);
 
   const xFor = useCallback(
     (v: number) =>
@@ -481,14 +485,12 @@ function ChartCore({
 
   const resetZoom = () => {
     hasUserZoomedRef.current = false;
-    setViewport(extent);
+    setUserViewport(null);
   };
 
-  const isZoomed =
-    Math.abs(viewport.xMin - extent.xMin) > 0.01 ||
-    Math.abs(viewport.xMax - extent.xMax) > 0.01 ||
-    Math.abs(viewport.yMin - extent.yMin) > 0.01 ||
-    Math.abs(viewport.yMax - extent.yMax) > 0.01;
+  // "Zoomed" now simply means the user has taken control of the
+  // viewport (userViewport != null). Auto-fit state → not zoomed.
+  const isZoomed = userViewport != null;
 
   const visiblePoints = points.filter(
     (p) =>
@@ -577,6 +579,7 @@ function ChartCore({
           fontSize: 13,
           marginBottom: 6,
           minHeight: 22,
+          flexWrap: "wrap",
         }}
       >
         <span style={{ color: "oklch(0.5 0.02 150)" }}>
@@ -594,6 +597,20 @@ function ChartCore({
           }}
         >
           {trendAtCursor != null ? formatSigned(trendAtCursor) : "—"}
+        </span>
+        {/* Diagnostic — shows what's actually loaded vs shown. Helps
+            spot when a viewport isn't fitting the data. */}
+        <span
+          style={{
+            fontFamily: "var(--font-mono, monospace)",
+            fontSize: 11,
+            color: "oklch(0.55 0.02 150)",
+            marginLeft: "auto",
+          }}
+        >
+          {points.length} loaded · {visiblePoints.length} shown · axis{" "}
+          {formatClock(viewport.xMin)}–{formatClock(viewport.xMax)} · data{" "}
+          {formatClock(extent.xMin)}–{formatClock(extent.xMax)}
         </span>
       </div>
 
