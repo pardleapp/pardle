@@ -1,7 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import Chart from "./Chart";
+import MainNav from "@/app/MainNav";
+import AuthChip from "@/app/live/auth/AuthChip";
+import { BRAND } from "@/lib/brand";
 
 export interface Row {
   dgId: string;
@@ -54,24 +58,40 @@ export default function Page() {
   }, [load]);
 
   return (
-    <main
-      style={{
-        maxWidth: 900,
-        margin: "0 auto",
-        padding: "20px 16px 60px",
-        fontFamily:
-          "var(--font-archivo), 'Archivo', system-ui, -apple-system, sans-serif",
-        color: "oklch(0.2 0.02 150)",
-      }}
-    >
-      <h1 style={{ fontSize: 22, marginBottom: 4 }}>
-        Skill-adjusted score vs tee time — R1
-      </h1>
-      <p style={{ fontSize: 13, color: "oklch(0.5 0.02 150)", margin: 0 }}>
-        Players who have completed R1 only. Points below zero outperformed
-        their skill baseline; above zero underperformed. Graph updates on a
-        rolling 60-second poll as more players finish.
-      </p>
+    <main className="container container-wide v4-theme pv-theme">
+      <header className="brand brand-split">
+        <h1>{BRAND.name}</h1>
+        <div className="brand-nav">
+          <MainNav active="analysis" />
+          <AuthChip />
+        </div>
+      </header>
+      <section
+        style={{
+          maxWidth: 1200,
+          margin: "0 auto",
+          padding: "20px 16px 60px",
+          fontFamily:
+            "var(--font-archivo), 'Archivo', system-ui, -apple-system, sans-serif",
+          color: "oklch(0.2 0.02 150)",
+        }}
+      >
+        <p style={{ fontSize: 12, color: "oklch(0.5 0.02 150)", margin: "0 0 6px" }}>
+          <Link
+            href="/analysis"
+            style={{ color: "oklch(0.5 0.02 150)", textDecoration: "none" }}
+          >
+            ← All analyses
+          </Link>
+        </p>
+        <h2 style={{ fontSize: 22, marginBottom: 4 }}>
+          Skill-adjusted score vs tee time
+        </h2>
+        <p style={{ fontSize: 13, color: "oklch(0.5 0.02 150)", margin: 0 }}>
+          Every finisher of a round plotted at their tee time, adjusted for
+          pre-tournament skill. Points below zero outperformed baseline,
+          above zero under-performed. Refreshes as new players finish.
+        </p>
       {error || (data && !data.ok) ? (
         <p style={{ marginTop: 20, color: "oklch(0.5 0.16 25)" }}>
           Couldn&apos;t load data: {error ?? data?.error}
@@ -97,6 +117,7 @@ export default function Page() {
           <Chart rows={data.rows} />
         </>
       )}
+      </section>
     </main>
   );
 }

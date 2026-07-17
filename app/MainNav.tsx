@@ -16,6 +16,7 @@ export type MainNavTab =
   | "course"
   | "sharp"
   | "games"
+  | "analysis"
   /** Page is not itself one of the nav tabs (e.g. tipster channel,
    *  bet detail) but still wants the nav visible so visitors can
    *  navigate to other surfaces. No tab is highlighted. */
@@ -31,6 +32,7 @@ const TABS: Array<{ key: MainNavTab; href: string; label: string }> = [
   { key: "leaderboard", href: "/leaderboard", label: "Leaderboard" },
   { key: "sharp", href: "/sharp", label: "Sharp" },
   { key: "games", href: "/games", label: "Games" },
+  { key: "analysis", href: "/analysis", label: "Analysis" },
 ];
 
 export default function MainNav({ active }: { active: MainNavTab }) {
