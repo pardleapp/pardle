@@ -68,6 +68,7 @@ interface LiveEntry {
 interface OutRow {
   dgId: string;
   name: string;
+  round: 1 | 2;
   teeTime: string;
   teeMinutes: number; // minutes since midnight for the scatter x-axis
   sgTotal: number;
@@ -76,7 +77,7 @@ interface OutRow {
   thru: string | number;
   startHole: number;
   /** True when the player has no DG skill rating (amateur, qualifier,
-   *  minor-tour). Their sgTotal defaults to 0 so their raw R1 score
+   *  minor-tour). Their sgTotal defaults to 0 so their raw score
    *  IS their adjusted score. The chart draws them as outlined dots
    *  so the visual distinguishes "skill-adjusted" from "raw score". */
   noSkill: boolean;
@@ -128,7 +129,7 @@ export async function GET() {
   try {
     const tour = "pga"; // The Open sits under DG's `pga` feed (majors covered there).
 
-    const [field, skills, live] = await Promise.all([
+    const [field, skills, liveR1, liveR2] = await Promise.all([
       fetchJson<{ field?: FieldEntry[] }>("/field-updates?tour=" + tour),
       fetchJson<{ players?: SkillEntry[] }>(
         "/preds/skill-ratings?display=value",
@@ -136,115 +137,114 @@ export async function GET() {
       fetchJson<{ live_stats?: LiveEntry[] }>(
         "/preds/live-tournament-stats?tour=" + tour + "&round=1",
       ),
+      // R2 may not have started yet — DG returns an empty live_stats
+      // in that case, which naturally produces zero R2 rows.
+      fetchJson<{ live_stats?: LiveEntry[] }>(
+        "/preds/live-tournament-stats?tour=" + tour + "&round=2",
+      ),
     ]);
 
     const fieldRows = field.field ?? [];
     const skillRows = skills.players ?? [];
-    const liveRows = live.live_stats ?? [];
+    const liveR1Rows = liveR1.live_stats ?? [];
+    const liveR2Rows = liveR2.live_stats ?? [];
 
     const fieldMap = new Map<number, FieldEntry>();
     for (const f of fieldRows) fieldMap.set(f.dg_id, f);
     const skillMap = new Map<number, SkillEntry>();
     for (const s of skillRows) skillMap.set(s.dg_id, s);
 
-    // Diagnostic counters — surfaced in the response so we can spot
-    // which step is dropping rows without adding a separate debug hop.
-    let noField = 0;
-    let noSkill = 0;
-    let noTeeTime = 0;
-    let noScore = 0;
-    let noSgTotal = 0;
+    // Diagnostic counters (per round).
+    const dropCounts = {
+      r1: { noField: 0, noSkill: 0, noTeeTime: 0, noScore: 0, notDone: 0 },
+      r2: { noField: 0, noSkill: 0, noTeeTime: 0, noScore: 0, notDone: 0 },
+    };
 
-    const rows: OutRow[] = [];
-    for (const l of liveRows) {
-      const f = fieldMap.get(l.dg_id);
-      const s = skillMap.get(l.dg_id);
-      if (!f) {
-        noField++;
-        continue;
-      }
-      const r1 = r1Teetime(f);
-      const mins = teeToMinutes(r1?.teetime);
-      if (mins == null) {
-        noTeeTime++;
-        continue;
-      }
-      // Only include players who have COMPLETED R1. Accept 18 / "18"
-      // (either number or string) or "F" / "F*" letter forms.
-      const thruNum =
-        typeof l.thru === "number"
-          ? l.thru
-          : typeof l.thru === "string"
-            ? Number(l.thru.trim())
-            : NaN;
-      const thruStr =
-        typeof l.thru === "string" ? l.thru.trim() : "";
-      const thruDone = thruNum === 18 || /^f/i.test(thruStr);
-      if (!thruDone) {
-        continue;
-      }
-      const r1Score =
-        typeof l.round === "number" ? l.round : undefined;
-      if (typeof r1Score !== "number") {
-        noScore++;
-        continue;
-      }
+    /** Extract the given round's tee time from a field entry. */
+    const roundTeetime = (
+      entry: FieldEntry,
+      round: 1 | 2,
+    ): FieldTeetime | null => {
+      const rows = entry.teetimes ?? [];
+      return rows.find((r) => r.round_num === round) ?? null;
+    };
 
-      // Skill missing? Default to tour-average (0) and flag the row.
-      // The chart draws these with an outlined circle instead of a
-      // filled one so the visual distinguishes skill-adjusted from
-      // raw. Amateurs / qualifiers hit this branch.
-      const hasSkill = !!s && typeof s.sg_total === "number";
-      const sgTotal = hasSkill ? (s.sg_total as number) : 0;
-      if (!hasSkill) noSkill++;
+    const buildRows = (
+      liveRows: LiveEntry[],
+      round: 1 | 2,
+    ): OutRow[] => {
+      const drops = dropCounts[round === 1 ? "r1" : "r2"];
+      const out: OutRow[] = [];
+      for (const l of liveRows) {
+        const f = fieldMap.get(l.dg_id);
+        const s = skillMap.get(l.dg_id);
+        if (!f) {
+          drops.noField++;
+          continue;
+        }
+        const tt = roundTeetime(f, round);
+        const mins = teeToMinutes(tt?.teetime);
+        if (mins == null) {
+          drops.noTeeTime++;
+          continue;
+        }
+        const thruNum =
+          typeof l.thru === "number"
+            ? l.thru
+            : typeof l.thru === "string"
+              ? Number(l.thru.trim())
+              : NaN;
+        const thruStr =
+          typeof l.thru === "string" ? l.thru.trim() : "";
+        const thruDone = thruNum === 18 || /^f/i.test(thruStr);
+        if (!thruDone) {
+          drops.notDone++;
+          continue;
+        }
+        const rndScore =
+          typeof l.round === "number" ? l.round : undefined;
+        if (typeof rndScore !== "number") {
+          drops.noScore++;
+          continue;
+        }
+        const hasSkill = !!s && typeof s.sg_total === "number";
+        const sgTotal = hasSkill ? (s.sg_total as number) : 0;
+        if (!hasSkill) drops.noSkill++;
 
-      rows.push({
-        dgId: String(l.dg_id),
-        name: l.player_name,
-        teeTime: minutesToClock(mins),
-        teeMinutes: mins,
-        sgTotal,
-        toPar: r1Score,
-        adjusted: r1Score + sgTotal,
-        thru: l.thru ?? "-",
-        startHole: r1?.start_hole ?? 1,
-        noSkill: !hasSkill,
-      });
-    }
-    rows.sort((a, b) => a.teeMinutes - b.teeMinutes);
+        out.push({
+          dgId: String(l.dg_id),
+          name: l.player_name,
+          round,
+          teeTime: minutesToClock(mins),
+          teeMinutes: mins,
+          sgTotal,
+          toPar: rndScore,
+          adjusted: rndScore + sgTotal,
+          thru: l.thru ?? "-",
+          startHole: tt?.start_hole ?? 1,
+          noSkill: !hasSkill,
+        });
+      }
+      return out;
+    };
 
-    // Diagnostic — for LATE-wave players (r1_teetime after 15:00),
-    // show their `thru` and `round` values so we can spot when the
-    // filter is dropping actually-finished ones.
-    const latePlayers = (live.live_stats ?? [])
-      .map((l) => ({ live: l, field: fieldMap.get(l.dg_id) }))
-      .filter((p) => {
-        const r1 = p.field ? r1Teetime(p.field) : null;
-        const mins = teeToMinutes(r1?.teetime);
-        return mins != null && mins >= 15 * 60;
-      })
-      .slice(0, 15)
-      .map((p) => ({
-        name: p.live.player_name,
-        r1_teetime: r1Teetime(p.field!)?.teetime,
-        thru: p.live.thru,
-        thruType: typeof p.live.thru,
-        round: p.live.round,
-      }));
+    const rowsR1 = buildRows(liveR1Rows, 1);
+    const rowsR2 = buildRows(liveR2Rows, 2);
+    const rows = [...rowsR1, ...rowsR2].sort(
+      (a, b) => a.teeMinutes - b.teeMinutes,
+    );
 
     return NextResponse.json({
       ok: true,
       count: rows.length,
+      countByRound: { r1: rowsR1.length, r2: rowsR2.length },
       generatedAt: Date.now(),
       diag: {
         fieldRowsCount: fieldRows.length,
         skillRowsCount: skillRows.length,
-        liveRowsCount: liveRows.length,
-        drops: { noField, noSkill, noTeeTime, noScore, noSgTotal },
-        latePlayers,
-        fieldSample: fieldRows.slice(0, 2),
-        skillSample: skillRows.slice(0, 2),
-        liveSample: liveRows.slice(0, 2),
+        liveR1RowsCount: liveR1Rows.length,
+        liveR2RowsCount: liveR2Rows.length,
+        drops: dropCounts,
       },
       rows,
     });

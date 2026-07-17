@@ -13,6 +13,7 @@ import {
 interface Row {
   dgId: string;
   name: string;
+  round: 1 | 2;
   teeTime: string;
   teeMinutes: number;
   sgTotal: number;
@@ -22,6 +23,8 @@ interface Row {
   startHole: number;
   noSkill?: boolean;
 }
+
+type RoundFilter = "both" | "r1" | "r2";
 
 interface ChartProps {
   rows: Row[];
@@ -177,9 +180,8 @@ function ChartCore({
   onExpand: (() => void) | null;
 }) {
   const [hover, setHover] = useState<Row | null>(null);
-  /** Cursor x in DATA space (tee-time minutes). Used to render the
-   *  vertical guide + trend-value readout. Null when not tracking. */
   const [cursorX, setCursorX] = useState<number | null>(null);
+  const [roundFilter, setRoundFilter] = useState<RoundFilter>("both");
   const svgRef = useRef<SVGSVGElement | null>(null);
 
   // Dimensions scale up in expanded mode.
@@ -193,7 +195,30 @@ function ChartCore({
   const ih = height - padT - padB;
 
   const points = useMemo(
-    () => rows.map((r) => ({ x: r.teeMinutes, y: r.adjusted, row: r })),
+    () =>
+      rows
+        .filter((r) => {
+          if (roundFilter === "r1") return r.round === 1;
+          if (roundFilter === "r2") return r.round === 2;
+          return true;
+        })
+        .map((r) => ({ x: r.teeMinutes, y: r.adjusted, row: r })),
+    [rows, roundFilter],
+  );
+
+  // Per-round point subsets — used for the two trend lines.
+  const pointsR1 = useMemo(
+    () =>
+      rows
+        .filter((r) => r.round === 1)
+        .map((r) => ({ x: r.teeMinutes, y: r.adjusted })),
+    [rows],
+  );
+  const pointsR2 = useMemo(
+    () =>
+      rows
+        .filter((r) => r.round === 2)
+        .map((r) => ({ x: r.teeMinutes, y: r.adjusted })),
     [rows],
   );
 
@@ -253,18 +278,32 @@ function ChartCore({
     [padT, ih, viewport.yMin, viewport.yMax],
   );
 
-  const smooth = useMemo(
-    () => rollingSmooth(points.map((p) => ({ x: p.x, y: p.y })), 60),
-    [points],
-  );
-  const smoothPath = smooth
+  const smoothR1 = useMemo(() => rollingSmooth(pointsR1, 60), [pointsR1]);
+  const smoothR2 = useMemo(() => rollingSmooth(pointsR2, 60), [pointsR2]);
+  const smoothPathR1 = smoothR1
+    .map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(p.x)} ${yFor(p.y)}`)
+    .join(" ");
+  const smoothPathR2 = smoothR2
     .map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(p.x)} ${yFor(p.y)}`)
     .join(" ");
 
   const trendAtCursor = useMemo(() => {
     if (cursorX == null) return null;
-    return interpolate(smooth, cursorX);
-  }, [cursorX, smooth]);
+    // When one round is selected show only that trend; when both,
+    // show the R1 trend as the primary readout (blue).
+    const active =
+      roundFilter === "r2"
+        ? smoothR2
+        : roundFilter === "r1" || roundFilter === "both"
+          ? smoothR1
+          : null;
+    if (!active) return null;
+    return interpolate(active, cursorX);
+  }, [cursorX, smoothR1, smoothR2, roundFilter]);
+  const trendAtCursorR2 = useMemo(() => {
+    if (cursorX == null || roundFilter === "r1") return null;
+    return interpolate(smoothR2, cursorX);
+  }, [cursorX, smoothR2, roundFilter]);
 
   const xSpan = viewport.xMax - viewport.xMin;
   const xStep =
@@ -501,15 +540,6 @@ function ChartCore({
   // ambiguously. Circles are cheap — 127 of them cost nothing.
   const visiblePoints = points;
 
-  const trendColor =
-    trendAtCursor == null
-      ? "#334155"
-      : trendAtCursor < -0.3
-        ? "#059669"
-        : trendAtCursor > 0.3
-          ? "#dc2626"
-          : "#334155";
-
   return (
     <div style={{ marginTop: 12 }}>
       <div
@@ -569,6 +599,93 @@ function ChartCore({
         >
           Drag · scroll · pinch to zoom
         </span>
+        {/* Round filter — small pill group. Layout: pill row on
+            the right, aligned with the zoom buttons. */}
+        <div
+          role="group"
+          aria-label="Round filter"
+          style={{ display: "flex", gap: 4, marginLeft: "auto" }}
+        >
+          {(["both", "r1", "r2"] as const).map((f) => {
+            const active = roundFilter === f;
+            const label = f === "both" ? "R1 + R2" : f.toUpperCase();
+            return (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setRoundFilter(f)}
+                style={{
+                  padding: "4px 10px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  borderRadius: 6,
+                  border: "1px solid oklch(0.85 0.013 95)",
+                  background: active ? "oklch(0.25 0.02 150)" : "white",
+                  color: active ? "white" : "oklch(0.3 0.02 150)",
+                  cursor: "pointer",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Legend row — shape encodes round, color encodes polarity. */}
+      <div
+        style={{
+          display: "flex",
+          gap: 16,
+          fontSize: 11,
+          color: "oklch(0.5 0.02 150)",
+          marginBottom: 6,
+          flexWrap: "wrap",
+        }}
+      >
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <svg width={14} height={14} viewBox="-7 -7 14 14">
+            <circle r={4} cx={0} cy={0} fill="#334155" />
+          </svg>
+          R1
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <svg width={14} height={14} viewBox="-7 -7 14 14">
+            <rect x={-4} y={-4} width={8} height={8} fill="#334155" />
+          </svg>
+          R2
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span
+            style={{
+              width: 20,
+              height: 3,
+              background: "#0284c7",
+              borderRadius: 2,
+            }}
+          />
+          R1 trend
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <span
+            style={{
+              width: 20,
+              height: 3,
+              background:
+                "repeating-linear-gradient(90deg, #d97706 0 6px, transparent 6px 10px)",
+              borderRadius: 2,
+            }}
+          />
+          R2 trend
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <span style={{ color: "#059669", fontWeight: 700 }}>green</span>
+          outperformed skill
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <span style={{ color: "#dc2626", fontWeight: 700 }}>red</span>
+          underperformed
+        </span>
       </div>
 
       {/* Trend readout — shows the smoothed-line value under cursor */}
@@ -584,21 +701,35 @@ function ChartCore({
         }}
       >
         <span style={{ color: "oklch(0.5 0.02 150)" }}>
-          Trend average at{" "}
+          Trend at{" "}
           <strong style={{ fontFamily: "var(--font-mono, monospace)" }}>
             {cursorX != null ? formatClock(cursorX) : "—"}
           </strong>
         </span>
-        <span
-          style={{
-            fontFamily: "var(--font-mono, monospace)",
-            fontWeight: 800,
-            fontSize: 16,
-            color: trendColor,
-          }}
-        >
-          {trendAtCursor != null ? formatSigned(trendAtCursor) : "—"}
-        </span>
+        {(roundFilter === "both" || roundFilter === "r1") && (
+          <span
+            style={{
+              fontFamily: "var(--font-mono, monospace)",
+              fontWeight: 800,
+              fontSize: 16,
+              color: "#0284c7",
+            }}
+          >
+            R1: {trendAtCursor != null ? formatSigned(trendAtCursor) : "—"}
+          </span>
+        )}
+        {(roundFilter === "both" || roundFilter === "r2") && (
+          <span
+            style={{
+              fontFamily: "var(--font-mono, monospace)",
+              fontWeight: 800,
+              fontSize: 16,
+              color: "#d97706",
+            }}
+          >
+            R2: {trendAtCursorR2 != null ? formatSigned(trendAtCursorR2) : "—"}
+          </span>
+        )}
         {/* Diagnostic — shows what's actually loaded vs shown. Helps
             spot when a viewport isn't fitting the data. */}
         <span
@@ -614,27 +745,7 @@ function ChartCore({
           {formatClock(extent.xMin)}–{formatClock(extent.xMax)}
         </span>
       </div>
-      <div
-        style={{
-          fontFamily: "var(--font-mono, monospace)",
-          fontSize: 11,
-          color: "oklch(0.55 0.02 150)",
-          marginBottom: 6,
-        }}
-      >
-        <span>Points after 12:30 tee: </span>
-        <strong>
-          {points.filter((p) => p.x >= 12 * 60 + 30).length}
-        </strong>
-        {" — "}
-        <span>latest 5 tee times: </span>
-        <strong>
-          {[...points]
-            .sort((a, b) => b.x - a.x)
-            .slice(0, 5)
-            .map((p) => formatClock(p.x))
-            .join(", ") || "—"}
-        </strong>
+      <div style={{ display: "none" }}>
       </div>
 
       <svg
@@ -742,39 +853,76 @@ function ChartCore({
         </text>
 
         <g clipPath="url(#chart-clip)">
-          <path
-            d={smoothPath}
-            fill="none"
-            stroke="#0284c7"
-            strokeWidth={2.5}
-            opacity={0.75}
-          />
+          {/* Round-1 trend (blue) */}
+          {(roundFilter === "both" || roundFilter === "r1") &&
+            smoothR1.length > 1 && (
+              <path
+                d={smoothPathR1}
+                fill="none"
+                stroke="#0284c7"
+                strokeWidth={2.5}
+                opacity={0.75}
+              />
+            )}
+          {/* Round-2 trend (amber) */}
+          {(roundFilter === "both" || roundFilter === "r2") &&
+            smoothR2.length > 1 && (
+              <path
+                d={smoothPathR2}
+                fill="none"
+                stroke="#d97706"
+                strokeWidth={2.5}
+                opacity={0.75}
+                strokeDasharray="6 4"
+              />
+            )}
 
           {visiblePoints.map((p) => {
             const y = p.y;
             const color =
               y < -0.3 ? "#059669" : y > 0.3 ? "#dc2626" : "#334155";
-            const isHover = hover?.dgId === p.row.dgId;
+            const isHover = hover?.dgId === p.row.dgId && hover?.round === p.row.round;
             const noSkill = p.row.noSkill === true;
+            const isR2 = p.row.round === 2;
+            const cx = xFor(p.x);
+            const cy = yFor(y);
+            const r = isHover ? 6 : 3.5;
+            // Distinguish rounds by MARK SHAPE (categorical secondary
+            // encoding on top of polarity colour): R1 = circle,
+            // R2 = square. Same green/red polarity in both.
+            if (isR2) {
+              return (
+                <rect
+                  key={`${p.row.dgId}-${p.row.round}`}
+                  x={cx - r}
+                  y={cy - r}
+                  width={r * 2}
+                  height={r * 2}
+                  fill={noSkill ? "white" : color}
+                  opacity={isHover ? 1 : 0.75}
+                  stroke={isHover ? "white" : noSkill ? color : "none"}
+                  strokeWidth={noSkill ? 1.5 : 2}
+                  onPointerEnter={() => setHover(p.row)}
+                />
+              );
+            }
             return (
               <circle
-                key={p.row.dgId}
-                cx={xFor(p.x)}
-                cy={yFor(y)}
-                r={isHover ? 6 : 3.5}
+                key={`${p.row.dgId}-${p.row.round}`}
+                cx={cx}
+                cy={cy}
+                r={r}
                 fill={noSkill ? "white" : color}
                 opacity={isHover ? 1 : 0.75}
-                stroke={
-                  isHover ? "white" : noSkill ? color : "none"
-                }
+                stroke={isHover ? "white" : noSkill ? color : "none"}
                 strokeWidth={noSkill ? 1.5 : 2}
                 onPointerEnter={() => setHover(p.row)}
               />
             );
           })}
 
-          {/* Cursor guideline + trend dot */}
-          {cursorX != null && trendAtCursor != null && (
+          {/* Cursor guideline + per-round trend dots */}
+          {cursorX != null && (
             <>
               <line
                 x1={xFor(cursorX)}
@@ -786,15 +934,31 @@ function ChartCore({
                 strokeDasharray="4 4"
                 pointerEvents="none"
               />
-              <circle
-                cx={xFor(cursorX)}
-                cy={yFor(trendAtCursor)}
-                r={5}
-                fill={trendColor}
-                stroke="white"
-                strokeWidth={2}
-                pointerEvents="none"
-              />
+              {(roundFilter === "both" || roundFilter === "r1") &&
+                trendAtCursor != null && (
+                  <circle
+                    cx={xFor(cursorX)}
+                    cy={yFor(trendAtCursor)}
+                    r={5}
+                    fill="#0284c7"
+                    stroke="white"
+                    strokeWidth={2}
+                    pointerEvents="none"
+                  />
+                )}
+              {(roundFilter === "both" || roundFilter === "r2") &&
+                trendAtCursorR2 != null && (
+                  <rect
+                    x={xFor(cursorX) - 5}
+                    y={yFor(trendAtCursorR2) - 5}
+                    width={10}
+                    height={10}
+                    fill="#d97706"
+                    stroke="white"
+                    strokeWidth={2}
+                    pointerEvents="none"
+                  />
+                )}
             </>
           )}
         </g>
@@ -815,7 +979,9 @@ function ChartCore({
             maxWidth: 480,
           }}
         >
-          <strong>{hover.name}</strong>
+          <strong>
+            {hover.name} · R{hover.round}
+          </strong>
           <span style={{ color: "oklch(0.5 0.02 150)" }}>
             teed off {hover.teeTime} · start hole {hover.startHole} · thru{" "}
             {hover.thru}

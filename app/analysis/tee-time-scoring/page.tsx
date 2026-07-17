@@ -6,6 +6,7 @@ import Chart from "./Chart";
 export interface Row {
   dgId: string;
   name: string;
+  round: 1 | 2;
   teeTime: string;
   teeMinutes: number;
   sgTotal: number;
@@ -20,6 +21,7 @@ interface FetchResp {
   ok: boolean;
   error?: string;
   count?: number;
+  countByRound?: { r1: number; r2: number };
   generatedAt?: number;
   rows?: Row[];
 }
@@ -84,7 +86,10 @@ export default function Page() {
       ) : (
         <>
           <p style={{ fontSize: 11, color: "oklch(0.55 0.02 150)", marginTop: 8 }}>
-            {data.count} players finished ·{" "}
+            {data.countByRound
+              ? `R1: ${data.countByRound.r1} · R2: ${data.countByRound.r2}`
+              : `${data.count} rows`}
+            {" · "}
             {data.generatedAt
               ? `updated ${new Date(data.generatedAt).toLocaleTimeString()}`
               : ""}
