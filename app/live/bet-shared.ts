@@ -376,6 +376,24 @@ interface LeaderboardLike {
   displayName: string;
 }
 
+/** Two names are "compatible" if they share a last name AND their
+ *  first-name tokens are prefix-compatible (either full-form or
+ *  initial). Used to disambiguate common last names (Kim, Smith,
+ *  Fitzpatrick etc.) so a bet on "Tom Kim" never binds to Si Woo Kim.
+ *
+ *  Examples:
+ *   "R. Henley" ↔ "Russell Henley"  → true (r prefix of russell)
+ *   "Tom Kim"   ↔ "Si Woo Kim"      → false (tom vs si — neither prefix)
+ *   "Tom Kim"   ↔ "Tom Kim"         → true (identical)
+ */
+function namesCompatible(a: string, b: string): boolean {
+  if (lastNameOf(a) !== lastNameOf(b)) return false;
+  const aFirst = normaliseName(a).split(" ")[0] ?? "";
+  const bFirst = normaliseName(b).split(" ")[0] ?? "";
+  if (!aFirst || !bFirst) return false;
+  return aFirst.startsWith(bFirst) || bFirst.startsWith(aFirst);
+}
+
 export function resolveBetPlayerId(
   bet: TrackedBet,
   leaderboard: LeaderboardLike[],
@@ -384,20 +402,51 @@ export function resolveBetPlayerId(
   const currentId =
     "playerId" in bet ? (bet as { playerId: string }).playerId : "";
   if (!currentId) return "";
-  // Direct match — most common case once the bet has been resolved
-  // once. Also covers bets placed via real-leaderboard ids from the
-  // start.
-  if (leaderboard.some((r) => r.playerId === currentId)) return currentId;
   const name = "playerName" in bet ? bet.playerName : "";
+
+  // Direct-ID match — but only trust it when the resolved player's
+  // display name is compatible with the bet's stored name. Guards
+  // against past mis-resolutions (e.g. "Tom Kim" wrongly mapped to
+  // Si Woo Kim's id, then persisted). Without this cross-check the
+  // bad mapping would live forever once locked in.
+  const current = leaderboard.find((r) => r.playerId === currentId);
+  if (current) {
+    if (!name) return currentId;
+    const targetNorm = normaliseName(name);
+    const currentNorm = normaliseName(current.displayName);
+    if (targetNorm === currentNorm) return currentId;
+    // Same last name AND compatible first name (either full or
+    // initial) — e.g., "R. Henley" ↔ "Russell Henley". Otherwise
+    // fall through to re-resolve by name.
+    if (namesCompatible(name, current.displayName)) return currentId;
+  }
+
   if (!name) return currentId;
   const target = normaliseName(name);
   const targetLast = lastNameOf(name);
+
   // Exact normalised match.
   let hit = leaderboard.find((r) => normaliseName(r.displayName) === target);
-  // Fall back to last-name match — covers "R. Henley" ↔ "Russell Henley"
-  // and other initial/full forms users picked from in the sheet.
+
+  // Last-name fallback — only used when there's a UNIQUE last-name
+  // match, OR when multiple candidates all have first names
+  // compatible with the bet's first name / initial. Prevents the
+  // "Tom Kim → Si Woo Kim" collision.
   if (!hit && targetLast.length >= 3) {
-    hit = leaderboard.find((r) => lastNameOf(r.displayName) === targetLast);
+    const lastNameMatches = leaderboard.filter(
+      (r) => lastNameOf(r.displayName) === targetLast,
+    );
+    if (lastNameMatches.length === 1) {
+      hit = lastNameMatches[0];
+    } else if (lastNameMatches.length > 1) {
+      // Disambiguate by first-name compatibility. Return the first
+      // match whose first token is a prefix of the bet's first token
+      // (or vice versa) so "Tom Kim" hits "Tom Kim", not "Si Woo Kim".
+      hit = lastNameMatches.find((r) => namesCompatible(name, r.displayName));
+      // If still ambiguous, DON'T guess — leave the bet unresolved
+      // and surface currentId. Better to show an unresolved bet than
+      // silently attribute it to the wrong player.
+    }
   }
   if (!hit) return currentId;
   // Self-heal: write the resolved id back so future loads skip the
