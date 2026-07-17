@@ -544,7 +544,10 @@ export default function FeedClient({
   // scroll. Bar removed in favour of the per-card hold-to-react
   // gesture; this scroll listener went with it.)
   type FilterMode = "all" | "hot" | "smart";
-  const [filterMode, setFilterMode] = useState<FilterMode>("hot");
+  // Default landing = All (chronological) — Hot's curated view was
+  // confusing users on cold-load because it silently dropped whole
+  // stretches of the timeline. Hot is still a one-tap toggle away.
+  const [filterMode, setFilterMode] = useState<FilterMode>("all");
   /** Shot-detail overlay — opens when a notable shot is tapped
    *  (inline shot card OR a Shots-of-the-day reel card). The
    *  detail surface in turn has its own Share button that opens
