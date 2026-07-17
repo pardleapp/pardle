@@ -209,23 +209,51 @@ function ChartCore({
     [rows, roundFilter],
   );
 
-  // Per-round point subsets — used for the two trend lines. Trend
-  // lines are computed from FINISHED rounds only (not projected) so
-  // the signal stays honest.
-  const pointsR1 = useMemo(
+  // Per-round point subsets — separated into ACTUAL (finished) and
+  // ALL (finished + projected). We compute the smooth over ALL so
+  // the line extends across the full tee-time range, then split the
+  // rendered path at the max-actual-x boundary so the "actual" segment
+  // renders solid and the "projected" segment renders dashed. The user
+  // sees a continuous line whose style clearly marks where certainty
+  // gives way to model projection.
+  const actualR1 = useMemo(
     () =>
       rows
         .filter((r) => r.round === 1 && !r.projected)
         .map((r) => ({ x: r.teeMinutes, y: r.adjusted })),
     [rows],
   );
-  const pointsR2 = useMemo(
+  const actualR2 = useMemo(
     () =>
       rows
         .filter((r) => r.round === 2 && !r.projected)
         .map((r) => ({ x: r.teeMinutes, y: r.adjusted })),
     [rows],
   );
+  const allR1 = useMemo(
+    () =>
+      rows
+        .filter((r) => r.round === 1)
+        .map((r) => ({ x: r.teeMinutes, y: r.adjusted })),
+    [rows],
+  );
+  const allR2 = useMemo(
+    () =>
+      rows
+        .filter((r) => r.round === 2)
+        .map((r) => ({ x: r.teeMinutes, y: r.adjusted })),
+    [rows],
+  );
+  // Boundary x-values where actual data ends and projections begin.
+  const boundaryR1 = actualR1.length > 0
+    ? Math.max(...actualR1.map((p) => p.x))
+    : null;
+  const boundaryR2 = actualR2.length > 0
+    ? Math.max(...actualR2.map((p) => p.x))
+    : null;
+  // Keep the existing pointsR1/pointsR2 names for the readouts.
+  const pointsR1 = actualR1;
+  const pointsR2 = actualR2;
 
   const extent = useMemo(() => {
     if (points.length === 0) {
@@ -283,14 +311,43 @@ function ChartCore({
     [padT, ih, viewport.yMin, viewport.yMax],
   );
 
-  const smoothR1 = useMemo(() => rollingSmooth(pointsR1, 60), [pointsR1]);
-  const smoothR2 = useMemo(() => rollingSmooth(pointsR2, 60), [pointsR2]);
-  const smoothPathR1 = smoothR1
-    .map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(p.x)} ${yFor(p.y)}`)
-    .join(" ");
-  const smoothPathR2 = smoothR2
-    .map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(p.x)} ${yFor(p.y)}`)
-    .join(" ");
+  // Smoothed lines: use ALL points (actuals + projections) so the
+  // trend flows continuously across the full tee-time span. We then
+  // split into two rendered paths based on the boundary — solid up
+  // to the last actual data point, dashed beyond it.
+  const smoothR1 = useMemo(() => rollingSmooth(allR1, 60), [allR1]);
+  const smoothR2 = useMemo(() => rollingSmooth(allR2, 60), [allR2]);
+
+  const buildSplitPaths = (
+    smooth: Array<{ x: number; y: number }>,
+    boundary: number | null,
+  ) => {
+    if (smooth.length === 0) return { actualPath: "", projectedPath: "" };
+    if (boundary == null) {
+      // No actuals — everything is projection.
+      return {
+        actualPath: "",
+        projectedPath: smooth
+          .map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(p.x)} ${yFor(p.y)}`)
+          .join(" "),
+      };
+    }
+    const actualPts = smooth.filter((p) => p.x <= boundary);
+    const projectedPts = smooth.filter((p) => p.x >= boundary);
+    const buildPath = (pts: Array<{ x: number; y: number }>) =>
+      pts
+        .map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(p.x)} ${yFor(p.y)}`)
+        .join(" ");
+    return {
+      actualPath: buildPath(actualPts),
+      projectedPath: projectedPts.length > 1 ? buildPath(projectedPts) : "",
+    };
+  };
+
+  const { actualPath: actualPathR1, projectedPath: projectedPathR1 } =
+    buildSplitPaths(smoothR1, boundaryR1);
+  const { actualPath: actualPathR2, projectedPath: projectedPathR2 } =
+    buildSplitPaths(smoothR2, boundaryR2);
 
   const trendAtCursor = useMemo(() => {
     if (cursorX == null) return null;
@@ -686,6 +743,18 @@ function ChartCore({
             }}
           />
           R1 trend
+          <span
+            style={{
+              width: 20,
+              height: 3,
+              marginLeft: 4,
+              background:
+                "repeating-linear-gradient(90deg, #0284c7 0 2px, transparent 2px 6px)",
+              opacity: 0.7,
+              borderRadius: 2,
+            }}
+          />
+          <span style={{ fontStyle: "italic", opacity: 0.75 }}>projected</span>
         </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           <span
@@ -698,6 +767,18 @@ function ChartCore({
             }}
           />
           R2 trend
+          <span
+            style={{
+              width: 20,
+              height: 3,
+              marginLeft: 4,
+              background:
+                "repeating-linear-gradient(90deg, #d97706 0 1px, transparent 1px 5px)",
+              opacity: 0.7,
+              borderRadius: 2,
+            }}
+          />
+          <span style={{ fontStyle: "italic", opacity: 0.75 }}>projected</span>
         </span>
         <span
           style={{
@@ -893,48 +974,91 @@ function ChartCore({
         </text>
 
         <g clipPath="url(#chart-clip)">
-          {/* Round-1 trend — solid blue, thick */}
-          {(roundFilter === "both" || roundFilter === "r1") &&
-            smoothR1.length > 1 && (
-              <>
-                <path
-                  d={smoothPathR1}
-                  fill="none"
-                  stroke="white"
-                  strokeWidth={5}
-                  opacity={0.9}
-                />
-                <path
-                  d={smoothPathR1}
-                  fill="none"
-                  stroke="#0284c7"
-                  strokeWidth={3}
-                  opacity={1}
-                />
-              </>
-            )}
-          {/* Round-2 trend — dashed amber, thick, with white halo
-              so it reads clearly when the two lines overlap. */}
-          {(roundFilter === "both" || roundFilter === "r2") &&
-            smoothR2.length > 1 && (
-              <>
-                <path
-                  d={smoothPathR2}
-                  fill="none"
-                  stroke="white"
-                  strokeWidth={5}
-                  opacity={0.9}
-                />
-                <path
-                  d={smoothPathR2}
-                  fill="none"
-                  stroke="#d97706"
-                  strokeWidth={3}
-                  opacity={1}
-                  strokeDasharray="7 5"
-                />
-              </>
-            )}
+          {/* Round-1 trend — solid blue for actuals, small-dash blue
+              for the projected extension. */}
+          {(roundFilter === "both" || roundFilter === "r1") && (
+            <>
+              {actualPathR1 && (
+                <>
+                  <path
+                    d={actualPathR1}
+                    fill="none"
+                    stroke="white"
+                    strokeWidth={5}
+                    opacity={0.9}
+                  />
+                  <path
+                    d={actualPathR1}
+                    fill="none"
+                    stroke="#0284c7"
+                    strokeWidth={3}
+                  />
+                </>
+              )}
+              {projectedPathR1 && (
+                <>
+                  <path
+                    d={projectedPathR1}
+                    fill="none"
+                    stroke="white"
+                    strokeWidth={5}
+                    opacity={0.85}
+                  />
+                  <path
+                    d={projectedPathR1}
+                    fill="none"
+                    stroke="#0284c7"
+                    strokeWidth={3}
+                    opacity={0.65}
+                    strokeDasharray="2 4"
+                  />
+                </>
+              )}
+            </>
+          )}
+          {/* Round-2 trend — long-dash amber for actuals, tight-dot
+              amber for the projected extension. */}
+          {(roundFilter === "both" || roundFilter === "r2") && (
+            <>
+              {actualPathR2 && (
+                <>
+                  <path
+                    d={actualPathR2}
+                    fill="none"
+                    stroke="white"
+                    strokeWidth={5}
+                    opacity={0.9}
+                  />
+                  <path
+                    d={actualPathR2}
+                    fill="none"
+                    stroke="#d97706"
+                    strokeWidth={3}
+                    strokeDasharray="7 5"
+                  />
+                </>
+              )}
+              {projectedPathR2 && (
+                <>
+                  <path
+                    d={projectedPathR2}
+                    fill="none"
+                    stroke="white"
+                    strokeWidth={5}
+                    opacity={0.85}
+                  />
+                  <path
+                    d={projectedPathR2}
+                    fill="none"
+                    stroke="#d97706"
+                    strokeWidth={3}
+                    opacity={0.65}
+                    strokeDasharray="1 4"
+                  />
+                </>
+              )}
+            </>
+          )}
 
           {visiblePoints.map((p) => {
             const y = p.y;
