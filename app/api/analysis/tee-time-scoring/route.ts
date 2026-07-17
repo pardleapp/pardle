@@ -142,15 +142,25 @@ interface OutRow {
   teeTime: string;
   teeMinutes: number; // minutes since midnight for the scatter x-axis
   sgTotal: number;
+  /** For finished rounds this is the actual round score to par.
+   *  For projected (in-progress) rounds this is the MODEL'S projection
+   *  of what they'll finish at. */
   toPar: number;
   adjusted: number; // toPar + sgTotal
   thru: string | number;
   startHole: number;
-  /** True when the player has no DG skill rating (amateur, qualifier,
-   *  minor-tour). Their sgTotal defaults to 0 so their raw score
-   *  IS their adjusted score. The chart draws them as outlined dots
-   *  so the visual distinguishes "skill-adjusted" from "raw score". */
+  /** True when the player has no DG skill rating. */
   noSkill: boolean;
+  /** True when this row is a MODEL PROJECTION (player still on course).
+   *  False when the round has actually completed. Drives the chart's
+   *  visual distinction — dashed hollow marks for projections. */
+  projected: boolean;
+  /** Holes completed at snapshot time. 18 when finished; anything
+   *  below when projected. Used for the tooltip. */
+  thruHoles: number;
+  /** Actual current score to par (only meaningful when projected).
+   *  For finished rounds this equals `toPar`. */
+  currentToPar: number;
 }
 
 /** Parse DataGolf tee times to minutes-since-midnight. Handles:
@@ -266,7 +276,11 @@ export async function GET() {
         const thruStr =
           typeof l.thru === "string" ? l.thru.trim() : "";
         const thruDone = thruNum === 18 || /^f/i.test(thruStr);
-        if (!thruDone) {
+        // Must have SOME holes played to project — skip pre-round.
+        const thruHoles = Number.isFinite(thruNum)
+          ? Math.max(0, Math.min(18, Math.floor(thruNum)))
+          : 0;
+        if (!thruDone && thruHoles === 0) {
           drops.notDone++;
           continue;
         }
@@ -276,12 +290,7 @@ export async function GET() {
           drops.noScore++;
           continue;
         }
-        // Skill source priority:
-        //   1. CSV `final_prediction` — event-specific (major + course
-        //      history + course-fit adjusted). Best available skill
-        //      estimate for The Open at Royal Birkdale.
-        //   2. DG `skill-ratings` endpoint — generic tour SG baseline.
-        //   3. Fall back to 0 (tour average) and mark as noSkill.
+        // Skill priority: CSV final_prediction → DG skill-ratings → 0.
         const csvSg = csvSkill.get(l.player_name);
         let sgTotal: number;
         let hasSkill: boolean;
@@ -297,6 +306,22 @@ export async function GET() {
           drops.noSkill++;
         }
 
+        // Projected final for players still on course.
+        //   projected_per_hole_remaining = -sgTotal / 18
+        //     (positive SG player expected to shoot below field per
+        //      hole; we treat field average as par as a simplification.)
+        //   projected_final_toPar =
+        //     current_score + (18 - thru) * projected_per_hole
+        //
+        // Regresses their current pace toward their skill baseline.
+        // Naive but honest: a good player who's off to a bad start
+        // gets projected to recover toward par; a bad player off to
+        // a hot start gets projected to fall back a bit.
+        const projected = !thruDone;
+        const finalToPar = projected
+          ? rndScore + (18 - thruHoles) * (-sgTotal / 18)
+          : rndScore;
+
         out.push({
           dgId: String(l.dg_id),
           name: l.player_name,
@@ -304,11 +329,14 @@ export async function GET() {
           teeTime: minutesToClock(mins),
           teeMinutes: mins,
           sgTotal,
-          toPar: rndScore,
-          adjusted: rndScore + sgTotal,
+          toPar: finalToPar,
+          adjusted: finalToPar + sgTotal,
           thru: l.thru ?? "-",
           startHole: tt?.start_hole ?? 1,
           noSkill: !hasSkill,
+          projected,
+          thruHoles,
+          currentToPar: rndScore,
         });
       }
       return out;

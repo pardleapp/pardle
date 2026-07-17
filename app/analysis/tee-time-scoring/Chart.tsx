@@ -22,6 +22,9 @@ interface Row {
   thru: string | number;
   startHole: number;
   noSkill?: boolean;
+  projected?: boolean;
+  thruHoles?: number;
+  currentToPar?: number;
 }
 
 type RoundFilter = "both" | "r1" | "r2";
@@ -206,18 +209,20 @@ function ChartCore({
     [rows, roundFilter],
   );
 
-  // Per-round point subsets — used for the two trend lines.
+  // Per-round point subsets — used for the two trend lines. Trend
+  // lines are computed from FINISHED rounds only (not projected) so
+  // the signal stays honest.
   const pointsR1 = useMemo(
     () =>
       rows
-        .filter((r) => r.round === 1)
+        .filter((r) => r.round === 1 && !r.projected)
         .map((r) => ({ x: r.teeMinutes, y: r.adjusted })),
     [rows],
   );
   const pointsR2 = useMemo(
     () =>
       rows
-        .filter((r) => r.round === 2)
+        .filter((r) => r.round === 2 && !r.projected)
         .map((r) => ({ x: r.teeMinutes, y: r.adjusted })),
     [rows],
   );
@@ -707,6 +712,20 @@ function ChartCore({
           outperformed ·{" "}
           <span style={{ color: "#dc2626", fontWeight: 700 }}>red</span> = under
         </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <svg width={16} height={16} viewBox="-8 -8 16 16">
+            <circle
+              r={5}
+              cx={0}
+              cy={0}
+              fill="white"
+              stroke="#334155"
+              strokeWidth={2}
+              strokeDasharray="3 2"
+            />
+          </svg>
+          hollow dashed = model projection (still on course)
+        </span>
       </div>
 
       {/* Trend readout — shows the smoothed-line value under cursor */}
@@ -925,14 +944,23 @@ function ChartCore({
               hover?.dgId === p.row.dgId && hover?.round === p.row.round;
             const noSkill = p.row.noSkill === true;
             const isR2 = p.row.round === 2;
-            // Ring colour — blue for R1, amber for R2. Combined with
-            // the polarity-coloured fill, each dot carries TWO pieces
-            // of information: round (ring hue + shape) and score
-            // direction (fill hue).
+            const isProjected = p.row.projected === true;
             const roundColor = isR2 ? "#d97706" : "#0284c7";
             const cx = xFor(p.x);
             const cy = yFor(y);
             const r = isHover ? 7 : 4;
+            // Projected dots: hollow (white fill), dashed ring in the
+            // round's hue, translucent so they read as "estimate, not
+            // yet reality". Actuals: solid fill, solid ring.
+            const commonFill = isProjected
+              ? "white"
+              : noSkill
+                ? "white"
+                : polarityColor;
+            const commonStroke = isProjected ? polarityColor : roundColor;
+            const commonStrokeWidth = isProjected ? 2 : isHover ? 3 : 1.8;
+            const commonDash = isProjected ? "3 2" : undefined;
+            const commonOpacity = isHover ? 1 : isProjected ? 0.7 : 0.85;
             if (isR2) {
               return (
                 <rect
@@ -941,10 +969,11 @@ function ChartCore({
                   y={cy - r}
                   width={r * 2}
                   height={r * 2}
-                  fill={noSkill ? "white" : polarityColor}
-                  opacity={isHover ? 1 : 0.85}
-                  stroke={roundColor}
-                  strokeWidth={isHover ? 3 : 1.8}
+                  fill={commonFill}
+                  opacity={commonOpacity}
+                  stroke={commonStroke}
+                  strokeWidth={commonStrokeWidth}
+                  strokeDasharray={commonDash}
                   onPointerEnter={() => setHover(p.row)}
                 />
               );
@@ -955,10 +984,11 @@ function ChartCore({
                 cx={cx}
                 cy={cy}
                 r={r}
-                fill={noSkill ? "white" : polarityColor}
-                opacity={isHover ? 1 : 0.85}
-                stroke={roundColor}
-                strokeWidth={isHover ? 3 : 1.8}
+                fill={commonFill}
+                opacity={commonOpacity}
+                stroke={commonStroke}
+                strokeWidth={commonStrokeWidth}
+                strokeDasharray={commonDash}
                 onPointerEnter={() => setHover(p.row)}
               />
             );
@@ -1024,6 +1054,22 @@ function ChartCore({
         >
           <strong>
             {hover.name} · R{hover.round}
+            {hover.projected && (
+              <span
+                style={{
+                  marginLeft: 8,
+                  fontSize: 10,
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                  background: "oklch(0.94 0.02 250)",
+                  color: "oklch(0.35 0.05 250)",
+                  fontWeight: 700,
+                  letterSpacing: 0.4,
+                }}
+              >
+                PROJECTED
+              </span>
+            )}
           </strong>
           <span style={{ color: "oklch(0.5 0.02 150)" }}>
             teed off {hover.teeTime} · start hole {hover.startHole} · thru{" "}
@@ -1038,7 +1084,24 @@ function ChartCore({
           >
             SG total {formatSigned(hover.sgTotal)}
           </span>
-          <span style={{ color: "oklch(0.5 0.02 150)" }}>R1 to par</span>
+          {hover.projected && typeof hover.currentToPar === "number" && (
+            <>
+              <span style={{ color: "oklch(0.5 0.02 150)" }}>
+                Current (thru {hover.thruHoles ?? hover.thru})
+              </span>
+              <span
+                style={{
+                  fontFamily: "var(--font-mono, monospace)",
+                  fontWeight: 700,
+                }}
+              >
+                {formatSigned(hover.currentToPar)}
+              </span>
+            </>
+          )}
+          <span style={{ color: "oklch(0.5 0.02 150)" }}>
+            {hover.projected ? "Projected final" : `R${hover.round} to par`}
+          </span>
           <span
             style={{
               fontFamily: "var(--font-mono, monospace)",

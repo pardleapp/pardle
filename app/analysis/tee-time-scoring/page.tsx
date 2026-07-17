@@ -19,6 +19,9 @@ export interface Row {
   thru: string | number;
   startHole: number;
   noSkill?: boolean;
+  projected?: boolean;
+  thruHoles?: number;
+  currentToPar?: number;
 }
 
 interface FetchResp {
