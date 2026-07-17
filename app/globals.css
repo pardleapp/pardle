@@ -14024,6 +14024,16 @@ html, body {
   margin-top: 0;
 }
 
+/* Desktop hides the top-nav MainNav pill — the left rail
+   (DesktopRail) already provides site-wide navigation, so the top
+   tabs are redundant and steal vertical space. Mobile keeps them
+   since there's no side rail there. */
+@media (min-width: 1024px) {
+  .brand-nav .hub-nav-tabs {
+    display: none;
+  }
+}
+
 .hub-header.hub-header-split .hub-subtitle {
   display: none;
 }
