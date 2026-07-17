@@ -102,6 +102,20 @@ const PRIMARY: Item[] = [
     ),
   },
   {
+    href: "/analysis",
+    label: "Analysis",
+    matches: ["/analysis"],
+    iconPath: (
+      <>
+        <path d="M4 20V4" />
+        <path d="M4 20h16" />
+        <path d="M8 16v-4" />
+        <path d="M12 16V9" />
+        <path d="M16 16v-6" />
+      </>
+    ),
+  },
+  {
     href: "/notifications",
     label: "Notifications",
     matches: ["/notifications"],
