@@ -16,6 +16,8 @@
  */
 
 import { NextResponse } from "next/server";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -26,6 +28,74 @@ function apiKey(): string {
   const k = process.env.DATAGOLF_API_KEY || process.env.DATAGOLF;
   if (!k) throw new Error("DATAGOLF_API_KEY is not set");
   return k;
+}
+
+/** Load DataGolf decomposition CSV — event-specific skill projections
+ *  including major_adj, course_history_adj, driving-fit adjustments.
+ *  `final_prediction` is what we use as the skill baseline. Cached
+ *  once per server process — the CSV is a static file bundled in the
+ *  repo. */
+let csvSkillCache: Map<string, number> | null = null;
+async function loadDecompositionSkill(): Promise<Map<string, number>> {
+  if (csvSkillCache) return csvSkillCache;
+  const map = new Map<string, number>();
+  try {
+    const csvPath = path.join(
+      process.cwd(),
+      "data",
+      "dg-open-decomposition.csv",
+    );
+    const text = await fs.readFile(csvPath, "utf8");
+    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length < 2) return map;
+    const header = parseCsvLine(lines[0]);
+    const nameIdx = header.indexOf("player_name");
+    const finalIdx = header.indexOf("final_prediction");
+    if (nameIdx < 0 || finalIdx < 0) return map;
+    for (let i = 1; i < lines.length; i++) {
+      const cells = parseCsvLine(lines[i]);
+      const name = cells[nameIdx];
+      const finalPred = Number(cells[finalIdx]);
+      if (name && Number.isFinite(finalPred)) {
+        map.set(name, finalPred);
+      }
+    }
+    csvSkillCache = map;
+  } catch (err) {
+    console.error("[tee-time-scoring] decomposition CSV load failed", err);
+  }
+  return map;
+}
+
+/** Very small CSV line parser handling quoted fields with commas
+ *  inside. Enough for this fixed-schema file. */
+function parseCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        cur += c;
+      }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ",") {
+        out.push(cur);
+        cur = "";
+      } else cur += c;
+    }
+  }
+  out.push(cur);
+  return out;
 }
 
 async function fetchJson<T>(path: string): Promise<T> {
@@ -129,7 +199,7 @@ export async function GET() {
   try {
     const tour = "pga"; // The Open sits under DG's `pga` feed (majors covered there).
 
-    const [field, skills, liveR1, liveR2] = await Promise.all([
+    const [field, skills, liveR1, liveR2, csvSkill] = await Promise.all([
       fetchJson<{ field?: FieldEntry[] }>("/field-updates?tour=" + tour),
       fetchJson<{ players?: SkillEntry[] }>(
         "/preds/skill-ratings?display=value",
@@ -137,11 +207,10 @@ export async function GET() {
       fetchJson<{ live_stats?: LiveEntry[] }>(
         "/preds/live-tournament-stats?tour=" + tour + "&round=1",
       ),
-      // R2 may not have started yet — DG returns an empty live_stats
-      // in that case, which naturally produces zero R2 rows.
       fetchJson<{ live_stats?: LiveEntry[] }>(
         "/preds/live-tournament-stats?tour=" + tour + "&round=2",
       ),
+      loadDecompositionSkill(),
     ]);
 
     const fieldRows = field.field ?? [];
@@ -207,9 +276,26 @@ export async function GET() {
           drops.noScore++;
           continue;
         }
-        const hasSkill = !!s && typeof s.sg_total === "number";
-        const sgTotal = hasSkill ? (s.sg_total as number) : 0;
-        if (!hasSkill) drops.noSkill++;
+        // Skill source priority:
+        //   1. CSV `final_prediction` — event-specific (major + course
+        //      history + course-fit adjusted). Best available skill
+        //      estimate for The Open at Royal Birkdale.
+        //   2. DG `skill-ratings` endpoint — generic tour SG baseline.
+        //   3. Fall back to 0 (tour average) and mark as noSkill.
+        const csvSg = csvSkill.get(l.player_name);
+        let sgTotal: number;
+        let hasSkill: boolean;
+        if (typeof csvSg === "number") {
+          sgTotal = csvSg;
+          hasSkill = true;
+        } else if (s && typeof s.sg_total === "number") {
+          sgTotal = s.sg_total;
+          hasSkill = true;
+        } else {
+          sgTotal = 0;
+          hasSkill = false;
+          drops.noSkill++;
+        }
 
         out.push({
           dgId: String(l.dg_id),
@@ -242,6 +328,7 @@ export async function GET() {
       diag: {
         fieldRowsCount: fieldRows.length,
         skillRowsCount: skillRows.length,
+        csvSkillCount: csvSkill.size,
         liveR1RowsCount: liveR1Rows.length,
         liveR2RowsCount: liveR2Rows.length,
         drops: dropCounts,

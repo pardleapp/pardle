@@ -632,7 +632,7 @@ function ChartCore({
         </div>
       </div>
 
-      {/* Legend row — shape encodes round, color encodes polarity. */}
+      {/* Legend row — shape + ring hue encode round, fill hue encodes polarity. */}
       <div
         style={{
           display: "flex",
@@ -641,24 +641,40 @@ function ChartCore({
           color: "oklch(0.5 0.02 150)",
           marginBottom: 6,
           flexWrap: "wrap",
+          alignItems: "center",
         }}
       >
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <svg width={14} height={14} viewBox="-7 -7 14 14">
-            <circle r={4} cx={0} cy={0} fill="#334155" />
+          <svg width={16} height={16} viewBox="-8 -8 16 16">
+            <circle
+              r={5}
+              cx={0}
+              cy={0}
+              fill="#334155"
+              stroke="#0284c7"
+              strokeWidth={2}
+            />
           </svg>
-          R1
+          <strong style={{ color: "#0284c7" }}>R1</strong> (circle, blue ring)
         </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <svg width={14} height={14} viewBox="-7 -7 14 14">
-            <rect x={-4} y={-4} width={8} height={8} fill="#334155" />
+          <svg width={16} height={16} viewBox="-8 -8 16 16">
+            <rect
+              x={-5}
+              y={-5}
+              width={10}
+              height={10}
+              fill="#334155"
+              stroke="#d97706"
+              strokeWidth={2}
+            />
           </svg>
-          R2
+          <strong style={{ color: "#d97706" }}>R2</strong> (square, amber ring)
         </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           <span
             style={{
-              width: 20,
+              width: 24,
               height: 3,
               background: "#0284c7",
               borderRadius: 2,
@@ -669,22 +685,27 @@ function ChartCore({
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           <span
             style={{
-              width: 20,
+              width: 24,
               height: 3,
               background:
-                "repeating-linear-gradient(90deg, #d97706 0 6px, transparent 6px 10px)",
+                "repeating-linear-gradient(90deg, #d97706 0 7px, transparent 7px 12px)",
               borderRadius: 2,
             }}
           />
           R2 trend
         </span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <span style={{ color: "#059669", fontWeight: 700 }}>green</span>
-          outperformed skill
-        </span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <span style={{ color: "#dc2626", fontWeight: 700 }}>red</span>
-          underperformed
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            marginLeft: 6,
+          }}
+        >
+          fill:{" "}
+          <span style={{ color: "#059669", fontWeight: 700 }}>green</span> =
+          outperformed ·{" "}
+          <span style={{ color: "#dc2626", fontWeight: 700 }}>red</span> = under
         </span>
       </div>
 
@@ -853,43 +874,65 @@ function ChartCore({
         </text>
 
         <g clipPath="url(#chart-clip)">
-          {/* Round-1 trend (blue) */}
+          {/* Round-1 trend — solid blue, thick */}
           {(roundFilter === "both" || roundFilter === "r1") &&
             smoothR1.length > 1 && (
-              <path
-                d={smoothPathR1}
-                fill="none"
-                stroke="#0284c7"
-                strokeWidth={2.5}
-                opacity={0.75}
-              />
+              <>
+                <path
+                  d={smoothPathR1}
+                  fill="none"
+                  stroke="white"
+                  strokeWidth={5}
+                  opacity={0.9}
+                />
+                <path
+                  d={smoothPathR1}
+                  fill="none"
+                  stroke="#0284c7"
+                  strokeWidth={3}
+                  opacity={1}
+                />
+              </>
             )}
-          {/* Round-2 trend (amber) */}
+          {/* Round-2 trend — dashed amber, thick, with white halo
+              so it reads clearly when the two lines overlap. */}
           {(roundFilter === "both" || roundFilter === "r2") &&
             smoothR2.length > 1 && (
-              <path
-                d={smoothPathR2}
-                fill="none"
-                stroke="#d97706"
-                strokeWidth={2.5}
-                opacity={0.75}
-                strokeDasharray="6 4"
-              />
+              <>
+                <path
+                  d={smoothPathR2}
+                  fill="none"
+                  stroke="white"
+                  strokeWidth={5}
+                  opacity={0.9}
+                />
+                <path
+                  d={smoothPathR2}
+                  fill="none"
+                  stroke="#d97706"
+                  strokeWidth={3}
+                  opacity={1}
+                  strokeDasharray="7 5"
+                />
+              </>
             )}
 
           {visiblePoints.map((p) => {
             const y = p.y;
-            const color =
+            const polarityColor =
               y < -0.3 ? "#059669" : y > 0.3 ? "#dc2626" : "#334155";
-            const isHover = hover?.dgId === p.row.dgId && hover?.round === p.row.round;
+            const isHover =
+              hover?.dgId === p.row.dgId && hover?.round === p.row.round;
             const noSkill = p.row.noSkill === true;
             const isR2 = p.row.round === 2;
+            // Ring colour — blue for R1, amber for R2. Combined with
+            // the polarity-coloured fill, each dot carries TWO pieces
+            // of information: round (ring hue + shape) and score
+            // direction (fill hue).
+            const roundColor = isR2 ? "#d97706" : "#0284c7";
             const cx = xFor(p.x);
             const cy = yFor(y);
-            const r = isHover ? 6 : 3.5;
-            // Distinguish rounds by MARK SHAPE (categorical secondary
-            // encoding on top of polarity colour): R1 = circle,
-            // R2 = square. Same green/red polarity in both.
+            const r = isHover ? 7 : 4;
             if (isR2) {
               return (
                 <rect
@@ -898,10 +941,10 @@ function ChartCore({
                   y={cy - r}
                   width={r * 2}
                   height={r * 2}
-                  fill={noSkill ? "white" : color}
-                  opacity={isHover ? 1 : 0.75}
-                  stroke={isHover ? "white" : noSkill ? color : "none"}
-                  strokeWidth={noSkill ? 1.5 : 2}
+                  fill={noSkill ? "white" : polarityColor}
+                  opacity={isHover ? 1 : 0.85}
+                  stroke={roundColor}
+                  strokeWidth={isHover ? 3 : 1.8}
                   onPointerEnter={() => setHover(p.row)}
                 />
               );
@@ -912,10 +955,10 @@ function ChartCore({
                 cx={cx}
                 cy={cy}
                 r={r}
-                fill={noSkill ? "white" : color}
-                opacity={isHover ? 1 : 0.75}
-                stroke={isHover ? "white" : noSkill ? color : "none"}
-                strokeWidth={noSkill ? 1.5 : 2}
+                fill={noSkill ? "white" : polarityColor}
+                opacity={isHover ? 1 : 0.85}
+                stroke={roundColor}
+                strokeWidth={isHover ? 3 : 1.8}
                 onPointerEnter={() => setHover(p.row)}
               />
             );
