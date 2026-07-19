@@ -225,6 +225,12 @@ export async function GET() {
   try {
     const tour = "pga"; // The Open sits under DG's `pga` feed (majors covered there).
 
+    // DG's live-tournament-stats needs an explicit `stats=` query
+    // param to return the round-specific columns we rely on. Without
+    // it the endpoint returns partial or stale data for the requested
+    // round (was surfacing as "R4 chart shows R3 scores"). The listed
+    // stats are the ones we actually consume downstream.
+    const dgStats = "sg_total,sg_ott,sg_app,sg_arg,sg_putt";
     const [field, skills, liveR1, liveR2, liveR3, liveR4, csvSkill] =
       await Promise.all([
         fetchJson<{ field?: FieldEntry[] }>("/field-updates?tour=" + tour),
@@ -232,18 +238,16 @@ export async function GET() {
           "/preds/skill-ratings?display=value",
         ),
         fetchJson<{ live_stats?: LiveEntry[] }>(
-          "/preds/live-tournament-stats?tour=" + tour + "&round=1",
+          "/preds/live-tournament-stats?tour=" + tour + "&round=1&stats=" + dgStats,
         ),
         fetchJson<{ live_stats?: LiveEntry[] }>(
-          "/preds/live-tournament-stats?tour=" + tour + "&round=2",
-        ),
-        // R3/R4 return empty live_stats until those rounds start — the
-        // buildRows helper naturally produces zero rows for those days.
-        fetchJson<{ live_stats?: LiveEntry[] }>(
-          "/preds/live-tournament-stats?tour=" + tour + "&round=3",
+          "/preds/live-tournament-stats?tour=" + tour + "&round=2&stats=" + dgStats,
         ),
         fetchJson<{ live_stats?: LiveEntry[] }>(
-          "/preds/live-tournament-stats?tour=" + tour + "&round=4",
+          "/preds/live-tournament-stats?tour=" + tour + "&round=3&stats=" + dgStats,
+        ),
+        fetchJson<{ live_stats?: LiveEntry[] }>(
+          "/preds/live-tournament-stats?tour=" + tour + "&round=4&stats=" + dgStats,
         ),
         loadDecompositionSkill(),
       ]);
@@ -451,6 +455,16 @@ export async function GET() {
             projectedFinal: Number(r.toPar.toFixed(3)),
             adjusted: Number(r.adjusted.toFixed(3)),
           })),
+        // Raw DG R4 payload for a couple of named players — verifies
+        // whether DG is returning R4 numbers or echoing older rounds.
+        r4RawFromDG: (liveR4Rows.filter((l) =>
+          /southgate|scheffler|mcilroy|fleetwood/i.test(l.player_name),
+        )).map((l) => ({
+          name: l.player_name,
+          thru: l.thru,
+          round: l.round,
+          total: l.total,
+        })),
       },
       rows,
     });
