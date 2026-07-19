@@ -193,6 +193,20 @@ function teeToMinutes(t: string | undefined): number | null {
   return null;
 }
 
+/** Parse the FULL DataGolf tee-time datetime string into an epoch ms.
+ *  Format from field-updates: "YYYY-MM-DD HH:MM". Interpreted as UTC
+ *  for the "is in the past?" check — 1h BST/UTC drift is fine at
+ *  round-scale granularity. Returns null when the string is malformed
+ *  or missing. */
+function teeToEpochMs(t: string | undefined): number | null {
+  if (!t) return null;
+  const m = t.trim().match(/(\d{4})-(\d{2})-(\d{2})[T ]?(\d{2}):(\d{2})/);
+  if (!m) return null;
+  const iso = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00Z`;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms : null;
+}
+
 /** Pull the R1 tee time entry from DataGolf's teetimes array. */
 function r1Teetime(entry: FieldEntry): FieldTeetime | null {
   const rows = entry.teetimes ?? [];
@@ -270,6 +284,7 @@ export async function GET() {
       return rows.find((r) => r.round_num === round) ?? null;
     };
 
+    const nowMs = Date.now();
     const buildRows = (
       liveRows: LiveEntry[],
       round: RoundNum,
@@ -287,6 +302,17 @@ export async function GET() {
         const mins = teeToMinutes(tt?.teetime);
         if (mins == null) {
           drops.noTeeTime++;
+          continue;
+        }
+        // Gate: player must have ACTUALLY teed off this round. DG's
+        // `live-tournament-stats?round=N` will happily echo the
+        // previous round's `thru: 18` and score for players who
+        // haven't teed off yet — without this check R4 shows
+        // R3 data for anyone in a late tee-time group. Compare the
+        // full round-N tee datetime to wall clock; drop if future.
+        const teeEpoch = teeToEpochMs(tt?.teetime);
+        if (teeEpoch != null && teeEpoch > nowMs) {
+          drops.notDone++;
           continue;
         }
         const thruNum =
