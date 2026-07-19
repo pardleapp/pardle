@@ -26,6 +26,13 @@ const CARDS: Card[] = [
       "Scatter of every finisher's round score minus their pre-tournament skill projection, plotted against tee time. Trend line reveals whether one wave had it easier.",
     status: "live",
   },
+  {
+    href: "/analysis/course-heatmap",
+    title: "Course difficulty by hole and time",
+    blurb:
+      "18-hole heatmap showing average scoring vs par for every hole across the day. Read a row to see when a hole started biting; read a column to see which holes were toughest at any hour.",
+    status: "live",
+  },
 ];
 
 export default function AnalysisIndex() {
