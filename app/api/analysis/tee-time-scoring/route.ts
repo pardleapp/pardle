@@ -398,6 +398,21 @@ export async function GET() {
       (a, b) => a.teeMinutes - b.teeMinutes,
     );
 
+    /** Per-round split of finished vs projected — surfaces when the
+     *  projection path is being taken. Verifies the "R4 still-on-course
+     *  players are projected" invariant at a glance. */
+    const splitByRound = (
+      rs: OutRow[],
+    ): { total: number; finished: number; projected: number } => {
+      let finished = 0;
+      let projected = 0;
+      for (const r of rs) {
+        if (r.projected) projected++;
+        else finished++;
+      }
+      return { total: rs.length, finished, projected };
+    };
+
     return NextResponse.json({
       ok: true,
       count: rows.length,
@@ -417,6 +432,25 @@ export async function GET() {
         liveR3RowsCount: liveR3Rows.length,
         liveR4RowsCount: liveR4Rows.length,
         drops: dropCounts,
+        splitByRound: {
+          r1: splitByRound(rowsR1),
+          r2: splitByRound(rowsR2),
+          r3: splitByRound(rowsR3),
+          r4: splitByRound(rowsR4),
+        },
+        // Sample R4 in-progress rows so you can spot-check the
+        // projection maths on the wire.
+        r4Samples: rowsR4
+          .filter((r) => r.projected)
+          .slice(0, 5)
+          .map((r) => ({
+            name: r.name,
+            thruHoles: r.thruHoles,
+            currentToPar: r.currentToPar,
+            sgTotal: Number(r.sgTotal.toFixed(3)),
+            projectedFinal: Number(r.toPar.toFixed(3)),
+            adjusted: Number(r.adjusted.toFixed(3)),
+          })),
       },
       rows,
     });
