@@ -18,6 +18,8 @@
 import { NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { getActiveTournament } from "@/lib/golf-api/pgatour";
+import { getSnapshot, getCachedTournamentPars } from "@/lib/feed/store";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -116,6 +118,7 @@ interface FieldTeetime {
 interface FieldEntry {
   dg_id: number;
   player_name: string;
+  player_num?: number; // PGA Tour orchestrator id — matches Pardle's snapshot key
   teetimes?: FieldTeetime[];
 }
 
@@ -225,14 +228,26 @@ export async function GET() {
   try {
     const tour = "pga"; // The Open sits under DG's `pga` feed (majors covered there).
 
-    // DG's live-tournament-stats needs an explicit `stats=` query
-    // param to return the round-specific columns we rely on. Without
-    // it the endpoint returns partial or stale data for the requested
-    // round (was surfacing as "R4 chart shows R3 scores"). The listed
-    // stats are the ones we actually consume downstream.
+    // Resolve the active tournament so we can fetch Pardle's own
+    // per-hole snapshot as the authoritative score source. DG's
+    // live-tournament-stats?round=4 was returning stale thru:18 /
+    // R3-echoed round scores for mid-R4 players — snapshot has real
+    // hole-by-hole data.
+    const activeTourney = await getActiveTournament();
+    const activeTournamentId = activeTourney?.tournament?.id ?? null;
+
     const dgStats = "sg_total,sg_ott,sg_app,sg_arg,sg_putt";
-    const [field, skills, liveR1, liveR2, liveR3, liveR4, csvSkill] =
-      await Promise.all([
+    const [
+      field,
+      skills,
+      liveR1,
+      liveR2,
+      liveR3,
+      liveR4,
+      csvSkill,
+      snapshot,
+      snapshotPars,
+    ] = await Promise.all([
         fetchJson<{ field?: FieldEntry[] }>("/field-updates?tour=" + tour),
         fetchJson<{ players?: SkillEntry[] }>(
           "/preds/skill-ratings?display=value",
@@ -250,6 +265,10 @@ export async function GET() {
           "/preds/live-tournament-stats?tour=" + tour + "&round=4&stats=" + dgStats,
         ),
         loadDecompositionSkill(),
+        activeTournamentId ? getSnapshot(activeTournamentId) : Promise.resolve(null),
+        activeTournamentId
+          ? getCachedTournamentPars(activeTournamentId)
+          : Promise.resolve({} as Record<number, Record<number, number>>),
       ]);
 
     const fieldRows = field.field ?? [];
@@ -289,6 +308,36 @@ export async function GET() {
     };
 
     const nowMs = Date.now();
+
+    /** Compute (thruHoles, scoreToPar) from Pardle's snapshot for a
+     *  specific (player, round). Returns null when there's no
+     *  snapshot data for this player/round yet — caller falls back
+     *  to DG. */
+    const snapshotScore = (
+      pgaId: string | undefined,
+      round: RoundNum,
+    ): { thruHoles: number; toPar: number } | null => {
+      if (!pgaId || !snapshot) return null;
+      const holes = snapshot.holes?.[pgaId]?.[round];
+      if (!holes) return null;
+      const roundPars = snapshotPars[round];
+      if (!roundPars) return null;
+      let strokes = 0;
+      let par = 0;
+      let played = 0;
+      for (const [holeStr, scoreStr] of Object.entries(holes)) {
+        const s = Number(scoreStr);
+        if (!Number.isFinite(s) || s <= 0) continue;
+        const p = roundPars[Number(holeStr)];
+        if (typeof p !== "number") continue;
+        strokes += s;
+        par += p;
+        played++;
+      }
+      if (played === 0) return null;
+      return { thruHoles: played, toPar: strokes - par };
+    };
+
     const buildRows = (
       liveRows: LiveEntry[],
       round: RoundNum,
@@ -308,39 +357,48 @@ export async function GET() {
           drops.noTeeTime++;
           continue;
         }
-        // Gate: player must have ACTUALLY teed off this round. DG's
-        // `live-tournament-stats?round=N` will happily echo the
-        // previous round's `thru: 18` and score for players who
-        // haven't teed off yet — without this check R4 shows
-        // R3 data for anyone in a late tee-time group. Compare the
-        // full round-N tee datetime to wall clock; drop if future.
+        // Drop players whose round hasn't started yet.
         const teeEpoch = teeToEpochMs(tt?.teetime);
         if (teeEpoch != null && teeEpoch > nowMs) {
           drops.notDone++;
           continue;
         }
-        const thruNum =
-          typeof l.thru === "number"
-            ? l.thru
-            : typeof l.thru === "string"
-              ? Number(l.thru.trim())
-              : NaN;
-        const thruStr =
-          typeof l.thru === "string" ? l.thru.trim() : "";
-        const thruDone = thruNum === 18 || /^f/i.test(thruStr);
-        // Must have SOME holes played to project — skip pre-round.
-        const thruHoles = Number.isFinite(thruNum)
-          ? Math.max(0, Math.min(18, Math.floor(thruNum)))
-          : 0;
-        if (!thruDone && thruHoles === 0) {
-          drops.notDone++;
-          continue;
-        }
-        const rndScore =
-          typeof l.round === "number" ? l.round : undefined;
-        if (typeof rndScore !== "number") {
-          drops.noScore++;
-          continue;
+        // Score source priority: Pardle snapshot (authoritative
+        // per-hole data) → DG live-tournament-stats (unreliable for
+        // in-progress rounds — DG echoes previous round data).
+        const pgaId = f.player_num ? String(f.player_num) : undefined;
+        const snap = snapshotScore(pgaId, round);
+        let thruHoles: number;
+        let rndScore: number;
+        let thruDone: boolean;
+        if (snap) {
+          thruHoles = snap.thruHoles;
+          rndScore = snap.toPar;
+          thruDone = snap.thruHoles === 18;
+        } else {
+          // Fallback: DG. Unreliable for R4 but OK for finished
+          // rounds that Pardle's snapshot hasn't been kept for.
+          const thruNum =
+            typeof l.thru === "number"
+              ? l.thru
+              : typeof l.thru === "string"
+                ? Number(l.thru.trim())
+                : NaN;
+          const thruStr =
+            typeof l.thru === "string" ? l.thru.trim() : "";
+          thruDone = thruNum === 18 || /^f/i.test(thruStr);
+          thruHoles = Number.isFinite(thruNum)
+            ? Math.max(0, Math.min(18, Math.floor(thruNum)))
+            : 0;
+          if (!thruDone && thruHoles === 0) {
+            drops.notDone++;
+            continue;
+          }
+          if (typeof l.round !== "number") {
+            drops.noScore++;
+            continue;
+          }
+          rndScore = l.round;
         }
         // Skill priority: CSV final_prediction → DG skill-ratings → 0.
         const csvSg = csvSkill.get(l.player_name);
@@ -435,6 +493,11 @@ export async function GET() {
         liveR2RowsCount: liveR2Rows.length,
         liveR3RowsCount: liveR3Rows.length,
         liveR4RowsCount: liveR4Rows.length,
+        activeTournamentId,
+        snapshotAvailable: snapshot != null,
+        snapshotPlayerCount: snapshot?.holes
+          ? Object.keys(snapshot.holes).length
+          : 0,
         drops: dropCounts,
         splitByRound: {
           r1: splitByRound(rowsR1),
