@@ -100,9 +100,12 @@ export default function Heatmap({ cells, bucketMinutes }: Props) {
 
   const holes = Array.from({ length: 18 }, (_, i) => i + 1);
 
-  // Auto-size cells to fit the width, min/max clamped for readability.
-  const CELL_W = Math.max(12, Math.min(28, Math.floor(900 / Math.max(buckets.length, 1))));
-  const CELL_H = 22;
+  // 1-hour buckets → ~10-12 columns per round → fixed 52px cells
+  // read cleanly across all four rounds and fit the desktop container
+  // without needing to scroll. Mobile still gets the scrollbar on
+  // narrow viewports (CSS below).
+  const CELL_W = 52;
+  const CELL_H = 26;
 
   return (
     <div style={{ marginTop: 12 }}>
@@ -168,18 +171,59 @@ export default function Heatmap({ cells, bucketMinutes }: Props) {
         </span>
       </div>
 
-      {/* Heatmap grid */}
+      {/* Force a chunky, always-visible horizontal scrollbar on the
+          heatmap. Some browsers (Safari on macOS, iOS) auto-hide
+          overlay scrollbars, which was making users think the chart
+          was cut off. The `.heatmap-scrollport` selector below wins
+          against that default. */}
+      <style>{`
+        .heatmap-scrollport {
+          overflow-x: scroll;
+          overflow-y: hidden;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-color: oklch(0.55 0.02 150) oklch(0.94 0.008 95);
+          scrollbar-width: thin;
+        }
+        .heatmap-scrollport::-webkit-scrollbar {
+          height: 14px;
+          background: oklch(0.94 0.008 95);
+        }
+        .heatmap-scrollport::-webkit-scrollbar-thumb {
+          background: oklch(0.55 0.02 150);
+          border-radius: 7px;
+          border: 3px solid oklch(0.94 0.008 95);
+        }
+        .heatmap-scrollport::-webkit-scrollbar-thumb:hover {
+          background: oklch(0.4 0.02 150);
+        }
+      `}</style>
       <div
         style={{
-          overflowX: "auto",
+          position: "relative",
           border: "1px solid oklch(0.9 0.008 95)",
           borderRadius: 8,
           background: "white",
-          padding: 12,
+          maxWidth: "100%",
         }}
       >
-        <table style={{ borderCollapse: "collapse", tableLayout: "fixed" }}>
-          <thead>
+        <div
+          className="heatmap-scrollport"
+          style={{
+            padding: 12,
+            borderRadius: 8,
+          }}
+        >
+          <table
+            style={{
+              borderCollapse: "collapse",
+              tableLayout: "fixed",
+              // width:max-content forces the table to its natural width,
+              // guaranteeing horizontal overflow → the scrollbar appears
+              // whenever the content is wider than the viewport.
+              width: "max-content",
+            }}
+          >
+            <thead>
             <tr>
               <th style={{ width: 44 }} />
               {buckets.map((t, i) => {
@@ -270,6 +314,26 @@ export default function Heatmap({ cells, bucketMinutes }: Props) {
             ))}
           </tbody>
         </table>
+        </div>
+        {/* Right-edge fade cue — tells the user "there's more if you
+            scroll". Positioned absolute so it doesn't push into the
+            cell colours. Non-interactive so mouse events fall through
+            to the scrollport underneath. */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: 24,
+            pointerEvents: "none",
+            background:
+              "linear-gradient(90deg, transparent 0%, white 100%)",
+            borderTopRightRadius: 8,
+            borderBottomRightRadius: 8,
+          }}
+        />
       </div>
 
       {/* Hover readout */}

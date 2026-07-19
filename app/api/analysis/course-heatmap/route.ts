@@ -55,7 +55,9 @@ interface FieldEntry {
   teetimes?: FieldTeetime[];
 }
 
-const BUCKET_MIN = 15; // 15-minute grid buckets
+const BUCKET_MIN = 60; // 1-hour grid buckets — coarse enough that
+                       // every round has a readable, uniform x-axis
+                       // (partial rounds don't drop into 15-min noise)
 const HOLE_PACE_MIN = 15; // approx minutes per hole
 
 /** "2026-07-16 15:04" → 15*60 + 04 = 904 (minutes since midnight). */
