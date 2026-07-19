@@ -100,11 +100,11 @@ export default function Heatmap({ cells, bucketMinutes }: Props) {
 
   const holes = Array.from({ length: 18 }, (_, i) => i + 1);
 
-  // 1-hour buckets → ~10-12 columns per round → fixed 52px cells
-  // read cleanly across all four rounds and fit the desktop container
-  // without needing to scroll. Mobile still gets the scrollbar on
-  // narrow viewports (CSS below).
-  const CELL_W = 52;
+  // 1-hour buckets → ~10-12 columns per round. Sized to fit the
+  // desktop shell's middle grid column (~580px cap) without touching
+  // the right rail: 44px label + 11 * 40 + 24 padding ≈ 508px. Mobile
+  // still gets the always-visible scrollbar on narrow viewports.
+  const CELL_W = 40;
   const CELL_H = 26;
 
   return (

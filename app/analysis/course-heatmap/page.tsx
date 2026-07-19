@@ -55,12 +55,14 @@ export default function Page() {
       </header>
       <section
         style={{
-          maxWidth: 1200,
+          width: "100%",
+          maxWidth: "100%",
           margin: "0 auto",
           padding: "20px 16px 60px",
           fontFamily:
             "var(--font-archivo), 'Archivo', system-ui, -apple-system, sans-serif",
           color: "oklch(0.2 0.02 150)",
+          minWidth: 0,
         }}
       >
         <p
