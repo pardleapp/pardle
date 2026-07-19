@@ -7,10 +7,12 @@ import MainNav from "@/app/MainNav";
 import AuthChip from "@/app/live/auth/AuthChip";
 import { BRAND } from "@/lib/brand";
 
+export type RoundNum = 1 | 2 | 3 | 4;
+
 export interface Row {
   dgId: string;
   name: string;
-  round: 1 | 2;
+  round: RoundNum;
   teeTime: string;
   teeMinutes: number;
   sgTotal: number;
@@ -28,7 +30,7 @@ interface FetchResp {
   ok: boolean;
   error?: string;
   count?: number;
-  countByRound?: { r1: number; r2: number };
+  countByRound?: { r1: number; r2: number; r3?: number; r4?: number };
   generatedAt?: number;
   rows?: Row[];
 }
@@ -110,7 +112,14 @@ export default function Page() {
         <>
           <p style={{ fontSize: 11, color: "oklch(0.55 0.02 150)", marginTop: 8 }}>
             {data.countByRound
-              ? `R1: ${data.countByRound.r1} · R2: ${data.countByRound.r2}`
+              ? [
+                  data.countByRound.r1 != null && `R1: ${data.countByRound.r1}`,
+                  data.countByRound.r2 != null && `R2: ${data.countByRound.r2}`,
+                  data.countByRound.r3 != null && `R3: ${data.countByRound.r3}`,
+                  data.countByRound.r4 != null && `R4: ${data.countByRound.r4}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")
               : `${data.count} rows`}
             {" · "}
             {data.generatedAt

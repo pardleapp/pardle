@@ -10,10 +10,12 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from "react";
 
+type RoundNum = 1 | 2 | 3 | 4;
+
 interface Row {
   dgId: string;
   name: string;
-  round: 1 | 2;
+  round: RoundNum;
   teeTime: string;
   teeMinutes: number;
   sgTotal: number;
@@ -27,7 +29,32 @@ interface Row {
   currentToPar?: number;
 }
 
-type RoundFilter = "both" | "r1" | "r2";
+type RoundFilter = "all" | "r1" | "r2" | "r3" | "r4";
+
+/** Per-round visual encoding — colour, mark shape, dash pattern for
+ *  the actual & projected trend lines. Kept side-by-side so any
+ *  future ramp changes touch a single spot. */
+const ROUND_STYLE: Record<
+  RoundNum,
+  {
+    color: string;
+    shape: "circle" | "square" | "triangle" | "diamond";
+    actualDash: string | undefined;
+    projectedDash: string;
+  }
+> = {
+  1: { color: "#0284c7", shape: "circle", actualDash: undefined, projectedDash: "2 4" },
+  2: { color: "#d97706", shape: "square", actualDash: "7 5", projectedDash: "1 4" },
+  3: { color: "#7c3aed", shape: "triangle", actualDash: "2 3 8 3", projectedDash: "1 3" },
+  4: { color: "#db2777", shape: "diamond", actualDash: "5 3", projectedDash: "1 3" },
+};
+
+const ROUND_LABEL: Record<RoundNum, string> = {
+  1: "R1",
+  2: "R2",
+  3: "R3",
+  4: "R4",
+};
 
 interface ChartProps {
   rows: Row[];
@@ -161,6 +188,72 @@ export default function Chart({ rows }: ChartProps) {
   );
 }
 
+/** Render one of 4 categorical mark shapes. Used both for scatter
+ *  dots and for the cursor trend markers so the same shape carries
+ *  round identity everywhere. */
+function ShapeMark({
+  shape,
+  cx,
+  cy,
+  size,
+  fill,
+  stroke,
+  strokeWidth,
+  strokeDasharray,
+  opacity,
+  onPointerEnter,
+}: {
+  shape: "circle" | "square" | "triangle" | "diamond";
+  cx: number;
+  cy: number;
+  size: number;
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+  strokeDasharray?: string;
+  opacity?: number;
+  onPointerEnter?: () => void;
+}) {
+  const commonProps = {
+    fill,
+    stroke,
+    strokeWidth,
+    strokeDasharray,
+    opacity,
+    onPointerEnter,
+  };
+  if (shape === "circle") {
+    return <circle cx={cx} cy={cy} r={size} {...commonProps} />;
+  }
+  if (shape === "square") {
+    return (
+      <rect
+        x={cx - size}
+        y={cy - size}
+        width={size * 2}
+        height={size * 2}
+        {...commonProps}
+      />
+    );
+  }
+  if (shape === "triangle") {
+    const h = size * 1.15;
+    return (
+      <polygon
+        points={`${cx},${cy - h} ${cx - h},${cy + h * 0.85} ${cx + h},${cy + h * 0.85}`}
+        {...commonProps}
+      />
+    );
+  }
+  // diamond
+  return (
+    <polygon
+      points={`${cx},${cy - size * 1.15} ${cx + size * 1.15},${cy} ${cx},${cy + size * 1.15} ${cx - size * 1.15},${cy}`}
+      {...commonProps}
+    />
+  );
+}
+
 interface Viewport {
   xMin: number;
   xMax: number;
@@ -184,7 +277,7 @@ function ChartCore({
 }) {
   const [hover, setHover] = useState<Row | null>(null);
   const [cursorX, setCursorX] = useState<number | null>(null);
-  const [roundFilter, setRoundFilter] = useState<RoundFilter>("both");
+  const [roundFilter, setRoundFilter] = useState<RoundFilter>("all");
   const svgRef = useRef<SVGSVGElement | null>(null);
 
   // Dimensions scale up in expanded mode.
@@ -197,63 +290,59 @@ function ChartCore({
   const iw = width - padL - padR;
   const ih = height - padT - padB;
 
+  const activeRounds = useMemo<RoundNum[]>(() => {
+    if (roundFilter === "all") return [1, 2, 3, 4];
+    if (roundFilter === "r1") return [1];
+    if (roundFilter === "r2") return [2];
+    if (roundFilter === "r3") return [3];
+    return [4];
+  }, [roundFilter]);
+
+  const activeRoundSet = useMemo(
+    () => new Set(activeRounds),
+    [activeRounds],
+  );
+
   const points = useMemo(
     () =>
       rows
-        .filter((r) => {
-          if (roundFilter === "r1") return r.round === 1;
-          if (roundFilter === "r2") return r.round === 2;
-          return true;
-        })
+        .filter((r) => activeRoundSet.has(r.round))
         .map((r) => ({ x: r.teeMinutes, y: r.adjusted, row: r })),
-    [rows, roundFilter],
+    [rows, activeRoundSet],
   );
 
-  // Per-round point subsets — separated into ACTUAL (finished) and
-  // ALL (finished + projected). We compute the smooth over ALL so
-  // the line extends across the full tee-time range, then split the
-  // rendered path at the max-actual-x boundary so the "actual" segment
-  // renders solid and the "projected" segment renders dashed. The user
-  // sees a continuous line whose style clearly marks where certainty
-  // gives way to model projection.
-  const actualR1 = useMemo(
-    () =>
-      rows
-        .filter((r) => r.round === 1 && !r.projected)
-        .map((r) => ({ x: r.teeMinutes, y: r.adjusted })),
-    [rows],
-  );
-  const actualR2 = useMemo(
-    () =>
-      rows
-        .filter((r) => r.round === 2 && !r.projected)
-        .map((r) => ({ x: r.teeMinutes, y: r.adjusted })),
-    [rows],
-  );
-  const allR1 = useMemo(
-    () =>
-      rows
-        .filter((r) => r.round === 1)
-        .map((r) => ({ x: r.teeMinutes, y: r.adjusted })),
-    [rows],
-  );
-  const allR2 = useMemo(
-    () =>
-      rows
-        .filter((r) => r.round === 2)
-        .map((r) => ({ x: r.teeMinutes, y: r.adjusted })),
-    [rows],
-  );
-  // Boundary x-values where actual data ends and projections begin.
-  const boundaryR1 = actualR1.length > 0
-    ? Math.max(...actualR1.map((p) => p.x))
-    : null;
-  const boundaryR2 = actualR2.length > 0
-    ? Math.max(...actualR2.map((p) => p.x))
-    : null;
-  // Keep the existing pointsR1/pointsR2 names for the readouts.
-  const pointsR1 = actualR1;
-  const pointsR2 = actualR2;
+  // Per-round buckets — actual (finished) vs all (finished + projected).
+  // Smooth uses ALL; render splits at the max-actual-x boundary so
+  // actual segment is solid and projected segment is dashed.
+  const byRound = useMemo(() => {
+    const out: Record<
+      RoundNum,
+      {
+        actual: Array<{ x: number; y: number }>;
+        all: Array<{ x: number; y: number }>;
+        boundary: number | null;
+      }
+    > = {
+      1: { actual: [], all: [], boundary: null },
+      2: { actual: [], all: [], boundary: null },
+      3: { actual: [], all: [], boundary: null },
+      4: { actual: [], all: [], boundary: null },
+    };
+    for (const r of rows) {
+      const pt = { x: r.teeMinutes, y: r.adjusted };
+      out[r.round].all.push(pt);
+      if (!r.projected) out[r.round].actual.push(pt);
+    }
+    (Object.keys(out) as unknown as RoundNum[]).forEach((k) => {
+      const num = Number(k) as RoundNum;
+      const bucket = out[num];
+      bucket.boundary =
+        bucket.actual.length > 0
+          ? Math.max(...bucket.actual.map((p) => p.x))
+          : null;
+    });
+    return out;
+  }, [rows]);
 
   const extent = useMemo(() => {
     if (points.length === 0) {
@@ -312,60 +401,59 @@ function ChartCore({
   );
 
   // Smoothed lines: use ALL points (actuals + projections) so the
-  // trend flows continuously across the full tee-time span. We then
-  // split into two rendered paths based on the boundary — solid up
-  // to the last actual data point, dashed beyond it.
-  const smoothR1 = useMemo(() => rollingSmooth(allR1, 60), [allR1]);
-  const smoothR2 = useMemo(() => rollingSmooth(allR2, 60), [allR2]);
+  // trend flows across the full tee-time span. Split into two paths
+  // per round at the max-actual-x boundary — solid up to that x,
+  // dashed beyond it.
+  const smoothByRound = useMemo(
+    () => ({
+      1: rollingSmooth(byRound[1].all, 60),
+      2: rollingSmooth(byRound[2].all, 60),
+      3: rollingSmooth(byRound[3].all, 60),
+      4: rollingSmooth(byRound[4].all, 60),
+    }),
+    [byRound],
+  );
 
   const buildSplitPaths = (
     smooth: Array<{ x: number; y: number }>,
     boundary: number | null,
   ) => {
     if (smooth.length === 0) return { actualPath: "", projectedPath: "" };
-    if (boundary == null) {
-      // No actuals — everything is projection.
-      return {
-        actualPath: "",
-        projectedPath: smooth
-          .map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(p.x)} ${yFor(p.y)}`)
-          .join(" "),
-      };
-    }
-    const actualPts = smooth.filter((p) => p.x <= boundary);
-    const projectedPts = smooth.filter((p) => p.x >= boundary);
     const buildPath = (pts: Array<{ x: number; y: number }>) =>
       pts
         .map((p, i) => `${i === 0 ? "M" : "L"} ${xFor(p.x)} ${yFor(p.y)}`)
         .join(" ");
+    if (boundary == null) {
+      return { actualPath: "", projectedPath: buildPath(smooth) };
+    }
+    const actualPts = smooth.filter((p) => p.x <= boundary);
+    const projectedPts = smooth.filter((p) => p.x >= boundary);
     return {
       actualPath: buildPath(actualPts),
       projectedPath: projectedPts.length > 1 ? buildPath(projectedPts) : "",
     };
   };
 
-  const { actualPath: actualPathR1, projectedPath: projectedPathR1 } =
-    buildSplitPaths(smoothR1, boundaryR1);
-  const { actualPath: actualPathR2, projectedPath: projectedPathR2 } =
-    buildSplitPaths(smoothR2, boundaryR2);
+  const pathsByRound: Record<
+    RoundNum,
+    { actualPath: string; projectedPath: string }
+  > = {
+    1: buildSplitPaths(smoothByRound[1], byRound[1].boundary),
+    2: buildSplitPaths(smoothByRound[2], byRound[2].boundary),
+    3: buildSplitPaths(smoothByRound[3], byRound[3].boundary),
+    4: buildSplitPaths(smoothByRound[4], byRound[4].boundary),
+  };
 
-  const trendAtCursor = useMemo(() => {
-    if (cursorX == null) return null;
-    // When one round is selected show only that trend; when both,
-    // show the R1 trend as the primary readout (blue).
-    const active =
-      roundFilter === "r2"
-        ? smoothR2
-        : roundFilter === "r1" || roundFilter === "both"
-          ? smoothR1
-          : null;
-    if (!active) return null;
-    return interpolate(active, cursorX);
-  }, [cursorX, smoothR1, smoothR2, roundFilter]);
-  const trendAtCursorR2 = useMemo(() => {
-    if (cursorX == null || roundFilter === "r1") return null;
-    return interpolate(smoothR2, cursorX);
-  }, [cursorX, smoothR2, roundFilter]);
+  const trendReadouts = useMemo(() => {
+    if (cursorX == null) return [] as Array<{ round: RoundNum; value: number }>;
+    const out: Array<{ round: RoundNum; value: number }> = [];
+    for (const r of activeRounds) {
+      const smooth = smoothByRound[r];
+      const v = interpolate(smooth, cursorX);
+      if (v != null) out.push({ round: r, value: v });
+    }
+    return out;
+  }, [cursorX, activeRounds, smoothByRound]);
 
   const xSpan = viewport.xMax - viewport.xMin;
   const xStep =
@@ -661,16 +749,20 @@ function ChartCore({
         >
           Drag · scroll · pinch to zoom
         </span>
-        {/* Round filter — small pill group. Layout: pill row on
-            the right, aligned with the zoom buttons. */}
+        {/* Round filter — pill group covers all 4 rounds + "All". */}
         <div
           role="group"
           aria-label="Round filter"
-          style={{ display: "flex", gap: 4, marginLeft: "auto" }}
+          style={{
+            display: "flex",
+            gap: 4,
+            marginLeft: "auto",
+            flexWrap: "wrap",
+          }}
         >
-          {(["both", "r1", "r2"] as const).map((f) => {
+          {(["all", "r1", "r2", "r3", "r4"] as const).map((f) => {
             const active = roundFilter === f;
-            const label = f === "both" ? "R1 + R2" : f.toUpperCase();
+            const label = f === "all" ? "All" : f.toUpperCase();
             return (
               <button
                 key={f}
@@ -698,7 +790,7 @@ function ChartCore({
       <div
         style={{
           display: "flex",
-          gap: 16,
+          gap: 14,
           fontSize: 11,
           color: "oklch(0.5 0.02 150)",
           marginBottom: 6,
@@ -706,86 +798,34 @@ function ChartCore({
           alignItems: "center",
         }}
       >
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <svg width={16} height={16} viewBox="-8 -8 16 16">
-            <circle
-              r={5}
-              cx={0}
-              cy={0}
-              fill="#334155"
-              stroke="#0284c7"
-              strokeWidth={2}
-            />
-          </svg>
-          <strong style={{ color: "#0284c7" }}>R1</strong> (circle, blue ring)
-        </span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <svg width={16} height={16} viewBox="-8 -8 16 16">
-            <rect
-              x={-5}
-              y={-5}
-              width={10}
-              height={10}
-              fill="#334155"
-              stroke="#d97706"
-              strokeWidth={2}
-            />
-          </svg>
-          <strong style={{ color: "#d97706" }}>R2</strong> (square, amber ring)
-        </span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span
-            style={{
-              width: 24,
-              height: 3,
-              background: "#0284c7",
-              borderRadius: 2,
-            }}
-          />
-          R1 trend
-          <span
-            style={{
-              width: 20,
-              height: 3,
-              marginLeft: 4,
-              background:
-                "repeating-linear-gradient(90deg, #0284c7 0 2px, transparent 2px 6px)",
-              opacity: 0.7,
-              borderRadius: 2,
-            }}
-          />
-          <span style={{ fontStyle: "italic", opacity: 0.75 }}>projected</span>
-        </span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span
-            style={{
-              width: 24,
-              height: 3,
-              background:
-                "repeating-linear-gradient(90deg, #d97706 0 7px, transparent 7px 12px)",
-              borderRadius: 2,
-            }}
-          />
-          R2 trend
-          <span
-            style={{
-              width: 20,
-              height: 3,
-              marginLeft: 4,
-              background:
-                "repeating-linear-gradient(90deg, #d97706 0 1px, transparent 1px 5px)",
-              opacity: 0.7,
-              borderRadius: 2,
-            }}
-          />
-          <span style={{ fontStyle: "italic", opacity: 0.75 }}>projected</span>
-        </span>
+        {([1, 2, 3, 4] as const).map((r) => {
+          const style = ROUND_STYLE[r];
+          return (
+            <span
+              key={r}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <svg width={16} height={16} viewBox="-8 -8 16 16">
+                <ShapeMark
+                  shape={style.shape}
+                  cx={0}
+                  cy={0}
+                  size={5}
+                  fill="#334155"
+                  stroke={style.color}
+                  strokeWidth={2}
+                />
+              </svg>
+              <strong style={{ color: style.color }}>{ROUND_LABEL[r]}</strong>
+            </span>
+          );
+        })}
         <span
           style={{
             display: "inline-flex",
             alignItems: "center",
             gap: 4,
-            marginLeft: 6,
+            marginLeft: 4,
           }}
         >
           fill:{" "}
@@ -827,30 +867,22 @@ function ChartCore({
             {cursorX != null ? formatClock(cursorX) : "—"}
           </strong>
         </span>
-        {(roundFilter === "both" || roundFilter === "r1") && (
-          <span
-            style={{
-              fontFamily: "var(--font-mono, monospace)",
-              fontWeight: 800,
-              fontSize: 16,
-              color: "#0284c7",
-            }}
-          >
-            R1: {trendAtCursor != null ? formatSigned(trendAtCursor) : "—"}
-          </span>
-        )}
-        {(roundFilter === "both" || roundFilter === "r2") && (
-          <span
-            style={{
-              fontFamily: "var(--font-mono, monospace)",
-              fontWeight: 800,
-              fontSize: 16,
-              color: "#d97706",
-            }}
-          >
-            R2: {trendAtCursorR2 != null ? formatSigned(trendAtCursorR2) : "—"}
-          </span>
-        )}
+        {activeRounds.map((r) => {
+          const readout = trendReadouts.find((t) => t.round === r);
+          return (
+            <span
+              key={r}
+              style={{
+                fontFamily: "var(--font-mono, monospace)",
+                fontWeight: 800,
+                fontSize: 16,
+                color: ROUND_STYLE[r].color,
+              }}
+            >
+              {ROUND_LABEL[r]}: {readout ? formatSigned(readout.value) : "—"}
+            </span>
+          );
+        })}
         {/* Diagnostic — shows what's actually loaded vs shown. Helps
             spot when a viewport isn't fitting the data. */}
         <span
@@ -974,91 +1006,56 @@ function ChartCore({
         </text>
 
         <g clipPath="url(#chart-clip)">
-          {/* Round-1 trend — solid blue for actuals, small-dash blue
-              for the projected extension. */}
-          {(roundFilter === "both" || roundFilter === "r1") && (
-            <>
-              {actualPathR1 && (
-                <>
-                  <path
-                    d={actualPathR1}
-                    fill="none"
-                    stroke="white"
-                    strokeWidth={5}
-                    opacity={0.9}
-                  />
-                  <path
-                    d={actualPathR1}
-                    fill="none"
-                    stroke="#0284c7"
-                    strokeWidth={3}
-                  />
-                </>
-              )}
-              {projectedPathR1 && (
-                <>
-                  <path
-                    d={projectedPathR1}
-                    fill="none"
-                    stroke="white"
-                    strokeWidth={5}
-                    opacity={0.85}
-                  />
-                  <path
-                    d={projectedPathR1}
-                    fill="none"
-                    stroke="#0284c7"
-                    strokeWidth={3}
-                    opacity={0.65}
-                    strokeDasharray="2 4"
-                  />
-                </>
-              )}
-            </>
-          )}
-          {/* Round-2 trend — long-dash amber for actuals, tight-dot
-              amber for the projected extension. */}
-          {(roundFilter === "both" || roundFilter === "r2") && (
-            <>
-              {actualPathR2 && (
-                <>
-                  <path
-                    d={actualPathR2}
-                    fill="none"
-                    stroke="white"
-                    strokeWidth={5}
-                    opacity={0.9}
-                  />
-                  <path
-                    d={actualPathR2}
-                    fill="none"
-                    stroke="#d97706"
-                    strokeWidth={3}
-                    strokeDasharray="7 5"
-                  />
-                </>
-              )}
-              {projectedPathR2 && (
-                <>
-                  <path
-                    d={projectedPathR2}
-                    fill="none"
-                    stroke="white"
-                    strokeWidth={5}
-                    opacity={0.85}
-                  />
-                  <path
-                    d={projectedPathR2}
-                    fill="none"
-                    stroke="#d97706"
-                    strokeWidth={3}
-                    opacity={0.65}
-                    strokeDasharray="1 4"
-                  />
-                </>
-              )}
-            </>
-          )}
+          {/* Per-round trend lines. Each round contributes an actual
+              (solid, style-specific dash) and optional projected
+              (thinner dash, lower opacity) segment. Loop over the
+              active rounds only so filter toggles hide/show them all
+              consistently. */}
+          {activeRounds.map((r) => {
+            const style = ROUND_STYLE[r];
+            const { actualPath, projectedPath } = pathsByRound[r];
+            return (
+              <g key={`trend-${r}`}>
+                {actualPath && (
+                  <>
+                    <path
+                      d={actualPath}
+                      fill="none"
+                      stroke="white"
+                      strokeWidth={5}
+                      opacity={0.9}
+                    />
+                    <path
+                      d={actualPath}
+                      fill="none"
+                      stroke={style.color}
+                      strokeWidth={3}
+                      strokeDasharray={style.actualDash}
+                    />
+                  </>
+                )}
+                {projectedPath && (
+                  <>
+                    <path
+                      d={projectedPath}
+                      fill="none"
+                      stroke="white"
+                      strokeWidth={5}
+                      opacity={0.85}
+                    />
+                    <path
+                      d={projectedPath}
+                      fill="none"
+                      stroke={style.color}
+                      strokeWidth={3}
+                      opacity={0.65}
+                      strokeDasharray={style.projectedDash}
+                    />
+                  </>
+                )}
+              </g>
+            );
+          })}
 
           {visiblePoints.map((p) => {
             const y = p.y;
@@ -1067,58 +1064,34 @@ function ChartCore({
             const isHover =
               hover?.dgId === p.row.dgId && hover?.round === p.row.round;
             const noSkill = p.row.noSkill === true;
-            const isR2 = p.row.round === 2;
             const isProjected = p.row.projected === true;
-            const roundColor = isR2 ? "#d97706" : "#0284c7";
+            const style = ROUND_STYLE[p.row.round];
             const cx = xFor(p.x);
             const cy = yFor(y);
-            const r = isHover ? 7 : 4;
-            // Projected dots: hollow (white fill), dashed ring in the
-            // round's hue, translucent so they read as "estimate, not
-            // yet reality". Actuals: solid fill, solid ring.
-            const commonFill = isProjected
-              ? "white"
-              : noSkill
-                ? "white"
-                : polarityColor;
-            const commonStroke = isProjected ? polarityColor : roundColor;
-            const commonStrokeWidth = isProjected ? 2 : isHover ? 3 : 1.8;
-            const commonDash = isProjected ? "3 2" : undefined;
-            const commonOpacity = isHover ? 1 : isProjected ? 0.7 : 0.85;
-            if (isR2) {
-              return (
-                <rect
-                  key={`${p.row.dgId}-${p.row.round}`}
-                  x={cx - r}
-                  y={cy - r}
-                  width={r * 2}
-                  height={r * 2}
-                  fill={commonFill}
-                  opacity={commonOpacity}
-                  stroke={commonStroke}
-                  strokeWidth={commonStrokeWidth}
-                  strokeDasharray={commonDash}
-                  onPointerEnter={() => setHover(p.row)}
-                />
-              );
-            }
+            const size = isHover ? 7 : 4;
+            const fill = isProjected || noSkill ? "white" : polarityColor;
+            const stroke = isProjected ? polarityColor : style.color;
+            const strokeWidth = isProjected ? 2 : isHover ? 3 : 1.8;
+            const dash = isProjected ? "3 2" : undefined;
+            const opacity = isHover ? 1 : isProjected ? 0.7 : 0.85;
             return (
-              <circle
+              <ShapeMark
                 key={`${p.row.dgId}-${p.row.round}`}
+                shape={style.shape}
                 cx={cx}
                 cy={cy}
-                r={r}
-                fill={commonFill}
-                opacity={commonOpacity}
-                stroke={commonStroke}
-                strokeWidth={commonStrokeWidth}
-                strokeDasharray={commonDash}
+                size={size}
+                fill={fill}
+                stroke={stroke}
+                strokeWidth={strokeWidth}
+                strokeDasharray={dash}
+                opacity={opacity}
                 onPointerEnter={() => setHover(p.row)}
               />
             );
           })}
 
-          {/* Cursor guideline + per-round trend dots */}
+          {/* Cursor guideline + per-round trend markers */}
           {cursorX != null && (
             <>
               <line
@@ -1131,31 +1104,23 @@ function ChartCore({
                 strokeDasharray="4 4"
                 pointerEvents="none"
               />
-              {(roundFilter === "both" || roundFilter === "r1") &&
-                trendAtCursor != null && (
-                  <circle
-                    cx={xFor(cursorX)}
-                    cy={yFor(trendAtCursor)}
-                    r={5}
-                    fill="#0284c7"
+              {trendReadouts.map((t) => {
+                const style = ROUND_STYLE[t.round];
+                const cx = xFor(cursorX);
+                const cy = yFor(t.value);
+                return (
+                  <ShapeMark
+                    key={t.round}
+                    shape={style.shape}
+                    cx={cx}
+                    cy={cy}
+                    size={6}
+                    fill={style.color}
                     stroke="white"
                     strokeWidth={2}
-                    pointerEvents="none"
                   />
-                )}
-              {(roundFilter === "both" || roundFilter === "r2") &&
-                trendAtCursorR2 != null && (
-                  <rect
-                    x={xFor(cursorX) - 5}
-                    y={yFor(trendAtCursorR2) - 5}
-                    width={10}
-                    height={10}
-                    fill="#d97706"
-                    stroke="white"
-                    strokeWidth={2}
-                    pointerEvents="none"
-                  />
-                )}
+                );
+              })}
             </>
           )}
         </g>

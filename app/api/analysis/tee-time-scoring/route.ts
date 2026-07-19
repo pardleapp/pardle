@@ -135,10 +135,12 @@ interface LiveEntry {
   thru?: number | string;
 }
 
+export type RoundNum = 1 | 2 | 3 | 4;
+
 interface OutRow {
   dgId: string;
   name: string;
-  round: 1 | 2;
+  round: RoundNum;
   teeTime: string;
   teeMinutes: number; // minutes since midnight for the scatter x-axis
   sgTotal: number;
@@ -209,24 +211,35 @@ export async function GET() {
   try {
     const tour = "pga"; // The Open sits under DG's `pga` feed (majors covered there).
 
-    const [field, skills, liveR1, liveR2, csvSkill] = await Promise.all([
-      fetchJson<{ field?: FieldEntry[] }>("/field-updates?tour=" + tour),
-      fetchJson<{ players?: SkillEntry[] }>(
-        "/preds/skill-ratings?display=value",
-      ),
-      fetchJson<{ live_stats?: LiveEntry[] }>(
-        "/preds/live-tournament-stats?tour=" + tour + "&round=1",
-      ),
-      fetchJson<{ live_stats?: LiveEntry[] }>(
-        "/preds/live-tournament-stats?tour=" + tour + "&round=2",
-      ),
-      loadDecompositionSkill(),
-    ]);
+    const [field, skills, liveR1, liveR2, liveR3, liveR4, csvSkill] =
+      await Promise.all([
+        fetchJson<{ field?: FieldEntry[] }>("/field-updates?tour=" + tour),
+        fetchJson<{ players?: SkillEntry[] }>(
+          "/preds/skill-ratings?display=value",
+        ),
+        fetchJson<{ live_stats?: LiveEntry[] }>(
+          "/preds/live-tournament-stats?tour=" + tour + "&round=1",
+        ),
+        fetchJson<{ live_stats?: LiveEntry[] }>(
+          "/preds/live-tournament-stats?tour=" + tour + "&round=2",
+        ),
+        // R3/R4 return empty live_stats until those rounds start — the
+        // buildRows helper naturally produces zero rows for those days.
+        fetchJson<{ live_stats?: LiveEntry[] }>(
+          "/preds/live-tournament-stats?tour=" + tour + "&round=3",
+        ),
+        fetchJson<{ live_stats?: LiveEntry[] }>(
+          "/preds/live-tournament-stats?tour=" + tour + "&round=4",
+        ),
+        loadDecompositionSkill(),
+      ]);
 
     const fieldRows = field.field ?? [];
     const skillRows = skills.players ?? [];
     const liveR1Rows = liveR1.live_stats ?? [];
     const liveR2Rows = liveR2.live_stats ?? [];
+    const liveR3Rows = liveR3.live_stats ?? [];
+    const liveR4Rows = liveR4.live_stats ?? [];
 
     const fieldMap = new Map<number, FieldEntry>();
     for (const f of fieldRows) fieldMap.set(f.dg_id, f);
@@ -234,15 +247,24 @@ export async function GET() {
     for (const s of skillRows) skillMap.set(s.dg_id, s);
 
     // Diagnostic counters (per round).
-    const dropCounts = {
-      r1: { noField: 0, noSkill: 0, noTeeTime: 0, noScore: 0, notDone: 0 },
-      r2: { noField: 0, noSkill: 0, noTeeTime: 0, noScore: 0, notDone: 0 },
+    const emptyDrops = () => ({
+      noField: 0,
+      noSkill: 0,
+      noTeeTime: 0,
+      noScore: 0,
+      notDone: 0,
+    });
+    const dropCounts: Record<"r1" | "r2" | "r3" | "r4", ReturnType<typeof emptyDrops>> = {
+      r1: emptyDrops(),
+      r2: emptyDrops(),
+      r3: emptyDrops(),
+      r4: emptyDrops(),
     };
 
     /** Extract the given round's tee time from a field entry. */
     const roundTeetime = (
       entry: FieldEntry,
-      round: 1 | 2,
+      round: RoundNum,
     ): FieldTeetime | null => {
       const rows = entry.teetimes ?? [];
       return rows.find((r) => r.round_num === round) ?? null;
@@ -250,9 +272,9 @@ export async function GET() {
 
     const buildRows = (
       liveRows: LiveEntry[],
-      round: 1 | 2,
+      round: RoundNum,
     ): OutRow[] => {
-      const drops = dropCounts[round === 1 ? "r1" : "r2"];
+      const drops = dropCounts[`r${round}` as "r1" | "r2" | "r3" | "r4"];
       const out: OutRow[] = [];
       for (const l of liveRows) {
         const f = fieldMap.get(l.dg_id);
@@ -344,14 +366,21 @@ export async function GET() {
 
     const rowsR1 = buildRows(liveR1Rows, 1);
     const rowsR2 = buildRows(liveR2Rows, 2);
-    const rows = [...rowsR1, ...rowsR2].sort(
+    const rowsR3 = buildRows(liveR3Rows, 3);
+    const rowsR4 = buildRows(liveR4Rows, 4);
+    const rows = [...rowsR1, ...rowsR2, ...rowsR3, ...rowsR4].sort(
       (a, b) => a.teeMinutes - b.teeMinutes,
     );
 
     return NextResponse.json({
       ok: true,
       count: rows.length,
-      countByRound: { r1: rowsR1.length, r2: rowsR2.length },
+      countByRound: {
+        r1: rowsR1.length,
+        r2: rowsR2.length,
+        r3: rowsR3.length,
+        r4: rowsR4.length,
+      },
       generatedAt: Date.now(),
       diag: {
         fieldRowsCount: fieldRows.length,
@@ -359,6 +388,8 @@ export async function GET() {
         csvSkillCount: csvSkill.size,
         liveR1RowsCount: liveR1Rows.length,
         liveR2RowsCount: liveR2Rows.length,
+        liveR3RowsCount: liveR3Rows.length,
+        liveR4RowsCount: liveR4Rows.length,
         drops: dropCounts,
       },
       rows,
