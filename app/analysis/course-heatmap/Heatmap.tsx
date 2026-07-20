@@ -1,6 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import WeatherStrip, {
+  type DailyWeatherView,
+} from "../_components/WeatherStrip";
 
 export interface Cell {
   round: number;
@@ -15,6 +18,7 @@ type RoundFilter = "1" | "2" | "3" | "4";
 interface Props {
   cells: Cell[];
   bucketMinutes: number;
+  weatherByRound?: Record<string, DailyWeatherView | null> | null;
 }
 
 /** Diverging colour scale — cool green for easier, neutral gray at
@@ -55,7 +59,7 @@ function formatSigned(v: number): string {
   return v > 0 ? `+${v.toFixed(2)}` : `−${Math.abs(v).toFixed(2)}`;
 }
 
-export default function Heatmap({ cells, bucketMinutes }: Props) {
+export default function Heatmap({ cells, bucketMinutes, weatherByRound }: Props) {
   const [round, setRound] = useState<RoundFilter>("1");
   const [hover, setHover] = useState<Cell | null>(null);
 
@@ -383,6 +387,13 @@ export default function Heatmap({ cells, bucketMinutes }: Props) {
             {hover.count} players
           </span>
         </div>
+      )}
+
+      {weatherByRound && (
+        <WeatherStrip
+          day={weatherByRound[String(effectiveRound)] ?? null}
+          roundLabel={`R${effectiveRound} weather`}
+        />
       )}
 
       <p

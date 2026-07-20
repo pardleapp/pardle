@@ -1,21 +1,14 @@
 "use client";
 
-import { Fragment } from "react";
-
 /**
- * 4 rows (one per round), each row a horizontal strip of 2-hour
- * buckets covering the daytime playing window. Each cell shows:
+ * Horizontal weather strip for ONE round. Renders below the chart
+ * when a single round tab is active. Cells are 2-hour windows from
+ * 6am to 8pm; each shows the condition, wind average, and peak gust
+ * inside that window — the trend within the day, not just the daily
+ * headline.
  *
- *   • wind average (large)
- *   • wind gust (small)
- *   • condition icon (sunny / cloudy / rain)
- *
- * Background colour is a green→red ramp on wind average (calm to
- * damaging). Rain buckets get a droplet + inches label overlaid.
- *
- * Reads the `hourly` array baked into each round's DailyWeather
- * (historical) or fetched at request time (live). Silently renders
- * nothing when no hourly data is present.
+ * Silently renders nothing when no hourly data is present or when
+ * the caller is showing "All rounds" (no single round to pin to).
  */
 
 export interface HourlyPointView {
@@ -24,6 +17,9 @@ export interface HourlyPointView {
   windGustMph: number | null;
   windDirCompass?: string | null;
   precipInches: number | null;
+  /** Some payloads carry an hourly weather_code; if absent we fall
+   *  back to the day-level condition/emoji from DailyWeatherView. */
+  weatherCode?: number | null;
 }
 
 export interface DailyWeatherView {
@@ -35,13 +31,13 @@ export interface DailyWeatherView {
 }
 
 interface Props {
-  weatherByRound: Record<string, DailyWeatherView | null> | null | undefined;
+  /** The single round's weather to render. Null → renders nothing. */
+  day: DailyWeatherView | null | undefined;
+  /** Displayed as the row label, e.g. "R1 weather". */
+  roundLabel?: string;
 }
 
-const ROUNDS = [1, 2, 3, 4];
-
-// 06:00 → 20:00 in 2-hour steps = 7 buckets. Covers every realistic
-// tee time and finish for a PGA Tour round.
+// 06:00 → 20:00 in 2-hour steps = 7 buckets.
 const BUCKET_STARTS = [6, 8, 10, 12, 14, 16, 18];
 const BUCKET_HOURS = 2;
 
@@ -51,19 +47,23 @@ function formatHour(h: number): string {
   return `${hr}${ampm}`;
 }
 
-/** Wind mph → oklch background. Piecewise linear ramp:
- *   0–5   pale grey-green   (calm)
- *   5–10  green              (breeze)
- *   10–15 amber              (moderate)
- *   15–20 orange             (strong)
- *   20+   red                (howling — scoring hurt) */
+function formatRange(start: number): string {
+  return `${formatHour(start)}–${formatHour(start + BUCKET_HOURS)}`;
+}
+
+/** Wind mph → oklch background. Piecewise ramp:
+ *   0–5   pale       (calm)
+ *   5–10  green      (breeze)
+ *   10–15 amber      (moderate)
+ *   15–20 orange     (strong)
+ *   20+   red        (howling — scoring hurt) */
 function windColour(mph: number | null): string {
   if (mph == null || !Number.isFinite(mph)) return "oklch(0.96 0.006 95)";
   if (mph < 5) return "oklch(0.94 0.02 150)";
   if (mph < 10) return "oklch(0.86 0.09 150)";
   if (mph < 15) return "oklch(0.85 0.11 85)";
-  if (mph < 20) return "oklch(0.75 0.15 50)";
-  return "oklch(0.62 0.18 25)";
+  if (mph < 20) return "oklch(0.78 0.15 50)";
+  return "oklch(0.65 0.18 25)";
 }
 
 function windTextColour(mph: number | null): string {
@@ -72,15 +72,42 @@ function windTextColour(mph: number | null): string {
   return "oklch(0.2 0.02 150)";
 }
 
-interface Bucketed {
-  startHour: number;
-  windAvg: number | null;
-  gustAvg: number | null;
-  precipSum: number | null;
-  hasRain: boolean;
+/** WMO weather code → short label + emoji. Duplicated from
+ *  lib/weather/open-meteo.ts because that module is server-only. */
+function classifyCode(code: number | null | undefined): {
+  condition: string;
+  emoji: string;
+} {
+  if (typeof code !== "number") return { condition: "—", emoji: "" };
+  if (code === 0) return { condition: "Sunny", emoji: "☀️" };
+  if (code === 1) return { condition: "Mostly clear", emoji: "🌤" };
+  if (code === 2) return { condition: "Partly cloudy", emoji: "⛅" };
+  if (code === 3) return { condition: "Overcast", emoji: "☁️" };
+  if (code >= 45 && code <= 48) return { condition: "Fog", emoji: "🌫" };
+  if (code >= 51 && code <= 57) return { condition: "Drizzle", emoji: "🌦" };
+  if (code >= 61 && code <= 67) return { condition: "Rain", emoji: "🌧" };
+  if (code >= 71 && code <= 77) return { condition: "Snow", emoji: "🌨" };
+  if (code >= 80 && code <= 82) return { condition: "Showers", emoji: "🌧" };
+  if (code >= 85 && code <= 86) return { condition: "Snow", emoji: "🌨" };
+  if (code >= 95 && code <= 99) return { condition: "Storm", emoji: "⛈" };
+  return { condition: "—", emoji: "" };
 }
 
-function bucketize(hourly: HourlyPointView[]): Bucketed[] {
+interface Bucket {
+  startHour: number;
+  windAvg: number | null;
+  gustPeak: number | null;
+  precipSum: number;
+  hasRain: boolean;
+  emoji: string;
+  condition: string;
+}
+
+function bucketize(
+  hourly: HourlyPointView[],
+  dayEmoji: string,
+  dayCondition: string,
+): Bucket[] {
   return BUCKET_STARTS.map((start) => {
     const pts = hourly.filter(
       (p) => p.hour >= start && p.hour < start + BUCKET_HOURS,
@@ -89,42 +116,62 @@ function bucketize(hourly: HourlyPointView[]): Bucketed[] {
       return {
         startHour: start,
         windAvg: null,
-        gustAvg: null,
-        precipSum: null,
+        gustPeak: null,
+        precipSum: 0,
         hasRain: false,
+        emoji: dayEmoji,
+        condition: dayCondition,
       };
     }
     const windVals = pts.map((p) => p.windMph).filter((v): v is number => typeof v === "number");
     const gustVals = pts.map((p) => p.windGustMph).filter((v): v is number => typeof v === "number");
-    const precipVals = pts.map((p) => p.precipInches ?? 0);
-    const precipSum = precipVals.reduce((a, b) => a + b, 0);
+    const precipSum = pts.reduce((acc, p) => acc + (p.precipInches ?? 0), 0);
+    // Condition preference: if any bucket-hour saw rain, override the
+    // day-level "cloudy" with a wet icon so the reader sees WHEN it
+    // rained. Otherwise inherit the day's condition.
+    let emoji = dayEmoji;
+    let condition = dayCondition;
+    if (precipSum >= 0.02) {
+      emoji = "🌧";
+      condition = "Rain";
+    } else {
+      // Look for the modal hourly weather_code among the bucket's
+      // hours (if the payload carries it). Falls back to day-level.
+      const codes = pts.map((p) => p.weatherCode).filter((c): c is number => typeof c === "number");
+      if (codes.length > 0) {
+        const c = classifyCode(codes[Math.floor(codes.length / 2)]);
+        if (c.emoji) {
+          emoji = c.emoji;
+          condition = c.condition;
+        }
+      }
+    }
     return {
       startHour: start,
       windAvg: windVals.length ? windVals.reduce((a, b) => a + b, 0) / windVals.length : null,
-      gustAvg: gustVals.length ? Math.max(...gustVals) : null, // peak gust in window, not avg
+      gustPeak: gustVals.length ? Math.max(...gustVals) : null,
       precipSum,
       hasRain: precipSum >= 0.02,
+      emoji,
+      condition,
     };
   });
 }
 
-function labelForRound(day: DailyWeatherView | null): string {
-  if (!day) return "—";
-  if (day.emoji && day.condition) return `${day.emoji} ${day.condition}`;
-  return day.emoji ?? day.condition ?? "—";
-}
-
-export default function WeatherStrip({ weatherByRound }: Props) {
-  if (!weatherByRound) return null;
-  const anyHourly = ROUNDS.some(
-    (r) => (weatherByRound[String(r)]?.hourly?.length ?? 0) > 0,
+export default function WeatherStrip({ day, roundLabel }: Props) {
+  if (!day) return null;
+  const hourly = day.hourly ?? [];
+  if (hourly.length === 0) return null;
+  const buckets = bucketize(
+    hourly,
+    day.emoji ?? "",
+    day.condition ?? "",
   );
-  if (!anyHourly) return null;
 
   return (
     <div
       style={{
-        marginTop: 10,
+        marginTop: 12,
         padding: "10px 12px",
         border: "1px solid oklch(0.9 0.008 95)",
         borderRadius: 8,
@@ -137,165 +184,129 @@ export default function WeatherStrip({ weatherByRound }: Props) {
     >
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: `48px 90px repeat(${BUCKET_STARTS.length}, minmax(56px, 1fr))`,
-          columnGap: 4,
-          rowGap: 4,
+          display: "flex",
           alignItems: "center",
-          minWidth: 620,
+          justifyContent: "space-between",
+          marginBottom: 8,
+          gap: 12,
         }}
       >
-        {/* Header row — R label col empty, condition col empty, then hour labels */}
-        <div />
-        <div />
-        {BUCKET_STARTS.map((h) => (
-          <div
-            key={`h-${h}`}
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 800,
+            color: "oklch(0.25 0.02 150)",
+            fontFamily: "var(--font-mono, monospace)",
+            letterSpacing: 0.4,
+            textTransform: "uppercase",
+          }}
+        >
+          {roundLabel ?? "Weather"}
+        </span>
+        {day.headline && (
+          <span
             style={{
-              fontSize: 10,
-              fontFamily: "var(--font-mono, monospace)",
+              fontSize: 11,
               color: "oklch(0.5 0.02 150)",
-              textAlign: "center",
-              paddingBottom: 2,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
-            {formatHour(h)}
-          </div>
-        ))}
-
-        {/* One row per round */}
-        {ROUNDS.map((r) => {
-          const day = weatherByRound[String(r)] ?? null;
-          const hourly = day?.hourly ?? [];
-          const buckets = hourly.length > 0 ? bucketize(hourly) : [];
-          return (
-            <Fragment key={r}>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 800,
-                  color: "oklch(0.25 0.02 150)",
-                  fontFamily: "var(--font-mono, monospace)",
-                  letterSpacing: 0.4,
-                }}
-              >
-                R{r}
-              </div>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: "oklch(0.5 0.02 150)",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-                title={day?.headline ?? undefined}
-              >
-                {labelForRound(day)}
-              </div>
-              {buckets.length === 0
-                ? BUCKET_STARTS.map((h) => (
-                    <div
-                      key={`empty-${r}-${h}`}
-                      style={{
-                        height: 44,
-                        background: "oklch(0.96 0.006 95)",
-                        borderRadius: 4,
-                      }}
-                    />
-                  ))
-                : buckets.map((b) => {
-                    const bg = windColour(b.windAvg);
-                    const fg = windTextColour(b.windAvg);
-                    const title =
-                      b.windAvg == null
-                        ? `${formatHour(b.startHour)}–${formatHour(b.startHour + BUCKET_HOURS)}: no data`
-                        : `${formatHour(b.startHour)}–${formatHour(b.startHour + BUCKET_HOURS)}: ${b.windAvg.toFixed(0)}mph avg, gusts to ${b.gustAvg?.toFixed(0) ?? "—"}mph${b.hasRain ? `, ${(b.precipSum ?? 0).toFixed(2)}" rain` : ""}`;
-                    return (
-                      <div
-                        key={`c-${r}-${b.startHour}`}
-                        title={title}
-                        style={{
-                          height: 44,
-                          background: bg,
-                          color: fg,
-                          borderRadius: 4,
-                          padding: "3px 4px",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          lineHeight: 1.1,
-                          fontFamily: "var(--font-mono, monospace)",
-                          position: "relative",
-                        }}
-                      >
-                        {b.windAvg == null ? (
-                          <span style={{ fontSize: 10, opacity: 0.6 }}>—</span>
-                        ) : (
-                          <>
-                            <span style={{ fontSize: 14, fontWeight: 800 }}>
-                              {Math.round(b.windAvg)}
-                            </span>
-                            <span
-                              style={{
-                                fontSize: 9,
-                                opacity: 0.8,
-                                marginTop: 1,
-                              }}
-                            >
-                              g{Math.round(b.gustAvg ?? 0)}
-                            </span>
-                          </>
-                        )}
-                        {b.hasRain && (
-                          <span
-                            style={{
-                              position: "absolute",
-                              top: 2,
-                              right: 3,
-                              fontSize: 10,
-                            }}
-                            title={`${(b.precipSum ?? 0).toFixed(2)}" rain`}
-                          >
-                            💧
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-            </Fragment>
-          );
-        })}
+            {day.headline}
+          </span>
+        )}
       </div>
       <div
         style={{
-          marginTop: 8,
-          fontSize: 10,
-          color: "oklch(0.55 0.02 150)",
-          display: "flex",
-          gap: 12,
-          alignItems: "center",
-          flexWrap: "wrap",
+          display: "grid",
+          gridTemplateColumns: `repeat(${BUCKET_STARTS.length}, minmax(78px, 1fr))`,
+          columnGap: 4,
+          minWidth: 560,
         }}
       >
-        <span>Wind mph (avg / gust). Colour: calm → damaging.</span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          {[3, 7, 12, 17, 22].map((mph) => (
-            <span
-              key={mph}
+        {buckets.map((b) => {
+          const bg = windColour(b.windAvg);
+          const fg = windTextColour(b.windAvg);
+          const tooltip =
+            b.windAvg == null
+              ? `${formatRange(b.startHour)}: no data`
+              : `${formatRange(b.startHour)} · ${b.condition} · ${b.windAvg.toFixed(1)}mph avg wind, gusts to ${b.gustPeak?.toFixed(0) ?? "—"}mph${b.hasRain ? `, ${b.precipSum.toFixed(2)}" rain` : ""}`;
+          return (
+            <div
+              key={b.startHour}
+              title={tooltip}
               style={{
-                width: 18,
-                height: 10,
-                background: windColour(mph),
-                borderRadius: 2,
-                display: "inline-block",
-                border: "1px solid oklch(0.92 0.008 95)",
+                background: bg,
+                color: fg,
+                borderRadius: 6,
+                padding: "6px 6px 5px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                lineHeight: 1.15,
+                fontFamily: "var(--font-mono, monospace)",
+                minHeight: 72,
               }}
-            />
-          ))}
-          <span style={{ marginLeft: 4 }}>&lt;5 · 10 · 15 · 20 · 20+</span>
-        </span>
+            >
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  opacity: 0.85,
+                  letterSpacing: 0.3,
+                }}
+              >
+                {formatRange(b.startHour)}
+              </span>
+              <span
+                style={{
+                  fontSize: 15,
+                  marginTop: 3,
+                  lineHeight: 1,
+                }}
+                aria-label={b.condition}
+              >
+                {b.emoji || "—"}
+              </span>
+              {b.windAvg == null ? (
+                <span style={{ fontSize: 10, marginTop: 6, opacity: 0.6 }}>—</span>
+              ) : (
+                <>
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 800,
+                      marginTop: 4,
+                    }}
+                  >
+                    {Math.round(b.windAvg)}mph
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      opacity: 0.85,
+                      marginTop: 1,
+                    }}
+                  >
+                    gusts {Math.round(b.gustPeak ?? 0)}
+                  </span>
+                </>
+              )}
+              {b.hasRain && (
+                <span
+                  style={{
+                    fontSize: 9,
+                    marginTop: 3,
+                    opacity: 0.9,
+                  }}
+                >
+                  💧 {b.precipSum.toFixed(2)}&quot;
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

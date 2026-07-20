@@ -6,7 +6,7 @@ import MainNav from "@/app/MainNav";
 import AuthChip from "@/app/live/auth/AuthChip";
 import { BRAND } from "@/lib/brand";
 import Heatmap, { type Cell } from "./Heatmap";
-import WeatherStrip, { type DailyWeatherView } from "../_components/WeatherStrip";
+import type { DailyWeatherView } from "../_components/WeatherStrip";
 
 interface FetchResp {
   ok: boolean;
@@ -183,8 +183,11 @@ export default function Page() {
                 ? `updated ${new Date(data.generatedAt).toLocaleTimeString()}`
                 : ""}
             </p>
-            <WeatherStrip weatherByRound={data.weatherByRound} />
-            <Heatmap cells={data.cells} bucketMinutes={data.bucketMinutes ?? 15} />
+            <Heatmap
+              cells={data.cells}
+              bucketMinutes={data.bucketMinutes ?? 15}
+              weatherByRound={data.weatherByRound}
+            />
           </>
         )}
       </section>

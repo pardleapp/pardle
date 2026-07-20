@@ -9,6 +9,9 @@ import {
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react";
+import WeatherStrip, {
+  type DailyWeatherView,
+} from "../_components/WeatherStrip";
 
 type RoundNum = 1 | 2 | 3 | 4;
 
@@ -58,6 +61,7 @@ const ROUND_LABEL: Record<RoundNum, string> = {
 
 interface ChartProps {
   rows: Row[];
+  weatherByRound?: Record<string, DailyWeatherView | null> | null;
 }
 
 /** Gaussian-weighted rolling mean (double pass). */
@@ -106,7 +110,7 @@ function interpolate(
   return null;
 }
 
-export default function Chart({ rows }: ChartProps) {
+export default function Chart({ rows, weatherByRound }: ChartProps) {
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -129,6 +133,7 @@ export default function Chart({ rows }: ChartProps) {
         rows={rows}
         expanded={false}
         onExpand={() => setExpanded(true)}
+        weatherByRound={weatherByRound ?? null}
       />
       {expanded && (
         <div
@@ -180,7 +185,12 @@ export default function Chart({ rows }: ChartProps) {
             >
               Close ✕
             </button>
-            <ChartCore rows={rows} expanded={true} onExpand={null} />
+            <ChartCore
+              rows={rows}
+              expanded={true}
+              onExpand={null}
+              weatherByRound={weatherByRound ?? null}
+            />
           </div>
         </div>
       )}
@@ -270,10 +280,12 @@ function ChartCore({
   rows,
   expanded,
   onExpand,
+  weatherByRound,
 }: {
   rows: Row[];
   expanded: boolean;
   onExpand: (() => void) | null;
+  weatherByRound: Record<string, DailyWeatherView | null> | null;
 }) {
   const [hover, setHover] = useState<Row | null>(null);
   const [cursorX, setCursorX] = useState<number | null>(null);
@@ -1228,6 +1240,16 @@ function ChartCore({
         negative = outperformed. Blue line: Gaussian-smoothed trend across
         tee times.
       </p>
+
+      {/* Weather strip — only when a single round tab is active. The
+          "All" tab collapses four days into one chart, so pinning
+          weather to a single day would be misleading. */}
+      {roundFilter !== "all" && weatherByRound && (
+        <WeatherStrip
+          day={weatherByRound[String(activeRounds[0])] ?? null}
+          roundLabel={`R${activeRounds[0]} weather`}
+        />
+      )}
     </div>
   );
 }
