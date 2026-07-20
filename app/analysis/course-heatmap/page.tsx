@@ -8,7 +8,11 @@ import { BRAND } from "@/lib/brand";
 import Heatmap, { type Cell } from "./Heatmap";
 import PinSheetModal from "./PinSheetModal";
 import type { DailyWeatherView } from "../_components/WeatherStrip";
-import type { CoursePinSheet, CoursePinHole } from "@/lib/golf-api/pgatour";
+import type {
+  CoursePinSheet,
+  CoursePinHole,
+  TournamentPuttSheet,
+} from "@/lib/golf-api/pgatour";
 
 interface FetchResp {
   ok: boolean;
@@ -34,6 +38,13 @@ interface PinsResp {
   error?: string;
 }
 
+interface PuttsResp {
+  ok: boolean;
+  cached?: boolean;
+  putts?: TournamentPuttSheet;
+  error?: string;
+}
+
 const POLL_MS = 60_000;
 type YearTab = "live" | "2025" | "2024" | "2023";
 const YEAR_TABS: YearTab[] = ["live", "2025", "2024", "2023"];
@@ -44,6 +55,8 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const [pins, setPins] = useState<CoursePinSheet | null>(null);
   const [pinsForTournament, setPinsForTournament] = useState<string | null>(null);
+  const [putts, setPutts] = useState<TournamentPuttSheet | null>(null);
+  const [puttsLoading, setPuttsLoading] = useState(false);
   const [openHole, setOpenHole] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -66,6 +79,8 @@ export default function Page() {
     setData(null);
     setPins(null);
     setPinsForTournament(null);
+    setPutts(null);
+    setPuttsLoading(false);
     setOpenHole(null);
     load();
     // Only the live tab polls; historical files never change.
@@ -74,9 +89,10 @@ export default function Page() {
     return () => clearInterval(id);
   }, [load, tab]);
 
-  // Fetch pin sheet whenever we get a tournamentId. Cached 6h Redis-
-  // side so this is a cheap poll for the modal; we still only ask
-  // once per tournament id per mount.
+  // Fetch pin sheet + putt sheet whenever we get a tournamentId.
+  // Cached 6h Redis-side. Pin sheet is small + fast; putt sheet is
+  // ~30s cold (240 shotDetailsV3 calls) so we fire it in the
+  // background right away so the modal has data ready when opened.
   useEffect(() => {
     const tid = data?.tournamentId;
     if (!tid || tid === pinsForTournament) return;
@@ -91,6 +107,21 @@ export default function Page() {
         if (json.ok && json.pins) setPins(json.pins);
       } catch {
         /* pin-sheet failure is non-fatal — the heatmap still renders. */
+      }
+    })();
+    setPuttsLoading(true);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/hole-putts?tournamentId=${encodeURIComponent(tid)}`,
+          { cache: "no-store" },
+        );
+        const json = (await res.json()) as PuttsResp;
+        if (json.ok && json.putts) setPutts(json.putts);
+      } catch {
+        /* putt overlay is non-fatal; modal will fall back to no overlay */
+      } finally {
+        setPuttsLoading(false);
       }
     })();
   }, [data?.tournamentId, pinsForTournament]);
@@ -265,6 +296,11 @@ export default function Page() {
       {openHoleData && (
         <PinSheetModal
           hole={openHoleData}
+          puttsForHole={putts?.puttsByHole[openHoleData.holeNumber] ?? []}
+          puttsGreenImageUrl={
+            putts?.greenImageByHole[openHoleData.holeNumber] ?? null
+          }
+          puttsLoading={puttsLoading && (putts?.puttsByHole[openHoleData.holeNumber]?.length ?? 0) === 0}
           onClose={() => setOpenHole(null)}
         />
       )}

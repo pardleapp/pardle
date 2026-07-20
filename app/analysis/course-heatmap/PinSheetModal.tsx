@@ -12,11 +12,22 @@
  * percentage-based left/top.
  */
 
-import { useEffect, useState } from "react";
-import type { CoursePinHole } from "@/lib/golf-api/pgatour";
+import { useEffect, useMemo, useState } from "react";
+import type { CoursePinHole, HolePutt } from "@/lib/golf-api/pgatour";
 
 interface Props {
   hole: CoursePinHole | null;
+  /** All putts on this hole across the field × rounds. Empty when
+   *  data hasn't loaded / no coverage. */
+  puttsForHole?: HolePutt[];
+  /** Alternate green diagram URL from the shot-detail feed. Putt
+   *  coords normalise against THIS image, so we prefer it over the
+   *  pin sheet's asset when it's present (they're often the same
+   *  Cloudinary render, but not always). */
+  puttsGreenImageUrl?: string | null;
+  /** True while the putt fetch is still in flight (first-open,
+   *  cold cache). */
+  puttsLoading?: boolean;
   onClose: () => void;
 }
 
@@ -52,11 +63,24 @@ function scoringColour(v: number | null | undefined): string {
   return "oklch(0.85 0.02 150)";
 }
 
-export default function PinSheetModal({ hole, onClose }: Props) {
+export default function PinSheetModal({
+  hole,
+  puttsForHole,
+  puttsGreenImageUrl,
+  puttsLoading,
+  onClose,
+}: Props) {
   /** eventId of the pin currently being hovered — null when not
    *  hovering. Renders a small tooltip anchored to that pin with
    *  the round's field scoring average. */
   const [hoverRound, setHoverRound] = useState<number | null>(null);
+  /** Which round(s) of putts to draw. `null` = all rounds. Filter
+   *  chip below the diagram flips this. */
+  const [puttRoundFilter, setPuttRoundFilter] = useState<number | null>(null);
+  /** True → overlay putt arcs on the green. Default on. */
+  const [showPutts, setShowPutts] = useState(true);
+  /** True → only show made putts. Default off (all). */
+  const [madeOnly, setMadeOnly] = useState(false);
   useEffect(() => {
     if (!hole) return;
     const onKey = (e: KeyboardEvent) => {
@@ -72,6 +96,26 @@ export default function PinSheetModal({ hole, onClose }: Props) {
   }, [hole, onClose]);
 
   if (!hole) return null;
+  // Filter putts to the currently-selected round + made/missed pref.
+  const filteredPutts = useMemo(() => {
+    const list = puttsForHole ?? [];
+    return list.filter((p) => {
+      if (puttRoundFilter != null && p.round !== puttRoundFilter) return false;
+      if (madeOnly && !p.made) return false;
+      return true;
+    });
+  }, [puttsForHole, puttRoundFilter, madeOnly]);
+
+  // Counts per round for the filter chips (so users see coverage).
+  const puttCountsByRound = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const p of puttsForHole ?? []) {
+      map.set(p.round, (map.get(p.round) ?? 0) + 1);
+    }
+    return map;
+  }, [puttsForHole]);
+
+  const diagramImageUrl = puttsGreenImageUrl || hole?.greenImageUrl || "";
   const roundsWithPin = Object.keys(hole.pinByRound)
     .map((k) => Number(k))
     .filter((r) => Number.isFinite(r))
@@ -162,7 +206,7 @@ export default function PinSheetModal({ hole, onClose }: Props) {
           </button>
         </header>
 
-        {hole.greenImageUrl ? (
+        {diagramImageUrl ? (
           // Container's height is driven by the <img> (width:100%, height
           // auto) so pin dot percentages resolve against the image's
           // actual painted area — no letterbox, no dots floating in
@@ -182,7 +226,7 @@ export default function PinSheetModal({ hole, onClose }: Props) {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={hole.greenImageUrl}
+              src={diagramImageUrl}
               alt={`Green diagram, hole ${hole.holeNumber}`}
               style={{
                 display: "block",
@@ -190,6 +234,84 @@ export default function PinSheetModal({ hole, onClose }: Props) {
                 height: "auto",
               }}
             />
+            {/* Putt overlay — arcs from each putt's start to end.
+                Stacking hundreds of putts reveals the green's break
+                pattern (approximate contours). SVG uses percentage-
+                unit coords so it scales with the responsive image
+                exactly. */}
+            {showPutts && filteredPutts.length > 0 && (
+              <svg
+                width="100%"
+                height="100%"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  pointerEvents: "none",
+                }}
+                aria-hidden="true"
+              >
+                {filteredPutts.map((p, i) => {
+                  const x1 = p.x1 * 100;
+                  const y1 = p.y1 * 100;
+                  const x2 = p.x2 * 100;
+                  const y2 = p.y2 * 100;
+                  // Curl each stroke into a subtle quadratic curve —
+                  // real putts break; drawing them as a slight arc
+                  // instead of a straight line reads more like a
+                  // contour indicator when 100+ are stacked.
+                  const midX = (x1 + x2) / 2;
+                  const midY = (y1 + y2) / 2;
+                  // Perpendicular unit vector for the curve control
+                  // point offset. Deterministic per-putt so re-renders
+                  // don't jitter.
+                  const dx = x2 - x1;
+                  const dy = y2 - y1;
+                  const len = Math.max(0.001, Math.hypot(dx, dy));
+                  const nx = -dy / len;
+                  const ny = dx / len;
+                  // Curl magnitude: scale with putt length so long
+                  // putts arc more than tap-ins. Sign alternates by
+                  // stroke index for visual density; when broadcasts
+                  // publish true line/lag we'd swap this for the real
+                  // sign.
+                  const curl = Math.min(3.5, len * 0.12) * (i % 2 === 0 ? 1 : -1);
+                  const cx = midX + nx * curl;
+                  const cy = midY + ny * curl;
+                  const stroke = p.made
+                    ? "oklch(0.7 0.19 150 / 0.35)"
+                    : "oklch(0.55 0.20 28 / 0.28)";
+                  return (
+                    <path
+                      key={`p${i}`}
+                      d={`M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`}
+                      stroke={stroke}
+                      strokeWidth={0.35}
+                      fill="none"
+                      strokeLinecap="round"
+                    />
+                  );
+                })}
+                {/* Endpoint dots — where the ball ended up. Made putts
+                    are the CUP so they cluster on the pin; missed
+                    putts scatter around the pin and reveal the fall
+                    line. */}
+                {filteredPutts.map((p, i) => (
+                  <circle
+                    key={`d${i}`}
+                    cx={p.x2 * 100}
+                    cy={p.y2 * 100}
+                    r={0.55}
+                    fill={
+                      p.made
+                        ? "oklch(0.6 0.2 150 / 0.6)"
+                        : "oklch(0.55 0.22 28 / 0.5)"
+                    }
+                  />
+                ))}
+              </svg>
+            )}
             {roundsWithPin.map((round) => {
               const pin = hole.pinByRound[round];
               if (!pin) return null;
@@ -337,6 +459,215 @@ export default function PinSheetModal({ hole, onClose }: Props) {
             }}
           >
             No green diagram available for this hole.
+          </div>
+        )}
+
+        {/* Putt overlay controls — round filter + made/missed toggle
+            + coverage summary. Only renders once we have any putt
+            data at all. */}
+        {(puttsForHole?.length ?? 0) > 0 && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: "8px 10px",
+              border: "1px solid oklch(0.94 0.008 95)",
+              borderRadius: 8,
+              background: "oklch(0.99 0.005 95)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              fontFamily:
+                "var(--font-archivo), 'Archivo', system-ui, sans-serif",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                fontSize: 11,
+                color: "oklch(0.5 0.02 150)",
+                letterSpacing: 0.3,
+              }}
+            >
+              <span
+                style={{
+                  fontWeight: 800,
+                  color: "oklch(0.3 0.02 150)",
+                  fontFamily: "var(--font-mono, monospace)",
+                  letterSpacing: 0.5,
+                  textTransform: "uppercase",
+                  fontSize: 10,
+                }}
+              >
+                PUTT PATHS
+              </span>
+              <span
+                style={{
+                  fontFamily: "var(--font-mono, monospace)",
+                  fontSize: 10,
+                }}
+              >
+                {filteredPutts.length} shown ·{" "}
+                {filteredPutts.filter((p) => p.made).length} made
+              </span>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {(
+                [
+                  { id: null, label: "All rounds" },
+                  { id: 1, label: "R1" },
+                  { id: 2, label: "R2" },
+                  { id: 3, label: "R3" },
+                  { id: 4, label: "R4" },
+                ] as Array<{ id: number | null; label: string }>
+              ).map((r) => {
+                const active = puttRoundFilter === r.id;
+                const count =
+                  r.id == null
+                    ? (puttsForHole?.length ?? 0)
+                    : puttCountsByRound.get(r.id) ?? 0;
+                const disabled = r.id != null && count === 0;
+                return (
+                  <button
+                    key={r.label}
+                    type="button"
+                    onClick={() => setPuttRoundFilter(r.id)}
+                    disabled={disabled}
+                    style={{
+                      padding: "3px 10px",
+                      fontSize: 11,
+                      fontFamily: "inherit",
+                      fontWeight: 700,
+                      borderRadius: 999,
+                      border: "1px solid oklch(0.9 0.008 95)",
+                      background: active
+                        ? "oklch(0.22 0.03 150)"
+                        : "white",
+                      color: active
+                        ? "white"
+                        : disabled
+                          ? "oklch(0.75 0.008 95)"
+                          : "oklch(0.3 0.02 150)",
+                      cursor: disabled ? "not-allowed" : "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    {r.label}
+                    <span
+                      style={{
+                        fontFamily: "var(--font-mono, monospace)",
+                        fontSize: 9,
+                        opacity: 0.7,
+                      }}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+              <span style={{ flex: 1 }} />
+              <button
+                type="button"
+                onClick={() => setMadeOnly((v) => !v)}
+                title={
+                  madeOnly ? "Showing MADE putts only" : "Showing all putts"
+                }
+                style={{
+                  padding: "3px 10px",
+                  fontSize: 11,
+                  fontFamily: "inherit",
+                  fontWeight: 700,
+                  borderRadius: 999,
+                  border: "1px solid oklch(0.9 0.008 95)",
+                  background: madeOnly ? "oklch(0.22 0.03 150)" : "white",
+                  color: madeOnly ? "white" : "oklch(0.3 0.02 150)",
+                  cursor: "pointer",
+                }}
+              >
+                Made only
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPutts((v) => !v)}
+                style={{
+                  padding: "3px 10px",
+                  fontSize: 11,
+                  fontFamily: "inherit",
+                  fontWeight: 700,
+                  borderRadius: 999,
+                  border: "1px solid oklch(0.9 0.008 95)",
+                  background: showPutts ? "white" : "oklch(0.22 0.03 150)",
+                  color: showPutts ? "oklch(0.3 0.02 150)" : "white",
+                  cursor: "pointer",
+                }}
+              >
+                Hide overlay
+              </button>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: 14,
+                fontSize: 10,
+                color: "oklch(0.5 0.02 150)",
+                fontFamily: "var(--font-mono, monospace)",
+              }}
+            >
+              <span
+                style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+              >
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 14,
+                    height: 3,
+                    background: "oklch(0.7 0.19 150)",
+                    borderRadius: 2,
+                  }}
+                />
+                MADE
+              </span>
+              <span
+                style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+              >
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 14,
+                    height: 3,
+                    background: "oklch(0.55 0.2 28)",
+                    borderRadius: 2,
+                  }}
+                />
+                MISSED
+              </span>
+              <span style={{ opacity: 0.7 }}>
+                Endpoint dots reveal the fall line — cluster on the low
+                side of the pin.
+              </span>
+            </div>
+          </div>
+        )}
+        {puttsLoading && (puttsForHole?.length ?? 0) === 0 && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: "10px 12px",
+              border: "1px dashed oklch(0.88 0.013 95)",
+              borderRadius: 8,
+              fontSize: 11,
+              color: "oklch(0.5 0.02 150)",
+              textAlign: "center",
+              fontFamily:
+                "var(--font-archivo), 'Archivo', system-ui, sans-serif",
+            }}
+          >
+            Loading putt-path overlay… (first open of a tournament can
+            take ~30 s; cached after that.)
           </div>
         )}
 

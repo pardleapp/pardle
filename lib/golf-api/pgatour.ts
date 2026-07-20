@@ -864,3 +864,143 @@ export async function getCoursePins(
     holes,
   };
 }
+
+// ──────────────────────────────────────────────────────────────────
+// Tournament putt sheet — aggregate every on-green stroke across a
+// slice of the field × every round, for the green-diagram contour
+// overlay. Each putt gives us a `from → to` vector on the zoomed
+// green view; stacking hundreds reveals slope direction without any
+// paid contour data.
+// ──────────────────────────────────────────────────────────────────
+
+export interface HolePutt {
+  round: number;
+  playerId: string;
+  /** Normalised 0-1 start position on the zoomed-green diagram. */
+  x1: number;
+  y1: number;
+  /** End position — where the putt finished / went in the hole. */
+  x2: number;
+  y2: number;
+  /** True when the putt was holed. Derived from
+   *  toLocationCode === "OHL" (in the hole). */
+  made: boolean;
+  /** Distance of the putt in feet, parsed from the display string
+   *  ("12 ft 4 in." etc). Null when un-parseable. */
+  distanceFt: number | null;
+  strokeNumber: number;
+}
+
+export interface TournamentPuttSheet {
+  tournamentId: string;
+  /** Requested cap on how many players we fetched (top N of the
+   *  leaderboard). */
+  playersRequested: number;
+  /** Actual player-round bundles returned with putt data. */
+  playerRoundsReturned: number;
+  /** Green-diagram image URL keyed by hole — same asset as the
+   *  shot tracer uses. When empty, fall back to the pin sheet's
+   *  greenImageUrl. */
+  greenImageByHole: Record<number, string>;
+  /** All putts on the tournament grouped by hole number. */
+  puttsByHole: Record<number, HolePutt[]>;
+}
+
+/** Parse a distance string ("12 ft 4 in.", "3 ft") into feet. */
+function parseDistanceFt(s: string | null | undefined): number | null {
+  if (!s) return null;
+  const t = s.trim();
+  const ft = t.match(/(\d+(?:\.\d+)?)\s*ft/i);
+  const inch = t.match(/(\d+(?:\.\d+)?)\s*in/i);
+  const feet = ft ? Number(ft[1]) : 0;
+  const inches = inch ? Number(inch[1]) : 0;
+  if (feet === 0 && inches === 0) return null;
+  return feet + inches / 12;
+}
+
+/** Pull every putt on the course for a tournament — batched across
+ *  top-N players of the current leaderboard, then filtered to
+ *  strokes taken from the green. Data is bulky (thousands of putts)
+ *  but travels well as JSON and gets Redis-cached upstream. */
+export async function getTournamentPutts(
+  tournamentId: string,
+  playerLimit: number = 60,
+): Promise<TournamentPuttSheet> {
+  const leaderboard = await getLeaderboard(tournamentId);
+  const players = leaderboard.slice(0, playerLimit).map((p) => p.playerId);
+
+  // Fan out every (player, round) that could have data. shotDetailsV3
+  // silently returns null for players who missed the cut / didn't
+  // start a round; we tolerate that.
+  const requests: { playerId: string; round: number }[] = [];
+  for (const pid of players) {
+    for (let r = 1; r <= 4; r++) requests.push({ playerId: pid, round: r });
+  }
+  const shotData = await getShotDetailsBatch(tournamentId, requests);
+
+  const puttsByHole: Record<number, HolePutt[]> = {};
+  const greenImageByHole: Record<number, string> = {};
+  let playerRoundsReturned = 0;
+  for (const [key, holes] of Object.entries(shotData)) {
+    if (!holes || holes.length === 0) continue;
+    playerRoundsReturned++;
+    const [playerId, roundStr] = key.split(":");
+    const round = Number(roundStr);
+    if (!Number.isFinite(round)) continue;
+    for (const hole of holes) {
+      const holeNum = hole.holeNumber;
+      if (typeof holeNum !== "number") continue;
+      if (!greenImageByHole[holeNum] && hole.greenImage) {
+        greenImageByHole[holeNum] = hole.greenImage;
+      }
+      for (const stroke of hole.strokes ?? []) {
+        // Only on-green strokes (putts). Guard against penalty /
+        // drop strokes with no coords.
+        if (stroke.fromLocationCode !== "OGR") continue;
+        if (stroke.strokeType && stroke.strokeType !== "STROKE") continue;
+        const x1 = stroke.greenFromX;
+        const y1 = stroke.greenFromY;
+        const x2 = stroke.greenToX;
+        const y2 = stroke.greenToY;
+        // -1 sentinel used when the orchestrator didn't capture
+        // green coords for this stroke.
+        if (
+          !Number.isFinite(x1) ||
+          !Number.isFinite(y1) ||
+          !Number.isFinite(x2) ||
+          !Number.isFinite(y2) ||
+          x1 < 0 ||
+          y1 < 0 ||
+          x2 < 0 ||
+          y2 < 0
+        ) {
+          continue;
+        }
+        const putt: HolePutt = {
+          round,
+          playerId,
+          x1,
+          y1,
+          x2,
+          y2,
+          // toLocationCode "OHL" = in the hole. Occasionally spelled
+          // "HOL" in older feeds; check both.
+          made:
+            stroke.toLocationCode === "OHL" || stroke.toLocationCode === "HOL",
+          distanceFt: parseDistanceFt(stroke.distance),
+          strokeNumber: stroke.strokeNumber,
+        };
+        if (!puttsByHole[holeNum]) puttsByHole[holeNum] = [];
+        puttsByHole[holeNum].push(putt);
+      }
+    }
+  }
+
+  return {
+    tournamentId,
+    playersRequested: playerLimit,
+    playerRoundsReturned,
+    greenImageByHole,
+    puttsByHole,
+  };
+}
