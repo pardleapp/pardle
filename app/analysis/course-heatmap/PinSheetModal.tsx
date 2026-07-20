@@ -619,7 +619,7 @@ export default function PinSheetModal({
               <button
                 type="button"
                 onClick={() => setShowSlope((v) => !v)}
-                title="Experimental: infer slope arrows from missed-putt patterns"
+                title="Experimental: trace slope-inferred flow lines through the putt vector field"
                 style={{
                   padding: "3px 10px",
                   fontSize: 11,
@@ -632,7 +632,7 @@ export default function PinSheetModal({
                   cursor: "pointer",
                 }}
               >
-                Slope arrows (β)
+                Slope flow (β)
               </button>
             </div>
             {showSlope && (
@@ -644,11 +644,11 @@ export default function PinSheetModal({
                   fontStyle: "italic",
                 }}
               >
-                Slope arrows are INFERRED from missed-putt deflection
-                patterns — a rough downhill signal, not a surveyed
-                contour. Each arrow is the mean roll-deflection of
-                ≥4 putts anchored in that cell. Sparse cells and
-                low-signal patches get dropped rather than guessed.
+                Streamlines INFERRED from putt-path deflection — trace
+                where a ball would roll from any point on the green,
+                following the aggregate downhill direction. Not a
+                surveyed contour map; the density of lines converging
+                on a spot ≈ a natural collection point.
               </div>
             )}
             <div
