@@ -112,41 +112,71 @@ function formatShotAnchor(ev: FeedEvent, kind: string): string | null {
       return `${Math.round(ev.shotYards)} y`;
     }
   }
-  // Approach / chip / sand — show proximity AFTER the shot (how close
-  // it finished to the pin). If the shot event carries `proximityInches`,
-  // that IS post-shot proximity from the collector's shot record.
+  // Approach / chip / sand / generic — prefer post-shot proximity to
+  // the pin (that's what matters to a bettor: how close did it end
+  // up?). Fall back to distance travelled, then to the collector's
+  // pre-formatted display string.
   if (typeof ev.proximityInches === "number") {
     const ft = ev.proximityInches / 12;
     if (ft < 100) return `${Math.round(ft)} ft`;
     return `${Math.round(ft / 3)} y`;
   }
-  // Last resort: the collector's own display string.
   if (ev.imgToPin) return ev.imgToPin;
+  if (
+    typeof ev.imgShotDistance === "number" &&
+    ev.imgShotDistanceUnit === "yds"
+  ) {
+    return `${Math.round(ev.imgShotDistance)} y`;
+  }
+  if (
+    typeof ev.imgShotDistance === "number" &&
+    ev.imgShotDistanceUnit === "ft"
+  ) {
+    return `${Math.round(ev.imgShotDistance)} ft`;
+  }
+  if (typeof ev.shotYards === "number") {
+    return `${Math.round(ev.shotYards)} y`;
+  }
   return "—";
 }
 
-/** Shot-type classifier for live IMG-sourced shot events. Uses the
- *  surface + shot-number signal from the collector to distinguish
- *  drive / approach / putt / chip / bunker. Falls back to a generic
- *  SHOT tag when the enrichment fields are absent. */
+/** Shot-type classifier for live IMG-sourced shot events. Prefers
+ *  the engine's headline (the collector formats it with the correct
+ *  verb: "putts", "approaches", "finds the bunker", etc — the most
+ *  reliable signal) and falls back to imgSurface + imgShotNum only
+ *  when the headline is generic. */
 function shotTag(ev: FeedEvent): { text: string; kind: string } {
+  const h = (ev.headline ?? "").toLowerCase();
+  // Headline-first: the collector's verb is authoritative because
+  // imgSurface sometimes reflects the LANDING surface (a shot from
+  // the fairway to the green would get surface=green and be
+  // misclassified as PUTT if we trusted surface alone).
+  if (/\bputts?\b/.test(h)) return { text: "PUTT", kind: "putt" };
+  if (/\b(bunker|sand)\b/.test(h)) return { text: "SAND", kind: "sand" };
+  if (/\b(chips?|chip[- ]in)\b/.test(h)) return { text: "CHIP", kind: "chip" };
+  if (/\bapproach(es|ing)?\b/.test(h)) return { text: "APPR", kind: "approach" };
+  if (/\b(drive|drives|bombs|hits|blasts).*(off the|from the tee)/.test(h)) {
+    return { text: "DRIVE", kind: "drive" };
+  }
+  if (/\btee shot\b/.test(h)) return { text: "TEE", kind: "tee" };
+
+  // Fallback: surface + shot-number signal.
   const surface = (ev.imgSurface ?? "").toLowerCase();
   const shotNum = ev.imgShotNum ?? 0;
   const par = ev.par ?? 0;
-  // Putts always start from the green — cheapest signal.
-  if (surface === "green" || surface === "putting green" || surface === "fringe") {
-    return { text: "PUTT", kind: "putt" };
-  }
   if (surface.includes("sand") || surface.includes("bunker")) {
     return { text: "SAND", kind: "sand" };
   }
-  // Tee shot on a par-4/5 = drive. Par-3 tee shot is an approach.
+  // Tee shot on a par-4/5 = drive. Par-3 tee shot is a "tee" shot.
   if (shotNum === 1) {
     if (par === 3) return { text: "TEE", kind: "tee" };
     return { text: "DRIVE", kind: "drive" };
   }
-  // Short-game shots off the green — proximity is small, surface is
-  // fairway/rough/fringe within pitching distance.
+  // If surface really is green (and headline didn't already say
+  // "putts") it's likely a fringe putt-with-putter.
+  if (surface === "green" || surface === "putting green") {
+    return { text: "PUTT", kind: "putt" };
+  }
   if (
     ev.imgShotDistance != null &&
     ev.imgShotDistanceUnit === "yds" &&
@@ -154,7 +184,6 @@ function shotTag(ev: FeedEvent): { text: string; kind: string } {
   ) {
     return { text: "CHIP", kind: "chip" };
   }
-  // Default second+ stroke = approach.
   if (shotNum >= 2) return { text: "APPR", kind: "approach" };
   return { text: "SHOT", kind: "shot" };
 }

@@ -14,7 +14,13 @@ try {
   // Wait for the feed to hydrate + first poll to return so we
   // capture the ranked cards, not the skeleton.
   await new Promise((r) => setTimeout(r, 4500));
-  await page.screenshot({ path: OUT, fullPage: true });
+  // fullPage crashes on very long feed pages (>32767 px). Cap to
+  // the first ~2500 px of the visible feed via a clip — enough to
+  // see the header, ribbon, filter tabs and ~30 cards.
+  await page.screenshot({
+    path: OUT,
+    clip: { x: 0, y: 0, width: 1537, height: 2400 },
+  });
   console.log(OUT, "written");
   await ctx.close();
 } finally {
