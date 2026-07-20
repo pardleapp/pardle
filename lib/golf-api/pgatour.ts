@@ -598,6 +598,89 @@ interface CourseStatsResp {
   } | null;
 }
 
+/** Same as getCoursePins, but returns the raw orchestrator payload
+ *  alongside so the API layer can surface diagnostic info when the
+ *  parsed sheet is empty. Never throws — errors are captured. */
+export async function getCoursePinsWithDiag(
+  tournamentId: string,
+): Promise<{ sheet: CoursePinSheet | null; raw: unknown }> {
+  const raw = await gql<CourseStatsResp>(`{
+    courseStats(tournamentId: "${tournamentId}") {
+      courses {
+        id
+        roundHoleStats {
+          roundNum
+          holeStats {
+            ... on CourseHoleStats {
+              holeNumber
+              pinGreen {
+                leftToRightCoords {
+                  x
+                  y
+                  enhancedX
+                  enhancedY
+                }
+              }
+              holePickle {
+                greenLeftToRight
+              }
+            }
+          }
+        }
+      }
+    }
+  }`);
+  const sheet = parseCoursePinsPayload(tournamentId, raw);
+  return { sheet, raw };
+}
+
+function parseCoursePinsPayload(
+  tournamentId: string,
+  raw: CourseStatsResp | null,
+): CoursePinSheet | null {
+  const courses = raw?.courseStats?.courses ?? [];
+  if (courses.length === 0) return null;
+  const primary = courses[0];
+  if (!primary) return null;
+
+  const holeMap = new Map<number, CoursePinHole>();
+  for (const rh of primary.roundHoleStats ?? []) {
+    const round = rh?.roundNum;
+    if (typeof round !== "number") continue;
+    for (const hs of rh?.holeStats ?? []) {
+      if (!hs) continue;
+      const holeNum = hs.holeNumber;
+      if (typeof holeNum !== "number") continue;
+      const coords = hs.pinGreen?.leftToRightCoords;
+      const x = coords?.enhancedX ?? coords?.x;
+      const y = coords?.enhancedY ?? coords?.y;
+      const img = hs.holePickle?.greenLeftToRight ?? "";
+      const existing = holeMap.get(holeNum);
+      const target: CoursePinHole = existing ?? {
+        holeNumber: holeNum,
+        par: hs.parValue ?? null,
+        yards: hs.yards ?? null,
+        greenImageUrl: upscalePickle(img),
+        pinByRound: {},
+      };
+      if (!target.greenImageUrl && img) target.greenImageUrl = upscalePickle(img);
+      if (target.par == null && typeof hs.parValue === "number") target.par = hs.parValue;
+      if (target.yards == null && typeof hs.yards === "number") target.yards = hs.yards;
+      if (
+        typeof x === "number" &&
+        typeof y === "number" &&
+        x >= 0 &&
+        y >= 0
+      ) {
+        target.pinByRound[round] = { x, y };
+      }
+      holeMap.set(holeNum, target);
+    }
+  }
+  const holes = [...holeMap.values()].sort((a, b) => a.holeNumber - b.holeNumber);
+  return { tournamentId, courseName: "", holes };
+}
+
 /** Pull pin positions for every (hole, round) in a tournament. One
  *  query, one caller — merge on the client (or in the /api layer)
  *  since PGA Tour returns the whole table in one shot. */

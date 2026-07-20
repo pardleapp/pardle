@@ -12,7 +12,11 @@
 
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import { getCoursePins, type CoursePinSheet } from "@/lib/golf-api/pgatour";
+import {
+  getCoursePins,
+  getCoursePinsWithDiag,
+  type CoursePinSheet,
+} from "@/lib/golf-api/pgatour";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -25,7 +29,9 @@ function cacheKey(tournamentId: string): string {
 }
 
 export async function GET(req: Request) {
-  const tournamentId = new URL(req.url).searchParams.get("tournamentId");
+  const url = new URL(req.url);
+  const tournamentId = url.searchParams.get("tournamentId");
+  const debug = url.searchParams.get("debug") === "1";
   if (!tournamentId) {
     return NextResponse.json(
       { ok: false, error: "tournamentId required" },
@@ -33,14 +39,28 @@ export async function GET(req: Request) {
     );
   }
 
-  // Cache lookup first — pin data is stable for the day.
-  try {
-    const cached = await redis.get<CoursePinSheet>(cacheKey(tournamentId));
-    if (cached) {
-      return NextResponse.json({ ok: true, cached: true, pins: cached });
+  // Cache lookup first — pin data is stable for the day. Skip when
+  // ?debug=1 so we can inspect the raw orchestrator response.
+  if (!debug) {
+    try {
+      const cached = await redis.get<CoursePinSheet>(cacheKey(tournamentId));
+      if (cached) {
+        return NextResponse.json({ ok: true, cached: true, pins: cached });
+      }
+    } catch {
+      /* cache-miss safe to ignore */
     }
-  } catch {
-    /* cache-miss safe to ignore */
+  }
+
+  if (debug) {
+    // Bypass cache and surface the raw payload so we can debug when
+    // parsing returns null. Not part of the normal client flow.
+    const result = await getCoursePinsWithDiag(tournamentId);
+    return NextResponse.json({
+      ok: result.sheet != null,
+      pins: result.sheet,
+      raw: result.raw,
+    });
   }
 
   let fresh: CoursePinSheet | null;
