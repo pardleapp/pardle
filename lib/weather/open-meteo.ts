@@ -29,6 +29,21 @@ export interface DailyWeather {
   emoji: string;
   /** One-line ready-to-render summary. */
   headline: string;
+  /** 24 hourly points for the same date, sorted ascending. Populated
+   *  when the caller uses getDailyAndHourlyWeather (or getDailyWeather
+   *  → hourly is []). */
+  hourly?: HourlyPoint[];
+}
+
+export interface HourlyPoint {
+  time: string; // ISO-ish "YYYY-MM-DDTHH:00" in the requested tz
+  hour: number; // 0-23 local
+  windMph: number | null;
+  windGustMph: number | null;
+  windDirDeg: number | null;
+  windDirCompass: string | null;
+  tempF: number | null;
+  precipInches: number | null;
 }
 
 interface OpenMeteoDailyResp {
@@ -42,6 +57,14 @@ interface OpenMeteoDailyResp {
     wind_direction_10m_dominant?: (number | null)[];
     weather_code?: (number | null)[];
   };
+  hourly?: {
+    time?: string[];
+    temperature_2m?: (number | null)[];
+    precipitation?: (number | null)[];
+    wind_speed_10m?: (number | null)[];
+    wind_gusts_10m?: (number | null)[];
+    wind_direction_10m?: (number | null)[];
+  };
 }
 
 const DAILY_VARS = [
@@ -52,6 +75,14 @@ const DAILY_VARS = [
   "wind_gusts_10m_max",
   "wind_direction_10m_dominant",
   "weather_code",
+].join(",");
+
+const HOURLY_VARS = [
+  "temperature_2m",
+  "precipitation",
+  "wind_speed_10m",
+  "wind_gusts_10m",
+  "wind_direction_10m",
 ].join(",");
 
 const COMMON_QS =
@@ -154,15 +185,43 @@ async function fetchOpenMeteo(url: string): Promise<OpenMeteoDailyResp | null> {
   }
 }
 
+function shapeHourlyByDate(
+  payload: OpenMeteoDailyResp | null,
+): Map<string, HourlyPoint[]> {
+  const h = payload?.hourly;
+  const out = new Map<string, HourlyPoint[]>();
+  if (!h?.time) return out;
+  for (let i = 0; i < h.time.length; i++) {
+    const t = h.time[i];
+    const day = t.slice(0, 10);
+    const hourNum = Number(t.slice(11, 13));
+    const dir = h.wind_direction_10m?.[i] ?? null;
+    const arr = out.get(day) ?? [];
+    arr.push({
+      time: t,
+      hour: Number.isFinite(hourNum) ? hourNum : 0,
+      windMph: h.wind_speed_10m?.[i] ?? null,
+      windGustMph: h.wind_gusts_10m?.[i] ?? null,
+      windDirDeg: dir,
+      windDirCompass: degToCompass(dir),
+      tempF: h.temperature_2m?.[i] ?? null,
+      precipInches: h.precipitation?.[i] ?? null,
+    });
+    out.set(day, arr);
+  }
+  return out;
+}
+
 function shapeDaily(payload: OpenMeteoDailyResp | null): DailyWeather[] {
   const d = payload?.daily;
   if (!d?.time) return [];
+  const hourlyByDate = shapeHourlyByDate(payload);
   const out: DailyWeather[] = [];
   for (let i = 0; i < d.time.length; i++) {
     const dir = d.wind_direction_10m_dominant?.[i] ?? null;
     const code = d.weather_code?.[i] ?? null;
     const { condition, emoji } = classifyCode(code);
-    const base: Omit<DailyWeather, "headline"> = {
+    const base: Omit<DailyWeather, "headline" | "hourly"> = {
       date: d.time[i],
       tempMaxF: d.temperature_2m_max?.[i] ?? null,
       tempMinF: d.temperature_2m_min?.[i] ?? null,
@@ -175,7 +234,11 @@ function shapeDaily(payload: OpenMeteoDailyResp | null): DailyWeather[] {
       condition,
       emoji,
     };
-    out.push({ ...base, headline: buildHeadline(base) });
+    out.push({
+      ...base,
+      headline: buildHeadline(base),
+      hourly: hourlyByDate.get(d.time[i]) ?? [],
+    });
   }
   return out;
 }
@@ -205,13 +268,15 @@ export async function getDailyWeather(
       `https://archive-api.open-meteo.com/v1/archive` +
       `?latitude=${lat}&longitude=${lon}` +
       `&start_date=${startDate}&end_date=${endDate}` +
-      `&daily=${DAILY_VARS}&${COMMON_QS}&timezone=${encodedTz}`;
+      `&daily=${DAILY_VARS}&hourly=${HOURLY_VARS}` +
+      `&${COMMON_QS}&timezone=${encodedTz}`;
   } else {
     url =
       `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${lat}&longitude=${lon}` +
       `&start_date=${startDate}&end_date=${endDate}` +
-      `&daily=${DAILY_VARS}&${COMMON_QS}&timezone=${encodedTz}` +
+      `&daily=${DAILY_VARS}&hourly=${HOURLY_VARS}` +
+      `&${COMMON_QS}&timezone=${encodedTz}` +
       `&past_days=7&forecast_days=10`;
   }
   const payload = await fetchOpenMeteo(url);

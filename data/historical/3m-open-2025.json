@@ -28,7 +28,249 @@
       "weatherCode": 51,
       "condition": "Drizzle",
       "emoji": "🌦",
-      "headline": "🌦 · 80°F · Wind 7mph NNW (gusts 16) · Dry"
+      "headline": "🌦 · 80°F · Wind 7mph NNW (gusts 16) · Dry",
+      "hourly": [
+        {
+          "time": "2025-07-24T00:00",
+          "hour": 0,
+          "windMph": 2.3,
+          "windGustMph": 4.5,
+          "windDirDeg": 351,
+          "windDirCompass": "N",
+          "tempF": 69.9,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T01:00",
+          "hour": 1,
+          "windMph": 2.3,
+          "windGustMph": 4.5,
+          "windDirDeg": 14,
+          "windDirCompass": "NNE",
+          "tempF": 69.4,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T02:00",
+          "hour": 2,
+          "windMph": 3.4,
+          "windGustMph": 6.5,
+          "windDirDeg": 19,
+          "windDirCompass": "NNE",
+          "tempF": 69.3,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T03:00",
+          "hour": 3,
+          "windMph": 2.5,
+          "windGustMph": 6.3,
+          "windDirDeg": 347,
+          "windDirCompass": "NNW",
+          "tempF": 67.9,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T04:00",
+          "hour": 4,
+          "windMph": 1.7,
+          "windGustMph": 4,
+          "windDirDeg": 290,
+          "windDirCompass": "WNW",
+          "tempF": 67,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T05:00",
+          "hour": 5,
+          "windMph": 3.5,
+          "windGustMph": 5.8,
+          "windDirDeg": 331,
+          "windDirCompass": "NNW",
+          "tempF": 67.9,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T06:00",
+          "hour": 6,
+          "windMph": 5.5,
+          "windGustMph": 11,
+          "windDirDeg": 347,
+          "windDirCompass": "NNW",
+          "tempF": 68,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T07:00",
+          "hour": 7,
+          "windMph": 5.3,
+          "windGustMph": 10.3,
+          "windDirDeg": 359,
+          "windDirCompass": "N",
+          "tempF": 68.8,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T08:00",
+          "hour": 8,
+          "windMph": 6.7,
+          "windGustMph": 13.6,
+          "windDirDeg": 2,
+          "windDirCompass": "N",
+          "tempF": 70.8,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T09:00",
+          "hour": 9,
+          "windMph": 6.5,
+          "windGustMph": 14.5,
+          "windDirDeg": 15,
+          "windDirCompass": "NNE",
+          "tempF": 72.2,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T10:00",
+          "hour": 10,
+          "windMph": 5.2,
+          "windGustMph": 14.5,
+          "windDirDeg": 15,
+          "windDirCompass": "NNE",
+          "tempF": 74.9,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T11:00",
+          "hour": 11,
+          "windMph": 4.7,
+          "windGustMph": 12.8,
+          "windDirDeg": 357,
+          "windDirCompass": "N",
+          "tempF": 76.9,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T12:00",
+          "hour": 12,
+          "windMph": 5.3,
+          "windGustMph": 13.4,
+          "windDirDeg": 342,
+          "windDirCompass": "NNW",
+          "tempF": 78.1,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T13:00",
+          "hour": 13,
+          "windMph": 6.5,
+          "windGustMph": 15.4,
+          "windDirDeg": 330,
+          "windDirCompass": "NNW",
+          "tempF": 78.4,
+          "precipInches": 0.004
+        },
+        {
+          "time": "2025-07-24T14:00",
+          "hour": 14,
+          "windMph": 6.4,
+          "windGustMph": 16.3,
+          "windDirDeg": 329,
+          "windDirCompass": "NNW",
+          "tempF": 79.6,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T15:00",
+          "hour": 15,
+          "windMph": 6.5,
+          "windGustMph": 15.7,
+          "windDirDeg": 334,
+          "windDirCompass": "NNW",
+          "tempF": 80.2,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T16:00",
+          "hour": 16,
+          "windMph": 5.9,
+          "windGustMph": 15.4,
+          "windDirDeg": 331,
+          "windDirCompass": "NNW",
+          "tempF": 80.2,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T17:00",
+          "hour": 17,
+          "windMph": 6.1,
+          "windGustMph": 14.3,
+          "windDirDeg": 332,
+          "windDirCompass": "NNW",
+          "tempF": 80.2,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T18:00",
+          "hour": 18,
+          "windMph": 5.8,
+          "windGustMph": 13.9,
+          "windDirDeg": 333,
+          "windDirCompass": "NNW",
+          "tempF": 79.5,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T19:00",
+          "hour": 19,
+          "windMph": 4.4,
+          "windGustMph": 12.3,
+          "windDirDeg": 330,
+          "windDirCompass": "NNW",
+          "tempF": 78.5,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T20:00",
+          "hour": 20,
+          "windMph": 3.1,
+          "windGustMph": 8.9,
+          "windDirDeg": 339,
+          "windDirCompass": "NNW",
+          "tempF": 76.6,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T21:00",
+          "hour": 21,
+          "windMph": 1.8,
+          "windGustMph": 5.6,
+          "windDirDeg": 349,
+          "windDirCompass": "N",
+          "tempF": 73.6,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T22:00",
+          "hour": 22,
+          "windMph": 0.5,
+          "windGustMph": 2.7,
+          "windDirDeg": 27,
+          "windDirCompass": "NNE",
+          "tempF": 72.3,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-24T23:00",
+          "hour": 23,
+          "windMph": 0.3,
+          "windGustMph": 0.9,
+          "windDirDeg": 297,
+          "windDirCompass": "WNW",
+          "tempF": 70.7,
+          "precipInches": 0
+        }
+      ]
     },
     "2": {
       "date": "2025-07-25",
@@ -42,7 +284,249 @@
       "weatherCode": 3,
       "condition": "Overcast",
       "emoji": "☁️",
-      "headline": "☁️ · 82°F · Wind 6mph SSE (gusts 14) · Dry"
+      "headline": "☁️ · 82°F · Wind 6mph SSE (gusts 14) · Dry",
+      "hourly": [
+        {
+          "time": "2025-07-25T00:00",
+          "hour": 0,
+          "windMph": 0.5,
+          "windGustMph": 1.1,
+          "windDirDeg": 346,
+          "windDirCompass": "NNW",
+          "tempF": 69.2,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T01:00",
+          "hour": 1,
+          "windMph": 0.4,
+          "windGustMph": 1.1,
+          "windDirDeg": 18,
+          "windDirCompass": "NNE",
+          "tempF": 68.2,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T02:00",
+          "hour": 2,
+          "windMph": 0.5,
+          "windGustMph": 0.9,
+          "windDirDeg": 76,
+          "windDirCompass": "ENE",
+          "tempF": 67.2,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T03:00",
+          "hour": 3,
+          "windMph": 0.7,
+          "windGustMph": 1.3,
+          "windDirDeg": 121,
+          "windDirCompass": "ESE",
+          "tempF": 66.5,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T04:00",
+          "hour": 4,
+          "windMph": 0.9,
+          "windGustMph": 1.6,
+          "windDirDeg": 150,
+          "windDirCompass": "SSE",
+          "tempF": 65.6,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T05:00",
+          "hour": 5,
+          "windMph": 1.1,
+          "windGustMph": 1.8,
+          "windDirDeg": 156,
+          "windDirCompass": "SSE",
+          "tempF": 65,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T06:00",
+          "hour": 6,
+          "windMph": 1.8,
+          "windGustMph": 2.5,
+          "windDirDeg": 133,
+          "windDirCompass": "SE",
+          "tempF": 64.5,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T07:00",
+          "hour": 7,
+          "windMph": 3.9,
+          "windGustMph": 6.5,
+          "windDirDeg": 127,
+          "windDirCompass": "SE",
+          "tempF": 67.5,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T08:00",
+          "hour": 8,
+          "windMph": 3.1,
+          "windGustMph": 7.8,
+          "windDirDeg": 131,
+          "windDirCompass": "SE",
+          "tempF": 68.2,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T09:00",
+          "hour": 9,
+          "windMph": 3.2,
+          "windGustMph": 8.9,
+          "windDirDeg": 134,
+          "windDirCompass": "SE",
+          "tempF": 72.9,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T10:00",
+          "hour": 10,
+          "windMph": 4.2,
+          "windGustMph": 11,
+          "windDirDeg": 136,
+          "windDirCompass": "SE",
+          "tempF": 76.7,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T11:00",
+          "hour": 11,
+          "windMph": 4.9,
+          "windGustMph": 12.8,
+          "windDirDeg": 143,
+          "windDirCompass": "SE",
+          "tempF": 78.7,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T12:00",
+          "hour": 12,
+          "windMph": 4.9,
+          "windGustMph": 13.2,
+          "windDirDeg": 150,
+          "windDirCompass": "SSE",
+          "tempF": 80.1,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T13:00",
+          "hour": 13,
+          "windMph": 5,
+          "windGustMph": 13.2,
+          "windDirDeg": 153,
+          "windDirCompass": "SSE",
+          "tempF": 81.1,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T14:00",
+          "hour": 14,
+          "windMph": 5.3,
+          "windGustMph": 13.6,
+          "windDirDeg": 158,
+          "windDirCompass": "SSE",
+          "tempF": 82,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T15:00",
+          "hour": 15,
+          "windMph": 5.7,
+          "windGustMph": 14.1,
+          "windDirDeg": 160,
+          "windDirCompass": "SSE",
+          "tempF": 82.3,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T16:00",
+          "hour": 16,
+          "windMph": 5.3,
+          "windGustMph": 13.6,
+          "windDirDeg": 159,
+          "windDirCompass": "SSE",
+          "tempF": 82.4,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T17:00",
+          "hour": 17,
+          "windMph": 5.2,
+          "windGustMph": 13,
+          "windDirDeg": 157,
+          "windDirCompass": "SSE",
+          "tempF": 82.3,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T18:00",
+          "hour": 18,
+          "windMph": 6,
+          "windGustMph": 12.5,
+          "windDirDeg": 156,
+          "windDirCompass": "SSE",
+          "tempF": 81.9,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T19:00",
+          "hour": 19,
+          "windMph": 5.5,
+          "windGustMph": 13,
+          "windDirDeg": 153,
+          "windDirCompass": "SSE",
+          "tempF": 80.5,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T20:00",
+          "hour": 20,
+          "windMph": 3.8,
+          "windGustMph": 9.8,
+          "windDirDeg": 150,
+          "windDirCompass": "SSE",
+          "tempF": 78.6,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T21:00",
+          "hour": 21,
+          "windMph": 5.8,
+          "windGustMph": 10.3,
+          "windDirDeg": 152,
+          "windDirCompass": "SSE",
+          "tempF": 76.5,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T22:00",
+          "hour": 22,
+          "windMph": 5.8,
+          "windGustMph": 10.7,
+          "windDirDeg": 160,
+          "windDirCompass": "SSE",
+          "tempF": 75.2,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-25T23:00",
+          "hour": 23,
+          "windMph": 4.9,
+          "windGustMph": 10.5,
+          "windDirDeg": 156,
+          "windDirCompass": "SSE",
+          "tempF": 73.5,
+          "precipInches": 0
+        }
+      ]
     },
     "3": {
       "date": "2025-07-26",
@@ -56,7 +540,249 @@
       "weatherCode": 3,
       "condition": "Overcast",
       "emoji": "☁️",
-      "headline": "☁️ · 87°F · Wind 8mph S (gusts 19) · Dry"
+      "headline": "☁️ · 87°F · Wind 8mph S (gusts 19) · Dry",
+      "hourly": [
+        {
+          "time": "2025-07-26T00:00",
+          "hour": 0,
+          "windMph": 4.7,
+          "windGustMph": 8.7,
+          "windDirDeg": 155,
+          "windDirCompass": "SSE",
+          "tempF": 72.6,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T01:00",
+          "hour": 1,
+          "windMph": 4.3,
+          "windGustMph": 8.5,
+          "windDirDeg": 157,
+          "windDirCompass": "SSE",
+          "tempF": 71.2,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T02:00",
+          "hour": 2,
+          "windMph": 4.3,
+          "windGustMph": 7.8,
+          "windDirDeg": 152,
+          "windDirCompass": "SSE",
+          "tempF": 70.5,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T03:00",
+          "hour": 3,
+          "windMph": 4.3,
+          "windGustMph": 7.8,
+          "windDirDeg": 160,
+          "windDirCompass": "SSE",
+          "tempF": 70,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T04:00",
+          "hour": 4,
+          "windMph": 5.2,
+          "windGustMph": 9.4,
+          "windDirDeg": 164,
+          "windDirCompass": "SSE",
+          "tempF": 69.7,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T05:00",
+          "hour": 5,
+          "windMph": 5.2,
+          "windGustMph": 9.6,
+          "windDirDeg": 167,
+          "windDirCompass": "SSE",
+          "tempF": 69.4,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T06:00",
+          "hour": 6,
+          "windMph": 6.2,
+          "windGustMph": 10.7,
+          "windDirDeg": 165,
+          "windDirCompass": "SSE",
+          "tempF": 69.1,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T07:00",
+          "hour": 7,
+          "windMph": 7.3,
+          "windGustMph": 13.4,
+          "windDirDeg": 170,
+          "windDirCompass": "S",
+          "tempF": 70.2,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T08:00",
+          "hour": 8,
+          "windMph": 6,
+          "windGustMph": 12.8,
+          "windDirDeg": 161,
+          "windDirCompass": "SSE",
+          "tempF": 72.6,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T09:00",
+          "hour": 9,
+          "windMph": 5.7,
+          "windGustMph": 13.4,
+          "windDirDeg": 170,
+          "windDirCompass": "S",
+          "tempF": 75.8,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T10:00",
+          "hour": 10,
+          "windMph": 4.9,
+          "windGustMph": 13.9,
+          "windDirDeg": 184,
+          "windDirCompass": "S",
+          "tempF": 79,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T11:00",
+          "hour": 11,
+          "windMph": 5.4,
+          "windGustMph": 12.8,
+          "windDirDeg": 214,
+          "windDirCompass": "SW",
+          "tempF": 81.8,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T12:00",
+          "hour": 12,
+          "windMph": 7,
+          "windGustMph": 16.8,
+          "windDirDeg": 211,
+          "windDirCompass": "SSW",
+          "tempF": 83.5,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T13:00",
+          "hour": 13,
+          "windMph": 7.2,
+          "windGustMph": 16.6,
+          "windDirDeg": 213,
+          "windDirCompass": "SSW",
+          "tempF": 84.9,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T14:00",
+          "hour": 14,
+          "windMph": 8.1,
+          "windGustMph": 18.1,
+          "windDirDeg": 200,
+          "windDirCompass": "SSW",
+          "tempF": 85.8,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T15:00",
+          "hour": 15,
+          "windMph": 8.2,
+          "windGustMph": 19.2,
+          "windDirDeg": 193,
+          "windDirCompass": "SSW",
+          "tempF": 86.2,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T16:00",
+          "hour": 16,
+          "windMph": 7.8,
+          "windGustMph": 18.3,
+          "windDirDeg": 199,
+          "windDirCompass": "SSW",
+          "tempF": 86.5,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T17:00",
+          "hour": 17,
+          "windMph": 6.8,
+          "windGustMph": 17.2,
+          "windDirDeg": 212,
+          "windDirCompass": "SSW",
+          "tempF": 86.3,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T18:00",
+          "hour": 18,
+          "windMph": 6,
+          "windGustMph": 14.8,
+          "windDirDeg": 214,
+          "windDirCompass": "SW",
+          "tempF": 85.6,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T19:00",
+          "hour": 19,
+          "windMph": 4.8,
+          "windGustMph": 12.8,
+          "windDirDeg": 202,
+          "windDirCompass": "SSW",
+          "tempF": 84.5,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T20:00",
+          "hour": 20,
+          "windMph": 3.6,
+          "windGustMph": 9.2,
+          "windDirDeg": 202,
+          "windDirCompass": "SSW",
+          "tempF": 82.1,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T21:00",
+          "hour": 21,
+          "windMph": 4.1,
+          "windGustMph": 6.9,
+          "windDirDeg": 189,
+          "windDirCompass": "S",
+          "tempF": 79.1,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T22:00",
+          "hour": 22,
+          "windMph": 3.7,
+          "windGustMph": 7.4,
+          "windDirDeg": 183,
+          "windDirCompass": "S",
+          "tempF": 77.4,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-26T23:00",
+          "hour": 23,
+          "windMph": 3.9,
+          "windGustMph": 6.5,
+          "windDirDeg": 183,
+          "windDirCompass": "S",
+          "tempF": 76.5,
+          "precipInches": 0
+        }
+      ]
     },
     "4": {
       "date": "2025-07-27",
@@ -70,7 +796,249 @@
       "weatherCode": 65,
       "condition": "Rain",
       "emoji": "🌧",
-      "headline": "🌧 · 90°F · Wind 12mph S (gusts 26) · 0.52\" rain"
+      "headline": "🌧 · 90°F · Wind 12mph S (gusts 26) · 0.52\" rain",
+      "hourly": [
+        {
+          "time": "2025-07-27T00:00",
+          "hour": 0,
+          "windMph": 3.7,
+          "windGustMph": 6.7,
+          "windDirDeg": 189,
+          "windDirCompass": "S",
+          "tempF": 75.1,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T01:00",
+          "hour": 1,
+          "windMph": 6.3,
+          "windGustMph": 11.4,
+          "windDirDeg": 186,
+          "windDirCompass": "S",
+          "tempF": 75.5,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T02:00",
+          "hour": 2,
+          "windMph": 6,
+          "windGustMph": 11.4,
+          "windDirDeg": 185,
+          "windDirCompass": "S",
+          "tempF": 74.8,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T03:00",
+          "hour": 3,
+          "windMph": 5.6,
+          "windGustMph": 11.2,
+          "windDirDeg": 183,
+          "windDirCompass": "S",
+          "tempF": 74,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T04:00",
+          "hour": 4,
+          "windMph": 6.7,
+          "windGustMph": 11.9,
+          "windDirDeg": 172,
+          "windDirCompass": "S",
+          "tempF": 73.5,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T05:00",
+          "hour": 5,
+          "windMph": 7.2,
+          "windGustMph": 13.2,
+          "windDirDeg": 175,
+          "windDirCompass": "S",
+          "tempF": 73,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T06:00",
+          "hour": 6,
+          "windMph": 7.7,
+          "windGustMph": 14.1,
+          "windDirDeg": 183,
+          "windDirCompass": "S",
+          "tempF": 72.6,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T07:00",
+          "hour": 7,
+          "windMph": 7.2,
+          "windGustMph": 14.3,
+          "windDirDeg": 192,
+          "windDirCompass": "SSW",
+          "tempF": 73.8,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T08:00",
+          "hour": 8,
+          "windMph": 6.5,
+          "windGustMph": 13.4,
+          "windDirDeg": 169,
+          "windDirCompass": "S",
+          "tempF": 76.5,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T09:00",
+          "hour": 9,
+          "windMph": 4.4,
+          "windGustMph": 12.5,
+          "windDirDeg": 193,
+          "windDirCompass": "SSW",
+          "tempF": 79.4,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T10:00",
+          "hour": 10,
+          "windMph": 3.6,
+          "windGustMph": 10.5,
+          "windDirDeg": 214,
+          "windDirCompass": "SW",
+          "tempF": 82,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T11:00",
+          "hour": 11,
+          "windMph": 6,
+          "windGustMph": 14.3,
+          "windDirDeg": 189,
+          "windDirCompass": "S",
+          "tempF": 84.6,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T12:00",
+          "hour": 12,
+          "windMph": 7.5,
+          "windGustMph": 17.4,
+          "windDirDeg": 184,
+          "windDirCompass": "S",
+          "tempF": 86.5,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T13:00",
+          "hour": 13,
+          "windMph": 8.3,
+          "windGustMph": 18.8,
+          "windDirDeg": 191,
+          "windDirCompass": "S",
+          "tempF": 88.4,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T14:00",
+          "hour": 14,
+          "windMph": 9.1,
+          "windGustMph": 19.9,
+          "windDirDeg": 196,
+          "windDirCompass": "SSW",
+          "tempF": 89.6,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T15:00",
+          "hour": 15,
+          "windMph": 10.1,
+          "windGustMph": 21.7,
+          "windDirDeg": 193,
+          "windDirCompass": "SSW",
+          "tempF": 90.1,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T16:00",
+          "hour": 16,
+          "windMph": 11.1,
+          "windGustMph": 23.3,
+          "windDirDeg": 189,
+          "windDirCompass": "S",
+          "tempF": 89.9,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T17:00",
+          "hour": 17,
+          "windMph": 12.2,
+          "windGustMph": 24.8,
+          "windDirDeg": 183,
+          "windDirCompass": "S",
+          "tempF": 89.2,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T18:00",
+          "hour": 18,
+          "windMph": 12.2,
+          "windGustMph": 26.2,
+          "windDirDeg": 179,
+          "windDirCompass": "S",
+          "tempF": 88.3,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T19:00",
+          "hour": 19,
+          "windMph": 9.2,
+          "windGustMph": 24.4,
+          "windDirDeg": 182,
+          "windDirCompass": "S",
+          "tempF": 86.4,
+          "precipInches": 0
+        },
+        {
+          "time": "2025-07-27T20:00",
+          "hour": 20,
+          "windMph": 6.9,
+          "windGustMph": 24.6,
+          "windDirDeg": 271,
+          "windDirCompass": "W",
+          "tempF": 75.7,
+          "precipInches": 0.358
+        },
+        {
+          "time": "2025-07-27T21:00",
+          "hour": 21,
+          "windMph": 8.9,
+          "windGustMph": 13,
+          "windDirDeg": 297,
+          "windDirCompass": "WNW",
+          "tempF": 72.4,
+          "precipInches": 0.012
+        },
+        {
+          "time": "2025-07-27T22:00",
+          "hour": 22,
+          "windMph": 2.5,
+          "windGustMph": 17.7,
+          "windDirDeg": 49,
+          "windDirCompass": "NE",
+          "tempF": 68.7,
+          "precipInches": 0.098
+        },
+        {
+          "time": "2025-07-27T23:00",
+          "hour": 23,
+          "windMph": 7.9,
+          "windGustMph": 12.3,
+          "windDirDeg": 164,
+          "windDirCompass": "SSE",
+          "tempF": 68.4,
+          "precipInches": 0.055
+        }
+      ]
     }
   },
   "generatedAt": null,

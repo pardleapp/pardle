@@ -291,7 +291,8 @@ async function fetchArchiveWeather(dates) {
   if (!dates.length) return new Map();
   const start = dates[0], end = dates[dates.length - 1];
   const daily = "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,weather_code";
-  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${VENUE.lat}&longitude=${VENUE.lon}&start_date=${start}&end_date=${end}&daily=${daily}&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=${encodeURIComponent(VENUE.tz)}`;
+  const hourly = "temperature_2m,precipitation,wind_speed_10m,wind_gusts_10m,wind_direction_10m";
+  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${VENUE.lat}&longitude=${VENUE.lon}&start_date=${start}&end_date=${end}&daily=${daily}&hourly=${hourly}&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=${encodeURIComponent(VENUE.tz)}`;
   const res = await fetch(url);
   if (!res.ok) {
     console.warn(`[weather] ${res.status} ${await res.text().catch(() => "")}`);
@@ -299,6 +300,29 @@ async function fetchArchiveWeather(dates) {
   }
   const j = await res.json();
   const d = j?.daily;
+  const h = j?.hourly;
+  // Bucket hourly points by date
+  const hourlyByDate = new Map();
+  if (h?.time) {
+    for (let i = 0; i < h.time.length; i++) {
+      const t = h.time[i];
+      const day = t.slice(0, 10);
+      const hourNum = Number(t.slice(11, 13));
+      const dir = h.wind_direction_10m?.[i] ?? null;
+      const arr = hourlyByDate.get(day) ?? [];
+      arr.push({
+        time: t,
+        hour: Number.isFinite(hourNum) ? hourNum : 0,
+        windMph: h.wind_speed_10m?.[i] ?? null,
+        windGustMph: h.wind_gusts_10m?.[i] ?? null,
+        windDirDeg: dir,
+        windDirCompass: degToCompass(dir),
+        tempF: h.temperature_2m?.[i] ?? null,
+        precipInches: h.precipitation?.[i] ?? null,
+      });
+      hourlyByDate.set(day, arr);
+    }
+  }
   const out = new Map();
   if (!d?.time) return out;
   for (let i = 0; i < d.time.length; i++) {
@@ -318,7 +342,11 @@ async function fetchArchiveWeather(dates) {
       condition,
       emoji,
     };
-    out.set(d.time[i], { ...base, headline: headline(base) });
+    out.set(d.time[i], {
+      ...base,
+      headline: headline(base),
+      hourly: hourlyByDate.get(d.time[i]) ?? [],
+    });
   }
   return out;
 }
