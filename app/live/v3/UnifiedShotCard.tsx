@@ -78,6 +78,87 @@ function formatScore(toPar: string | undefined): string {
   return toPar.replace(/^-/, "−");
 }
 
+/** Format the anchor number for a shot event — shot-type appropriate:
+ *   drive/tee → distance in yards (e.g. "342 y")
+ *   putt      → distance in feet  (e.g. "12 ft")
+ *   approach/chip/sand → proximity to pin AFTER the shot (e.g. "4 ft")
+ *  Falls back to the collector's `imgToPin` display string, then to a
+ *  neutral em-dash. Returns null when the caller should use the
+ *  normal score anchor instead (non-shot events, or shots with no
+ *  usable enrichment). */
+function formatShotAnchor(ev: FeedEvent, kind: string): string | null {
+  if (ev.type !== "shot") return null;
+  // Putts and drives use imgShotDistance directly.
+  if (kind === "putt") {
+    if (
+      typeof ev.imgShotDistance === "number" &&
+      ev.imgShotDistanceUnit === "ft"
+    ) {
+      return `${Math.round(ev.imgShotDistance)} ft`;
+    }
+    // Fallback: proximity BEFORE the putt = putt distance.
+    if (typeof ev.proximityInches === "number") {
+      return `${Math.round(ev.proximityInches / 12)} ft`;
+    }
+  }
+  if (kind === "drive" || kind === "tee") {
+    if (
+      typeof ev.imgShotDistance === "number" &&
+      ev.imgShotDistanceUnit === "yds"
+    ) {
+      return `${Math.round(ev.imgShotDistance)} y`;
+    }
+    if (typeof ev.shotYards === "number") {
+      return `${Math.round(ev.shotYards)} y`;
+    }
+  }
+  // Approach / chip / sand — show proximity AFTER the shot (how close
+  // it finished to the pin). If the shot event carries `proximityInches`,
+  // that IS post-shot proximity from the collector's shot record.
+  if (typeof ev.proximityInches === "number") {
+    const ft = ev.proximityInches / 12;
+    if (ft < 100) return `${Math.round(ft)} ft`;
+    return `${Math.round(ft / 3)} y`;
+  }
+  // Last resort: the collector's own display string.
+  if (ev.imgToPin) return ev.imgToPin;
+  return "—";
+}
+
+/** Shot-type classifier for live IMG-sourced shot events. Uses the
+ *  surface + shot-number signal from the collector to distinguish
+ *  drive / approach / putt / chip / bunker. Falls back to a generic
+ *  SHOT tag when the enrichment fields are absent. */
+function shotTag(ev: FeedEvent): { text: string; kind: string } {
+  const surface = (ev.imgSurface ?? "").toLowerCase();
+  const shotNum = ev.imgShotNum ?? 0;
+  const par = ev.par ?? 0;
+  // Putts always start from the green — cheapest signal.
+  if (surface === "green" || surface === "putting green" || surface === "fringe") {
+    return { text: "PUTT", kind: "putt" };
+  }
+  if (surface.includes("sand") || surface.includes("bunker")) {
+    return { text: "SAND", kind: "sand" };
+  }
+  // Tee shot on a par-4/5 = drive. Par-3 tee shot is an approach.
+  if (shotNum === 1) {
+    if (par === 3) return { text: "TEE", kind: "tee" };
+    return { text: "DRIVE", kind: "drive" };
+  }
+  // Short-game shots off the green — proximity is small, surface is
+  // fairway/rough/fringe within pitching distance.
+  if (
+    ev.imgShotDistance != null &&
+    ev.imgShotDistanceUnit === "yds" &&
+    ev.imgShotDistance <= 40
+  ) {
+    return { text: "CHIP", kind: "chip" };
+  }
+  // Default second+ stroke = approach.
+  if (shotNum >= 2) return { text: "APPR", kind: "approach" };
+  return { text: "SHOT", kind: "shot" };
+}
+
 function tagText(ev: FeedEvent): { text: string; kind: string } {
   if (ev.ace) return { text: "ACE", kind: "ace" };
   if (ev.result === "albatross") return { text: "ALB", kind: "albatross" };
@@ -86,7 +167,7 @@ function tagText(ev: FeedEvent): { text: string; kind: string } {
   if (ev.result === "bogey") return { text: "BOGEY", kind: "bogey" };
   if (ev.result === "double") return { text: "DBL", kind: "double" };
   if (ev.result === "triple-plus") return { text: "TRIP+", kind: "triple-plus" };
-  if (ev.type === "shot") return { text: "SHOT", kind: "shot" };
+  if (ev.type === "shot") return shotTag(ev);
   if (ev.type === "position") return { text: "MOVE", kind: "position" };
   if (ev.type === "milestone") return { text: ev.headline?.slice(0, 8).toUpperCase() ?? "NOTE", kind: "milestone" };
   return { text: ev.type.toUpperCase(), kind: "misc" };
@@ -116,12 +197,16 @@ export default function UnifiedShotCard({
   onReact,
   onShare,
 }: Props) {
-  const polarity = scorePolarity(event.toPar);
-  const scoreCls = `feed-v3-card-score feed-v3-card-score-${polarity}`;
+  const tag = tagText(event);
+  const shotAnchor = formatShotAnchor(event, tag.kind);
+  // Shot events use a distance/proximity anchor and stay neutral —
+  // there's no under/over "polarity" for a drive distance. Only
+  // score-outcome events get the green/red polarity treatment.
+  const polarity = shotAnchor ? "none" : scorePolarity(event.toPar);
+  const scoreCls = `feed-v3-card-score feed-v3-card-score-${polarity}${shotAnchor ? " feed-v3-card-score-shot" : ""}`;
   const cls = ["feed-v3-card"];
   if (isMine) cls.push("feed-v3-card-mine");
   else if (isNotable) cls.push("feed-v3-card-notable");
-  const tag = tagText(event);
 
   return (
     <article
@@ -167,7 +252,9 @@ export default function UnifiedShotCard({
         <span className={`feed-v3-card-tag feed-v3-card-tag-${tag.kind}`}>
           {tag.text}
         </span>
-        <span className={scoreCls}>{formatScore(event.toPar)}</span>
+        <span className={scoreCls}>
+          {shotAnchor ?? formatScore(event.toPar)}
+        </span>
       </div>
       <div className="feed-v3-card-actions">
         <button

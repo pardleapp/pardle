@@ -53,6 +53,12 @@ function baseTier(ev: FeedEvent, ctx: RankerContext): Tier {
   if (ev.ace) return "hero";
   if (ev.result === "eagle" || ev.result === "albatross") return "hero";
 
+  // Confirmed wow-shots / disasters (set by the enrichment overlay
+  // once shot detail comes in — a hole-out, tap-in eagle, dunked
+  // bunker escape, penalty stroke). These are the moments the reel
+  // system curates and they deserve a hero stripe live too.
+  if (ev.reelGreat === true || ev.reelWorthy === true) return "hero";
+
   // The engine tags material shots with `highlight` / `lowlight`;
   // treat those as hero-worthy if from a top-10 player, otherwise
   // standard.

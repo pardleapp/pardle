@@ -29204,3 +29204,18 @@ body[data-chat-open] .addbet-fab {
   .feed-v3 .feed-v3-shot-cell .feed-v3-mobile-content { display: none; }
   .feed-v3 .feed-v3-shot-cell .feed-v3-card { display: grid; }
 }
+
+/* Shot events use a distance/proximity anchor ("342 y", "12 ft") —
+   4-6 chars long, monospace, needs to breathe. Score anchors are
+   1-3 chars ("−8") so they can afford the big 22 px treatment; shot
+   anchors drop to 13 px + a slim label to stay in the same column
+   width without wrapping. */
+@media (min-width: 1024px) {
+  .feed-v3 .feed-v3-card-score-shot {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    color: oklch(0.3 0.02 150);
+    min-width: 52px;
+  }
+}
