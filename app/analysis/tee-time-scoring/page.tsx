@@ -6,6 +6,7 @@ import Chart from "./Chart";
 import MainNav from "@/app/MainNav";
 import AuthChip from "@/app/live/auth/AuthChip";
 import { BRAND } from "@/lib/brand";
+import WeatherStrip, { type DailyWeatherView } from "../_components/WeatherStrip";
 
 export type RoundNum = 1 | 2 | 3 | 4;
 
@@ -36,6 +37,7 @@ interface FetchResp {
   countByRound?: { r1: number; r2: number; r3?: number; r4?: number };
   generatedAt?: number | null;
   rows?: Row[];
+  weatherByRound?: Record<string, DailyWeatherView | null> | null;
 }
 
 /** Poll cadence — 60 s is plenty for a golf round; players finish
@@ -187,6 +189,7 @@ export default function Page() {
               ? `updated ${new Date(data.generatedAt).toLocaleTimeString()}`
               : ""}
           </p>
+          <WeatherStrip weatherByRound={data.weatherByRound} />
           <Chart rows={data.rows} />
         </>
       )}

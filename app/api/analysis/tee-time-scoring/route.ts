@@ -20,6 +20,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
 import { getSnapshot, getCachedTournamentPars } from "@/lib/feed/store";
+import { getDailyWeather, type DailyWeather } from "@/lib/weather/open-meteo";
+import { coordsForTournamentId } from "@/lib/weather/course-coords";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -224,6 +226,54 @@ function minutesToClock(mins: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+/** Pick the earliest R1 tee date from the field payload → derive Thu
+ *  → Sun round dates. Prefers R1; falls back to the min date across
+ *  all teetimes. Returns date strings in the venue's local timezone
+ *  (Open-Meteo will bucket by them). */
+function deriveRoundDates(
+  fieldRows: { teetimes?: { round_num?: number; teetime?: string }[] }[],
+): Record<1 | 2 | 3 | 4, string> | null {
+  let earliest: string | null = null;
+  for (const f of fieldRows) {
+    for (const t of f.teetimes ?? []) {
+      if (t.round_num !== 1 || !t.teetime) continue;
+      const day = t.teetime.slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+      if (!earliest || day < earliest) earliest = day;
+    }
+  }
+  if (!earliest) return null;
+  const [y, m, d] = earliest.split("-").map(Number);
+  const r1 = new Date(Date.UTC(y, m - 1, d));
+  const iso = (dt: Date) => dt.toISOString().slice(0, 10);
+  const bump = (offset: number) => {
+    const dt = new Date(r1);
+    dt.setUTCDate(r1.getUTCDate() + offset);
+    return iso(dt);
+  };
+  return { 1: iso(r1), 2: bump(1), 3: bump(2), 4: bump(3) };
+}
+
+async function fetchLiveWeatherByRound(
+  activeTournamentId: string | null,
+  fieldRows: { teetimes?: { round_num?: number; teetime?: string }[] }[],
+): Promise<Record<string, DailyWeather | null> | null> {
+  const coords = coordsForTournamentId(activeTournamentId);
+  if (!coords) return null;
+  const dates = deriveRoundDates(fieldRows);
+  if (!dates) return null;
+  const flat = [dates[1], dates[2], dates[3], dates[4]];
+  const daily = await getDailyWeather(coords.lat, coords.lon, flat, coords.tz);
+  const byDate = new Map(daily.map((d) => [d.date, d]));
+  const out: Record<string, DailyWeather | null> = {
+    "1": byDate.get(dates[1]) ?? null,
+    "2": byDate.get(dates[2]) ?? null,
+    "3": byDate.get(dates[3]) ?? null,
+    "4": byDate.get(dates[4]) ?? null,
+  };
+  return out;
+}
+
 /** Load a historical 3M Open payload and reshape into the same
  *  OutRow[] the live path returns. skillBaseline in the JSON is the
  *  per-player 4-round average sg_total (see the fetcher script), so
@@ -247,6 +297,7 @@ interface HistoricalPayload {
   year: number;
   dgEventName: string;
   players: HistoricalPlayer[];
+  weatherByRound?: Record<string, DailyWeather | null> | null;
 }
 
 async function loadHistorical(year: number): Promise<HistoricalPayload | null> {
@@ -325,6 +376,7 @@ export async function GET(req: Request) {
           r3: perRound(3).length,
           r4: perRound(4).length,
         },
+        weatherByRound: hist.weatherByRound ?? null,
         generatedAt: null,
         rows,
       });
@@ -579,6 +631,15 @@ export async function GET(req: Request) {
       return { total: rs.length, finished, projected };
     };
 
+    // Live weather — resolve venue coords from the active tournament
+    // and pull 4 days from Open-Meteo (past days + forecast in one
+    // call). If we don't have coords for this course, weather is
+    // simply omitted from the response.
+    const weatherByRound = await fetchLiveWeatherByRound(
+      activeTournamentId,
+      fieldRows,
+    );
+
     return NextResponse.json({
       ok: true,
       count: rows.length,
@@ -588,6 +649,7 @@ export async function GET(req: Request) {
         r3: rowsR3.length,
         r4: rowsR4.length,
       },
+      weatherByRound,
       generatedAt: Date.now(),
       diag: {
         fieldRowsCount: fieldRows.length,

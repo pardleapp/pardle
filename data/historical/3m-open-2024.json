@@ -3,6 +3,76 @@
   "dgEventId": 525,
   "dgEventName": "3M Open",
   "pgaTournamentId": "R2024525",
+  "venue": {
+    "name": "TPC Twin Cities",
+    "lat": 45.148,
+    "lon": -93.219,
+    "tz": "America/Chicago"
+  },
+  "roundDates": {
+    "1": "2024-07-25",
+    "2": "2024-07-26",
+    "3": "2024-07-27",
+    "4": "2024-07-28"
+  },
+  "weatherByRound": {
+    "1": {
+      "date": "2024-07-25",
+      "tempMaxF": 81.2,
+      "tempMinF": 59.2,
+      "windAvgMph": 8,
+      "windGustMph": 18.8,
+      "windDirDeg": 138,
+      "windDirCompass": "SE",
+      "precipInches": 0,
+      "weatherCode": 0,
+      "condition": "Clear",
+      "emoji": "☀️",
+      "headline": "☀️ · 81°F · Wind 8mph SE (gusts 19) · Dry"
+    },
+    "2": {
+      "date": "2024-07-26",
+      "tempMaxF": 87.6,
+      "tempMinF": 64.9,
+      "windAvgMph": 12.5,
+      "windGustMph": 27.5,
+      "windDirDeg": 165,
+      "windDirCompass": "SSE",
+      "precipInches": 0,
+      "weatherCode": 2,
+      "condition": "Partly cloudy",
+      "emoji": "⛅",
+      "headline": "⛅ · 88°F · Wind 13mph SSE (gusts 28) · Dry"
+    },
+    "3": {
+      "date": "2024-07-27",
+      "tempMaxF": 91,
+      "tempMinF": 71.4,
+      "windAvgMph": 13.9,
+      "windGustMph": 29.3,
+      "windDirDeg": 185,
+      "windDirCompass": "S",
+      "precipInches": 0,
+      "weatherCode": 1,
+      "condition": "Mostly clear",
+      "emoji": "🌤",
+      "headline": "🌤 · 91°F · Wind 14mph S (gusts 29) · Dry"
+    },
+    "4": {
+      "date": "2024-07-28",
+      "tempMaxF": 89.2,
+      "tempMinF": 71.2,
+      "windAvgMph": 11.9,
+      "windGustMph": 27.1,
+      "windDirDeg": 179,
+      "windDirCompass": "S",
+      "precipInches": 0.26,
+      "weatherCode": 63,
+      "condition": "Rain",
+      "emoji": "🌧",
+      "headline": "🌧 · 89°F · Wind 12mph S (gusts 27) · 0.26\" rain"
+    }
+  },
   "generatedAt": null,
   "players": [
     {

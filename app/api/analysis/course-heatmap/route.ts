@@ -26,6 +26,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
 import { getSnapshot, getCachedTournamentPars } from "@/lib/feed/store";
+import { getDailyWeather, type DailyWeather } from "@/lib/weather/open-meteo";
+import { coordsForTournamentId } from "@/lib/weather/course-coords";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -118,6 +120,7 @@ interface HistoricalPayload {
   year: number;
   dgEventName: string;
   players: HistoricalPlayer[];
+  weatherByRound?: Record<string, DailyWeather | null> | null;
 }
 
 /** Parse "7:29am" / "1:45pm" / "07:29" → minutes since midnight. */
@@ -197,7 +200,56 @@ async function buildHistoricalCells(year: number) {
     avgVsPar: c.sumVsPar / c.count,
     count: c.count,
   }));
-  return { cells, tallied, noHoles, noTee, eventName: payload.dgEventName };
+  return {
+    cells,
+    tallied,
+    noHoles,
+    noTee,
+    eventName: payload.dgEventName,
+    weatherByRound: payload.weatherByRound ?? null,
+  };
+}
+
+/** Same shape as the tee-time-scoring version — small enough to
+ *  duplicate rather than share, keeps each route self-contained. */
+async function fetchLiveWeatherByRoundLocal(
+  tournamentId: string | null,
+  fieldRows: { teetimes?: { round_num?: number; teetime?: string }[] }[],
+): Promise<Record<string, DailyWeather | null> | null> {
+  const coords = coordsForTournamentId(tournamentId);
+  if (!coords) return null;
+  let earliest: string | null = null;
+  for (const f of fieldRows) {
+    for (const t of f.teetimes ?? []) {
+      if (t.round_num !== 1 || !t.teetime) continue;
+      const day = t.teetime.slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+      if (!earliest || day < earliest) earliest = day;
+    }
+  }
+  if (!earliest) return null;
+  const [y, m, d] = earliest.split("-").map(Number);
+  const r1 = new Date(Date.UTC(y, m - 1, d));
+  const iso = (dt: Date) => dt.toISOString().slice(0, 10);
+  const bump = (offset: number) => {
+    const dt = new Date(r1);
+    dt.setUTCDate(r1.getUTCDate() + offset);
+    return iso(dt);
+  };
+  const dates = { 1: iso(r1), 2: bump(1), 3: bump(2), 4: bump(3) };
+  const daily = await getDailyWeather(
+    coords.lat,
+    coords.lon,
+    [dates[1], dates[2], dates[3], dates[4]],
+    coords.tz,
+  );
+  const byDate = new Map(daily.map((x) => [x.date, x]));
+  return {
+    "1": byDate.get(dates[1]) ?? null,
+    "2": byDate.get(dates[2]) ?? null,
+    "3": byDate.get(dates[3]) ?? null,
+    "4": byDate.get(dates[4]) ?? null,
+  };
 }
 
 export async function GET(req: Request) {
@@ -238,6 +290,7 @@ export async function GET(req: Request) {
         bucketMinutes: BUCKET_MIN,
         cells: hist.cells,
         roundRanges,
+        weatherByRound: hist.weatherByRound,
         diag: {
           tallied: hist.tallied,
           noHoles: hist.noHoles,
@@ -362,6 +415,13 @@ export async function GET(req: Request) {
       roundRanges[c.round] = r;
     }
 
+    // Live weather (shared with tee-time-scoring — same venue lookup,
+    // same date derivation from field-updates R1 tee times).
+    const weatherByRound = await fetchLiveWeatherByRoundLocal(
+      tournamentId,
+      field.field ?? [],
+    );
+
     return NextResponse.json({
       ok: true,
       tournamentId,
@@ -370,6 +430,7 @@ export async function GET(req: Request) {
       bucketMinutes: BUCKET_MIN,
       cells,
       roundRanges,
+      weatherByRound,
       diag: { tallied, noTeeInfo, noPar, noScore },
     });
   } catch (err) {

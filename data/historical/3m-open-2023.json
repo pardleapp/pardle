@@ -3,6 +3,76 @@
   "dgEventId": 525,
   "dgEventName": "3M Open",
   "pgaTournamentId": "R2023525",
+  "venue": {
+    "name": "TPC Twin Cities",
+    "lat": 45.148,
+    "lon": -93.219,
+    "tz": "America/Chicago"
+  },
+  "roundDates": {
+    "1": "2023-07-27",
+    "2": "2023-07-28",
+    "3": "2023-07-29",
+    "4": "2023-07-30"
+  },
+  "weatherByRound": {
+    "1": {
+      "date": "2023-07-27",
+      "tempMaxF": 90,
+      "tempMinF": 71.9,
+      "windAvgMph": 11.4,
+      "windGustMph": 32.2,
+      "windDirDeg": 143,
+      "windDirCompass": "SE",
+      "precipInches": 1.866,
+      "weatherCode": 65,
+      "condition": "Rain",
+      "emoji": "🌧",
+      "headline": "🌧 · 90°F · Wind 11mph SE (gusts 32) · 1.87\" rain"
+    },
+    "2": {
+      "date": "2023-07-28",
+      "tempMaxF": 86.3,
+      "tempMinF": 66.7,
+      "windAvgMph": 11.2,
+      "windGustMph": 24.8,
+      "windDirDeg": 35,
+      "windDirCompass": "NE",
+      "precipInches": 0.067,
+      "weatherCode": 61,
+      "condition": "Rain",
+      "emoji": "🌧",
+      "headline": "🌧 · 86°F · Wind 11mph NE (gusts 25) · 0.07\" rain"
+    },
+    "3": {
+      "date": "2023-07-29",
+      "tempMaxF": 78.3,
+      "tempMinF": 60.3,
+      "windAvgMph": 11.3,
+      "windGustMph": 25.1,
+      "windDirDeg": 349,
+      "windDirCompass": "N",
+      "precipInches": 0.008,
+      "weatherCode": 51,
+      "condition": "Drizzle",
+      "emoji": "🌦",
+      "headline": "🌦 · 78°F · Wind 11mph N (gusts 25) · Dry"
+    },
+    "4": {
+      "date": "2023-07-30",
+      "tempMaxF": 77.6,
+      "tempMinF": 59.3,
+      "windAvgMph": 6.1,
+      "windGustMph": 15.4,
+      "windDirDeg": 12,
+      "windDirCompass": "NNE",
+      "precipInches": 0,
+      "weatherCode": 3,
+      "condition": "Overcast",
+      "emoji": "☁️",
+      "headline": "☁️ · 78°F · Wind 6mph NNE (gusts 15) · Dry"
+    }
+  },
   "generatedAt": null,
   "players": [
     {

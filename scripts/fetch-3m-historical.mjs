@@ -38,6 +38,15 @@ const OUT_DIR = resolve(REPO_ROOT, "data", "historical");
 // ── Config ─────────────────────────────────────────────────────────
 const YEARS = [2023, 2024, 2025];
 const EVENT_NAME_MATCH = /3\s*m\s*open/i; // "3M Open"
+// TPC Twin Cities, Blaine MN — the 3M Open venue in every year we
+// cover. Kept in sync with lib/weather/course-coords.ts (used by the
+// live path).
+const VENUE = {
+  name: "TPC Twin Cities",
+  lat: 45.148,
+  lon: -93.219,
+  tz: "America/Chicago",
+};
 
 // ── Env loading (mirror season-rounds pattern) ─────────────────────
 async function loadEnvLocal() {
@@ -234,6 +243,104 @@ function skillFromWinProb(winProb, fieldSize) {
   return Math.max(-2.5, Math.min(3, raw));
 }
 
+// ── Weather (Open-Meteo archive) ──────────────────────────────────
+// Pulled once per year at build time and baked into the JSON so the
+// analysis pages never have to hit Open-Meteo at request time. Mirrors
+// the shape of lib/weather/open-meteo.ts's DailyWeather (must stay
+// in sync).
+const COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+function degToCompass(d) {
+  if (typeof d !== "number" || !Number.isFinite(d)) return null;
+  return COMPASS[Math.round(((d % 360) / 22.5)) % 16];
+}
+function classifyCode(c) {
+  if (typeof c !== "number") return { condition: "—", emoji: "" };
+  if (c === 0) return { condition: "Clear", emoji: "☀️" };
+  if (c === 1) return { condition: "Mostly clear", emoji: "🌤" };
+  if (c === 2) return { condition: "Partly cloudy", emoji: "⛅" };
+  if (c === 3) return { condition: "Overcast", emoji: "☁️" };
+  if (c >= 45 && c <= 48) return { condition: "Fog", emoji: "🌫" };
+  if (c >= 51 && c <= 57) return { condition: "Drizzle", emoji: "🌦" };
+  if (c >= 61 && c <= 67) return { condition: "Rain", emoji: "🌧" };
+  if (c >= 71 && c <= 77) return { condition: "Snow", emoji: "🌨" };
+  if (c >= 80 && c <= 82) return { condition: "Showers", emoji: "🌧" };
+  if (c >= 85 && c <= 86) return { condition: "Snow showers", emoji: "🌨" };
+  if (c >= 95 && c <= 99) return { condition: "Thunderstorm", emoji: "⛈" };
+  return { condition: "—", emoji: "" };
+}
+function headline(w) {
+  const parts = [];
+  if (w.emoji) parts.push(w.emoji);
+  if (typeof w.tempMaxF === "number") parts.push(`${Math.round(w.tempMaxF)}°F`);
+  const wb = [];
+  if (typeof w.windAvgMph === "number") {
+    wb.push(`${Math.round(w.windAvgMph)}mph`);
+    if (w.windDirCompass) wb.push(w.windDirCompass);
+  }
+  if (typeof w.windGustMph === "number" && (w.windAvgMph ?? 0) > 0) {
+    wb.push(`(gusts ${Math.round(w.windGustMph)})`);
+  }
+  if (wb.length) parts.push(`Wind ${wb.join(" ")}`);
+  if (typeof w.precipInches === "number") {
+    if (w.precipInches < 0.05) parts.push("Dry");
+    else parts.push(`${w.precipInches.toFixed(2)}" rain`);
+  }
+  return parts.join(" · ");
+}
+async function fetchArchiveWeather(dates) {
+  if (!dates.length) return new Map();
+  const start = dates[0], end = dates[dates.length - 1];
+  const daily = "temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,weather_code";
+  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${VENUE.lat}&longitude=${VENUE.lon}&start_date=${start}&end_date=${end}&daily=${daily}&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=${encodeURIComponent(VENUE.tz)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    console.warn(`[weather] ${res.status} ${await res.text().catch(() => "")}`);
+    return new Map();
+  }
+  const j = await res.json();
+  const d = j?.daily;
+  const out = new Map();
+  if (!d?.time) return out;
+  for (let i = 0; i < d.time.length; i++) {
+    const dir = d.wind_direction_10m_dominant?.[i] ?? null;
+    const code = d.weather_code?.[i] ?? null;
+    const { condition, emoji } = classifyCode(code);
+    const base = {
+      date: d.time[i],
+      tempMaxF: d.temperature_2m_max?.[i] ?? null,
+      tempMinF: d.temperature_2m_min?.[i] ?? null,
+      windAvgMph: d.wind_speed_10m_max?.[i] ?? null,
+      windGustMph: d.wind_gusts_10m_max?.[i] ?? null,
+      windDirDeg: dir,
+      windDirCompass: degToCompass(dir),
+      precipInches: d.precipitation_sum?.[i] ?? null,
+      weatherCode: code,
+      condition,
+      emoji,
+    };
+    out.set(d.time[i], { ...base, headline: headline(base) });
+  }
+  return out;
+}
+
+/** Given "2023-07-30" (event_completed = Sunday R4), return
+ *  { 1: "2023-07-27", 2: "2023-07-28", 3: "2023-07-29", 4: "2023-07-30" }
+ *  as UTC-date-only strings — matches Open-Meteo's daily buckets in
+ *  America/Chicago (round rollover happens after midnight local). */
+function roundDatesFromSunday(sundayStr) {
+  const m = sundayStr?.match?.(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const sunday = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  const iso = (d) => d.toISOString().slice(0, 10);
+  const days = {};
+  for (let r = 1; r <= 4; r++) {
+    const d = new Date(sunday);
+    d.setUTCDate(sunday.getUTCDate() - (4 - r));
+    days[r] = iso(d);
+  }
+  return days;
+}
+
 function normNameForCsv(s) {
   return String(s ?? "")
     .toLowerCase()
@@ -408,6 +515,27 @@ async function main() {
       }
     }
 
+    // Round dates + daily weather (Open-Meteo archive). event_completed
+    // in the DG payload is the Sunday finish; the four rounds run
+    // Thu→Sun in the venue's local timezone. If parsing fails we
+    // silently proceed with no weather so a bad DG date never blocks
+    // the whole build.
+    const roundDates = roundDatesFromSunday(dgRounds.event_completed);
+    let weatherByRound = { 1: null, 2: null, 3: null, 4: null };
+    if (roundDates) {
+      const dateList = [1, 2, 3, 4].map((r) => roundDates[r]).filter(Boolean);
+      const weatherByDate = await fetchArchiveWeather(dateList);
+      console.log(
+        `[weather] ${weatherByDate.size}/${dateList.length} days resolved for ${year}`,
+      );
+      for (const r of [1, 2, 3, 4]) {
+        const w = weatherByDate.get(roundDates[r]);
+        weatherByRound[r] = w ?? null;
+      }
+    } else {
+      console.warn(`[weather] no event_completed date for ${year}, skipping`);
+    }
+
     // Merge DG per-round rows with PGA per-hole rows
     const players = [];
     for (const row of dgRounds.scores ?? []) {
@@ -447,6 +575,9 @@ async function main() {
       dgEventId: dgMeta.event_id,
       dgEventName: dgMeta.event_name,
       pgaTournamentId: pgaMeta?.id ?? null,
+      venue: VENUE,
+      roundDates: roundDates ?? null,
+      weatherByRound,
       generatedAt: null, // deterministic — no timestamp so re-runs stay idempotent
       players,
     };

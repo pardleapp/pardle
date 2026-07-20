@@ -3,6 +3,76 @@
   "dgEventId": 525,
   "dgEventName": "3M Open",
   "pgaTournamentId": "R2025525",
+  "venue": {
+    "name": "TPC Twin Cities",
+    "lat": 45.148,
+    "lon": -93.219,
+    "tz": "America/Chicago"
+  },
+  "roundDates": {
+    "1": "2025-07-24",
+    "2": "2025-07-25",
+    "3": "2025-07-26",
+    "4": "2025-07-27"
+  },
+  "weatherByRound": {
+    "1": {
+      "date": "2025-07-24",
+      "tempMaxF": 80.2,
+      "tempMinF": 67,
+      "windAvgMph": 6.7,
+      "windGustMph": 16.3,
+      "windDirDeg": 346,
+      "windDirCompass": "NNW",
+      "precipInches": 0.004,
+      "weatherCode": 51,
+      "condition": "Drizzle",
+      "emoji": "🌦",
+      "headline": "🌦 · 80°F · Wind 7mph NNW (gusts 16) · Dry"
+    },
+    "2": {
+      "date": "2025-07-25",
+      "tempMaxF": 82.4,
+      "tempMinF": 64.5,
+      "windAvgMph": 6,
+      "windGustMph": 14.1,
+      "windDirDeg": 150,
+      "windDirCompass": "SSE",
+      "precipInches": 0,
+      "weatherCode": 3,
+      "condition": "Overcast",
+      "emoji": "☁️",
+      "headline": "☁️ · 82°F · Wind 6mph SSE (gusts 14) · Dry"
+    },
+    "3": {
+      "date": "2025-07-26",
+      "tempMaxF": 86.5,
+      "tempMinF": 69.1,
+      "windAvgMph": 8.2,
+      "windGustMph": 19.2,
+      "windDirDeg": 186,
+      "windDirCompass": "S",
+      "precipInches": 0,
+      "weatherCode": 3,
+      "condition": "Overcast",
+      "emoji": "☁️",
+      "headline": "☁️ · 87°F · Wind 8mph S (gusts 19) · Dry"
+    },
+    "4": {
+      "date": "2025-07-27",
+      "tempMaxF": 90.1,
+      "tempMinF": 68.4,
+      "windAvgMph": 12.2,
+      "windGustMph": 26.2,
+      "windDirDeg": 190,
+      "windDirCompass": "S",
+      "precipInches": 0.524,
+      "weatherCode": 65,
+      "condition": "Rain",
+      "emoji": "🌧",
+      "headline": "🌧 · 90°F · Wind 12mph S (gusts 26) · 0.52\" rain"
+    }
+  },
   "generatedAt": null,
   "players": [
     {
