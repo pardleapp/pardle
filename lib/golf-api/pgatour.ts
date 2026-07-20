@@ -548,6 +548,14 @@ export interface PinCoord {
   y: number;
 }
 
+/** Field scoring for one hole in one round. */
+export interface HoleScoringSummary {
+  /** Field average strokes on the hole (e.g. 3.87). */
+  avg: number | null;
+  /** Signed vs-par (avg − par), e.g. −0.13. */
+  vsPar: number | null;
+}
+
 /** Pin sheet for one hole across the tournament. `greenImageUrl` is
  *  the Cloudinary raster that pin coords are normalised against — the
  *  same asset the shot tracer uses. `pinByRound` is keyed 1-4; a hole
@@ -558,6 +566,9 @@ export interface CoursePinHole {
   yards: number | null;
   greenImageUrl: string;
   pinByRound: Record<number, PinCoord>;
+  /** Per-round scoring average + vs-par. Keys match pinByRound
+   *  (1-4). Rounds not yet played will be missing. */
+  scoringByRound: Record<number, HoleScoringSummary>;
 }
 
 export interface CoursePinSheet {
@@ -580,6 +591,10 @@ interface CourseStatsHoleStats {
   /** parValue is String on this type (not Int). Parse it to a number. */
   parValue?: string;
   yards?: number;
+  /** Field scoring average for this (round, hole). String like "3.845". */
+  scoringAverage?: string;
+  /** Scoring average vs par, signed string like "+0.15" or "-0.42". */
+  scoringAverageDiff?: string;
   pinGreen?: {
     leftToRightCoords?: CourseStatsCoords | null;
   } | null;
@@ -622,6 +637,8 @@ export async function getCoursePinsWithDiag(
               courseHoleNum
               parValue
               yards
+              scoringAverage
+              scoringAverageDiff
               pinGreen {
                 leftToRightCoords {
                   x
@@ -698,6 +715,7 @@ function parseCoursePinsPayload(
         yards: typeof hs.yards === "number" ? hs.yards : null,
         greenImageUrl: upscalePickle(img),
         pinByRound: {},
+        scoringByRound: {},
       };
       if (!target.greenImageUrl && img) target.greenImageUrl = upscalePickle(img);
       if (target.par == null && Number.isFinite(parNum)) target.par = parNum;
@@ -709,6 +727,24 @@ function parseCoursePinsPayload(
         y >= 0
       ) {
         target.pinByRound[round] = { x, y };
+      }
+      // Per-round scoring — comes as strings on this type. Parse
+      // defensively; "0" (all pars) is still valid.
+      const avgStr = hs.scoringAverage;
+      const diffStr = hs.scoringAverageDiff;
+      const avgNum =
+        typeof avgStr === "string" && avgStr.trim()
+          ? Number.parseFloat(avgStr)
+          : NaN;
+      const diffNum =
+        typeof diffStr === "string" && diffStr.trim()
+          ? Number.parseFloat(diffStr)
+          : NaN;
+      if (Number.isFinite(avgNum) || Number.isFinite(diffNum)) {
+        target.scoringByRound[round] = {
+          avg: Number.isFinite(avgNum) ? avgNum : null,
+          vsPar: Number.isFinite(diffNum) ? diffNum : null,
+        };
       }
       holeMap.set(holeNum, target);
     }
@@ -737,6 +773,8 @@ export async function getCoursePins(
               courseHoleNum
               parValue
               yards
+              scoringAverage
+              scoringAverageDiff
               pinGreen {
                 leftToRightCoords {
                   x
@@ -787,6 +825,7 @@ export async function getCoursePins(
           yards: typeof hs.yards === "number" ? hs.yards : null,
           greenImageUrl: upscalePickle(img),
           pinByRound: {},
+          scoringByRound: {},
         };
       if (!target.greenImageUrl && img) target.greenImageUrl = upscalePickle(img);
       if (target.par == null && Number.isFinite(parNum)) target.par = parNum;
@@ -798,6 +837,22 @@ export async function getCoursePins(
         y >= 0
       ) {
         target.pinByRound[round] = { x, y };
+      }
+      const avgStr = hs.scoringAverage;
+      const diffStr = hs.scoringAverageDiff;
+      const avgNum =
+        typeof avgStr === "string" && avgStr.trim()
+          ? Number.parseFloat(avgStr)
+          : NaN;
+      const diffNum =
+        typeof diffStr === "string" && diffStr.trim()
+          ? Number.parseFloat(diffStr)
+          : NaN;
+      if (Number.isFinite(avgNum) || Number.isFinite(diffNum)) {
+        target.scoringByRound[round] = {
+          avg: Number.isFinite(avgNum) ? avgNum : null,
+          vsPar: Number.isFinite(diffNum) ? diffNum : null,
+        };
       }
       holeMap.set(holeNum, target);
     }
