@@ -600,11 +600,15 @@ interface CourseStatsResp {
 
 /** Same as getCoursePins, but returns the raw orchestrator payload
  *  alongside so the API layer can surface diagnostic info when the
- *  parsed sheet is empty. Never throws — errors are captured. */
+ *  parsed sheet is empty. Never throws — errors are captured.
+ *
+ *  Inlines the fetch (rather than going through gql<T>) so that
+ *  GraphQL errors + non-200 bodies are visible in the response,
+ *  not silently swallowed. */
 export async function getCoursePinsWithDiag(
   tournamentId: string,
-): Promise<{ sheet: CoursePinSheet | null; raw: unknown }> {
-  const raw = await gql<CourseStatsResp>(`{
+): Promise<{ sheet: CoursePinSheet | null; raw: unknown; error?: string }> {
+  const query = `{
     courseStats(tournamentId: "${tournamentId}") {
       courses {
         id
@@ -629,9 +633,32 @@ export async function getCoursePinsWithDiag(
         }
       }
     }
-  }`);
-  const sheet = parseCoursePinsPayload(tournamentId, raw);
-  return { sheet, raw };
+  }`;
+  let raw: unknown = null;
+  let error: string | undefined;
+  try {
+    const res = await fetch(GQL_URL, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ query }),
+      cache: "no-store",
+    });
+    const text = await res.text();
+    try {
+      raw = JSON.parse(text);
+    } catch {
+      raw = { httpStatus: res.status, body: text.slice(0, 800) };
+    }
+    if (!res.ok) error = `http ${res.status}`;
+  } catch (err) {
+    error = err instanceof Error ? err.message : "fetch failed";
+  }
+  const data =
+    typeof raw === "object" && raw != null && "data" in raw
+      ? ((raw as { data: CourseStatsResp | null }).data ?? null)
+      : null;
+  const sheet = parseCoursePinsPayload(tournamentId, data);
+  return { sheet, raw, error };
 }
 
 function parseCoursePinsPayload(
