@@ -573,7 +573,9 @@ interface CourseStatsCoords {
   y?: number | null;
 }
 interface CourseStatsHoleStats {
-  holeNumber?: number;
+  /** Orchestrator names this `hole` on CourseHoleStats (not
+   *  `holeNumber` — that lives on scorecard types). */
+  hole?: number;
   parValue?: number;
   yards?: number;
   pinGreen?: {
@@ -611,12 +613,11 @@ export async function getCoursePinsWithDiag(
   const query = `{
     courseStats(tournamentId: "${tournamentId}") {
       courses {
-        id
         roundHoleStats {
           roundNum
           holeStats {
             ... on CourseHoleStats {
-              holeNumber
+              hole
               pinGreen {
                 leftToRightCoords {
                   x
@@ -676,7 +677,7 @@ function parseCoursePinsPayload(
     if (typeof round !== "number") continue;
     for (const hs of rh?.holeStats ?? []) {
       if (!hs) continue;
-      const holeNum = hs.holeNumber;
+      const holeNum = hs.hole;
       if (typeof holeNum !== "number") continue;
       const coords = hs.pinGreen?.leftToRightCoords;
       const x = coords?.enhancedX ?? coords?.x;
@@ -721,12 +722,11 @@ export async function getCoursePins(
   const data = await gql<CourseStatsResp>(`{
     courseStats(tournamentId: "${tournamentId}") {
       courses {
-        id
         roundHoleStats {
           roundNum
           holeStats {
             ... on CourseHoleStats {
-              holeNumber
+              hole
               pinGreen {
                 leftToRightCoords {
                   x
@@ -758,7 +758,7 @@ export async function getCoursePins(
     if (typeof round !== "number") continue;
     for (const hs of rh?.holeStats ?? []) {
       if (!hs) continue;
-      const holeNum = hs.holeNumber;
+      const holeNum = hs.hole;
       if (typeof holeNum !== "number") continue;
       const coords = hs.pinGreen?.leftToRightCoords;
       const x = coords?.enhancedX ?? coords?.x;

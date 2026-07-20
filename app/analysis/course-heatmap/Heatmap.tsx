@@ -297,7 +297,7 @@ export default function Heatmap({
               <tr key={h}>
                 <td
                   style={{
-                    width: 44,
+                    width: 58,
                     fontSize: 11,
                     fontWeight: 700,
                     color: "oklch(0.3 0.02 150)",
@@ -313,19 +313,32 @@ export default function Heatmap({
                       onClick={() => onHoleClick(h)}
                       title={`See pin positions for hole ${h}`}
                       style={{
-                        background: "transparent",
-                        border: "none",
-                        padding: 0,
-                        color: "oklch(0.25 0.02 150)",
+                        background: "oklch(0.96 0.006 95)",
+                        border: "1px solid oklch(0.9 0.008 95)",
+                        padding: "3px 6px",
+                        color: "oklch(0.2 0.02 150)",
                         font: "inherit",
                         fontWeight: 800,
                         cursor: "pointer",
-                        textDecoration: "underline",
-                        textDecorationColor: "oklch(0.85 0.013 95)",
-                        textUnderlineOffset: 3,
-                        textDecorationThickness: 1,
+                        borderRadius: 4,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        lineHeight: 1,
+                        letterSpacing: 0.2,
+                        transition:
+                          "background-color 0.12s ease, border-color 0.12s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "oklch(0.94 0.02 150)";
+                        e.currentTarget.style.borderColor = "oklch(0.55 0.15 250)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "oklch(0.96 0.006 95)";
+                        e.currentTarget.style.borderColor = "oklch(0.9 0.008 95)";
                       }}
                     >
+                      <span style={{ fontSize: 10 }}>📍</span>
                       H{h}
                     </button>
                   ) : (
