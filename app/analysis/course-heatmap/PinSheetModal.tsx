@@ -14,7 +14,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CoursePinHole, HolePutt } from "@/lib/golf-api/pgatour";
-import SlopeOverlay from "./SlopeOverlay";
 
 interface Props {
   hole: CoursePinHole | null;
@@ -82,8 +81,6 @@ export default function PinSheetModal({
   const [showPutts, setShowPutts] = useState(true);
   /** True → only show made putts. Default off (all). */
   const [madeOnly, setMadeOnly] = useState(false);
-  /** True → overlay inferred slope arrows on the green. */
-  const [showSlope, setShowSlope] = useState(false);
   useEffect(() => {
     if (!hole) return;
     const onKey = (e: KeyboardEvent) => {
@@ -296,30 +293,29 @@ export default function PinSheetModal({
                     />
                   );
                 })}
-                {/* Endpoint dots — where the ball ended up. Made putts
-                    are the CUP so they cluster on the pin; missed
-                    putts scatter around the pin and reveal the fall
-                    line. */}
+                {/* Endpoint dots — where the ball actually came to
+                    rest. Made putts are the CUP so they cluster on
+                    the pin; missed putts scatter around the pin and
+                    the shape of that scatter reads as the fall line
+                    (balls settle on the low side of the hole).
+                    Missed dots get more visual weight than made
+                    dots — they carry the slope signal. */}
                 {filteredPutts.map((p, i) => (
                   <circle
                     key={`d${i}`}
                     cx={p.x2 * 100}
                     cy={p.y2 * 100}
-                    r={0.55}
+                    r={p.made ? 0.5 : 0.85}
                     fill={
                       p.made
-                        ? "oklch(0.6 0.2 150 / 0.6)"
-                        : "oklch(0.55 0.22 28 / 0.5)"
+                        ? "oklch(0.55 0.2 150 / 0.55)"
+                        : "oklch(0.55 0.22 28 / 0.75)"
                     }
+                    stroke={p.made ? "none" : "oklch(0.25 0.15 28 / 0.5)"}
+                    strokeWidth={p.made ? 0 : 0.2}
                   />
                 ))}
               </svg>
-            )}
-            {showSlope && (puttsForHole?.length ?? 0) > 0 && (
-              <SlopeOverlay
-                putts={puttsForHole ?? []}
-                pinByRound={hole.pinByRound}
-              />
             )}
             {roundsWithPin.map((round) => {
               const pin = hole.pinByRound[round];
@@ -616,41 +612,7 @@ export default function PinSheetModal({
               >
                 Hide overlay
               </button>
-              <button
-                type="button"
-                onClick={() => setShowSlope((v) => !v)}
-                title="Experimental: trace slope-inferred flow lines through the putt vector field"
-                style={{
-                  padding: "3px 10px",
-                  fontSize: 11,
-                  fontFamily: "inherit",
-                  fontWeight: 700,
-                  borderRadius: 999,
-                  border: "1px solid oklch(0.9 0.008 95)",
-                  background: showSlope ? "oklch(0.22 0.03 150)" : "white",
-                  color: showSlope ? "white" : "oklch(0.3 0.02 150)",
-                  cursor: "pointer",
-                }}
-              >
-                Slope flow (β)
-              </button>
             </div>
-            {showSlope && (
-              <div
-                style={{
-                  marginTop: 4,
-                  fontSize: 10,
-                  color: "oklch(0.5 0.02 150)",
-                  fontStyle: "italic",
-                }}
-              >
-                Streamlines INFERRED from putt-path deflection — trace
-                where a ball would roll from any point on the green,
-                following the aggregate downhill direction. Not a
-                surveyed contour map; the density of lines converging
-                on a spot ≈ a natural collection point.
-              </div>
-            )}
             <div
               style={{
                 display: "flex",
@@ -689,8 +651,9 @@ export default function PinSheetModal({
                 MISSED
               </span>
               <span style={{ opacity: 0.7 }}>
-                Endpoint dots reveal the fall line — cluster on the low
-                side of the pin.
+                Missed-putt endpoints (larger red dots) cluster on the
+                LOW side of the pin — that scatter direction is the
+                fall line for that round&apos;s pin position.
               </span>
             </div>
           </div>
