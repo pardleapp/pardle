@@ -604,18 +604,19 @@ interface CourseStatsResp {
 export async function getCoursePins(
   tournamentId: string,
 ): Promise<CoursePinSheet | null> {
+  // Minimal query — only fields the schema recon confirmed. Adding
+  // parValue/yards/courseName earlier caused the whole query to be
+  // rejected (courseStats returned null). Par + yards are cosmetic
+  // for the modal; not worth breaking pin lookup for.
   const data = await gql<CourseStatsResp>(`{
     courseStats(tournamentId: "${tournamentId}") {
       courses {
         id
-        courseName
         roundHoleStats {
           roundNum
           holeStats {
             ... on CourseHoleStats {
               holeNumber
-              parValue
-              yards
               pinGreen {
                 leftToRightCoords {
                   x
