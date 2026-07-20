@@ -139,6 +139,26 @@ export default function Heatmap({
     return out;
   }, [buckets, cellIndex]);
 
+  /** Per-row summary: mean of vs-par across all time buckets for that
+   *  hole in the current round. Answers "how did hole 15 play today?"
+   *  in a single number, same units as the cell values. */
+  const rowMeans = useMemo(() => {
+    const out = new Map<number, { avgVsPar: number; count: number }>();
+    for (let h = 1; h <= 18; h++) {
+      let sum = 0;
+      let n = 0;
+      for (const t of buckets) {
+        const cell = cellIndex.get(`${h}:${t}`);
+        if (cell) {
+          sum += cell.avgVsPar * cell.count;
+          n += cell.count;
+        }
+      }
+      if (n > 0) out.set(h, { avgVsPar: sum / n, count: n });
+    }
+    return out;
+  }, [buckets, cellIndex]);
+
   const holes = Array.from({ length: 18 }, (_, i) => i + 1);
 
   // 1-hour buckets → ~10-12 columns per round. Sized to fit the
@@ -290,6 +310,26 @@ export default function Heatmap({
                   </th>
                 );
               })}
+              {/* Rightmost column: per-hole average for this round. */}
+              <th
+                style={{
+                  width: CELL_W + 12,
+                  fontSize: 10,
+                  color: "oklch(0.35 0.02 150)",
+                  fontWeight: 800,
+                  fontFamily: "var(--font-mono, monospace)",
+                  paddingBottom: 4,
+                  paddingLeft: 10,
+                  verticalAlign: "bottom",
+                  textAlign: "center",
+                  letterSpacing: 0.4,
+                  textTransform: "uppercase",
+                  borderLeft: "2px solid oklch(0.88 0.012 95)",
+                }}
+                title="Average strokes vs par across the round for this hole"
+              >
+                ROUND
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -387,6 +427,51 @@ export default function Heatmap({
                     </td>
                   );
                 })}
+                {/* Rightmost cell: this hole's average across the
+                    whole round. Same colour scale as individual cells
+                    so it reads as a summary of the row. */}
+                {(() => {
+                  const mean = rowMeans.get(h);
+                  const has = mean != null;
+                  return (
+                    <td
+                      key="row-mean"
+                      title={
+                        has
+                          ? `H${h} · round average ${formatSigned(mean.avgVsPar)} vs par (${mean.count} players)`
+                          : `H${h} · not enough data yet`
+                      }
+                      style={{
+                        width: CELL_W + 12,
+                        height: CELL_H,
+                        paddingLeft: 10,
+                        borderLeft: "2px solid oklch(0.88 0.012 95)",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      <div
+                        style={{
+                          background: has ? colourFor(mean.avgVsPar) : "transparent",
+                          color: has ? textOn(mean.avgVsPar) : "oklch(0.65 0.008 95)",
+                          fontFamily: "var(--font-mono, monospace)",
+                          fontWeight: 800,
+                          fontSize: 11,
+                          border: has
+                            ? "1px solid oklch(0.88 0.012 95)"
+                            : "1px dashed oklch(0.92 0.008 95)",
+                          borderRadius: 3,
+                          padding: "4px 2px",
+                          minHeight: CELL_H,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {has ? formatSigned(mean.avgVsPar) : "—"}
+                      </div>
+                    </td>
+                  );
+                })()}
               </tr>
             ))}
           </tbody>
@@ -485,6 +570,57 @@ export default function Heatmap({
                   </td>
                 );
               })}
+              {/* Bottom-right corner: mean of every hole's round mean.
+                  Reads as "the course played {value} today across every
+                  hole with data." */}
+              {(() => {
+                let sum = 0;
+                let n = 0;
+                for (const m of rowMeans.values()) {
+                  sum += m.avgVsPar * m.count;
+                  n += m.count;
+                }
+                const avg = n > 0 ? sum / n : null;
+                return (
+                  <td
+                    key="round-mean"
+                    title={
+                      avg != null
+                        ? `Round-wide field average vs par ${formatSigned(avg)} (${n} scored holes)`
+                        : "Round-wide average — no data yet"
+                    }
+                    style={{
+                      width: CELL_W + 12,
+                      paddingLeft: 10,
+                      paddingTop: 8,
+                      borderTop: "2px solid oklch(0.88 0.012 95)",
+                      borderLeft: "2px solid oklch(0.88 0.012 95)",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    <div
+                      style={{
+                        background: avg != null ? colourFor(avg) : "transparent",
+                        color: avg != null ? textOn(avg) : "oklch(0.65 0.008 95)",
+                        fontFamily: "var(--font-mono, monospace)",
+                        fontWeight: 800,
+                        fontSize: 11,
+                        border: avg != null
+                          ? "1px solid oklch(0.88 0.012 95)"
+                          : "1px dashed oklch(0.92 0.008 95)",
+                        borderRadius: 3,
+                        padding: "4px 2px",
+                        minHeight: CELL_H,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {avg != null ? formatSigned(avg) : "—"}
+                    </div>
+                  </td>
+                );
+              })()}
             </tr>
           </tfoot>
         </table>
@@ -577,9 +713,12 @@ export default function Heatmap({
         completed that hole in that window. Small samples (1–2 players)
         are noisy — a single blow-up on hole 12 in a quiet minute can
         show up as a red cell; read the trend across neighbouring cells.
-        Bottom <strong>18 HOLES</strong> row sums vs-par across the
-        whole course for that hour — only shows when every hole has
-        data (partial hours render dimmed as {"“"}n/18{"”"}).
+        Right-hand <strong>ROUND</strong> column is that hole&apos;s
+        mean vs-par across every player who scored it today. Bottom
+        <strong> 18 HOLES</strong> row sums vs-par across the whole
+        course for that hour — only shows when every hole has data
+        (partial hours render dimmed as {"“"}n/18{"”"}). The bottom-
+        right cell is the field&apos;s overall vs-par for the round.
         {onHoleClick && pinsAvailable ? (
           <>
             {" "}
