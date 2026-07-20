@@ -1,36 +1,63 @@
 "use client";
 
 /**
- * v4 primary view — a live leaderboard with per-player shot updates
- * and round SG stats. The bet-native way to watch a tournament: see
- * position, current activity, and who's playing well by shot type
- * all in one scan-friendly grid.
+ * v4 primary view — a live leaderboard with per-player shot updates,
+ * per-round SG stats, and per-SHOT social affordances (reactions,
+ * comment counts, row expansion for recent-shot history).
  *
- * Data pipeline: single 3 s poll of /api/live-leaderboard, which
- * server-side joins Pardle's cached leaderboard + latest event per
- * player + DataGolf per-round SG. Client just renders the merged
- * response — no client-side joins, no per-row fetches.
+ * Reactions target the specific event id (McIlroy's 380y drive is a
+ * separate reactable object from his next putt), so as the row's
+ * latest event ticks over, its reactions reset — reactions belong to
+ * the shot, not the row.
+ *
+ * Data pipeline: single 3 s poll of /api/live-leaderboard which
+ * server-side joins Pardle leaderboard + latest 5 events per player
+ * + DataGolf per-round SG + reactions/comment-counts for every event.
  */
 
-import { useCallback, useEffect, useState } from "react";
-import LeaderRow from "./LeaderRow";
+import { useCallback, useEffect, useRef, useState } from "react";
+import LeaderRow, { type ReactionState } from "./LeaderRow";
 import { useFollowedPlayers } from "../useFollowedPlayers";
 import { readBets, type TrackedBet } from "../bet-shared";
 import type { LeaderboardResponse } from "@/app/api/live-leaderboard/route";
 
 const POLL_MS = 3_000;
 const POLL_MS_HIDDEN = 30_000;
+const AUTHOR_KEY_STORAGE = "pardle_feed_visitor_v1";
 
 type Filter = "all" | "mine";
+
+/** Persistent visitor id — reused by /api/feed/burst for rate-limiting
+ *  and by /api/feed/react as authorKey. Not secure; reactions are
+ *  low-stakes. */
+function ensureAuthorKey(): string {
+  if (typeof window === "undefined") return "";
+  const existing = window.localStorage.getItem(AUTHOR_KEY_STORAGE);
+  if (existing) return existing;
+  const fresh = `v${Math.random().toString(36).slice(2, 12)}${Date.now().toString(36)}`;
+  window.localStorage.setItem(AUTHOR_KEY_STORAGE, fresh);
+  return fresh;
+}
+
+interface Floater {
+  key: string;
+  emoji: string;
+  xPct: number;
+}
 
 export default function LeaderboardFeed() {
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [bets, setBets] = useState<TrackedBet[]>([]);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [emojiReactions, setEmojiReactions] = useState<Record<string, ReactionState>>({});
+  const [floaters, setFloaters] = useState<Floater[]>([]);
+  const authorKey = useRef<string>("");
   const { followed } = useFollowedPlayers();
 
   useEffect(() => {
+    authorKey.current = ensureAuthorKey();
     setBets(readBets());
     const sync = () => setBets(readBets());
     window.addEventListener("focus", sync);
@@ -68,6 +95,60 @@ export default function LeaderboardFeed() {
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [load]);
+
+  const toggleExpanded = useCallback((playerId: string) => {
+    setExpandedIds((cur) => {
+      const next = new Set(cur);
+      if (next.has(playerId)) next.delete(playerId);
+      else next.add(playerId);
+      return next;
+    });
+  }, []);
+
+  /** Emoji reaction on a specific event. Optimistically increments
+   *  local state + fires an ephemeral burst floater across the page
+   *  (via /api/feed/burst — every other client watching this
+   *  tournament will see the floater rise). The counter is per-user
+   *  local (same as v1); switching to server-persisted emoji reactions
+   *  is a follow-up. */
+  const react = useCallback(
+    (eventId: string, emoji: string) => {
+      setEmojiReactions((all) => {
+        const cur: ReactionState = all[eventId] ?? { counts: {}, mine: [] };
+        if (cur.mine.includes(emoji)) {
+          // Toggle off
+          const nextCount = Math.max(0, (cur.counts[emoji] ?? 0) - 1);
+          const nextCounts = { ...cur.counts };
+          if (nextCount === 0) delete nextCounts[emoji];
+          else nextCounts[emoji] = nextCount;
+          return {
+            ...all,
+            [eventId]: { counts: nextCounts, mine: cur.mine.filter((e) => e !== emoji) },
+          };
+        }
+        return {
+          ...all,
+          [eventId]: {
+            counts: { ...cur.counts, [emoji]: (cur.counts[emoji] ?? 0) + 1 },
+            mine: [...cur.mine, emoji],
+          },
+        };
+      });
+      // Fire a floater on this row (visual burst)
+      const key = `f${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      setFloaters((f) => [...f, { key, emoji, xPct: 40 + Math.random() * 20 }]);
+      window.setTimeout(() => {
+        setFloaters((f) => f.filter((x) => x.key !== key));
+      }, 1600);
+      // Fire and forget — burst is a nice-to-have.
+      void fetch("/api/feed/burst", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji, visitorId: authorKey.current }),
+      }).catch(() => {});
+    },
+    [],
+  );
 
   const mineIds = new Set<string>(followed);
   for (const b of bets) {
@@ -130,9 +211,6 @@ export default function LeaderboardFeed() {
         </p>
       ) : (
         <div className="v4-table" role="table">
-          {/* Column header row — muted labels for scan orientation.
-              Sticky under the header so the row grid stays legible when
-              scrolling a full field. */}
           <div className="v4-headings" role="row">
             <span className="v4-h-pos">POS</span>
             <span />
@@ -147,14 +225,37 @@ export default function LeaderboardFeed() {
             <span className="v4-h-sg" title="SG: total">TOT</span>
           </div>
           {shown.map((r) => (
-            <LeaderRow key={r.playerId} row={r} isMine={mineIds.has(r.playerId)} />
+            <LeaderRow
+              key={r.playerId}
+              row={r}
+              isMine={mineIds.has(r.playerId)}
+              social={data.social ?? {}}
+              emojiReactions={emojiReactions}
+              expanded={expandedIds.has(r.playerId)}
+              onToggleExpanded={() => toggleExpanded(r.playerId)}
+              onReact={react}
+            />
           ))}
         </div>
       )}
 
       <p className="v4-footnote">
-        Position + today via PGA Tour · SG this round · latest event streams in as it happens.
+        Position + today via PGA Tour · SG this round · click any row for the last few shots · react to any shot with 🔥 😬 🎯
       </p>
+
+      {/* Global emoji floater layer — bursts on reactions rise across
+          the feed as ambient "the room is watching" energy. */}
+      <div className="v4-floater-layer" aria-hidden="true">
+        {floaters.map((f) => (
+          <span
+            key={f.key}
+            className="v4-floater"
+            style={{ left: `${f.xPct}%` }}
+          >
+            {f.emoji}
+          </span>
+        ))}
+      </div>
     </section>
   );
 }

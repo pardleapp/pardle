@@ -28,9 +28,11 @@ import {
 import {
   getCachedLeaderboard,
   getEvents,
+  getReactionsBulk,
+  getCommentCountsBulk,
   type CachedLeaderboardRow,
 } from "@/lib/feed/store";
-import type { FeedEvent } from "@/lib/feed/types";
+import type { FeedEvent, ReactionCounts } from "@/lib/feed/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -126,6 +128,19 @@ export interface LeaderboardRow {
   /** Latest event for this player from the buffer — null when no
    *  recent events for them. */
   latestEvent: FeedEvent | null;
+  /** Up to N most-recent events (latest first). Used when the row
+   *  is expanded to show the arc of the player's last few shots.
+   *  Same underlying array `latestEvent` was picked from. */
+  recentEvents: FeedEvent[];
+}
+
+/** Social state attached to a single event id. Server-side {up,down}
+ *  reactions from Pardle's existing store + comment count from the
+ *  comments store. Client hydrates its per-user emoji reactions on
+ *  top of this baseline (matches v1 pattern). */
+export interface EventSocial {
+  reactions: ReactionCounts;
+  commentCount: number;
 }
 
 export interface LeaderboardResponse {
@@ -133,6 +148,9 @@ export interface LeaderboardResponse {
   tournament: PGATournamentRef | null;
   activeRound: number;
   rows: LeaderboardRow[];
+  /** eventId → server-side reactions + comment count. Client bulk-
+   *  hydrates the social chips for every event in the response. */
+  social: Record<string, EventSocial>;
   generatedAt: number;
   diag: {
     leaderboardCount: number;
@@ -141,6 +159,8 @@ export interface LeaderboardResponse {
     dgTotal: number;
   };
 }
+
+const RECENT_PER_PLAYER = 5;
 
 export async function GET(req: Request) {
   try {
@@ -156,6 +176,7 @@ export async function GET(req: Request) {
         tournament: null,
         activeRound: 1,
         rows: [],
+        social: {},
         generatedAt: Date.now(),
         diag: { leaderboardCount: 0, eventsCount: 0, dgMatched: 0, dgTotal: 0 },
       } satisfies LeaderboardResponse);
@@ -174,11 +195,16 @@ export async function GET(req: Request) {
       dgByName.set(normName(dgToFirstLast(r.player_name)), r);
     }
 
-    // Latest event per playerId — events are already newest-first.
-    const latestByPlayer = new Map<string, FeedEvent>();
+    // Latest + recent events per playerId. `events` is newest-first
+    // so we just accumulate up to RECENT_PER_PLAYER per player in
+    // order. Latest = first item in each list.
+    const recentByPlayer = new Map<string, FeedEvent[]>();
     for (const ev of events) {
-      if (!latestByPlayer.has(ev.playerId)) {
-        latestByPlayer.set(ev.playerId, ev);
+      const list = recentByPlayer.get(ev.playerId);
+      if (!list) {
+        recentByPlayer.set(ev.playerId, [ev]);
+      } else if (list.length < RECENT_PER_PLAYER) {
+        list.push(ev);
       }
     }
 
@@ -195,6 +221,7 @@ export async function GET(req: Request) {
             total: typeof dg.sg_total === "number" ? dg.sg_total : null,
           }
         : null;
+      const recent = recentByPlayer.get(lb.playerId) ?? [];
       return {
         playerId: lb.playerId,
         playerName: lb.displayName,
@@ -203,15 +230,36 @@ export async function GET(req: Request) {
         thru: lb.thru,
         playerState: lb.playerState,
         sg,
-        latestEvent: latestByPlayer.get(lb.playerId) ?? null,
+        latestEvent: recent[0] ?? null,
+        recentEvents: recent,
       };
     });
+
+    // Bulk-fetch reactions + comment counts for every event we're
+    // shipping to the client. Doing this in one pass keeps request
+    // latency flat regardless of leaderboard size.
+    const allEventIds: string[] = [];
+    for (const r of rows) {
+      for (const ev of r.recentEvents) allEventIds.push(ev.id);
+    }
+    const [reactionsById, commentsById] = await Promise.all([
+      getReactionsBulk(allEventIds).catch(() => ({}) as Record<string, ReactionCounts>),
+      getCommentCountsBulk(allEventIds).catch(() => ({}) as Record<string, number>),
+    ]);
+    const social: Record<string, EventSocial> = {};
+    for (const id of allEventIds) {
+      social[id] = {
+        reactions: reactionsById[id] ?? { up: 0, down: 0 },
+        commentCount: commentsById[id] ?? 0,
+      };
+    }
 
     return NextResponse.json({
       ok: true,
       tournament,
       activeRound,
       rows,
+      social,
       generatedAt: Date.now(),
       diag: {
         leaderboardCount: leaderboard.length,

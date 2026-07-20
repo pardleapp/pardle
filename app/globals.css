@@ -29547,3 +29547,181 @@ body[data-chat-open] .addbet-fab {
     min-width: 820px;
   }
 }
+
+/* ── v4 social layer — reactions, picker, comments, expanded row,
+   floater. Layered on top of the base v4 leaderboard CSS. */
+
+.feed-v4 .v4-row-wrap {
+  display: block;
+  background: white;
+}
+.feed-v4 .v4-row-wrap-open {
+  background: oklch(0.99 0.005 95);
+}
+
+/* Reaction cluster on the right side of the latest cell. */
+.feed-v4 .v4-react-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  flex-shrink: 0;
+  position: relative;
+}
+.feed-v4 .v4-react-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.feed-v4 .v4-react-chip {
+  border: 1px solid oklch(0.9 0.008 95);
+  background: white;
+  padding: 1px 6px 1px 4px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-family: inherit;
+  color: oklch(0.4 0.02 150);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  line-height: 1.4;
+  transition: background-color 0.1s ease, border-color 0.1s ease;
+}
+.feed-v4 .v4-react-chip:hover {
+  border-color: oklch(0.55 0.15 250);
+  background: oklch(0.98 0.02 250);
+}
+.feed-v4 .v4-react-chip-mine {
+  border-color: oklch(0.75 0.18 65);
+  background: oklch(0.97 0.06 65);
+  color: oklch(0.35 0.15 65);
+  font-weight: 700;
+}
+.feed-v4 .v4-react-chip-emoji {
+  font-size: 11px;
+  line-height: 1;
+}
+.feed-v4 .v4-react-chip-count {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 700;
+}
+.feed-v4 .v4-comment-chip {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: oklch(0.5 0.02 150);
+  background: oklch(0.96 0.006 95);
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+/* Reaction picker — 3 emojis, hidden at rest, revealed when the row
+   is hovered. Absolutely positioned so it doesn't push layout when
+   it appears. */
+.feed-v4 .v4-react-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px 3px;
+  border: 1px solid oklch(0.9 0.008 95);
+  border-radius: 999px;
+  background: white;
+  box-shadow: 0 2px 8px oklch(0.2 0.02 150 / 0.08);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.feed-v4 .v4-row:hover .v4-react-picker,
+.feed-v4 .v4-row:focus-within .v4-react-picker,
+.feed-v4 .v4-row-expand:hover .v4-react-picker,
+.feed-v4 .v4-row-expand .v4-latest:hover .v4-react-picker,
+.feed-v4 .v4-row-expand .v4-latest:focus-within .v4-react-picker {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+.feed-v4 .v4-react-pick-btn {
+  border: none;
+  background: transparent;
+  padding: 3px 5px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.08s ease, background-color 0.1s ease;
+}
+.feed-v4 .v4-react-pick-btn:hover {
+  background: oklch(0.94 0.008 95);
+  transform: scale(1.15);
+}
+
+/* Expanded row — sits directly beneath the leader row, indented so it
+   visually associates with its parent. Shows the last N events for
+   this player, each with its own reactions bar. */
+.feed-v4 .v4-row-expand {
+  padding: 6px 16px 12px calc(46px + 32px + 20px); /* align under name column */
+  background: oklch(0.99 0.005 95);
+  border-top: 1px dashed oklch(0.92 0.008 95);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.feed-v4 .v4-row-expand-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: oklch(0.55 0.02 150);
+  padding: 4px 0;
+  text-transform: uppercase;
+}
+/* Latest-cell wrappers inside the expand strip need their own layout
+   context (row-grid doesn't apply here). Give them a light bg row. */
+.feed-v4 .v4-row-expand .v4-latest {
+  padding: 6px 8px;
+  border: 1px solid oklch(0.94 0.008 95);
+  border-radius: 6px;
+  background: white;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Clickable rows — subtle visual cue that the row is interactive.
+   No underline / colour shift; just the cursor + hover bg. */
+.feed-v4 .v4-row {
+  cursor: pointer;
+}
+.feed-v4 .v4-row:focus-visible {
+  outline: 2px solid oklch(0.55 0.15 250);
+  outline-offset: -2px;
+}
+
+/* Emoji floater layer — fixed above the feed, non-interactive. */
+.feed-v4 .v4-floater-layer {
+  position: fixed;
+  pointer-events: none;
+  bottom: 60px;
+  left: 0;
+  right: 0;
+  height: 200px;
+  z-index: 30;
+  overflow: hidden;
+}
+.feed-v4 .v4-floater {
+  position: absolute;
+  bottom: 0;
+  font-size: 28px;
+  animation: v4-floater-rise 1.6s ease-out forwards;
+  opacity: 0;
+}
+@keyframes v4-floater-rise {
+  0%   { transform: translateY(0)    scale(0.7); opacity: 0;    }
+  15%  { transform: translateY(-30px) scale(1);   opacity: 1;   }
+  100% { transform: translateY(-180px) scale(1.1); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feed-v4 .v4-floater { animation: none; opacity: 0; }
+}
