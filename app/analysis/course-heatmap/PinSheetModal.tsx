@@ -14,6 +14,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CoursePinHole, HolePutt } from "@/lib/golf-api/pgatour";
+import SlopeOverlay from "./SlopeOverlay";
 
 interface Props {
   hole: CoursePinHole | null;
@@ -81,6 +82,8 @@ export default function PinSheetModal({
   const [showPutts, setShowPutts] = useState(true);
   /** True → only show made putts. Default off (all). */
   const [madeOnly, setMadeOnly] = useState(false);
+  /** True → overlay inferred slope arrows on the green. */
+  const [showSlope, setShowSlope] = useState(false);
   useEffect(() => {
     if (!hole) return;
     const onKey = (e: KeyboardEvent) => {
@@ -311,6 +314,12 @@ export default function PinSheetModal({
                   />
                 ))}
               </svg>
+            )}
+            {showSlope && (puttsForHole?.length ?? 0) > 0 && (
+              <SlopeOverlay
+                putts={puttsForHole ?? []}
+                pinByRound={hole.pinByRound}
+              />
             )}
             {roundsWithPin.map((round) => {
               const pin = hole.pinByRound[round];
@@ -607,7 +616,41 @@ export default function PinSheetModal({
               >
                 Hide overlay
               </button>
+              <button
+                type="button"
+                onClick={() => setShowSlope((v) => !v)}
+                title="Experimental: infer slope arrows from missed-putt patterns"
+                style={{
+                  padding: "3px 10px",
+                  fontSize: 11,
+                  fontFamily: "inherit",
+                  fontWeight: 700,
+                  borderRadius: 999,
+                  border: "1px solid oklch(0.9 0.008 95)",
+                  background: showSlope ? "oklch(0.22 0.03 150)" : "white",
+                  color: showSlope ? "white" : "oklch(0.3 0.02 150)",
+                  cursor: "pointer",
+                }}
+              >
+                Slope arrows (β)
+              </button>
             </div>
+            {showSlope && (
+              <div
+                style={{
+                  marginTop: 4,
+                  fontSize: 10,
+                  color: "oklch(0.5 0.02 150)",
+                  fontStyle: "italic",
+                }}
+              >
+                Slope arrows are INFERRED from missed-putt deflection
+                patterns — a rough downhill signal, not a surveyed
+                contour. Each arrow is the mean roll-deflection of
+                ≥4 putts anchored in that cell. Sparse cells and
+                low-signal patches get dropped rather than guessed.
+              </div>
+            )}
             <div
               style={{
                 display: "flex",
