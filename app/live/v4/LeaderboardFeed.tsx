@@ -16,7 +16,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import LeaderRow, { type ReactionState } from "./LeaderRow";
+import LeaderRow from "./LeaderRow";
 import { useFollowedPlayers } from "../useFollowedPlayers";
 import { readBets, type TrackedBet } from "../bet-shared";
 import type { LeaderboardResponse } from "@/app/api/live-leaderboard/route";
@@ -24,6 +24,11 @@ import type { LeaderboardResponse } from "@/app/api/live-leaderboard/route";
 const POLL_MS = 3_000;
 const POLL_MS_HIDDEN = 30_000;
 const AUTHOR_KEY_STORAGE = "pardle_feed_visitor_v1";
+const MINE_STORAGE = "pardle_emoji_mine_v1";
+/** Cap the number of event IDs kept in the localStorage "mine" map.
+ *  Prevents unbounded growth over months of reactions. Oldest keys
+ *  get evicted first. */
+const MINE_CAP = 500;
 
 type Filter = "all" | "mine";
 
@@ -39,6 +44,39 @@ function ensureAuthorKey(): string {
   return fresh;
 }
 
+/** Load the "which emojis have I reacted with on which events" map
+ *  from localStorage. Bounded to prevent unbounded growth. */
+function loadMineMap(): Record<string, string[]> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(MINE_STORAGE);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "object" && parsed ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function persistMineMap(m: Record<string, string[]>): void {
+  if (typeof window === "undefined") return;
+  try {
+    const keys = Object.keys(m);
+    if (keys.length > MINE_CAP) {
+      // Sort by ts embedded in event IDs (mb, ev — most start with a
+      // base36 timestamp). Newest ids sort last alphabetically for our
+      // scheme. Keep the newest MINE_CAP.
+      keys.sort();
+      const trimmed: Record<string, string[]> = {};
+      for (const k of keys.slice(-MINE_CAP)) trimmed[k] = m[k];
+      m = trimmed;
+    }
+    window.localStorage.setItem(MINE_STORAGE, JSON.stringify(m));
+  } catch {
+    /* quota or serialisation failure — reactions are ephemeral, ok to drop */
+  }
+}
+
 interface Floater {
   key: string;
   emoji: string;
@@ -51,7 +89,9 @@ export default function LeaderboardFeed() {
   const [filter, setFilter] = useState<Filter>("all");
   const [bets, setBets] = useState<TrackedBet[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [emojiReactions, setEmojiReactions] = useState<Record<string, ReactionState>>({});
+  /** Per-user emoji reactions this visitor has cast. Persisted in
+   *  localStorage; merged with server-side global counts on render. */
+  const [mineMap, setMineMap] = useState<Record<string, string[]>>({});
   const [floaters, setFloaters] = useState<Floater[]>([]);
   const authorKey = useRef<string>("");
   const { followed } = useFollowedPlayers();
@@ -59,12 +99,16 @@ export default function LeaderboardFeed() {
   useEffect(() => {
     authorKey.current = ensureAuthorKey();
     setBets(readBets());
+    setMineMap(loadMineMap());
     const sync = () => setBets(readBets());
+    const syncMine = () => setMineMap(loadMineMap());
     window.addEventListener("focus", sync);
     window.addEventListener("storage", sync);
+    window.addEventListener("storage", syncMine);
     return () => {
       window.removeEventListener("focus", sync);
       window.removeEventListener("storage", sync);
+      window.removeEventListener("storage", syncMine);
     };
   }, []);
 
@@ -105,34 +149,26 @@ export default function LeaderboardFeed() {
     });
   }, []);
 
-  /** Emoji reaction on a specific event. Optimistically increments
-   *  local state + fires an ephemeral burst floater across the page
-   *  (via /api/feed/burst — every other client watching this
-   *  tournament will see the floater rise). The counter is per-user
-   *  local (same as v1); switching to server-persisted emoji reactions
-   *  is a follow-up. */
+  /** Emoji reaction on a specific event. Toggles the visitor's local
+   *  mine list, POSTs an add/remove delta to /api/feed/emoji-react to
+   *  update the global count, and fires an ephemeral floater. Next
+   *  poll of /api/live-leaderboard rehydrates the global count so
+   *  other viewers' reactions land automatically. */
   const react = useCallback(
     (eventId: string, emoji: string) => {
-      setEmojiReactions((all) => {
-        const cur: ReactionState = all[eventId] ?? { counts: {}, mine: [] };
-        if (cur.mine.includes(emoji)) {
-          // Toggle off
-          const nextCount = Math.max(0, (cur.counts[emoji] ?? 0) - 1);
-          const nextCounts = { ...cur.counts };
-          if (nextCount === 0) delete nextCounts[emoji];
-          else nextCounts[emoji] = nextCount;
-          return {
-            ...all,
-            [eventId]: { counts: nextCounts, mine: cur.mine.filter((e) => e !== emoji) },
-          };
-        }
-        return {
-          ...all,
-          [eventId]: {
-            counts: { ...cur.counts, [emoji]: (cur.counts[emoji] ?? 0) + 1 },
-            mine: [...cur.mine, emoji],
-          },
-        };
+      let dir: "add" | "remove" = "add";
+      setMineMap((cur) => {
+        const list = cur[eventId] ?? [];
+        const had = list.includes(emoji);
+        dir = had ? "remove" : "add";
+        const nextList = had
+          ? list.filter((e) => e !== emoji)
+          : [...list, emoji];
+        const next: Record<string, string[]> = { ...cur };
+        if (nextList.length === 0) delete next[eventId];
+        else next[eventId] = nextList;
+        persistMineMap(next);
+        return next;
       });
       // Fire a floater on this row (visual burst)
       const key = `f${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -140,12 +176,26 @@ export default function LeaderboardFeed() {
       window.setTimeout(() => {
         setFloaters((f) => f.filter((x) => x.key !== key));
       }, 1600);
-      // Fire and forget — burst is a nice-to-have.
-      void fetch("/api/feed/burst", {
+      // Persist global count + fire an ambient floater for other
+      // viewers. Both are fire-and-forget; local state is what
+      // paints immediately.
+      void fetch("/api/feed/emoji-react", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emoji, visitorId: authorKey.current }),
+        body: JSON.stringify({
+          eventId,
+          emoji,
+          dir,
+          visitorId: authorKey.current,
+        }),
       }).catch(() => {});
+      if (dir === "add") {
+        void fetch("/api/feed/burst", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ emoji, visitorId: authorKey.current }),
+        }).catch(() => {});
+      }
     },
     [],
   );
@@ -230,10 +280,11 @@ export default function LeaderboardFeed() {
               row={r}
               isMine={mineIds.has(r.playerId)}
               social={data.social ?? {}}
-              emojiReactions={emojiReactions}
+              mineMap={mineMap}
               expanded={expandedIds.has(r.playerId)}
               onToggleExpanded={() => toggleExpanded(r.playerId)}
               onReact={react}
+              authorKey={authorKey.current}
             />
           ))}
         </div>

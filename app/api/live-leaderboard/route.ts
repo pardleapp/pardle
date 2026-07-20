@@ -30,6 +30,7 @@ import {
   getEvents,
   getReactionsBulk,
   getCommentCountsBulk,
+  getEmojiReactionsBulk,
   type CachedLeaderboardRow,
 } from "@/lib/feed/store";
 import type { FeedEvent, ReactionCounts } from "@/lib/feed/types";
@@ -140,6 +141,9 @@ export interface LeaderboardRow {
  *  top of this baseline (matches v1 pattern). */
 export interface EventSocial {
   reactions: ReactionCounts;
+  /** Emoji → count. Global tally; the client tracks its own "mine"
+   *  list in localStorage and merges on render. */
+  emojiCounts: Record<string, number>;
   commentCount: number;
 }
 
@@ -242,14 +246,16 @@ export async function GET(req: Request) {
     for (const r of rows) {
       for (const ev of r.recentEvents) allEventIds.push(ev.id);
     }
-    const [reactionsById, commentsById] = await Promise.all([
+    const [reactionsById, emojiCountsById, commentsById] = await Promise.all([
       getReactionsBulk(allEventIds).catch(() => ({}) as Record<string, ReactionCounts>),
+      getEmojiReactionsBulk(allEventIds).catch(() => ({}) as Record<string, Record<string, number>>),
       getCommentCountsBulk(allEventIds).catch(() => ({}) as Record<string, number>),
     ]);
     const social: Record<string, EventSocial> = {};
     for (const id of allEventIds) {
       social[id] = {
         reactions: reactionsById[id] ?? { up: 0, down: 0 },
+        emojiCounts: emojiCountsById[id] ?? {},
         commentCount: commentsById[id] ?? 0,
       };
     }

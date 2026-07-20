@@ -29725,3 +29725,123 @@ body[data-chat-open] .addbet-fab {
 @media (prefers-reduced-motion: reduce) {
   .feed-v4 .v4-floater { animation: none; opacity: 0; }
 }
+
+/* ── v4 comment thread — sits inline beneath the event pill it
+   belongs to, inside the expanded row. Minimal chrome: label,
+   scrolling list, compose input. */
+
+.feed-v4 .v4-comment-chip-btn {
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background-color 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+}
+.feed-v4 .v4-comment-chip-btn:hover {
+  background: oklch(0.94 0.02 250);
+  color: oklch(0.4 0.15 250);
+  border-color: oklch(0.85 0.05 250);
+}
+.feed-v4 .v4-comment-chip-open {
+  background: oklch(0.94 0.04 250);
+  color: oklch(0.3 0.15 250);
+  border-color: oklch(0.72 0.12 250);
+  font-weight: 700;
+}
+
+.feed-v4 .v4-comments {
+  margin: 6px 0 10px 8px;
+  padding: 10px 12px;
+  border: 1px solid oklch(0.9 0.02 250);
+  border-radius: 8px;
+  background: oklch(0.99 0.008 250);
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+.feed-v4 .v4-comments-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: oklch(0.5 0.02 150);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.feed-v4 .v4-comments-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.feed-v4 .v4-comment {
+  padding: 6px 8px;
+  background: white;
+  border: 1px solid oklch(0.94 0.008 95);
+  border-radius: 6px;
+  font-size: 12px;
+  color: oklch(0.25 0.02 150);
+  line-height: 1.35;
+}
+.feed-v4 .v4-comment-author {
+  font-weight: 800;
+  color: oklch(0.2 0.02 150);
+  font-size: 11px;
+}
+.feed-v4 .v4-comment-time {
+  color: oklch(0.55 0.02 150);
+  font-size: 10px;
+  margin-left: 4px;
+  font-family: var(--font-mono, monospace);
+}
+.feed-v4 .v4-comment-text {
+  margin-top: 2px;
+  color: oklch(0.25 0.02 150);
+  overflow-wrap: anywhere;
+}
+
+.feed-v4 .v4-comment-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.feed-v4 .v4-comment-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid oklch(0.9 0.008 95);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  color: oklch(0.2 0.02 150);
+  background: white;
+}
+.feed-v4 .v4-comment-input:focus {
+  outline: none;
+  border-color: oklch(0.55 0.15 250);
+  box-shadow: 0 0 0 3px oklch(0.55 0.15 250 / 0.15);
+}
+.feed-v4 .v4-comment-send {
+  border: none;
+  background: oklch(0.4 0.15 250);
+  color: white;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0.3px;
+}
+.feed-v4 .v4-comment-send:hover:not(:disabled) {
+  background: oklch(0.35 0.15 250);
+}
+.feed-v4 .v4-comment-send:disabled {
+  background: oklch(0.85 0.02 150);
+  cursor: not-allowed;
+}
+.feed-v4 .v4-comment-error {
+  margin-top: 4px;
+  color: oklch(0.5 0.18 25);
+  font-size: 11px;
+}

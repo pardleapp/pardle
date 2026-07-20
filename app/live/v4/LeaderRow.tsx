@@ -1,33 +1,35 @@
 "use client";
 
 /**
- * One player row in v4 — plus expanded shot history when clicked.
+ * One player row in v4 — plus expanded shot history + inline comment
+ * threads when a shot's 💬 chip is clicked.
+ *
  * Reactions target the SHOT (event id), not the row: McIlroy's 380y
- * drive is a separate reactable object from his next putt. Each shot
- * in the expanded strip has its own reactions bar and comment count.
+ * drive is a separate reactable object from his next putt. Global
+ * counts come from the server (bulk-fetched in /api/live-leaderboard),
+ * the visitor's own "mine" list is local to their browser.
  */
 
 import { useEffect, useState } from "react";
 import type { FeedEvent } from "@/lib/feed/types";
 import PlayerAvatar from "../PlayerAvatar";
+import CommentThread from "./CommentThread";
 import type {
   LeaderboardRow,
   EventSocial,
 } from "@/app/api/live-leaderboard/route";
 
-export interface ReactionState {
-  counts: Record<string, number>;
-  mine: string[];
-}
-
 interface Props {
   row: LeaderboardRow;
   isMine: boolean;
   social: Record<string, EventSocial>;
-  emojiReactions: Record<string, ReactionState>;
+  /** eventId → emojis this visitor has reacted with. Merged with the
+   *  server-side counts to render mine-highlighted chips. */
+  mineMap: Record<string, string[]>;
   expanded: boolean;
   onToggleExpanded: () => void;
   onReact: (eventId: string, emoji: string) => void;
+  authorKey: string;
 }
 
 const REACTION_EMOJI = ["🔥", "😬", "🎯"];
@@ -124,104 +126,129 @@ function eventVerb(ev: FeedEvent): { tag: string; kind: string; text: string; an
   return { tag: (ev.type ?? "").toUpperCase(), kind: "misc", text: ev.headline ?? "", anchor: "" };
 }
 
-/** Compact reactions summary for an event — top 2 emoji + counts.
- *  Falls back to a single "React" pill when nothing has landed yet. */
-function summarizeReactions(state: ReactionState | undefined): Array<{ emoji: string; count: number; mine: boolean }> {
-  if (!state) return [];
-  const entries = Object.entries(state.counts)
-    .filter(([, n]) => n > 0)
-    .sort((a, b) => b[1] - a[1])
+/** Merge server-side global counts with the visitor's local "mine"
+ *  list. Emojis in mine that aren't in counts still show as "1 (you)". */
+function reactionChips(
+  emojiCounts: Record<string, number> | undefined,
+  mineEmojis: string[] | undefined,
+): Array<{ emoji: string; count: number; mine: boolean }> {
+  const merged = new Map<string, { count: number; mine: boolean }>();
+  if (emojiCounts) {
+    for (const [e, c] of Object.entries(emojiCounts)) {
+      if (c > 0) merged.set(e, { count: c, mine: false });
+    }
+  }
+  if (mineEmojis) {
+    for (const e of mineEmojis) {
+      const cur = merged.get(e);
+      if (cur) merged.set(e, { ...cur, mine: true });
+      else merged.set(e, { count: 1, mine: true });
+    }
+  }
+  return [...merged.entries()]
+    .map(([emoji, v]) => ({ emoji, count: v.count, mine: v.mine }))
+    .sort((a, b) => b.count - a.count)
     .slice(0, 3);
-  return entries.map(([emoji, count]) => ({
-    emoji,
-    count,
-    mine: state.mine.includes(emoji),
-  }));
 }
 
 interface EventInlineProps {
   event: FeedEvent;
   now: number;
   social: EventSocial | undefined;
-  reactionState: ReactionState | undefined;
+  mineEmojis: string[] | undefined;
   onReact: (emoji: string) => void;
-  /** True for the top row of the collapsed leaderboard — enables
-   *  the fresh-event pulse. */
   isLatest: boolean;
+  authorKey: string;
+  commentsOpen: boolean;
+  onToggleComments: () => void;
 }
 
-/** Renders a single event as a self-contained inline pill: tag ·
- *  verb · anchor · time · reactions · comments · emoji picker. Used
- *  both as the row's "latest" cell (isLatest) and as each expanded-
- *  row history item. */
 function EventInline({
   event,
   now,
   social,
-  reactionState,
+  mineEmojis,
   onReact,
   isLatest,
+  authorKey,
+  commentsOpen,
+  onToggleComments,
 }: EventInlineProps) {
   const verb = eventVerb(event);
   const fresh = isLatest && now - event.ts < 60_000;
-  const reactionSummary = summarizeReactions(reactionState);
+  const chips = reactionChips(social?.emojiCounts, mineEmojis);
   const commentCount = social?.commentCount ?? 0;
 
   return (
-    <div className="v4-latest">
-      <span
-        className={`v4-latest-pulse${fresh ? " v4-latest-pulse-on" : ""}`}
-        aria-hidden="true"
-      />
-      <span className={`v4-latest-tag v4-latest-tag-${verb.kind}`}>{verb.tag}</span>
-      <span className="v4-latest-text">{verb.text}</span>
-      {verb.anchor && <span className="v4-latest-anchor">{verb.anchor}</span>}
-      <span className="v4-latest-time">{formatEventTime(event.ts, now)}</span>
-      <span className="v4-react-cluster">
-        {reactionSummary.length > 0 && (
-          <span className="v4-react-summary">
-            {reactionSummary.map((r) => (
+    <>
+      <div className="v4-latest">
+        <span
+          className={`v4-latest-pulse${fresh ? " v4-latest-pulse-on" : ""}`}
+          aria-hidden="true"
+        />
+        <span className={`v4-latest-tag v4-latest-tag-${verb.kind}`}>{verb.tag}</span>
+        <span className="v4-latest-text">{verb.text}</span>
+        {verb.anchor && <span className="v4-latest-anchor">{verb.anchor}</span>}
+        <span className="v4-latest-time">{formatEventTime(event.ts, now)}</span>
+        <span className="v4-react-cluster">
+          {chips.length > 0 && (
+            <span className="v4-react-summary">
+              {chips.map((r) => (
+                <button
+                  key={r.emoji}
+                  type="button"
+                  className={`v4-react-chip${r.mine ? " v4-react-chip-mine" : ""}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onReact(r.emoji);
+                  }}
+                  title={r.mine ? "Remove your reaction" : `React with ${r.emoji}`}
+                >
+                  <span className="v4-react-chip-emoji">{r.emoji}</span>
+                  <span className="v4-react-chip-count">{r.count}</span>
+                </button>
+              ))}
+            </span>
+          )}
+          <button
+            type="button"
+            className={`v4-comment-chip v4-comment-chip-btn${commentsOpen ? " v4-comment-chip-open" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleComments();
+            }}
+            title={
+              commentsOpen
+                ? "Hide comments"
+                : commentCount > 0
+                  ? `Show ${commentCount} comment${commentCount === 1 ? "" : "s"}`
+                  : "Add a comment"
+            }
+          >
+            💬 {commentCount || ""}
+          </button>
+          <span className="v4-react-picker">
+            {REACTION_EMOJI.map((emoji) => (
               <button
-                key={r.emoji}
+                key={emoji}
                 type="button"
-                className={`v4-react-chip${r.mine ? " v4-react-chip-mine" : ""}`}
+                className="v4-react-pick-btn"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onReact(r.emoji);
+                  onReact(emoji);
                 }}
-                title={r.mine ? "Remove your reaction" : `React with ${r.emoji}`}
+                title={`React with ${emoji}`}
               >
-                <span className="v4-react-chip-emoji">{r.emoji}</span>
-                <span className="v4-react-chip-count">{r.count}</span>
+                {emoji}
               </button>
             ))}
           </span>
-        )}
-        {commentCount > 0 && (
-          <span className="v4-comment-chip" title={`${commentCount} comment${commentCount === 1 ? "" : "s"}`}>
-            💬 {commentCount}
-          </span>
-        )}
-        {/* Emoji picker — always rendered; CSS hides at rest and shows
-            on cell hover so the row stays clean when at rest. */}
-        <span className="v4-react-picker">
-          {REACTION_EMOJI.map((emoji) => (
-            <button
-              key={emoji}
-              type="button"
-              className="v4-react-pick-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                onReact(emoji);
-              }}
-              title={`React with ${emoji}`}
-            >
-              {emoji}
-            </button>
-          ))}
         </span>
-      </span>
-    </div>
+      </div>
+      {commentsOpen && (
+        <CommentThread eventId={event.id} authorKey={authorKey} />
+      )}
+    </>
   );
 }
 
@@ -229,12 +256,14 @@ export default function LeaderRow({
   row,
   isMine,
   social,
-  emojiReactions,
+  mineMap,
   expanded,
   onToggleExpanded,
   onReact,
+  authorKey,
 }: Props) {
   const [now, setNow] = useState(() => Date.now());
+  const [openComments, setOpenComments] = useState<Set<string>>(new Set());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 20_000);
     return () => clearInterval(id);
@@ -244,6 +273,20 @@ export default function LeaderRow({
   const isCut = state === "CUT" || state === "MC" || state === "WD" || state === "DQ";
   const latest = row.latestEvent;
   const eventFresh = latest != null && now - latest.ts < 60_000;
+
+  const toggleComments = (eventId: string) => {
+    setOpenComments((cur) => {
+      const next = new Set(cur);
+      if (next.has(eventId)) next.delete(eventId);
+      else {
+        next.add(eventId);
+        // Also expand the row if it isn't — comments live in the
+        // expanded panel below the row.
+        if (!expanded) onToggleExpanded();
+      }
+      return next;
+    });
+  };
 
   return (
     <div className={`v4-row-wrap${expanded ? " v4-row-wrap-open" : ""}`}>
@@ -277,9 +320,12 @@ export default function LeaderRow({
             event={latest}
             now={now}
             social={social[latest.id]}
-            reactionState={emojiReactions[latest.id]}
+            mineEmojis={mineMap[latest.id]}
             onReact={(emoji) => onReact(latest.id, emoji)}
             isLatest
+            authorKey={authorKey}
+            commentsOpen={openComments.has(latest.id)}
+            onToggleComments={() => toggleComments(latest.id)}
           />
         ) : (
           <span className="v4-latest">
@@ -303,9 +349,12 @@ export default function LeaderRow({
               event={ev}
               now={now}
               social={social[ev.id]}
-              reactionState={emojiReactions[ev.id]}
+              mineEmojis={mineMap[ev.id]}
               onReact={(emoji) => onReact(ev.id, emoji)}
               isLatest={false}
+              authorKey={authorKey}
+              commentsOpen={openComments.has(ev.id)}
+              onToggleComments={() => toggleComments(ev.id)}
             />
           ))}
         </div>

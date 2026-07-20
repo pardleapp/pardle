@@ -244,7 +244,66 @@ export async function getEvents(
 }
 
 // ──────────────────────────────────────────────────────────────────
-// Reactions
+// Emoji reactions (server-persisted, per-event, per-emoji counts).
+// Mine-tracking is client-side (localStorage per visitor) — counts
+// here are the global tally. Client sends toggle deltas via
+// /api/feed/emoji-react; server just applies them.
+// ──────────────────────────────────────────────────────────────────
+
+function emojiReactionsKey(eventId: string): string {
+  return `feed:emoji:${eventId}`;
+}
+
+/** Apply a delta to one emoji's count on an event. Returns the new
+ *  count for that emoji (or 0 if the counter was already at floor). */
+export async function emojiReactApply(
+  eventId: string,
+  emoji: string,
+  dir: "add" | "remove",
+): Promise<number> {
+  const key = emojiReactionsKey(eventId);
+  if (dir === "add") {
+    // 30-day TTL bumped on every write — reactions live as long as
+    // the event is likely to be viewed. Fresh writes reset the ttl.
+    const next = await redis.hincrby(key, emoji, 1);
+    await redis.expire(key, 30 * 24 * 60 * 60);
+    return next;
+  }
+  const cur = await redis.hget<string>(key, emoji);
+  const n = Number(cur ?? "0");
+  if (n <= 0) return 0;
+  const next = await redis.hincrby(key, emoji, -1);
+  if (next <= 0) await redis.hdel(key, emoji);
+  return Math.max(0, next);
+}
+
+/** Bulk fetch emoji-count maps for many events in one pipeline. */
+export async function getEmojiReactionsBulk(
+  eventIds: string[],
+): Promise<Record<string, Record<string, number>>> {
+  if (eventIds.length === 0) return {};
+  const pipe = redis.pipeline();
+  for (const id of eventIds) pipe.hgetall(emojiReactionsKey(id));
+  const results = (await pipe.exec()) as (Record<string, string> | null)[];
+  const out: Record<string, Record<string, number>> = {};
+  eventIds.forEach((id, i) => {
+    const h = results[i];
+    if (!h) {
+      out[id] = {};
+      return;
+    }
+    const counts: Record<string, number> = {};
+    for (const [emoji, v] of Object.entries(h)) {
+      const n = Number(v);
+      if (Number.isFinite(n) && n > 0) counts[emoji] = n;
+    }
+    out[id] = counts;
+  });
+  return out;
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Reactions (legacy up/down — kept for v1 compatibility)
 // ──────────────────────────────────────────────────────────────────
 
 export async function getReactions(
