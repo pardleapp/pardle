@@ -570,9 +570,12 @@ export default function Heatmap({
                   </td>
                 );
               })}
-              {/* Bottom-right corner: mean of every hole's round mean.
-                  Reads as "the course played {value} today across every
-                  hole with data." */}
+              {/* Bottom-right corner: the round's SCORE-TO-PAR total —
+                  per-hole mean × 18. Reads as "the field averaged −2.4
+                  today," matching how bettors read scores (not the
+                  per-hole −0.13 fraction). Same colour scale still
+                  applies; large absolute totals just paint at the
+                  extreme end of the ramp. */}
               {(() => {
                 let sum = 0;
                 let n = 0;
@@ -580,13 +583,14 @@ export default function Heatmap({
                   sum += m.avgVsPar * m.count;
                   n += m.count;
                 }
-                const avg = n > 0 ? sum / n : null;
+                const perHoleMean = n > 0 ? sum / n : null;
+                const roundTotal = perHoleMean != null ? perHoleMean * 18 : null;
                 return (
                   <td
                     key="round-mean"
                     title={
-                      avg != null
-                        ? `Round-wide field average vs par ${formatSigned(avg)} (${n} scored holes)`
+                      roundTotal != null
+                        ? `Field average round score today: ${formatSigned(roundTotal)} vs par (per-hole ${formatSigned(perHoleMean!)}, ${n} scored holes)`
                         : "Round-wide average — no data yet"
                     }
                     style={{
@@ -600,14 +604,19 @@ export default function Heatmap({
                   >
                     <div
                       style={{
-                        background: avg != null ? colourFor(avg) : "transparent",
-                        color: avg != null ? textOn(avg) : "oklch(0.65 0.008 95)",
+                        background:
+                          perHoleMean != null ? colourFor(perHoleMean) : "transparent",
+                        color:
+                          perHoleMean != null
+                            ? textOn(perHoleMean)
+                            : "oklch(0.65 0.008 95)",
                         fontFamily: "var(--font-mono, monospace)",
                         fontWeight: 800,
-                        fontSize: 11,
-                        border: avg != null
-                          ? "1px solid oklch(0.88 0.012 95)"
-                          : "1px dashed oklch(0.92 0.008 95)",
+                        fontSize: 12,
+                        border:
+                          perHoleMean != null
+                            ? "1px solid oklch(0.88 0.012 95)"
+                            : "1px dashed oklch(0.92 0.008 95)",
                         borderRadius: 3,
                         padding: "4px 2px",
                         minHeight: CELL_H,
@@ -616,7 +625,13 @@ export default function Heatmap({
                         justifyContent: "center",
                       }}
                     >
-                      {avg != null ? formatSigned(avg) : "—"}
+                      {roundTotal != null
+                        ? roundTotal > 0.05
+                          ? `+${roundTotal.toFixed(1)}`
+                          : roundTotal < -0.05
+                            ? `−${Math.abs(roundTotal).toFixed(1)}`
+                            : "E"
+                        : "—"}
                     </div>
                   </td>
                 );
@@ -718,7 +733,9 @@ export default function Heatmap({
         <strong> 18 HOLES</strong> row sums vs-par across the whole
         course for that hour — only shows when every hole has data
         (partial hours render dimmed as {"“"}n/18{"”"}). The bottom-
-        right cell is the field&apos;s overall vs-par for the round.
+        right cell is the field&apos;s average round score to par
+        (per-hole mean × 18), so a &quot;−2.4&quot; there means the
+        field averaged 2.4 under today.
         {onHoleClick && pinsAvailable ? (
           <>
             {" "}
