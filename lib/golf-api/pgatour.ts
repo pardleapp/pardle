@@ -681,22 +681,26 @@ function parseCoursePinsPayload(
     if (typeof round !== "number") continue;
     for (const hs of rh?.holeStats ?? []) {
       if (!hs) continue;
-      const holeNum = hs.hole;
+      const holeNum = hs.courseHoleNum;
       if (typeof holeNum !== "number") continue;
       const coords = hs.pinGreen?.leftToRightCoords;
       const x = coords?.enhancedX ?? coords?.x;
       const y = coords?.enhancedY ?? coords?.y;
       const img = hs.holePickle?.greenLeftToRight ?? "";
+      const parNum =
+        typeof hs.parValue === "string" && hs.parValue
+          ? Number.parseInt(hs.parValue, 10)
+          : null;
       const existing = holeMap.get(holeNum);
       const target: CoursePinHole = existing ?? {
         holeNumber: holeNum,
-        par: hs.parValue ?? null,
-        yards: hs.yards ?? null,
+        par: Number.isFinite(parNum) ? (parNum as number) : null,
+        yards: typeof hs.yards === "number" ? hs.yards : null,
         greenImageUrl: upscalePickle(img),
         pinByRound: {},
       };
       if (!target.greenImageUrl && img) target.greenImageUrl = upscalePickle(img);
-      if (target.par == null && typeof hs.parValue === "number") target.par = hs.parValue;
+      if (target.par == null && Number.isFinite(parNum)) target.par = parNum;
       if (target.yards == null && typeof hs.yards === "number") target.yards = hs.yards;
       if (
         typeof x === "number" &&
