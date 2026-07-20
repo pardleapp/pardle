@@ -59,6 +59,10 @@ import PuttPollWidget from "./PuttPollWidget";
 import { useToast } from "./Toast";
 import { useFollowedPlayers } from "./useFollowedPlayers";
 import HoleScoringAverage from "./HoleScoringAverage";
+import ScoringRibbonV3 from "./v3/ScoringRibbonV3";
+import FilterTabsV3 from "./v3/FilterTabsV3";
+import TickerRow from "./v3/TickerRow";
+import { rank as rankEvent, type RankerContext } from "./v3/priority-ranker";
 import BetPost from "./BetPost";
 import BetPostErrorBoundary from "./BetPostErrorBoundary";
 import SweatHeader from "./SweatHeader";
@@ -370,6 +374,13 @@ interface FeedClientProps {
    *  scrub back to mid-round density on tournaments that have already
    *  finished — otherwise the buffer is pinned at end-of-R4. */
   replayBackHours?: number;
+  /** Visual variant. "v3" swaps in the priority-weighted trading-
+   *  terminal layout preview (compact ribbon, slim filter tabs,
+   *  hero/standard/ticker tiers, Mine accent, fresh-event flash).
+   *  Data pipeline is IDENTICAL — same fetch, same polling cadence,
+   *  same events — v3 only rewrites the render layer. Behind the
+   *  `?v=3` query flag on the root page. */
+  variant?: "v1" | "v3";
 }
 
 /** Resolve a poll ID's matching event ID. Used by the deep-link
@@ -393,7 +404,9 @@ function findEventIdForPoll(
 export default function FeedClient({
   forcedTournamentId,
   replayBackHours,
+  variant = "v1",
 }: FeedClientProps = {}) {
+  const isV3 = variant === "v3";
   const toast = useToast();
   const { followed: followedPlayerIds } = useFollowedPlayers();
   /** Read demo flag synchronously so initial state can seed
@@ -583,6 +596,11 @@ export default function FeedClient({
   // Event IDs we've already auto-celebrated this session — prevents
   // re-spawning floaters every poll cycle for the same eagle.
   const celebratedEvents = useRef<Set<string>>(new Set());
+  // v3-only: track event IDs we've already rendered so we can
+  // one-shot flash the newest ones on their first render. `mountTs`
+  // guards against flashing the entire first paint's worth of history.
+  const v3MountTs = useRef<number>(Date.now());
+  const v3SeenIds = useRef<Set<string>>(new Set());
   // Median /api/feed duration across recent fetches (ms). Drives the
   // honest "usually ~2.1s" hint on the skeleton. Hydrated from
   // localStorage on mount + updated after each successful load.
@@ -1002,6 +1020,32 @@ export default function FeedClient({
     followedPlayerIds,
   });
   const hotCtx = buildHotFilterCtx({ leaderboard: data.leaderboard });
+
+  // v3-only: ranker context (top-N leader IDs + Mine set) built once
+  // per render from the same primitives Hot/Smart already use. Ranker
+  // is a pure function called per row below; here we just prep the
+  // shared inputs.
+  const rankerCtx: RankerContext | null = isV3
+    ? (() => {
+        const top10 = new Set(
+          data.leaderboard.slice(0, 10).map((r) => r.playerId),
+        );
+        const top3 = new Set(
+          data.leaderboard.slice(0, 3).map((r) => r.playerId),
+        );
+        const mine = new Set<string>(followedPlayerIds);
+        for (const b of trackedBets) {
+          if (b.settledAt != null) continue;
+          const pid = (b as { playerId?: string }).playerId;
+          if (typeof pid === "string" && pid) mine.add(pid);
+        }
+        return {
+          minePlayerIds: mine,
+          topTenPlayerIds: top10,
+          topThreePlayerIds: top3,
+        };
+      })()
+    : null;
   const visibleRows = (() => {
     if (filterMode === "smart") {
       return rowsAfterImgPrimary.filter((r) =>
@@ -1081,7 +1125,9 @@ export default function FeedClient({
     })?.event.pollId ?? null;
 
   return (
-    <section className="feed-wrap v4-theme pv-theme tchat-content-pad">
+    <section
+      className={`feed-wrap v4-theme pv-theme tchat-content-pad${isV3 ? " feed-v3" : ""}`}
+    >
       <SweatHeader />
       {demoMode && (
         <div className="demo-banner" role="note" aria-live="polite">
@@ -1132,11 +1178,19 @@ export default function FeedClient({
       {(data.holeAggregates &&
         Object.keys(data.holeAggregates).length > 0) ||
       data.rows.some((r) => r.event.type === "score") ? (
-        <HoleScoringAverage
-          rows={data.rows}
-          aggregates={data.holeAggregates}
-          trend={data.courseTrend}
-        />
+        isV3 ? (
+          <ScoringRibbonV3
+            rows={data.rows}
+            aggregates={data.holeAggregates}
+            trend={data.courseTrend}
+          />
+        ) : (
+          <HoleScoringAverage
+            rows={data.rows}
+            aggregates={data.holeAggregates}
+            trend={data.courseTrend}
+          />
+        )
       ) : null}
 
       {/* Filter row — Hot / All / (Mine).
@@ -1145,35 +1199,46 @@ export default function FeedClient({
           the raw-firehose density of All. Mine is the personal
           tab — bets + follows — and only surfaces when the user has
           either an active bet OR a followed player. */}
-      <div className="feed-filter-row">
-        <button
-          type="button"
-          className={`feed-filter-btn ${filterMode === "hot" ? "feed-filter-on" : ""}`}
-          onClick={() => setFilterMode("hot")}
-          title="Notable moments only — birdies, close approaches, big drives, contenders"
-        >
-          🔥 Hot
-        </button>
-        <button
-          type="button"
-          className={`feed-filter-btn ${filterMode === "all" ? "feed-filter-on" : ""}`}
-          onClick={() => setFilterMode("all")}
-          title="Every shot from every player — the raw firehose"
-        >
-          All
-        </button>
-        {(trackedBets.some((b) => b.settledAt == null) ||
-          followedPlayerIds.length > 0) && (
+      {isV3 ? (
+        <FilterTabsV3
+          mode={filterMode}
+          onChange={setFilterMode}
+          canShowMine={
+            trackedBets.some((b) => b.settledAt == null) ||
+            followedPlayerIds.length > 0
+          }
+        />
+      ) : (
+        <div className="feed-filter-row">
           <button
             type="button"
-            className={`feed-filter-btn ${filterMode === "smart" ? "feed-filter-on" : ""}`}
-            onClick={() => setFilterMode("smart")}
-            title="Your bets + followed players only"
+            className={`feed-filter-btn ${filterMode === "hot" ? "feed-filter-on" : ""}`}
+            onClick={() => setFilterMode("hot")}
+            title="Notable moments only — birdies, close approaches, big drives, contenders"
           >
-            ✦ Mine
+            🔥 Hot
           </button>
-        )}
-      </div>
+          <button
+            type="button"
+            className={`feed-filter-btn ${filterMode === "all" ? "feed-filter-on" : ""}`}
+            onClick={() => setFilterMode("all")}
+            title="Every shot from every player — the raw firehose"
+          >
+            All
+          </button>
+          {(trackedBets.some((b) => b.settledAt == null) ||
+            followedPlayerIds.length > 0) && (
+            <button
+              type="button"
+              className={`feed-filter-btn ${filterMode === "smart" ? "feed-filter-on" : ""}`}
+              onClick={() => setFilterMode("smart")}
+              title="Your bets + followed players only"
+            >
+              ✦ Mine
+            </button>
+          )}
+        </div>
+      )}
 
       {data.rows.length === 0 ? (
         <FeedWarmingUp leaderboard={data.leaderboard} />
@@ -1333,12 +1398,69 @@ export default function FeedClient({
                     contextRows: data.rows,
                   })
                 : null;
+            // v3-only decorations: rank the event, add tier classes,
+            // flag it for a fresh-arrival flash. For ticker tier
+            // score events we bypass ShotPost entirely and render
+            // the compact TickerRow so routine bogeys/birdies read
+            // as one-liners.
+            let v3Tier: "hero" | "standard" | "ticker" | null = null;
+            let v3Mine = false;
+            let v3Flash = false;
+            if (isV3 && rankerCtx) {
+              const r = rankEvent(event, rankerCtx);
+              v3Tier = r.tier;
+              v3Mine = r.mine;
+              if (!v3SeenIds.current.has(event.id)) {
+                v3SeenIds.current.add(event.id);
+                // Only flash arrivals that landed AFTER the first
+                // paint (avoids flashing every historical event
+                // on initial mount).
+                if (Date.now() - v3MountTs.current > 3000) v3Flash = true;
+              }
+            }
+            const v3ClassName = isV3
+              ? [
+                  "feed-row-wrap",
+                  v3Tier ? `feed-v3-tier-${v3Tier}` : "",
+                  v3Mine ? "feed-v3-mine" : "",
+                  v3Flash ? "feed-v3-flash" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")
+              : "feed-row-wrap";
+
+            // Render ticker rows (v3 only, ticker tier, score events
+            // that aren't putt polls or notable-share candidates).
+            if (
+              isV3 &&
+              v3Tier === "ticker" &&
+              event.type === "score" &&
+              !isPuttPoll &&
+              !isNotable
+            ) {
+              return (
+                <Fragment key={event.id}>
+                  {reelHere}
+                  <li data-event-id={event.id} className={v3ClassName}>
+                    <TickerRow
+                      event={event}
+                      isMine={v3Mine}
+                      onOpen={() => setShotDetail(event)}
+                      onReact={() => {
+                        void sendBurst("♡");
+                        addEmojiReaction(`shot:${event.id}`, "♡");
+                      }}
+                    />
+                  </li>
+                </Fragment>
+              );
+            }
             return (
               <Fragment key={event.id}>
                 {reelHere}
                 <li
                   data-event-id={event.id}
-                  className="feed-row-wrap"
+                  className={v3ClassName}
                 >
                   <ShotPost
                     event={event}

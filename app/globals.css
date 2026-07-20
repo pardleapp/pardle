@@ -28556,3 +28556,324 @@ body[data-chat-open] .addbet-fab {
 .tchat-content-pad {
   padding-bottom: 44px !important;
 }
+
+/* ═════════════════════════════════════════════════════════════════
+   Feed v3 — priority-weighted layout ("trading terminal" preview)
+   Behind a ?v=3 flag on the root page. Rendered under .feed-v3 on
+   the section root. Every rule scoped to .feed-v3 so v1 is 100%
+   unaffected.
+   ═════════════════════════════════════════════════════════════════ */
+
+/* ── Slim segmented filter control ─────────────────────────────── */
+.feed-v3 .feed-v3-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: oklch(0.94 0.008 95);
+  border-radius: 999px;
+  margin: 4px 0 8px;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+.feed-v3 .feed-v3-tab {
+  border: none;
+  background: transparent;
+  color: oklch(0.4 0.02 150);
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.feed-v3 .feed-v3-tab:hover {
+  color: oklch(0.2 0.02 150);
+}
+.feed-v3 .feed-v3-tab-on {
+  background: oklch(0.22 0.03 150);
+  color: white;
+  box-shadow: 0 1px 4px oklch(0.22 0.03 150 / 0.25);
+}
+.feed-v3 .feed-v3-tab-count {
+  margin-left: 6px;
+  font-size: 10px;
+  opacity: 0.7;
+  font-family: var(--font-mono, monospace);
+}
+
+/* ── Compact scoring ribbon (numbers only + expand toggle) ────── */
+.feed-v3 .feed-v3-ribbon {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid oklch(0.9 0.008 95);
+  border-radius: 10px;
+  background: white;
+  margin-bottom: 8px;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  flex-wrap: wrap;
+}
+.feed-v3 .feed-v3-ribbon-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 12px;
+  color: oklch(0.5 0.02 150);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.feed-v3 .feed-v3-ribbon-num {
+  font-family: var(--font-mono, monospace);
+  font-size: 14px;
+  font-weight: 800;
+  color: oklch(0.2 0.02 150);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.feed-v3 .feed-v3-ribbon-num-easy {
+  color: oklch(0.42 0.14 150);
+}
+.feed-v3 .feed-v3-ribbon-num-hard {
+  color: oklch(0.42 0.16 28);
+}
+.feed-v3 .feed-v3-ribbon-flag {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+.feed-v3 .feed-v3-ribbon-flag-hard {
+  background: oklch(0.94 0.05 25);
+  color: oklch(0.4 0.15 28);
+}
+.feed-v3 .feed-v3-ribbon-flag-easy {
+  background: oklch(0.94 0.05 150);
+  color: oklch(0.4 0.14 150);
+}
+.feed-v3 .feed-v3-ribbon-toggle {
+  border: none;
+  background: transparent;
+  color: oklch(0.5 0.02 150);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+.feed-v3 .feed-v3-ribbon-drawer {
+  overflow: hidden;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  animation: feed-v3-drawer-in 240ms ease;
+}
+@keyframes feed-v3-drawer-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Tier: HERO (tournament-altering event) ─────────────────── */
+.feed-v3 .feed-v3-tier-hero {
+  border-left: 3px solid oklch(0.55 0.15 250);
+  background: linear-gradient(90deg, oklch(0.98 0.02 250) 0%, white 45%);
+  border-radius: 10px;
+  margin: 4px 0;
+  padding-left: 2px;
+  box-shadow: 0 1px 6px oklch(0.55 0.15 250 / 0.08);
+  position: relative;
+}
+.feed-v3 .feed-v3-tier-hero::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: -3px;
+  width: 3px;
+  height: 22px;
+  background: oklch(0.55 0.15 250);
+  border-radius: 2px;
+  box-shadow: 0 0 8px oklch(0.55 0.15 250 / 0.5);
+}
+
+/* ── Tier: STANDARD (notable non-hero events) ───────────────── */
+.feed-v3 .feed-v3-tier-standard { margin: 3px 0; }
+
+/* ── Tier: TICKER (routine events, one-liner) ──────────────── */
+.feed-v3 .feed-v3-ticker {
+  display: grid;
+  grid-template-columns: 40px 1fr auto auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 12px;
+  border: 1px solid oklch(0.94 0.008 95);
+  border-radius: 8px;
+  margin: 2px 0;
+  background: white;
+  font-size: 13px;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  color: oklch(0.35 0.02 150);
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.feed-v3 .feed-v3-ticker:hover {
+  background: oklch(0.98 0.006 95);
+  border-color: oklch(0.85 0.013 95);
+}
+.feed-v3 .feed-v3-ticker-time {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: oklch(0.55 0.02 150);
+  letter-spacing: 0.3px;
+}
+.feed-v3 .feed-v3-ticker-headline {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.feed-v3 .feed-v3-ticker-player {
+  font-weight: 700;
+  color: oklch(0.2 0.02 150);
+}
+.feed-v3 .feed-v3-ticker-hole {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  color: oklch(0.5 0.02 150);
+  letter-spacing: 0.2px;
+}
+.feed-v3 .feed-v3-ticker-tag {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-family: var(--font-mono, monospace);
+}
+.feed-v3 .feed-v3-ticker-tag-birdie,
+.feed-v3 .feed-v3-ticker-tag-eagle,
+.feed-v3 .feed-v3-ticker-tag-albatross {
+  background: oklch(0.94 0.05 150);
+  color: oklch(0.32 0.14 150);
+}
+.feed-v3 .feed-v3-ticker-tag-bogey,
+.feed-v3 .feed-v3-ticker-tag-double,
+.feed-v3 .feed-v3-ticker-tag-triple-plus {
+  background: oklch(0.94 0.04 28);
+  color: oklch(0.42 0.16 28);
+}
+.feed-v3 .feed-v3-ticker-tag-par {
+  background: oklch(0.94 0.008 95);
+  color: oklch(0.5 0.02 150);
+}
+.feed-v3 .feed-v3-ticker-score {
+  font-family: var(--font-mono, monospace);
+  font-weight: 800;
+  font-size: 13px;
+  color: oklch(0.2 0.02 150);
+  min-width: 32px;
+  text-align: right;
+}
+.feed-v3 .feed-v3-ticker-actions {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  display: inline-flex;
+  gap: 4px;
+}
+.feed-v3 .feed-v3-ticker:hover .feed-v3-ticker-actions {
+  opacity: 1;
+}
+.feed-v3 .feed-v3-ticker-action {
+  border: 1px solid oklch(0.9 0.008 95);
+  background: white;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  color: oklch(0.4 0.02 150);
+  cursor: pointer;
+  font-family: inherit;
+}
+.feed-v3 .feed-v3-ticker-action:hover {
+  border-color: oklch(0.55 0.15 250);
+  color: oklch(0.4 0.15 250);
+}
+
+/* ── Mine accent: golden dot on rows for followed / bet players */
+.feed-v3 .feed-v3-mine::after {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: oklch(0.75 0.18 65);
+  box-shadow: 0 0 6px oklch(0.75 0.18 65 / 0.6);
+}
+.feed-v3 .feed-v3-ticker.feed-v3-mine {
+  position: relative;
+  padding-right: 22px;
+}
+.feed-v3 .feed-v3-tier-hero.feed-v3-mine::after {
+  right: 10px;
+  top: 12px;
+  transform: none;
+  width: 6px;
+  height: 6px;
+}
+.feed-v3 .feed-v3-tier-standard.feed-v3-mine {
+  position: relative;
+}
+
+/* ── Fresh-event flash: brief slide-in + glow on arrival ─────── */
+.feed-v3 .feed-v3-flash {
+  animation: feed-v3-flash 900ms ease;
+}
+@keyframes feed-v3-flash {
+  0%   { transform: translateY(-6px); opacity: 0.4; box-shadow: 0 0 0 3px oklch(0.75 0.18 65 / 0.35); }
+  40%  { transform: translateY(0);    opacity: 1;   box-shadow: 0 0 0 3px oklch(0.75 0.18 65 / 0.25); }
+  100% { transform: translateY(0);    opacity: 1;   box-shadow: 0 0 0 0   oklch(0.75 0.18 65 / 0);    }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feed-v3 .feed-v3-flash { animation: none; }
+  .feed-v3 .feed-v3-ribbon-drawer { animation: none; }
+}
+
+/* ── Just-now ribbon (persistent latest-event timestamp) ─────── */
+.feed-v3 .feed-v3-justnow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: oklch(0.98 0.02 250);
+  border: 1px solid oklch(0.9 0.05 250);
+  color: oklch(0.35 0.1 250);
+  font-size: 11px;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  font-weight: 600;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.feed-v3 .feed-v3-justnow:hover { background: oklch(0.96 0.03 250); }
+.feed-v3 .feed-v3-justnow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(0.5 0.18 25);
+  box-shadow: 0 0 8px oklch(0.5 0.18 25 / 0.5);
+  animation: feed-v3-pulse 1.4s ease-in-out infinite;
+}
+@keyframes feed-v3-pulse {
+  0%, 100% { opacity: 1;    transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.85); }
+}

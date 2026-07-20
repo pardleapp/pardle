@@ -27,6 +27,11 @@ interface PageProps {
      *  event in the buffer. Lets us test mid-round density instead
      *  of being stuck at end-of-R4 where the field is compressed. */
     back?: string;
+    /** Feed visual variant. `v=3` opts into the priority-weighted
+     *  trading-terminal layout preview. Data pipeline is identical
+     *  — v3 is a pure render swap. Undocumented; internal preview
+     *  flag until we're ready to flip the default. */
+    v?: string;
   }>;
 }
 
@@ -41,6 +46,7 @@ export default async function HomeLive({ searchParams }: PageProps) {
     params.back != null && Number.isFinite(Number(params.back))
       ? Number(params.back)
       : undefined;
+  const variant = params.v === "3" ? "v3" : "v1";
   return (
     <main className="container container-wide v4-theme pv-theme">
       {replayId && (
@@ -59,7 +65,11 @@ export default async function HomeLive({ searchParams }: PageProps) {
           {backHours != null ? ` · rewound ${backHours}h` : ""} · not live
         </div>
       )}
-      <FeedClient forcedTournamentId={replayId} replayBackHours={backHours} />
+      <FeedClient
+        forcedTournamentId={replayId}
+        replayBackHours={backHours}
+        variant={variant}
+      />
       <Suspense fallback={null}>
         <AddBetTrigger />
       </Suspense>
