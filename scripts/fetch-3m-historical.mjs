@@ -209,27 +209,125 @@ async function fetchAllScorecards(tournamentId, playerIds) {
 /**
  * Skill baseline for historical charts.
  *
- * DG's `historical-model-predictions/pre-tournament` endpoint 404s on
- * our tier, and using the current 2026 `preds/skill-ratings` for a
- * 2023 event misgrades everyone who's improved / declined since (a
- * systematic bias). So instead we derive a within-event skill baseline
- * per player: their average sg_total across the 4 rounds of THIS event.
+ * Preferred source: a DG pre-tournament predictions CSV saved at
+ * data/historical/predictions/3m-open-{year}.csv (columns include
+ * player_name and win). We turn win probability into a skill rating
+ * using the log-odds vs a uniform-field baseline:
  *
- * Chart interpretation becomes "how much did this round deviate from
- * that player's own week average?" — a real, defensible skill-adjusted
- * signal that doesn't depend on any external prediction.
+ *     skill = clamp(-2.5, 3, ln(win * fieldSize))
+ *
+ * The intuition: a player with win prob = 1/N is exactly average
+ * (skill 0). Double the average → +0.69 SG. 8× the average → +2 SG.
+ * Zero wins is clamped to 0.1/N so log doesn't blow up. This gives
+ * ~[-2.5, +2] on a mid-strength field like the 3M Open, and would
+ * cleanly extend to +3 on a Scheffler-in-a-major field.
+ *
+ * Fallback (no CSV): within-event 4-round average sg_total per
+ * player. Not as good — reveals week form rather than pre-tournament
+ * skill — but strictly better than nothing.
  */
-function derivePerPlayerSkillBaseline(dgScores) {
+function skillFromWinProb(winProb, fieldSize) {
+  if (fieldSize <= 0) return null;
+  const floor = 0.1 / fieldSize;
+  const w = Math.max(winProb ?? 0, floor);
+  const raw = Math.log(w * fieldSize);
+  return Math.max(-2.5, Math.min(3, raw));
+}
+
+function normNameForCsv(s) {
+  return String(s ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z]/g, "");
+}
+
+async function loadPredictionsCsv(year) {
+  const p = resolve(REPO_ROOT, "data", "historical", "predictions", `3m-open-${year}.csv`);
+  let text;
+  try {
+    text = await readFile(p, "utf-8");
+  } catch {
+    return null;
+  }
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return null;
+  const parse = (line) => {
+    const out = [];
+    let cur = "";
+    let q = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (q) {
+        if (c === '"' && line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else if (c === '"') q = false;
+        else cur += c;
+      } else {
+        if (c === '"') q = true;
+        else if (c === ",") {
+          out.push(cur);
+          cur = "";
+        } else cur += c;
+      }
+    }
+    out.push(cur);
+    return out;
+  };
+  const header = parse(lines[0]);
+  const nameIdx = header.indexOf("player_name");
+  const winIdx = header.indexOf("win");
+  if (nameIdx < 0 || winIdx < 0) return null;
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = parse(lines[i]);
+    const name = cells[nameIdx]?.replace(/^"|"$/g, "");
+    const winStr = cells[winIdx];
+    if (!name || winStr == null) continue;
+    const win = Number(winStr);
+    if (!Number.isFinite(win)) continue;
+    rows.push({ name, win });
+  }
+  return rows;
+}
+
+/** Build a normalisedName → skill map from the predictions CSV. */
+function buildCsvSkillMap(csvRows) {
+  const out = new Map();
+  if (!csvRows) return out;
+  const N = csvRows.length;
+  for (const r of csvRows) {
+    const skill = skillFromWinProb(r.win, N);
+    if (skill != null) {
+      // DG's CSV uses "Last, First"; normalise both orderings so we
+      // can match against the historical-rounds `player_name` field.
+      out.set(normNameForCsv(r.name), skill);
+      const [last, first] = r.name.split(",").map((s) => s.trim());
+      if (first) out.set(normNameForCsv(`${first} ${last}`), skill);
+    }
+  }
+  return out;
+}
+
+function derivePerPlayerSkillBaseline(dgScores, csvSkillMap) {
   const out = {};
   for (const row of dgScores ?? []) {
+    const dgId = String(row.dg_id);
+    // Preferred: CSV-derived skill from pre-tournament win probability.
+    const csvSkill = csvSkillMap?.get(normNameForCsv(row.player_name));
+    if (typeof csvSkill === "number") {
+      out[dgId] = csvSkill;
+      continue;
+    }
+    // Fallback: within-event 4-round average sg_total.
     const sgs = [];
     for (let rn = 1; rn <= 4; rn++) {
       const r = row[`round_${rn}`];
       if (r && typeof r.sg_total === "number") sgs.push(r.sg_total);
     }
     if (sgs.length === 0) continue;
-    const mean = sgs.reduce((a, b) => a + b, 0) / sgs.length;
-    out[String(row.dg_id)] = mean;
+    out[dgId] = sgs.reduce((a, b) => a + b, 0) / sgs.length;
   }
   return out;
 }
@@ -252,8 +350,22 @@ async function main() {
       `/historical-raw-data/rounds?tour=pga&event_id=${dgMeta.event_id}&year=${year}`,
     );
 
-    const skillMap = derivePerPlayerSkillBaseline(dgRounds.scores);
-    console.log(`[dg] within-event skill baselines derived for ${Object.keys(skillMap).length} players`);
+    const csvRows = await loadPredictionsCsv(year);
+    const csvSkillMap = buildCsvSkillMap(csvRows);
+    if (csvRows) {
+      console.log(`[csv] predictions CSV loaded for ${year}: ${csvRows.length} rows`);
+    } else {
+      console.log(`[csv] no predictions CSV for ${year} — falling back to within-event avg`);
+    }
+    const skillMap = derivePerPlayerSkillBaseline(dgRounds.scores, csvSkillMap);
+    const csvBackedCount = Object.entries(skillMap).filter(([id]) => {
+      const row = dgRounds.scores?.find((s) => String(s.dg_id) === id);
+      return row && csvSkillMap.get(normNameForCsv(row.player_name)) != null;
+    }).length;
+    console.log(
+      `[dg] skill baselines: ${csvBackedCount} from CSV (pre-tournament win-prob), ` +
+        `${Object.keys(skillMap).length - csvBackedCount} from within-event 4-round avg`,
+    );
 
     // PGA hole-level data (optional — heatmap degrades if missing)
     let holesByPgaId = {};
