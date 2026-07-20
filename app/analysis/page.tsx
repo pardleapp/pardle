@@ -28,9 +28,9 @@ const CARDS: Card[] = [
   },
   {
     href: "/analysis/course-heatmap",
-    title: "Course difficulty by hole and time",
+    title: "Course & pin guide",
     blurb:
-      "18-hole heatmap showing average scoring vs par for every hole across the day. Read a row to see when a hole started biting; read a column to see which holes were toughest at any hour.",
+      "Field scoring vs par per hole per hour, per-round summary, weather, and click into any hole for that week's pin positions on the green with the field's putt paths layered on top.",
     status: "live",
   },
 ];

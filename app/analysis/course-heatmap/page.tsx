@@ -190,13 +190,13 @@ export default function Page() {
           </Link>
         </p>
         <h2 style={{ fontSize: 22, marginBottom: 4 }}>
-          Course difficulty by hole and time
+          Course &amp; pin guide
         </h2>
         <p style={{ fontSize: 13, color: "oklch(0.5 0.02 150)", margin: 0 }}>
-          Heatmap of field average strokes vs par for every hole across the
-          day. Green cells were easier than par; red cells were harder.
-          Scanning a row shows when a specific hole started biting; scanning
-          a column shows which holes were toughest at a specific hour.
+          Field-average strokes vs par for every hole across the day
+          (heatmap), plus a per-round scoring summary, per-hour weather,
+          and click any hole label for that week&apos;s pin positions on
+          the green — with the field&apos;s putt paths layered on top.
         </p>
         <p
           style={{
