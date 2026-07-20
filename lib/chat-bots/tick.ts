@@ -31,11 +31,17 @@ import { isRecentBotDuplicate } from "./dedup";
 
 const redis = Redis.fromEnv();
 
-/** Minimum gap between bot messages per tournament. Tightened during
- *  the pre-launch phase — a room that ticks every ~25s reads as
- *  populated without being oppressive. Bump this up once real users
- *  are chatting so bots don't drown them out. */
-const BOT_TICK_MIN_MS = 25_000;
+/** Minimum gap between bot messages per tournament while a round is
+ *  actually being played (Thu-Sun). A room that ticks every ~25s
+ *  reads as populated without being oppressive. Bump this up once
+ *  real users are chatting so bots don't drown them out. */
+const BOT_TICK_MIN_MS_LIVE = 25_000;
+
+/** Minimum gap during the Mon-Wed pre-tournament lead-in. No live
+ *  shots to react to, so the room should feel occasionally alive
+ *  (a message every ~15 min) rather than a chattering group that's
+ *  clearly bots. */
+const BOT_TICK_MIN_MS_PRE = 15 * 60 * 1000;
 
 /** Per-poll probability the tick actually fires (in addition to the
  *  hard rate limit above). 0.6 lands a bot message roughly every
@@ -61,10 +67,13 @@ function tickLockKey(tournamentId: string): string {
 /** True if we're clear to post right now — sets the lock as a
  *  side-effect. Redis SET NX/EX gives atomic acquire; failure means
  *  another /api/feed call in this window already ticked. */
-async function acquireLock(tournamentId: string): Promise<boolean> {
+async function acquireLock(
+  tournamentId: string,
+  minMs: number,
+): Promise<boolean> {
   const res = await redis.set(tickLockKey(tournamentId), "1", {
     nx: true,
-    px: BOT_TICK_MIN_MS,
+    px: minMs,
   });
   return res === "OK";
 }
@@ -142,7 +151,8 @@ export async function maybeTickChatBots(input: {
 }): Promise<ChatMessage | null> {
   if (!input.tournamentId) return null;
   if (Math.random() > TICK_PROBABILITY) return null;
-  const gotLock = await acquireLock(input.tournamentId);
+  const minMs = input.isLive ? BOT_TICK_MIN_MS_LIVE : BOT_TICK_MIN_MS_PRE;
+  const gotLock = await acquireLock(input.tournamentId, minMs);
   if (!gotLock) return null;
 
   const context: TickContext = {
