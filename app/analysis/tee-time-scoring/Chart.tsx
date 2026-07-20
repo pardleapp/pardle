@@ -291,6 +291,13 @@ function ChartCore({
   const [cursorX, setCursorX] = useState<number | null>(null);
   const [roundFilter, setRoundFilter] = useState<RoundFilter>("all");
   const [showPoints, setShowPoints] = useState(true);
+  /** When false, the y-axis shows raw round-score-to-par (each dot is
+   *  where that player finished the round vs par). When true (default),
+   *  the y-axis shows the skill-adjusted deviation (score + skill
+   *  baseline — negative = over-performed, positive = under-performed).
+   *  Toggle lets bettors flip between "who actually shot low today?"
+   *  and "who out-played their form today?" without leaving the chart. */
+  const [showAdjusted, setShowAdjusted] = useState(true);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
   // Dimensions scale up in expanded mode.
@@ -316,18 +323,36 @@ function ChartCore({
     [activeRounds],
   );
 
+  /** Pick which y-value the chart should use — adjusted (skill-baseline
+   *  corrected) or raw round-to-par. Same function used by the point
+   *  scatter and the per-round trend bucketing so the two stay in
+   *  sync when the toggle flips. */
+  const yOf = useCallback(
+    (r: Row) => (showAdjusted ? r.adjusted : r.toPar),
+    [showAdjusted],
+  );
+
   const points = useMemo(
     () =>
       rows
         .filter((r) => activeRoundSet.has(r.round))
-        .map((r) => ({ x: r.teeMinutes, y: r.adjusted, row: r })),
-    [rows, activeRoundSet],
+        .map((r) => ({ x: r.teeMinutes, y: yOf(r), row: r })),
+    [rows, activeRoundSet, yOf],
   );
 
   // Per-round buckets — actual (finished) vs all (finished + projected).
   // Smooth uses ALL; render splits at the max-actual-x boundary so
   // actual segment is solid and projected segment is dashed.
-  const byRound = useMemo(() => {
+  const byRound = useMemo<
+    Record<
+      RoundNum,
+      {
+        actual: Array<{ x: number; y: number }>;
+        all: Array<{ x: number; y: number }>;
+        boundary: number | null;
+      }
+    >
+  >(() => {
     const out: Record<
       RoundNum,
       {
@@ -342,7 +367,7 @@ function ChartCore({
       4: { actual: [], all: [], boundary: null },
     };
     for (const r of rows) {
-      const pt = { x: r.teeMinutes, y: r.adjusted };
+      const pt = { x: r.teeMinutes, y: yOf(r) };
       out[r.round].all.push(pt);
       if (!r.projected) out[r.round].actual.push(pt);
     }
@@ -355,7 +380,7 @@ function ChartCore({
           : null;
     });
     return out;
-  }, [rows]);
+  }, [rows, yOf]);
 
   const extent = useMemo(() => {
     if (points.length === 0) {
@@ -762,6 +787,28 @@ function ChartCore({
         >
           Drag · scroll · pinch to zoom
         </span>
+        {/* Skill-adjust on/off — lets the reader flip between
+            "who out-played their form?" (adjusted, default) and
+            "who actually shot low today?" (raw round-to-par). Same
+            axis; trend lines rebuild instantly when toggled. */}
+        <button
+          type="button"
+          onClick={() => setShowAdjusted((v) => !v)}
+          aria-pressed={showAdjusted}
+          style={{
+            ...btnStyle,
+            marginLeft: "auto",
+            background: showAdjusted ? "oklch(0.25 0.02 150)" : "white",
+            color: showAdjusted ? "white" : "oklch(0.3 0.02 150)",
+          }}
+          title={
+            showAdjusted
+              ? "Y-axis is skill-adjusted — click for raw round-to-par"
+              : "Y-axis is raw round-to-par — click for skill-adjusted"
+          }
+        >
+          {showAdjusted ? "Skill-adjusted" : "Raw scores"}
+        </button>
         {/* Points on/off — lets the reader strip the scatter so the
             trend lines read clearly on their own. Trend lines stay
             regardless (they're the anchor of the chart). */}
@@ -771,7 +818,6 @@ function ChartCore({
           aria-pressed={showPoints}
           style={{
             ...btnStyle,
-            marginLeft: "auto",
             background: showPoints ? "white" : "oklch(0.25 0.02 150)",
             color: showPoints ? "oklch(0.3 0.02 150)" : "white",
           }}
@@ -1254,9 +1300,10 @@ function ChartCore({
           marginTop: 10,
         }}
       >
-        Adjusted = R1 to-par + SG total. Positive = under-performed skill,
-        negative = outperformed. Blue line: Gaussian-smoothed trend across
-        tee times.
+        {showAdjusted
+          ? "Adjusted = round to-par + pre-tournament skill. Positive = under-performed skill, negative = outperformed."
+          : "Raw = round to-par (no skill correction). Positive = over par, negative = under par."}{" "}
+        Blue line: Gaussian-smoothed trend across tee times.
       </p>
 
       {/* Weather strip — only when a single round tab is active. The
