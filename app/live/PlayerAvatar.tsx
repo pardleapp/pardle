@@ -54,6 +54,19 @@ const SIZE_PX: Record<NonNullable<Props["size"]>, number> = {
   lg: 56,
 };
 
+/** Two-letter initials from a display name — "Rory McIlroy" → "RM",
+ *  "Rasmus Neergaard-Petersen" → "RN". Used as the always-visible
+ *  loading/fallback state on top of the gradient background so the
+ *  avatar slot never shows a browser broken-image icon or spinner. */
+function initialsOf(name: string): string {
+  const cleaned = (name ?? "").trim();
+  if (!cleaned) return "•";
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return `${first}${last}`.toUpperCase() || "•";
+}
+
 export default function PlayerAvatar({
   playerId,
   playerName,
@@ -63,16 +76,14 @@ export default function PlayerAvatar({
   const [from, to] = gradientFor(playerId);
   const dim = SIZE_PX[size];
   const fontSize = size === "sm" ? 11 : size === "lg" ? 18 : 14;
-  // Halo color picked to match the v4 hot/cold tokens.
   const haloColor =
     state === "hot"
       ? "rgba(255, 157, 46, 0.55)"
       : state === "cold"
         ? "rgba(123, 178, 230, 0.55)"
         : null;
-  // Headshot — sized 2× the avatar dim for retina sharpness. Falls
-  // through to initials when the image fails to load.
   const headshotUrl = pgaTourHeadshotUrlById(playerId, dim * 2);
+  const [imgReady, setImgReady] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
   return (
     <span
@@ -81,17 +92,40 @@ export default function PlayerAvatar({
         width: dim,
         height: dim,
         fontSize,
+        fontWeight: 800,
+        color: "white",
+        letterSpacing: "0.5px",
+        textShadow: "0 1px 2px rgba(0,0,0,0.25)",
         background: `linear-gradient(135deg, ${from}, ${to})`,
         boxShadow: haloColor ? `0 0 0 2px ${haloColor}` : undefined,
         position: "relative",
         overflow: "hidden",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
       }}
       aria-hidden="true"
     >
+      {/* Initials always paint — this is the loading/fallback state.
+          When the headshot loads it fades over the top. No spinner,
+          no broken-image icon; the slot always looks intentional. */}
+      <span
+        style={{
+          position: "relative",
+          zIndex: 0,
+          pointerEvents: "none",
+          userSelect: "none",
+        }}
+      >
+        {initialsOf(playerName)}
+      </span>
       {!imgFailed && (
         <img
           src={headshotUrl}
           alt=""
+          loading="lazy"
+          decoding="async"
+          onLoad={() => setImgReady(true)}
           onError={() => setImgFailed(true)}
           style={{
             position: "absolute",
@@ -99,6 +133,9 @@ export default function PlayerAvatar({
             width: "100%",
             height: "100%",
             objectFit: "cover",
+            opacity: imgReady ? 1 : 0,
+            transition: "opacity 180ms ease",
+            zIndex: 1,
           }}
         />
       )}

@@ -76,13 +76,26 @@ function totalClass(total: string): string {
   return "";
 }
 
+const STALE_THRESHOLD_MS = 6 * 60 * 60 * 1000; // 6h
+
+/** Live-appropriate timestamp. Events older than the stale threshold
+ *  aren't shown as "24h ago" — the tournament's done and that read
+ *  as broken during pre-launch testing on old buffers. Caller should
+ *  render a small "Final" chip in place of this when isStale(ts). */
 function formatEventTime(ts: number, now: number): string {
-  const diff = Math.max(0, Math.floor((now - ts) / 1000));
-  if (diff < 60) return `${diff}s`;
-  const mins = Math.floor(diff / 60);
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  return `${hours}h`;
+  const diff = Math.max(0, now - ts);
+  if (diff >= STALE_THRESHOLD_MS) return "Final";
+  const s = Math.floor(diff / 1000);
+  if (s < 20) return "now";
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  return `${h}h`;
+}
+
+function isStale(ts: number, now: number): boolean {
+  return now - ts >= STALE_THRESHOLD_MS;
 }
 
 function eventVerb(ev: FeedEvent): { tag: string; kind: string; text: string; anchor: string } {
@@ -175,7 +188,8 @@ function EventInline({
   onToggleComments,
 }: EventInlineProps) {
   const verb = eventVerb(event);
-  const fresh = isLatest && now - event.ts < 60_000;
+  const stale = isStale(event.ts, now);
+  const fresh = isLatest && !stale && now - event.ts < 60_000;
   const chips = reactionChips(social?.emojiCounts, mineEmojis);
   const commentCount = social?.commentCount ?? 0;
 
@@ -189,7 +203,11 @@ function EventInline({
         <span className={`v4-latest-tag v4-latest-tag-${verb.kind}`}>{verb.tag}</span>
         <span className="v4-latest-text">{verb.text}</span>
         {verb.anchor && <span className="v4-latest-anchor">{verb.anchor}</span>}
-        <span className="v4-latest-time">{formatEventTime(event.ts, now)}</span>
+        <span
+          className={`v4-latest-time${stale ? " v4-latest-time-final" : ""}`}
+        >
+          {formatEventTime(event.ts, now)}
+        </span>
         <span className="v4-react-cluster">
           {chips.length > 0 && (
             <span className="v4-react-summary">

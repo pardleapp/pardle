@@ -29845,3 +29845,212 @@ body[data-chat-open] .addbet-fab {
   color: oklch(0.5 0.18 25);
   font-size: 11px;
 }
+
+/* ═════════════════════════════════════════════════════════════════
+   v4 polish — tighter rows, muted tags, grid-aligned expansion,
+   snappier expand animation, no spinners anywhere.
+   These overrides come AFTER the base v4 CSS so they take
+   precedence in the cascade.
+   ═════════════════════════════════════════════════════════════════ */
+
+/* ── Tighter table rhythm ─────────────────────────────────────── */
+.feed-v4 .v4-headings {
+  padding: 6px 12px;
+  font-size: 9px;
+  letter-spacing: 0.8px;
+}
+.feed-v4 .v4-row {
+  padding: 5px 12px;
+  min-height: 34px;
+}
+
+/* ── Muted tags — only ACE/ALB keep a coloured accent (rare enough
+   that they earn attention). Every other tag drops to a monochrome
+   grey chip so the score/SG numerals are the only chromatic beat. */
+.feed-v4 .v4-latest-tag {
+  background: oklch(0.96 0.006 95);
+  color: oklch(0.5 0.02 150);
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.feed-v4 .v4-latest-tag-birdie,
+.feed-v4 .v4-latest-tag-eagle,
+.feed-v4 .v4-latest-tag-bogey,
+.feed-v4 .v4-latest-tag-double,
+.feed-v4 .v4-latest-tag-shot,
+.feed-v4 .v4-latest-tag-misc {
+  background: oklch(0.96 0.006 95);
+  color: oklch(0.5 0.02 150);
+}
+.feed-v4 .v4-latest-tag-ace,
+.feed-v4 .v4-latest-tag-albatross {
+  background: oklch(0.94 0.06 250);
+  color: oklch(0.35 0.15 250);
+}
+
+/* ── Latest column: tighter spacing, mono time chip ───────────── */
+.feed-v4 .v4-latest {
+  gap: 5px;
+  font-size: 12px;
+}
+.feed-v4 .v4-latest-text {
+  color: oklch(0.25 0.02 150);
+  font-weight: 600;
+}
+.feed-v4 .v4-latest-time {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: oklch(0.5 0.02 150);
+  margin-left: auto;
+  padding-right: 6px;
+  min-width: 32px;
+  text-align: right;
+}
+.feed-v4 .v4-latest-time-final {
+  color: oklch(0.55 0.02 150);
+  background: oklch(0.96 0.006 95);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  min-width: 0;
+  text-align: center;
+}
+
+/* ── SG cells uniform mono, right-aligned, tabular-nums ─────── */
+.feed-v4 .v4-sg,
+.feed-v4 .v4-total,
+.feed-v4 .v4-thru,
+.feed-v4 .v4-pos {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+.feed-v4 .v4-total {
+  font-size: 14px;
+}
+.feed-v4 .v4-sg {
+  font-size: 11px;
+}
+.feed-v4 .v4-sg-total {
+  font-size: 12px;
+}
+
+/* ── Grid-aligned expansion — nest under the LATEST column so the
+   recent-shot pills sit in the same lane as the parent row's
+   latest event. Uses the same column widths as .v4-row so the
+   indent matches perfectly at any viewport. */
+.feed-v4 .v4-row-expand {
+  display: grid;
+  grid-template-columns:
+    46px          /* pos */
+    32px          /* avatar */
+    minmax(0, 1.2fr) /* name */
+    64px          /* today */
+    52px          /* thru */
+    minmax(0, 2fr)   /* latest — expanded events live here */
+    56px 56px 56px 56px 60px; /* 5x SG */
+  padding: 4px 12px 8px;
+  background: oklch(0.985 0.005 95);
+  border-top: 1px solid oklch(0.94 0.008 95);
+  animation: v4-expand-in 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes v4-expand-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feed-v4 .v4-row-expand { animation: none; }
+}
+
+/* Label spans just the LATEST column so it sits above the shot
+   pills (aligned to them, not floating full-width). */
+.feed-v4 .v4-row-expand-label {
+  grid-column: 6 / 7;
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: oklch(0.55 0.02 150);
+  padding: 2px 4px 4px;
+  text-transform: uppercase;
+}
+
+/* Each recent-shot pill lives in the LATEST column too, spans
+   through to the last SG column so the pill can carry its own
+   reactions/comments without wrapping. Compact height. */
+.feed-v4 .v4-row-expand > .v4-latest {
+  grid-column: 6 / -1;
+  min-height: 26px;
+  padding: 3px 6px;
+  border: 1px solid oklch(0.94 0.008 95);
+  border-radius: 5px;
+  background: white;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  margin: 1px 0;
+}
+
+/* Comment threads that open under an expanded event also nest into
+   the same lane, indented slightly further so they read as a child
+   of their event. */
+.feed-v4 .v4-row-expand > .v4-comments {
+  grid-column: 6 / -1;
+  margin: 4px 0 6px 12px;
+  padding: 8px 10px;
+}
+
+/* ── Row visual clean-up: subtle separator, no heavy fresh-flash on
+   stale rows, keep hover cheap. */
+.feed-v4 .v4-row {
+  border-bottom: 1px solid oklch(0.96 0.006 95);
+}
+.feed-v4 .v4-row-wrap:last-child .v4-row {
+  border-bottom: none;
+}
+.feed-v4 .v4-row-fresh {
+  animation: none; /* fresh flash reserved for events <60s old;
+                      formatEventTime already gates the pulse dot */
+}
+
+/* ── Reaction & comment chips: dead simple, no borders unless mine
+   is active. Tighter clickable targets. */
+.feed-v4 .v4-react-chip {
+  border: 1px solid transparent;
+  background: oklch(0.96 0.006 95);
+  padding: 1px 6px 1px 4px;
+  color: oklch(0.4 0.02 150);
+  height: 18px;
+}
+.feed-v4 .v4-react-chip:hover {
+  border-color: oklch(0.85 0.05 250);
+  background: oklch(0.96 0.03 250);
+}
+.feed-v4 .v4-react-chip-mine {
+  border-color: oklch(0.7 0.15 65);
+  background: oklch(0.96 0.06 65);
+  color: oklch(0.35 0.15 65);
+}
+.feed-v4 .v4-comment-chip {
+  height: 18px;
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  color: oklch(0.5 0.02 150);
+}
+
+/* ── Kill any img-loading spinner from lazy images inside v4 cells.
+   Browsers sometimes render one for empty/decoding <img>; make sure
+   any <img> we didn't explicitly style stays invisible until loaded. */
+.feed-v4 img {
+  background: transparent;
+}
+.feed-v4 img[src=""] { visibility: hidden; }
