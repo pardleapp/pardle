@@ -141,15 +141,21 @@ export default function PinSheetModal({ hole, onClose }: Props) {
         </header>
 
         {hole.greenImageUrl ? (
+          // Container's height is driven by the <img> (width:100%, height
+          // auto) so pin dot percentages resolve against the image's
+          // actual painted area — no letterbox, no dots floating in
+          // empty padding. `display:block` on the img kills the inline
+          // baseline gap that would otherwise leave a 4px sliver at
+          // the bottom.
           <div
             style={{
               position: "relative",
               width: "100%",
-              aspectRatio: "1 / 1",
               background: "oklch(0.94 0.008 95)",
               borderRadius: 10,
               overflow: "hidden",
               border: "1px solid oklch(0.9 0.008 95)",
+              lineHeight: 0,
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -157,12 +163,9 @@ export default function PinSheetModal({ hole, onClose }: Props) {
               src={hole.greenImageUrl}
               alt={`Green diagram, hole ${hole.holeNumber}`}
               style={{
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
                 display: "block",
+                width: "100%",
+                height: "auto",
               }}
             />
             {roundsWithPin.map((round) => {
@@ -192,6 +195,7 @@ export default function PinSheetModal({ hole, onClose }: Props) {
                     color: "white",
                     fontFamily: "var(--font-mono, monospace)",
                     letterSpacing: 0.2,
+                    lineHeight: 1,
                   }}
                 >
                   {round}
