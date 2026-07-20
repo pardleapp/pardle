@@ -102,6 +102,30 @@ export default function Heatmap({ cells, bucketMinutes, weatherByRound }: Props)
     return m;
   }, [cellsThisRound]);
 
+  /** Per-column summary: sum of vs-par across all 18 holes, and the
+   *  count of holes that actually have data. Enables the "18 HOLES"
+   *  footer row which only shows a total when the column is complete
+   *  — a full-course readout of "how the course played this hour". */
+  const columnTotals = useMemo(() => {
+    const out = new Map<
+      number,
+      { sumVsPar: number; holesPlayed: number }
+    >();
+    for (const t of buckets) {
+      let sum = 0;
+      let n = 0;
+      for (let h = 1; h <= 18; h++) {
+        const cell = cellIndex.get(`${h}:${t}`);
+        if (cell) {
+          sum += cell.avgVsPar;
+          n++;
+        }
+      }
+      out.set(t, { sumVsPar: sum, holesPlayed: n });
+    }
+    return out;
+  }, [buckets, cellIndex]);
+
   const holes = Array.from({ length: 18 }, (_, i) => i + 1);
 
   // 1-hour buckets → ~10-12 columns per round. Sized to fit the
@@ -317,6 +341,103 @@ export default function Heatmap({ cells, bucketMinutes, weatherByRound }: Props)
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            <tr>
+              <td
+                style={{
+                  width: 44,
+                  fontSize: 10,
+                  fontWeight: 800,
+                  color: "oklch(0.35 0.02 150)",
+                  fontFamily: "var(--font-mono, monospace)",
+                  paddingRight: 8,
+                  paddingTop: 8,
+                  textAlign: "right",
+                  verticalAlign: "middle",
+                  letterSpacing: 0.4,
+                  textTransform: "uppercase",
+                  borderTop: "2px solid oklch(0.88 0.012 95)",
+                }}
+                title="Sum of vs-par across all 18 holes for that hour. Only shows when every hole has data for that column."
+              >
+                18
+                <br />
+                HOLES
+              </td>
+              {buckets.map((t) => {
+                const total = columnTotals.get(t);
+                const complete = total?.holesPlayed === 18;
+                const sum = total?.sumVsPar ?? 0;
+                // Wider colour range than per-hole cells because sum
+                // stacks 18 numbers — ±3 total is meaningful.
+                const capped = Math.max(-3, Math.min(3, sum));
+                let bg = "transparent";
+                let fg = "oklch(0.55 0.02 150)";
+                if (complete) {
+                  const t = (capped + 3) / 6; // 0..1
+                  if (Math.abs(sum) < 0.15) {
+                    bg = "oklch(0.94 0.008 150)";
+                    fg = "oklch(0.3 0.02 150)";
+                  } else if (t < 0.5) {
+                    const strength = (0.5 - t) * 2;
+                    bg = `oklch(${0.9 - strength * 0.35} ${0.03 + strength * 0.14} 150)`;
+                    fg = strength > 0.55 ? "white" : "oklch(0.25 0.15 150)";
+                  } else {
+                    const strength = (t - 0.5) * 2;
+                    bg = `oklch(${0.9 - strength * 0.35} ${0.03 + strength * 0.16} 28)`;
+                    fg = strength > 0.55 ? "white" : "oklch(0.32 0.16 28)";
+                  }
+                }
+                const label = complete
+                  ? sum > 0.05
+                    ? `+${sum.toFixed(1)}`
+                    : sum < -0.05
+                      ? `−${Math.abs(sum).toFixed(1)}`
+                      : "0"
+                  : "";
+                return (
+                  <td
+                    key={`total-${t}`}
+                    title={
+                      complete
+                        ? `${formatClock(t)} · ${label} strokes vs par across all 18 holes`
+                        : `${formatClock(t)} · ${total?.holesPlayed ?? 0} of 18 holes with data — not enough for a full-course total`
+                    }
+                    style={{
+                      width: CELL_W,
+                      height: CELL_H + 2,
+                      paddingTop: 8,
+                      textAlign: "center",
+                      verticalAlign: "middle",
+                      borderTop: "2px solid oklch(0.88 0.012 95)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        background: bg,
+                        color: fg,
+                        fontFamily: "var(--font-mono, monospace)",
+                        fontWeight: 800,
+                        fontSize: 11,
+                        border: complete
+                          ? "1px solid oklch(0.88 0.012 95)"
+                          : "1px dashed oklch(0.92 0.008 95)",
+                        borderRadius: 3,
+                        padding: "4px 2px",
+                        minHeight: CELL_H,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        opacity: complete ? 1 : 0.35,
+                      }}
+                    >
+                      {complete ? label : `${total?.holesPlayed ?? 0}/18`}
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          </tfoot>
         </table>
         </div>
         {/* Right-edge fade cue — tells the user "there's more if you
@@ -407,6 +528,9 @@ export default function Heatmap({ cells, bucketMinutes, weatherByRound }: Props)
         completed that hole in that window. Small samples (1–2 players)
         are noisy — a single blow-up on hole 12 in a quiet minute can
         show up as a red cell; read the trend across neighbouring cells.
+        Bottom <strong>18 HOLES</strong> row sums vs-par across the
+        whole course for that hour — only shows when every hole has
+        data (partial hours render dimmed as {"“"}n/18{"”"}).
       </p>
     </div>
   );
