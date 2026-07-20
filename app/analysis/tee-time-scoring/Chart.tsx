@@ -290,6 +290,7 @@ function ChartCore({
   const [hover, setHover] = useState<Row | null>(null);
   const [cursorX, setCursorX] = useState<number | null>(null);
   const [roundFilter, setRoundFilter] = useState<RoundFilter>("all");
+  const [showPoints, setShowPoints] = useState(true);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
   // Dimensions scale up in expanded mode.
@@ -761,6 +762,23 @@ function ChartCore({
         >
           Drag · scroll · pinch to zoom
         </span>
+        {/* Points on/off — lets the reader strip the scatter so the
+            trend lines read clearly on their own. Trend lines stay
+            regardless (they're the anchor of the chart). */}
+        <button
+          type="button"
+          onClick={() => setShowPoints((v) => !v)}
+          aria-pressed={showPoints}
+          style={{
+            ...btnStyle,
+            marginLeft: "auto",
+            background: showPoints ? "white" : "oklch(0.25 0.02 150)",
+            color: showPoints ? "oklch(0.3 0.02 150)" : "white",
+          }}
+          title={showPoints ? "Hide individual players" : "Show individual players"}
+        >
+          {showPoints ? "Hide points" : "Show points"}
+        </button>
         {/* Round filter — pill group covers all 4 rounds + "All". */}
         <div
           role="group"
@@ -768,7 +786,6 @@ function ChartCore({
           style={{
             display: "flex",
             gap: 4,
-            marginLeft: "auto",
             flexWrap: "wrap",
           }}
         >
@@ -1069,39 +1086,40 @@ function ChartCore({
             );
           })}
 
-          {visiblePoints.map((p) => {
-            const y = p.y;
-            const polarityColor =
-              y < -0.3 ? "#059669" : y > 0.3 ? "#dc2626" : "#334155";
-            const isHover =
-              hover?.dgId === p.row.dgId && hover?.round === p.row.round;
-            const noSkill = p.row.noSkill === true;
-            const isProjected = p.row.projected === true;
-            const style = ROUND_STYLE[p.row.round];
-            const cx = xFor(p.x);
-            const cy = yFor(y);
-            const size = isHover ? 7 : 4;
-            const fill = isProjected || noSkill ? "white" : polarityColor;
-            const stroke = isProjected ? polarityColor : style.color;
-            const strokeWidth = isProjected ? 2 : isHover ? 3 : 1.8;
-            const dash = isProjected ? "3 2" : undefined;
-            const opacity = isHover ? 1 : isProjected ? 0.7 : 0.85;
-            return (
-              <ShapeMark
-                key={`${p.row.dgId}-${p.row.round}`}
-                shape={style.shape}
-                cx={cx}
-                cy={cy}
-                size={size}
-                fill={fill}
-                stroke={stroke}
-                strokeWidth={strokeWidth}
-                strokeDasharray={dash}
-                opacity={opacity}
-                onPointerEnter={() => setHover(p.row)}
-              />
-            );
-          })}
+          {showPoints &&
+            visiblePoints.map((p) => {
+              const y = p.y;
+              const polarityColor =
+                y < -0.3 ? "#059669" : y > 0.3 ? "#dc2626" : "#334155";
+              const isHover =
+                hover?.dgId === p.row.dgId && hover?.round === p.row.round;
+              const noSkill = p.row.noSkill === true;
+              const isProjected = p.row.projected === true;
+              const style = ROUND_STYLE[p.row.round];
+              const cx = xFor(p.x);
+              const cy = yFor(y);
+              const size = isHover ? 7 : 4;
+              const fill = isProjected || noSkill ? "white" : polarityColor;
+              const stroke = isProjected ? polarityColor : style.color;
+              const strokeWidth = isProjected ? 2 : isHover ? 3 : 1.8;
+              const dash = isProjected ? "3 2" : undefined;
+              const opacity = isHover ? 1 : isProjected ? 0.7 : 0.85;
+              return (
+                <ShapeMark
+                  key={`${p.row.dgId}-${p.row.round}`}
+                  shape={style.shape}
+                  cx={cx}
+                  cy={cy}
+                  size={size}
+                  fill={fill}
+                  stroke={stroke}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={dash}
+                  opacity={opacity}
+                  onPointerEnter={() => setHover(p.row)}
+                />
+              );
+            })}
 
           {/* Cursor guideline + per-round trend markers */}
           {cursorX != null && (
