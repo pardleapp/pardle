@@ -286,6 +286,11 @@ export async function GET(req: Request) {
         source: "historical",
         year: yearNum,
         eventName: hist.eventName,
+        // Historical is always 3M Open at TPC Twin Cities on the
+        // R{year}525 tournament id (fetched via PGA Tour schedule
+        // in scripts/fetch-3m-historical.mjs). Surfacing it here
+        // lets the client fetch pin sheets for old years too.
+        tournamentId: `R${yearNum}525`,
         generatedAt: null,
         bucketMinutes: BUCKET_MIN,
         cells: hist.cells,

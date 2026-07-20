@@ -6,7 +6,9 @@ import MainNav from "@/app/MainNav";
 import AuthChip from "@/app/live/auth/AuthChip";
 import { BRAND } from "@/lib/brand";
 import Heatmap, { type Cell } from "./Heatmap";
+import PinSheetModal from "./PinSheetModal";
 import type { DailyWeatherView } from "../_components/WeatherStrip";
+import type { CoursePinSheet, CoursePinHole } from "@/lib/golf-api/pgatour";
 
 interface FetchResp {
   ok: boolean;
@@ -14,6 +16,7 @@ interface FetchResp {
   source?: "historical";
   year?: number;
   eventName?: string;
+  tournamentId?: string;
   bucketMinutes?: number;
   cells?: Cell[];
   generatedAt?: number | null;
@@ -24,6 +27,13 @@ interface FetchResp {
   weatherByRound?: Record<string, DailyWeatherView | null> | null;
 }
 
+interface PinsResp {
+  ok: boolean;
+  cached?: boolean;
+  pins?: CoursePinSheet;
+  error?: string;
+}
+
 const POLL_MS = 60_000;
 type YearTab = "live" | "2025" | "2024" | "2023";
 const YEAR_TABS: YearTab[] = ["live", "2025", "2024", "2023"];
@@ -32,6 +42,9 @@ export default function Page() {
   const [tab, setTab] = useState<YearTab>("live");
   const [data, setData] = useState<FetchResp | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pins, setPins] = useState<CoursePinSheet | null>(null);
+  const [pinsForTournament, setPinsForTournament] = useState<string | null>(null);
+  const [openHole, setOpenHole] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -51,12 +64,40 @@ export default function Page() {
     // Reset the previous tab's data so we don't briefly render stale
     // cells from another year while the new fetch is in flight.
     setData(null);
+    setPins(null);
+    setPinsForTournament(null);
+    setOpenHole(null);
     load();
     // Only the live tab polls; historical files never change.
     if (tab !== "live") return;
     const id = setInterval(load, POLL_MS);
     return () => clearInterval(id);
   }, [load, tab]);
+
+  // Fetch pin sheet whenever we get a tournamentId. Cached 6h Redis-
+  // side so this is a cheap poll for the modal; we still only ask
+  // once per tournament id per mount.
+  useEffect(() => {
+    const tid = data?.tournamentId;
+    if (!tid || tid === pinsForTournament) return;
+    setPinsForTournament(tid);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/course-pins?tournamentId=${encodeURIComponent(tid)}`,
+          { cache: "no-store" },
+        );
+        const json = (await res.json()) as PinsResp;
+        if (json.ok && json.pins) setPins(json.pins);
+      } catch {
+        /* pin-sheet failure is non-fatal — the heatmap still renders. */
+      }
+    })();
+  }, [data?.tournamentId, pinsForTournament]);
+
+  const openHoleData: CoursePinHole | null = openHole != null
+    ? pins?.holes.find((h) => h.holeNumber === openHole) ?? null
+    : null;
 
   return (
     <main className="container container-wide v4-theme pv-theme">
@@ -187,10 +228,18 @@ export default function Page() {
               cells={data.cells}
               bucketMinutes={data.bucketMinutes ?? 15}
               weatherByRound={data.weatherByRound}
+              onHoleClick={pins ? (h) => setOpenHole(h) : undefined}
+              pinsAvailable={pins != null}
             />
           </>
         )}
       </section>
+      {openHoleData && (
+        <PinSheetModal
+          hole={openHoleData}
+          onClose={() => setOpenHole(null)}
+        />
+      )}
     </main>
   );
 }

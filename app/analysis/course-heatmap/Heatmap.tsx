@@ -19,6 +19,13 @@ interface Props {
   cells: Cell[];
   bucketMinutes: number;
   weatherByRound?: Record<string, DailyWeatherView | null> | null;
+  /** Optional. When set, hole row labels ("H15") become buttons that
+   *  fire this callback with the hole number — the parent opens a
+   *  pin-sheet modal for that hole. */
+  onHoleClick?: (hole: number) => void;
+  /** True when the pin sheet has loaded, so the label styling can hint
+   *  clickability. When false, labels are plain text. */
+  pinsAvailable?: boolean;
 }
 
 /** Diverging colour scale — cool green for easier, neutral gray at
@@ -59,7 +66,13 @@ function formatSigned(v: number): string {
   return v > 0 ? `+${v.toFixed(2)}` : `−${Math.abs(v).toFixed(2)}`;
 }
 
-export default function Heatmap({ cells, bucketMinutes, weatherByRound }: Props) {
+export default function Heatmap({
+  cells,
+  bucketMinutes,
+  weatherByRound,
+  onHoleClick,
+  pinsAvailable,
+}: Props) {
   const [round, setRound] = useState<RoundFilter>("1");
   const [hover, setHover] = useState<Cell | null>(null);
 
@@ -294,7 +307,30 @@ export default function Heatmap({ cells, bucketMinutes, weatherByRound }: Props)
                     verticalAlign: "middle",
                   }}
                 >
-                  H{h}
+                  {onHoleClick && pinsAvailable ? (
+                    <button
+                      type="button"
+                      onClick={() => onHoleClick(h)}
+                      title={`See pin positions for hole ${h}`}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        padding: 0,
+                        color: "oklch(0.25 0.02 150)",
+                        font: "inherit",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        textDecorationColor: "oklch(0.85 0.013 95)",
+                        textUnderlineOffset: 3,
+                        textDecorationThickness: 1,
+                      }}
+                    >
+                      H{h}
+                    </button>
+                  ) : (
+                    <>H{h}</>
+                  )}
                 </td>
                 {buckets.map((t) => {
                   const cell = cellIndex.get(`${h}:${t}`);
@@ -531,6 +567,13 @@ export default function Heatmap({ cells, bucketMinutes, weatherByRound }: Props)
         Bottom <strong>18 HOLES</strong> row sums vs-par across the
         whole course for that hour — only shows when every hole has
         data (partial hours render dimmed as {"“"}n/18{"”"}).
+        {onHoleClick && pinsAvailable ? (
+          <>
+            {" "}
+            Click a hole label (<code>H15</code>) to see this
+            week&apos;s pin positions on the green.
+          </>
+        ) : null}
       </p>
     </div>
   );

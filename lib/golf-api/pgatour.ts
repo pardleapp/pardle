@@ -535,3 +535,154 @@ function normalizeScorecard(
     rounds,
   };
 }
+
+// ──────────────────────────────────────────────────────────────────
+// Pin sheet — per-round pin coordinates + green diagram image
+// ──────────────────────────────────────────────────────────────────
+
+/** Normalised (0-1) coordinates of a pin on the paired green diagram
+ *  image. `enhancedX/Y` is the refined tracer value; `x/y` is the raw
+ *  fallback for the odd hole where enhanced isn't populated. */
+export interface PinCoord {
+  x: number;
+  y: number;
+}
+
+/** Pin sheet for one hole across the tournament. `greenImageUrl` is
+ *  the Cloudinary raster that pin coords are normalised against — the
+ *  same asset the shot tracer uses. `pinByRound` is keyed 1-4; a hole
+ *  might miss a round if PGA Tour hasn't posted it yet. */
+export interface CoursePinHole {
+  holeNumber: number;
+  par: number | null;
+  yards: number | null;
+  greenImageUrl: string;
+  pinByRound: Record<number, PinCoord>;
+}
+
+export interface CoursePinSheet {
+  tournamentId: string;
+  courseName: string;
+  holes: CoursePinHole[];
+}
+
+interface CourseStatsCoords {
+  enhancedX?: number | null;
+  enhancedY?: number | null;
+  x?: number | null;
+  y?: number | null;
+}
+interface CourseStatsHoleStats {
+  holeNumber?: number;
+  parValue?: number;
+  yards?: number;
+  pinGreen?: {
+    leftToRightCoords?: CourseStatsCoords | null;
+  } | null;
+  holePickle?: {
+    greenLeftToRight?: string | null;
+  } | null;
+}
+interface CourseStatsRoundHole {
+  roundNum?: number;
+  holeStats?: (CourseStatsHoleStats | null)[];
+}
+interface CourseStatsCourse {
+  id?: string;
+  courseName?: string;
+  roundHoleStats?: (CourseStatsRoundHole | null)[];
+}
+interface CourseStatsResp {
+  courseStats?: {
+    courses?: (CourseStatsCourse | null)[];
+  } | null;
+}
+
+/** Pull pin positions for every (hole, round) in a tournament. One
+ *  query, one caller — merge on the client (or in the /api layer)
+ *  since PGA Tour returns the whole table in one shot. */
+export async function getCoursePins(
+  tournamentId: string,
+): Promise<CoursePinSheet | null> {
+  const data = await gql<CourseStatsResp>(`{
+    courseStats(tournamentId: "${tournamentId}") {
+      courses {
+        id
+        courseName
+        roundHoleStats {
+          roundNum
+          holeStats {
+            ... on CourseHoleStats {
+              holeNumber
+              parValue
+              yards
+              pinGreen {
+                leftToRightCoords {
+                  x
+                  y
+                  enhancedX
+                  enhancedY
+                }
+              }
+              holePickle {
+                greenLeftToRight
+              }
+            }
+          }
+        }
+      }
+    }
+  }`);
+  const courses = data?.courseStats?.courses ?? [];
+  if (courses.length === 0) return null;
+  // Multi-course events (rare — 3M, WMPO — one venue) still return
+  // an array. Take the first course; if a tournament ever splits
+  // rounds across venues we'll handle that when it comes up.
+  const primary = courses[0];
+  if (!primary) return null;
+
+  const holeMap = new Map<number, CoursePinHole>();
+  for (const rh of primary.roundHoleStats ?? []) {
+    const round = rh?.roundNum;
+    if (typeof round !== "number") continue;
+    for (const hs of rh?.holeStats ?? []) {
+      if (!hs) continue;
+      const holeNum = hs.holeNumber;
+      if (typeof holeNum !== "number") continue;
+      const coords = hs.pinGreen?.leftToRightCoords;
+      const x = coords?.enhancedX ?? coords?.x;
+      const y = coords?.enhancedY ?? coords?.y;
+      const img = hs.holePickle?.greenLeftToRight ?? "";
+      const existing = holeMap.get(holeNum);
+      const target: CoursePinHole =
+        existing ?? {
+          holeNumber: holeNum,
+          par: hs.parValue ?? null,
+          yards: hs.yards ?? null,
+          greenImageUrl: upscalePickle(img),
+          pinByRound: {},
+        };
+      // Fill greenImage / par / yards from whichever round has them
+      // first (they're the same across rounds; some rounds may leave
+      // them blank).
+      if (!target.greenImageUrl && img) target.greenImageUrl = upscalePickle(img);
+      if (target.par == null && typeof hs.parValue === "number") target.par = hs.parValue;
+      if (target.yards == null && typeof hs.yards === "number") target.yards = hs.yards;
+      if (
+        typeof x === "number" &&
+        typeof y === "number" &&
+        x >= 0 &&
+        y >= 0
+      ) {
+        target.pinByRound[round] = { x, y };
+      }
+      holeMap.set(holeNum, target);
+    }
+  }
+  const holes = [...holeMap.values()].sort((a, b) => a.holeNumber - b.holeNumber);
+  return {
+    tournamentId,
+    courseName: primary.courseName ?? "",
+    holes,
+  };
+}
