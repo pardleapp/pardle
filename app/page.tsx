@@ -7,6 +7,13 @@ export const metadata = {
   title: `${BRAND.name} — Live bet tracker + tournament feed`,
   description:
     "Track your golf bets live, see the fair value move with every shot, and watch the tournament alongside other bettors.",
+  // Explicitly clear the openGraph/twitter blocks that layout.tsx sets
+  // globally, so pardle.app unfurls as a plain link (no rich card).
+  // Lets Tom drop his own screenshots into posts without competing
+  // against an auto-generated card. To restore: delete these two
+  // nulls and un-disable app/opengraph-image.disabled.tsx.
+  openGraph: null,
+  twitter: null,
 };
 
 export const dynamic = "force-dynamic";
