@@ -41,13 +41,15 @@ function formatVsPar(v: number | null | undefined): string {
   return v > 0 ? `+${v.toFixed(2)}` : `−${Math.abs(v).toFixed(2)}`;
 }
 
-/** Colour for the vs-par pill inside the tooltip — matches the
- *  heatmap's green/red polarity but softer since the pill is small. */
+/** Colour for the vs-par value inside the tooltip. Tuned bright
+ *  (~0.78 lightness) so it reads clearly on the dark near-black
+ *  tooltip background — the previous 0.4-lightness green was
+ *  invisible against black. */
 function scoringColour(v: number | null | undefined): string {
-  if (v == null || !Number.isFinite(v)) return "oklch(0.5 0.02 150)";
-  if (v > 0.05) return "oklch(0.45 0.17 28)";
-  if (v < -0.05) return "oklch(0.4 0.15 150)";
-  return "oklch(0.4 0.02 150)";
+  if (v == null || !Number.isFinite(v)) return "oklch(0.85 0.02 150)";
+  if (v > 0.05) return "oklch(0.78 0.18 28)";
+  if (v < -0.05) return "oklch(0.82 0.19 150)";
+  return "oklch(0.85 0.02 150)";
 }
 
 export default function PinSheetModal({ hole, onClose }: Props) {
@@ -288,6 +290,7 @@ export default function PinSheetModal({ hole, onClose }: Props) {
                               fontFamily: "var(--font-mono, monospace)",
                               fontWeight: 800,
                               color: "white",
+                              fontSize: 13,
                             }}
                           >
                             {scoring.avg != null ? scoring.avg.toFixed(2) : "—"}
@@ -296,12 +299,10 @@ export default function PinSheetModal({ hole, onClose }: Props) {
                             <span
                               style={{
                                 fontFamily: "var(--font-mono, monospace)",
-                                fontWeight: 700,
+                                fontWeight: 800,
                                 color: scoringColour(scoring.vsPar),
-                                background: "rgba(255,255,255,0.08)",
-                                padding: "1px 5px",
-                                borderRadius: 3,
-                                fontSize: 10,
+                                fontSize: 12,
+                                letterSpacing: 0.2,
                               }}
                             >
                               {formatVsPar(scoring.vsPar)}
@@ -311,7 +312,7 @@ export default function PinSheetModal({ hole, onClose }: Props) {
                       ) : (
                         <span
                           style={{
-                            color: "oklch(0.65 0.02 150)",
+                            color: "oklch(0.72 0.02 150)",
                             fontStyle: "italic",
                           }}
                         >
