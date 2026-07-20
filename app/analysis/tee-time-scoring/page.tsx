@@ -155,8 +155,8 @@ export default function Page() {
               margin: "4px 0 0",
             }}
           >
-            {data?.eventName ?? "3M Open"} {tab} — TPC Twin Cities. Skill
-            baseline is the player&apos;s own 4-round average that week;
+            {data?.eventName ?? "3M Open"} {tab} — TPC Twin Cities.
+            Skill baseline is each player&apos;s pre-tournament projection;
             deviation from that is what the y-axis shows.
           </p>
         )}
