@@ -573,10 +573,12 @@ interface CourseStatsCoords {
   y?: number | null;
 }
 interface CourseStatsHoleStats {
-  /** Orchestrator names this `hole` on CourseHoleStats (not
-   *  `holeNumber` — that lives on scorecard types). */
-  hole?: number;
-  parValue?: number;
+  /** Confirmed via introspection: CourseHoleStats.courseHoleNum
+   *  (Int, non-null). Neither `hole` nor `holeNumber` exists on this
+   *  type — those live on scorecard types. */
+  courseHoleNum?: number;
+  /** parValue is String on this type (not Int). Parse it to a number. */
+  parValue?: string;
   yards?: number;
   pinGreen?: {
     leftToRightCoords?: CourseStatsCoords | null;
@@ -617,7 +619,9 @@ export async function getCoursePinsWithDiag(
           roundNum
           holeStats {
             ... on CourseHoleStats {
-              hole
+              courseHoleNum
+              parValue
+              yards
               pinGreen {
                 leftToRightCoords {
                   x
@@ -726,7 +730,9 @@ export async function getCoursePins(
           roundNum
           holeStats {
             ... on CourseHoleStats {
-              hole
+              courseHoleNum
+              parValue
+              yards
               pinGreen {
                 leftToRightCoords {
                   x
@@ -758,26 +764,28 @@ export async function getCoursePins(
     if (typeof round !== "number") continue;
     for (const hs of rh?.holeStats ?? []) {
       if (!hs) continue;
-      const holeNum = hs.hole;
+      const holeNum = hs.courseHoleNum;
       if (typeof holeNum !== "number") continue;
       const coords = hs.pinGreen?.leftToRightCoords;
       const x = coords?.enhancedX ?? coords?.x;
       const y = coords?.enhancedY ?? coords?.y;
       const img = hs.holePickle?.greenLeftToRight ?? "";
+      // parValue is a String on this type — parse it to number.
+      const parNum =
+        typeof hs.parValue === "string" && hs.parValue
+          ? Number.parseInt(hs.parValue, 10)
+          : null;
       const existing = holeMap.get(holeNum);
       const target: CoursePinHole =
         existing ?? {
           holeNumber: holeNum,
-          par: hs.parValue ?? null,
-          yards: hs.yards ?? null,
+          par: Number.isFinite(parNum) ? (parNum as number) : null,
+          yards: typeof hs.yards === "number" ? hs.yards : null,
           greenImageUrl: upscalePickle(img),
           pinByRound: {},
         };
-      // Fill greenImage / par / yards from whichever round has them
-      // first (they're the same across rounds; some rounds may leave
-      // them blank).
       if (!target.greenImageUrl && img) target.greenImageUrl = upscalePickle(img);
-      if (target.par == null && typeof hs.parValue === "number") target.par = hs.parValue;
+      if (target.par == null && Number.isFinite(parNum)) target.par = parNum;
       if (target.yards == null && typeof hs.yards === "number") target.yards = hs.yards;
       if (
         typeof x === "number" &&
