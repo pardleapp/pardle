@@ -61,7 +61,7 @@ import { useFollowedPlayers } from "./useFollowedPlayers";
 import HoleScoringAverage from "./HoleScoringAverage";
 import ScoringRibbonV3 from "./v3/ScoringRibbonV3";
 import FilterTabsV3 from "./v3/FilterTabsV3";
-import TickerRow from "./v3/TickerRow";
+import UnifiedShotCard from "./v3/UnifiedShotCard";
 import { rank as rankEvent, type RankerContext } from "./v3/priority-ranker";
 import BetPost from "./BetPost";
 import BetPostErrorBoundary from "./BetPostErrorBoundary";
@@ -1259,7 +1259,10 @@ export default function FeedClient({
               __idx === 4 &&
               ((data.bestReel?.length ?? 0) > 0 ||
                 (data.worstReel?.length ?? 0) > 0) ? (
-                <li className="feed-row-wrap" key="shots-reel">
+                <li
+                  className={`feed-row-wrap${isV3 ? " feed-v3-fullspan" : ""}`}
+                  key="shots-reel"
+                >
                   <ShotsReel
                     best={data.bestReel ?? []}
                     worst={data.worstReel ?? []}
@@ -1287,7 +1290,7 @@ export default function FeedClient({
                   {reelHere}
                   <li
                     data-bet-id={__bet.id}
-                    className="feed-row-wrap"
+                    className={`feed-row-wrap${isV3 ? " feed-v3-fullspan" : ""}`}
                   >
                     <BetPostErrorBoundary label={__bet.id}>
                       <BetPost
@@ -1321,7 +1324,7 @@ export default function FeedClient({
               return (
                 <Fragment key={`crew:${p.id}`}>
                   {reelHere}
-                  <li className="feed-row-wrap">
+                  <li className={`feed-row-wrap${isV3 ? " feed-v3-fullspan" : ""}`}>
                     {p.kind === "crew-bet" && (
                       <CrewBetPost
                         post={p}
@@ -1398,63 +1401,33 @@ export default function FeedClient({
                     contextRows: data.rows,
                   })
                 : null;
-            // v3-only decorations: rank the event, add tier classes,
-            // flag it for a fresh-arrival flash. For ticker tier
-            // score events we bypass ShotPost entirely and render
-            // the compact TickerRow so routine bogeys/birdies read
-            // as one-liners.
-            let v3Tier: "hero" | "standard" | "ticker" | null = null;
+            // v3 desktop: rank the event for the accent-stripe
+            // colour (Mine = gold, notable = blue), flag it for a
+            // fresh-arrival flash. Card SIZE stays uniform — the
+            // desktop grid puts every shot in an identical 82 px cell
+            // regardless of tier. Mobile falls through to ShotPost
+            // exactly as v1 renders it (v3 CSS is @media-scoped ≥1024).
             let v3Mine = false;
+            let v3Notable = false;
             let v3Flash = false;
             if (isV3 && rankerCtx) {
               const r = rankEvent(event, rankerCtx);
-              v3Tier = r.tier;
               v3Mine = r.mine;
+              v3Notable = r.tier === "hero";
               if (!v3SeenIds.current.has(event.id)) {
                 v3SeenIds.current.add(event.id);
-                // Only flash arrivals that landed AFTER the first
-                // paint (avoids flashing every historical event
-                // on initial mount).
                 if (Date.now() - v3MountTs.current > 3000) v3Flash = true;
               }
             }
             const v3ClassName = isV3
               ? [
                   "feed-row-wrap",
-                  v3Tier ? `feed-v3-tier-${v3Tier}` : "",
-                  v3Mine ? "feed-v3-mine" : "",
+                  "feed-v3-shot-cell",
                   v3Flash ? "feed-v3-flash" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")
               : "feed-row-wrap";
-
-            // Render ticker rows (v3 only, ticker tier, score events
-            // that aren't putt polls or notable-share candidates).
-            if (
-              isV3 &&
-              v3Tier === "ticker" &&
-              event.type === "score" &&
-              !isPuttPoll &&
-              !isNotable
-            ) {
-              return (
-                <Fragment key={event.id}>
-                  {reelHere}
-                  <li data-event-id={event.id} className={v3ClassName}>
-                    <TickerRow
-                      event={event}
-                      isMine={v3Mine}
-                      onOpen={() => setShotDetail(event)}
-                      onReact={() => {
-                        void sendBurst("♡");
-                        addEmojiReaction(`shot:${event.id}`, "♡");
-                      }}
-                    />
-                  </li>
-                </Fragment>
-              );
-            }
             return (
               <Fragment key={event.id}>
                 {reelHere}
@@ -1462,39 +1435,64 @@ export default function FeedClient({
                   data-event-id={event.id}
                   className={v3ClassName}
                 >
-                  <ShotPost
-                    event={event}
-                    commentCount={count}
-                    contextTag={primaryContextTag}
-                    handStatus={data.handStatus?.[event.playerId] ?? null}
-                    impact={impact}
-                    onShare={
-                      isNotable ? (ev) => setShotDetail(ev) : undefined
-                    }
-                    showDiagram={isNotable}
-                    onCustomReact={(emoji) => {
-                      // Float-up across the page + bump the chip
-                      // cluster on this card. Long-press adds (never
-                      // toggles off); tap-pill below toggles.
-                      void sendBurst(emoji);
-                      addEmojiReaction(`shot:${event.id}`, emoji);
-                    }}
-                    reactionState={emojiReactions[`shot:${event.id}`]}
-                    onToggleReaction={(emoji) =>
-                      toggleEmojiReaction(`shot:${event.id}`, emoji)
-                    }
-                  />
-                  {isPuttPoll && event.pollId && (
-                    <PuttPollWidget
-                      pollId={event.pollId}
-                      puttDistanceFt={event.puttDistanceFt}
-                      playerName={event.playerName}
-                      serverState={data.puttPolls?.[event.pollId]}
-                      optimisticVote={myPollVotes[event.pollId]}
-                      optimisticCounts={pollCounts[event.pollId]}
-                      onVote={(v) => sendPollVote(event.pollId!, v)}
+                  {/* Desktop v3 unified card. CSS hides this on mobile
+                      (<1024px) so ShotPost below remains the mobile
+                      render path, unchanged. */}
+                  {isV3 && (
+                    <UnifiedShotCard
+                      event={event}
+                      contextTag={primaryContextTag}
+                      isMine={v3Mine}
+                      isNotable={v3Notable}
+                      onOpen={() => setShotDetail(event)}
+                      onReact={() => {
+                        void sendBurst("♡");
+                        addEmojiReaction(`shot:${event.id}`, "♡");
+                      }}
+                      onShare={
+                        isNotable ? () => setShotDetail(event) : undefined
+                      }
                     />
                   )}
+                  <div
+                    className={
+                      isV3 ? "feed-v3-mobile-content" : undefined
+                    }
+                  >
+                    <ShotPost
+                      event={event}
+                      commentCount={count}
+                      contextTag={primaryContextTag}
+                      handStatus={data.handStatus?.[event.playerId] ?? null}
+                      impact={impact}
+                      onShare={
+                        isNotable ? (ev) => setShotDetail(ev) : undefined
+                      }
+                      showDiagram={isNotable}
+                      onCustomReact={(emoji) => {
+                        // Float-up across the page + bump the chip
+                        // cluster on this card. Long-press adds
+                        // (never toggles off); tap-pill below toggles.
+                        void sendBurst(emoji);
+                        addEmojiReaction(`shot:${event.id}`, emoji);
+                      }}
+                      reactionState={emojiReactions[`shot:${event.id}`]}
+                      onToggleReaction={(emoji) =>
+                        toggleEmojiReaction(`shot:${event.id}`, emoji)
+                      }
+                    />
+                    {isPuttPoll && event.pollId && (
+                      <PuttPollWidget
+                        pollId={event.pollId}
+                        puttDistanceFt={event.puttDistanceFt}
+                        playerName={event.playerName}
+                        serverState={data.puttPolls?.[event.pollId]}
+                        optimisticVote={myPollVotes[event.pollId]}
+                        optimisticCounts={pollCounts[event.pollId]}
+                        onVote={(v) => sendPollVote(event.pollId!, v)}
+                      />
+                    )}
+                  </div>
                 </li>
               </Fragment>
             );

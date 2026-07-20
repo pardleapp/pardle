@@ -28877,3 +28877,330 @@ body[data-chat-open] .addbet-fab {
   0%, 100% { opacity: 1;    transform: scale(1); }
   50%      { opacity: 0.55; transform: scale(0.85); }
 }
+
+/* ═════════════════════════════════════════════════════════════════
+   Feed v3 — DESKTOP layout (≥1024px). Precise 2-column grid, one
+   uniform card component for every shot, ruthless colour restraint.
+   Mobile (<1024px) is byte-for-byte untouched.
+   ═════════════════════════════════════════════════════════════════ */
+
+@media (min-width: 1024px) {
+  /* Kill any inherited multi-column masonry in v3 and go to a strict
+     2-column grid with tight gutters. Rows auto-size to content
+     (shot cells are fixed height; full-span rows are auto). */
+  .feed-v3 .feed-list,
+  body:has(.feed-v3) .feed-list {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px 4px 24px !important;
+    align-items: stretch;
+  }
+
+  /* Full-width rows (bet posts, crew posts, shots-of-the-day reel,
+     poll widgets attached to shot cards). Span both columns and
+     keep their intrinsic height. */
+  .feed-v3 .feed-list > li:has(.shots-reel),
+  .feed-v3 .feed-list > li.feed-v3-fullspan,
+  body:has(.feed-v3) .feed-list > li.feed-v3-fullspan {
+    grid-column: 1 / -1;
+  }
+
+  /* Any shot-card cell: fixed 82 px so the grid rows align cleanly. */
+  .feed-v3 .feed-list > li.feed-v3-shot-cell {
+    height: 82px;
+    min-height: 0;
+    overflow: hidden;
+    display: block;
+    padding: 0;
+    background: transparent;
+    border: none;
+  }
+}
+
+/* ── UnifiedShotCard skeleton (desktop only; mobile falls back to
+   ShotPost via FeedClient's variant guard so nothing appears here) */
+@media (min-width: 1024px) {
+  .feed-v3 .feed-v3-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: 3px 34px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    height: 100%;
+    padding: 10px 12px 10px 0;
+    background: white;
+    border: 1px solid oklch(0.94 0.008 95);
+    border-radius: 8px;
+    color: oklch(0.25 0.02 150);
+    font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+    cursor: pointer;
+    transition: border-color 0.12s ease, background-color 0.12s ease, transform 0.08s ease;
+    overflow: hidden;
+  }
+  .feed-v3 .feed-v3-card:hover {
+    background: oklch(0.99 0.005 95);
+    border-color: oklch(0.88 0.012 95);
+  }
+  .feed-v3 .feed-v3-card:active {
+    transform: translateY(0.5px);
+  }
+
+  /* Accent stripe — colour carries the priority signal. Default is
+     invisible (transparent), Mine goes gold, notable events go blue.
+     3 px wide, top-to-bottom, flush inside the border-radius. */
+  .feed-v3 .feed-v3-card-stripe {
+    align-self: stretch;
+    width: 3px;
+    background: transparent;
+    border-radius: 2px;
+  }
+  .feed-v3 .feed-v3-card-mine .feed-v3-card-stripe {
+    background: oklch(0.75 0.18 65);
+    box-shadow: 0 0 6px oklch(0.75 0.18 65 / 0.45);
+  }
+  .feed-v3 .feed-v3-card-notable .feed-v3-card-stripe {
+    background: oklch(0.55 0.15 250);
+  }
+
+  /* Avatar — small, restrained. PlayerAvatar renders its own sizing
+     via size="sm"; we wrap in a 34 px cell so the outer grid stays
+     predictable. */
+  .feed-v3 .feed-v3-card-avatar {
+    width: 34px;
+    height: 34px;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Card body — 3 stacked rows: headline / verb / context. Fixed
+     line heights so the total is exactly 62 px between the padding. */
+  .feed-v3 .feed-v3-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .feed-v3 .feed-v3-card-headline {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: oklch(0.5 0.02 150);
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .feed-v3 .feed-v3-card-name {
+    color: oklch(0.2 0.02 150);
+    font-weight: 800;
+  }
+  .feed-v3 .feed-v3-card-hole {
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+    color: oklch(0.5 0.02 150);
+    letter-spacing: 0;
+  }
+  .feed-v3 .feed-v3-card-time {
+    font-family: var(--font-mono, monospace);
+    font-size: 10px;
+    color: oklch(0.55 0.02 150);
+    letter-spacing: 0.2px;
+    margin-left: auto;
+  }
+  .feed-v3 .feed-v3-card-sep {
+    color: oklch(0.75 0.008 95);
+    font-weight: 400;
+  }
+  .feed-v3 .feed-v3-card-verb {
+    font-size: 14px;
+    font-weight: 700;
+    color: oklch(0.2 0.02 150);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.25;
+  }
+  .feed-v3 .feed-v3-card-context {
+    font-size: 11px;
+    color: oklch(0.5 0.02 150);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-height: 14px;
+  }
+  .feed-v3 .feed-v3-card-context-empty {
+    visibility: hidden;
+  }
+
+  /* Anchor — right side. Tag on top (muted monochrome), score below
+     (the ONE coloured element on the card). */
+  .feed-v3 .feed-v3-card-anchor {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    padding-left: 12px;
+    border-left: 1px solid oklch(0.95 0.006 95);
+    margin-left: 6px;
+  }
+  .feed-v3 .feed-v3-card-tag {
+    font-family: var(--font-mono, monospace);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    color: oklch(0.55 0.02 150);
+    background: oklch(0.96 0.006 95);
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    line-height: 1.2;
+  }
+  /* Tags are monochrome by default — colour reserved for the score
+     delta. The only exception is the ACE tag (still worth flagging). */
+  .feed-v3 .feed-v3-card-tag-ace,
+  .feed-v3 .feed-v3-card-tag-albatross {
+    background: oklch(0.94 0.05 250);
+    color: oklch(0.35 0.15 250);
+  }
+
+  /* Score — the emotional beat. Mono, big, coloured by polarity. */
+  .feed-v3 .feed-v3-card-score {
+    font-family: var(--font-mono, monospace);
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.5px;
+    color: oklch(0.4 0.02 150);
+    min-width: 44px;
+    text-align: right;
+  }
+  .feed-v3 .feed-v3-card-score-under {
+    color: oklch(0.4 0.16 150);
+  }
+  .feed-v3 .feed-v3-card-score-over {
+    color: oklch(0.5 0.18 25);
+  }
+  .feed-v3 .feed-v3-card-score-even {
+    color: oklch(0.5 0.02 150);
+  }
+  .feed-v3 .feed-v3-card-score-none {
+    color: oklch(0.75 0.008 95);
+  }
+
+  /* Actions — hidden at rest, fade in on card hover. Absolute-
+     positioned so they overlay the anchor without pushing content. */
+  .feed-v3 .feed-v3-card-actions {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    display: inline-flex;
+    gap: 3px;
+    opacity: 0;
+    transition: opacity 0.14s ease;
+    pointer-events: none;
+  }
+  .feed-v3 .feed-v3-card:hover .feed-v3-card-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .feed-v3 .feed-v3-card-action {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid oklch(0.9 0.008 95);
+    background: white;
+    color: oklch(0.4 0.02 150);
+    border-radius: 999px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .feed-v3 .feed-v3-card-action:hover {
+    border-color: oklch(0.55 0.15 250);
+    color: oklch(0.4 0.15 250);
+    background: oklch(0.98 0.02 250);
+  }
+}
+
+/* ── Suppress v1's tier-sized helpers when v3 is on (desktop) —
+   uniformity beats hierarchy on the desktop grid. The ranker still
+   runs (its `mine` / notable flags feed the stripe colour), but tier
+   no longer changes card size. */
+@media (min-width: 1024px) {
+  .feed-v3 .feed-v3-tier-hero,
+  .feed-v3 .feed-v3-tier-standard,
+  .feed-v3 .feed-v3-tier-ticker {
+    border-left: none;
+    background: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+  }
+  .feed-v3 .feed-v3-tier-hero::before {
+    display: none;
+  }
+  /* Cell fresh-arrival flash — subtle slide-in top-of-column. */
+  .feed-v3 .feed-list > li.feed-v3-shot-cell.feed-v3-flash .feed-v3-card {
+    animation: feed-v3-desk-flash 800ms ease;
+  }
+  @keyframes feed-v3-desk-flash {
+    0%   { transform: translateY(-6px); opacity: 0.5;   box-shadow: 0 0 0 2px oklch(0.75 0.18 65 / 0.35); }
+    45%  { transform: translateY(0);    opacity: 1;     box-shadow: 0 0 0 2px oklch(0.75 0.18 65 / 0.25); }
+    100% { transform: translateY(0);    opacity: 1;     box-shadow: 0 0 0 0   oklch(0.75 0.18 65 / 0);    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .feed-v3 .feed-list > li.feed-v3-shot-cell.feed-v3-flash .feed-v3-card {
+      animation: none;
+    }
+  }
+}
+
+/* ── LIVE badge pulse — the tournament-strip's inline dot already
+   has an animation on desktop but rides ~subtle. In v3 make it a
+   clearer, more premium heartbeat. */
+@media (min-width: 1024px) {
+  .feed-v3 .pv-tournament-strip {
+    padding: 6px 12px !important;
+    border-radius: 8px;
+    background: oklch(0.99 0.005 95);
+    border: 1px solid oklch(0.94 0.008 95);
+    margin-bottom: 8px;
+    font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  }
+  .feed-v3 .feed-live-pulse-inline {
+    width: 8px !important;
+    height: 8px !important;
+    background: oklch(0.55 0.18 25) !important;
+    box-shadow: 0 0 8px oklch(0.55 0.18 25 / 0.6);
+    animation: feed-v3-live-pulse 1.6s ease-in-out infinite !important;
+  }
+  @keyframes feed-v3-live-pulse {
+    0%, 100% { opacity: 1;    transform: scale(1);    box-shadow: 0 0 8px oklch(0.55 0.18 25 / 0.7); }
+    50%      { opacity: 0.55; transform: scale(0.82); box-shadow: 0 0 12px oklch(0.55 0.18 25 / 0.4); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .feed-v3 .feed-live-pulse-inline {
+      animation: none !important;
+    }
+  }
+}
+
+/* ── v3 desktop/mobile content toggle ─────────────────────────────
+   Both UnifiedShotCard and ShotPost render inside every v3 shot li;
+   CSS decides which one is visible for the current breakpoint. */
+.feed-v3 .feed-v3-card { display: none; }
+@media (min-width: 1024px) {
+  .feed-v3 .feed-v3-shot-cell .feed-v3-mobile-content { display: none; }
+  .feed-v3 .feed-v3-shot-cell .feed-v3-card { display: grid; }
+}
