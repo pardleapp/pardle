@@ -224,8 +224,112 @@ function minutesToClock(mins: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-export async function GET() {
+/** Load a historical 3M Open payload and reshape into the same
+ *  OutRow[] the live path returns. skillBaseline in the JSON is the
+ *  per-player 4-round average sg_total (see the fetcher script), so
+ *  the chart's "adjusted = toPar + sgTotal" formula naturally shows
+ *  each round's deviation from that player's own week baseline. */
+interface HistoricalRound {
+  teetime: string | null;
+  startHole: number;
+  score: number;
+  sgTotal: number | null;
+  coursePar: number | null;
+}
+interface HistoricalPlayer {
+  dgId: string;
+  pgaId: string | null;
+  name: string;
+  skillBaseline: number | null;
+  rounds: Record<string, HistoricalRound>;
+}
+interface HistoricalPayload {
+  year: number;
+  dgEventName: string;
+  players: HistoricalPlayer[];
+}
+
+async function loadHistorical(year: number): Promise<HistoricalPayload | null> {
   try {
+    const p = path.join(
+      process.cwd(),
+      "data",
+      "historical",
+      `3m-open-${year}.json`,
+    );
+    const text = await fs.readFile(p, "utf8");
+    return JSON.parse(text) as HistoricalPayload;
+  } catch {
+    return null;
+  }
+}
+
+function buildHistoricalRows(payload: HistoricalPayload): OutRow[] {
+  const rows: OutRow[] = [];
+  for (const p of payload.players) {
+    const skill = typeof p.skillBaseline === "number" ? p.skillBaseline : 0;
+    const hasSkill = typeof p.skillBaseline === "number";
+    for (const [roundStr, r] of Object.entries(p.rounds)) {
+      const round = Number(roundStr) as RoundNum;
+      const mins = teeToMinutes(r.teetime ?? undefined);
+      if (mins == null) continue;
+      if (typeof r.score !== "number" || typeof r.coursePar !== "number") continue;
+      const toPar = r.score - r.coursePar;
+      rows.push({
+        dgId: p.dgId,
+        name: p.name,
+        round,
+        teeTime: minutesToClock(mins),
+        teeMinutes: mins,
+        sgTotal: skill,
+        toPar,
+        adjusted: toPar + skill,
+        thru: 18,
+        startHole: r.startHole ?? 1,
+        noSkill: !hasSkill,
+        projected: false,
+        thruHoles: 18,
+        currentToPar: toPar,
+      });
+    }
+  }
+  return rows.sort((a, b) => a.teeMinutes - b.teeMinutes);
+}
+
+export async function GET(req: Request) {
+  try {
+    const url = new URL(req.url);
+    const yearParam = url.searchParams.get("year");
+    const yearNum = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : null;
+
+    // Historical branch — one file per year, no external calls.
+    if (yearNum && yearNum !== new Date().getUTCFullYear()) {
+      const hist = await loadHistorical(yearNum);
+      if (!hist) {
+        return NextResponse.json(
+          { ok: false, error: `no historical data for ${yearNum}` },
+          { status: 404 },
+        );
+      }
+      const rows = buildHistoricalRows(hist);
+      const perRound = (r: RoundNum) => rows.filter((x) => x.round === r);
+      return NextResponse.json({
+        ok: true,
+        source: "historical",
+        year: yearNum,
+        eventName: hist.dgEventName,
+        count: rows.length,
+        countByRound: {
+          r1: perRound(1).length,
+          r2: perRound(2).length,
+          r3: perRound(3).length,
+          r4: perRound(4).length,
+        },
+        generatedAt: null,
+        rows,
+      });
+    }
+
     const tour = "pga"; // The Open sits under DG's `pga` feed (majors covered there).
 
     // Resolve the active tournament so we can fetch Pardle's own

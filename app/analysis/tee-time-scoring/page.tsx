@@ -29,9 +29,12 @@ export interface Row {
 interface FetchResp {
   ok: boolean;
   error?: string;
+  source?: "historical";
+  year?: number;
+  eventName?: string;
   count?: number;
   countByRound?: { r1: number; r2: number; r3?: number; r4?: number };
-  generatedAt?: number;
+  generatedAt?: number | null;
   rows?: Row[];
 }
 
@@ -39,13 +42,18 @@ interface FetchResp {
  *  at roughly 15 min intervals so refreshing more often is waste. */
 const POLL_MS = 60_000;
 
+type YearTab = "live" | "2025" | "2024" | "2023";
+const YEAR_TABS: YearTab[] = ["live", "2025", "2024", "2023"];
+
 export default function Page() {
+  const [tab, setTab] = useState<YearTab>("live");
   const [data, setData] = useState<FetchResp | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/analysis/tee-time-scoring", {
+      const qs = tab === "live" ? "" : `?year=${tab}`;
+      const res = await fetch(`/api/analysis/tee-time-scoring${qs}`, {
         cache: "no-store",
       });
       const json = (await res.json()) as FetchResp;
@@ -54,13 +62,15 @@ export default function Page() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "network error");
     }
-  }, []);
+  }, [tab]);
 
   useEffect(() => {
+    setData(null);
     load();
+    if (tab !== "live") return;
     const id = setInterval(load, POLL_MS);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, tab]);
 
   return (
     <main className="container container-wide v4-theme pv-theme">
@@ -97,6 +107,57 @@ export default function Page() {
           pre-tournament skill. Points below zero outperformed baseline,
           above zero under-performed. Refreshes as new players finish.
         </p>
+        <div
+          role="tablist"
+          aria-label="Year"
+          style={{
+            display: "flex",
+            gap: 4,
+            marginTop: 12,
+            marginBottom: 4,
+            flexWrap: "wrap",
+          }}
+        >
+          {YEAR_TABS.map((t) => {
+            const active = tab === t;
+            const label = t === "live" ? "Live" : t;
+            return (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(t)}
+                style={{
+                  padding: "5px 14px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  borderRadius: 6,
+                  border: "1px solid oklch(0.85 0.013 95)",
+                  background: active ? "oklch(0.25 0.02 150)" : "white",
+                  color: active ? "white" : "oklch(0.3 0.02 150)",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        {tab !== "live" && (
+          <p
+            style={{
+              fontSize: 11,
+              color: "oklch(0.55 0.02 150)",
+              margin: "4px 0 0",
+            }}
+          >
+            {data?.eventName ?? "3M Open"} {tab} — TPC Twin Cities. Skill
+            baseline is the player&apos;s own 4-round average that week;
+            deviation from that is what the y-axis shows.
+          </p>
+        )}
       {error || (data && !data.ok) ? (
         <p style={{ marginTop: 20, color: "oklch(0.5 0.16 25)" }}>
           Couldn&apos;t load data: {error ?? data?.error}

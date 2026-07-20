@@ -22,6 +22,8 @@
  */
 
 import { NextResponse } from "next/server";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
 import { getSnapshot, getCachedTournamentPars } from "@/lib/feed/store";
 
@@ -99,8 +101,151 @@ function pgaIdOf(entry: FieldEntry): string | null {
   return entry.player_num ? String(entry.player_num) : null;
 }
 
-export async function GET() {
+/** Historical file shape (see scripts/fetch-3m-historical.mjs). */
+interface HistoricalRound {
+  teetime: string | null;
+  startHole: number;
+  coursePar: number | null;
+  holes: Record<string, { strokes: number; par: number }> | null;
+}
+interface HistoricalPlayer {
+  dgId: string;
+  pgaId: string | null;
+  name: string;
+  rounds: Record<string, HistoricalRound>;
+}
+interface HistoricalPayload {
+  year: number;
+  dgEventName: string;
+  players: HistoricalPlayer[];
+}
+
+/** Parse "7:29am" / "1:45pm" / "07:29" → minutes since midnight. */
+function historicalTeeToMinutes(t: string | null | undefined): number | null {
+  if (!t) return null;
+  const s = t.trim();
+  const h12 = s.match(/^(\d{1,2}):(\d{2})\s*([ap]m)$/i);
+  if (h12) {
+    let h = Number(h12[1]);
+    const m = Number(h12[2]);
+    const isPm = h12[3].toLowerCase() === "pm";
+    if (h === 12) h = 0;
+    if (isPm) h += 12;
+    return h * 60 + m;
+  }
+  const h24 = s.match(/(\d{1,2}):(\d{2})/);
+  if (h24) {
+    const h = Number(h24[1]);
+    const m = Number(h24[2]);
+    if (h >= 0 && h < 24 && m >= 0 && m < 60) return h * 60 + m;
+  }
+  return null;
+}
+
+async function buildHistoricalCells(year: number) {
+  const p = path.join(process.cwd(), "data", "historical", `3m-open-${year}.json`);
+  let payload: HistoricalPayload;
   try {
+    payload = JSON.parse(await fs.readFile(p, "utf8")) as HistoricalPayload;
+  } catch {
+    return null;
+  }
+  const cellMap = new Map<string, CellAgg>();
+  let tallied = 0;
+  let noHoles = 0;
+  let noTee = 0;
+  for (const player of payload.players) {
+    for (const [roundStr, r] of Object.entries(player.rounds)) {
+      const round = Number(roundStr);
+      const teeMins = historicalTeeToMinutes(r.teetime);
+      if (teeMins == null) {
+        noTee++;
+        continue;
+      }
+      if (!r.holes) {
+        noHoles++;
+        continue;
+      }
+      const startHole = r.startHole || 1;
+      for (const [holeStr, cell] of Object.entries(r.holes)) {
+        const hole = Number(holeStr);
+        const strokes = Number(cell.strokes);
+        const par = Number(cell.par);
+        if (!Number.isFinite(strokes) || !Number.isFinite(par) || strokes <= 0) continue;
+        const pos = holePosition(hole, startHole);
+        const completionMins = teeMins + (pos + 1) * HOLE_PACE_MIN;
+        const bucket = Math.floor(completionMins / BUCKET_MIN) * BUCKET_MIN;
+        const key = `${round}:${hole}:${bucket}`;
+        const c = cellMap.get(key) ?? {
+          round,
+          hole,
+          timeBucket: bucket,
+          sumVsPar: 0,
+          count: 0,
+        };
+        c.sumVsPar += strokes - par;
+        c.count += 1;
+        cellMap.set(key, c);
+        tallied++;
+      }
+    }
+  }
+  const cells = [...cellMap.values()].map((c) => ({
+    round: c.round,
+    hole: c.hole,
+    timeBucket: c.timeBucket,
+    avgVsPar: c.sumVsPar / c.count,
+    count: c.count,
+  }));
+  return { cells, tallied, noHoles, noTee, eventName: payload.dgEventName };
+}
+
+export async function GET(req: Request) {
+  try {
+    const url = new URL(req.url);
+    const yearParam = url.searchParams.get("year");
+    const yearNum = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : null;
+
+    if (yearNum && yearNum !== new Date().getUTCFullYear()) {
+      const hist = await buildHistoricalCells(yearNum);
+      if (!hist) {
+        return NextResponse.json(
+          { ok: false, error: `no historical data for ${yearNum}` },
+          { status: 404 },
+        );
+      }
+      const roundRanges: Record<
+        number,
+        { minMins: number; maxMins: number; cellCount: number }
+      > = {};
+      for (const c of hist.cells) {
+        const r = roundRanges[c.round] ?? {
+          minMins: Infinity,
+          maxMins: -Infinity,
+          cellCount: 0,
+        };
+        if (c.timeBucket < r.minMins) r.minMins = c.timeBucket;
+        if (c.timeBucket > r.maxMins) r.maxMins = c.timeBucket;
+        r.cellCount += 1;
+        roundRanges[c.round] = r;
+      }
+      return NextResponse.json({
+        ok: true,
+        source: "historical",
+        year: yearNum,
+        eventName: hist.eventName,
+        generatedAt: null,
+        bucketMinutes: BUCKET_MIN,
+        cells: hist.cells,
+        roundRanges,
+        diag: {
+          tallied: hist.tallied,
+          noHoles: hist.noHoles,
+          noTee: hist.noTee,
+        },
+      });
+    }
+
     const active = await getActiveTournament();
     if (!active?.tournament?.id) {
       return NextResponse.json(
