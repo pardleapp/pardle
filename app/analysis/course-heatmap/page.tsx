@@ -95,9 +95,37 @@ export default function Page() {
     })();
   }, [data?.tournamentId, pinsForTournament]);
 
-  const openHoleData: CoursePinHole | null = openHole != null
-    ? pins?.holes.find((h) => h.holeNumber === openHole) ?? null
-    : null;
+  /** Merge the raw pin sheet with per-hole/per-round scoring derived
+   *  from the heatmap cells we already have. PGA Tour's own
+   *  scoringAverage field on courseStats is empty for historical
+   *  events; the cells we render the heatmap from carry the same
+   *  signal so we fill scoringByRound here rather than fetching
+   *  again. Weighted by player count per bucket so a sparse morning
+   *  window doesn't skew the round total. */
+  const openHoleData: CoursePinHole | null = (() => {
+    if (openHole == null) return null;
+    const base = pins?.holes.find((h) => h.holeNumber === openHole) ?? null;
+    if (!base) return null;
+    if (!data?.cells) return base;
+    const merged: CoursePinHole["scoringByRound"] = { ...base.scoringByRound };
+    for (let round = 1; round <= 4; round++) {
+      // Skip if PGA Tour already had a real value for this round.
+      const existing = merged[round];
+      if (existing?.vsPar != null || existing?.avg != null) continue;
+      let sum = 0;
+      let n = 0;
+      for (const cell of data.cells) {
+        if (cell.round !== round || cell.hole !== openHole) continue;
+        sum += cell.avgVsPar * cell.count;
+        n += cell.count;
+      }
+      if (n === 0) continue;
+      const vsPar = sum / n;
+      const avg = base.par != null ? base.par + vsPar : null;
+      merged[round] = { avg, vsPar };
+    }
+    return { ...base, scoringByRound: merged };
+  })();
 
   return (
     <main className="container container-wide v4-theme pv-theme">
