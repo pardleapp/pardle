@@ -787,10 +787,10 @@ function ChartCore({
         >
           Drag · scroll · pinch to zoom
         </span>
-        {/* Skill-adjust on/off — lets the reader flip between
-            "who out-played their form?" (adjusted, default) and
-            "who actually shot low today?" (raw round-to-par). Same
-            axis; trend lines rebuild instantly when toggled. */}
+        {/* Both toggles use the same visual grammar: fixed label,
+            black background when the feature is ON, white when OFF.
+            "Skill adjusted" black = adjustment applied (default).
+            "Hide points" black = scatter dots hidden. */}
         <button
           type="button"
           onClick={() => setShowAdjusted((v) => !v)}
@@ -807,23 +807,24 @@ function ChartCore({
               : "Y-axis is raw round-to-par — click for skill-adjusted"
           }
         >
-          {showAdjusted ? "Skill-adjusted" : "Raw scores"}
+          Skill adjusted
         </button>
-        {/* Points on/off — lets the reader strip the scatter so the
-            trend lines read clearly on their own. Trend lines stay
-            regardless (they're the anchor of the chart). */}
         <button
           type="button"
           onClick={() => setShowPoints((v) => !v)}
-          aria-pressed={showPoints}
+          aria-pressed={!showPoints}
           style={{
             ...btnStyle,
-            background: showPoints ? "white" : "oklch(0.25 0.02 150)",
-            color: showPoints ? "oklch(0.3 0.02 150)" : "white",
+            background: !showPoints ? "oklch(0.25 0.02 150)" : "white",
+            color: !showPoints ? "white" : "oklch(0.3 0.02 150)",
           }}
-          title={showPoints ? "Hide individual players" : "Show individual players"}
+          title={
+            showPoints
+              ? "Hide the scatter — trend lines only"
+              : "Show individual players"
+          }
         >
-          {showPoints ? "Hide points" : "Show points"}
+          Hide points
         </button>
         {/* Round filter — pill group covers all 4 rounds + "All". */}
         <div
