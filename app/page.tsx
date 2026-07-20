@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { BRAND } from "@/lib/brand";
 import FeedClient from "./live/FeedClient";
+import LeaderboardFeed from "./live/v4/LeaderboardFeed";
 import AddBetTrigger from "./_components/AddBetTrigger";
 
 export const metadata = {
@@ -46,7 +47,7 @@ export default async function HomeLive({ searchParams }: PageProps) {
     params.back != null && Number.isFinite(Number(params.back))
       ? Number(params.back)
       : undefined;
-  const variant = params.v === "3" ? "v3" : "v1";
+  const variant = params.v === "3" ? "v3" : params.v === "4" ? "v4" : "v1";
   return (
     <main className="container container-wide v4-theme pv-theme">
       {replayId && (
@@ -65,11 +66,15 @@ export default async function HomeLive({ searchParams }: PageProps) {
           {backHours != null ? ` · rewound ${backHours}h` : ""} · not live
         </div>
       )}
-      <FeedClient
-        forcedTournamentId={replayId}
-        replayBackHours={backHours}
-        variant={variant}
-      />
+      {variant === "v4" ? (
+        <LeaderboardFeed />
+      ) : (
+        <FeedClient
+          forcedTournamentId={replayId}
+          replayBackHours={backHours}
+          variant={variant === "v3" ? "v3" : "v1"}
+        />
+      )}
       <Suspense fallback={null}>
         <AddBetTrigger />
       </Suspense>
