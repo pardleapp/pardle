@@ -953,6 +953,15 @@ export async function getTournamentPutts(
       if (!greenImageByHole[holeNum] && hole.greenImage) {
         greenImageByHole[holeNum] = hole.greenImage;
       }
+      // The final stroke of the hole is definitionally the one that
+      // holed out — most reliable "made" signal since PGA Tour's
+      // toLocationCode conventions vary by season / product feed.
+      // Compute strokeNumber ceiling once per hole and mark strokes
+      // that match it.
+      const finalStrokeNumber = (hole.strokes ?? []).reduce(
+        (max, s) => (s.strokeNumber > max ? s.strokeNumber : max),
+        0,
+      );
       for (const stroke of hole.strokes ?? []) {
         // Only on-green strokes (putts). Guard against penalty /
         // drop strokes with no coords.
@@ -983,10 +992,15 @@ export async function getTournamentPutts(
           y1,
           x2,
           y2,
-          // toLocationCode "OHL" = in the hole. Occasionally spelled
-          // "HOL" in older feeds; check both.
+          // Made when this is the last stroke of the hole. Covers
+          // 1-putt / 2-putt / 3-putt outcomes; each hole's final
+          // stroke IS the make. Fallback to the location-code check
+          // when strokes weren't numbered (rare).
           made:
-            stroke.toLocationCode === "OHL" || stroke.toLocationCode === "HOL",
+            (finalStrokeNumber > 0 &&
+              stroke.strokeNumber === finalStrokeNumber) ||
+            stroke.toLocationCode === "OHL" ||
+            stroke.toLocationCode === "HOL",
           distanceFt: parseDistanceFt(stroke.distance),
           strokeNumber: stroke.strokeNumber,
         };

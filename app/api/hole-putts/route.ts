@@ -26,8 +26,12 @@ const redis = Redis.fromEnv();
 const TTL_SECONDS = 6 * 60 * 60;
 const DEFAULT_PLAYER_LIMIT = 60;
 
+// Version tag on the cache key — bump when the shape of the response
+// or the derivation of any field changes so stale entries expire
+// immediately instead of poisoning the next 6h of reads.
+const CACHE_VERSION = "v2";
 function cacheKey(tournamentId: string, limit: number): string {
-  return `feed:putts:${tournamentId}:${limit}`;
+  return `feed:putts:${CACHE_VERSION}:${tournamentId}:${limit}`;
 }
 
 export async function GET(req: Request) {
