@@ -29879,14 +29879,26 @@ body[data-chat-open] .addbet-fab {
   text-transform: uppercase;
   flex-shrink: 0;
 }
-.feed-v4 .v4-latest-tag-birdie,
-.feed-v4 .v4-latest-tag-eagle,
-.feed-v4 .v4-latest-tag-bogey,
-.feed-v4 .v4-latest-tag-double,
+/* Shot-type tags (no polarity) — muted grey. */
 .feed-v4 .v4-latest-tag-shot,
-.feed-v4 .v4-latest-tag-misc {
+.feed-v4 .v4-latest-tag-misc,
+.feed-v4 .v4-latest-tag-position {
   background: oklch(0.96 0.006 95);
   color: oklch(0.5 0.02 150);
+}
+/* Hole-outcome tags DO have polarity — keep the semantic tint so the
+   eye picks up birdie/eagle vs bogey/double at a glance, tuned to
+   sit softer than the score number itself (score is the loudest
+   chromatic beat; the tag is a supporting cue). */
+.feed-v4 .v4-latest-tag-birdie,
+.feed-v4 .v4-latest-tag-eagle {
+  background: oklch(0.94 0.06 150);
+  color: oklch(0.32 0.14 150);
+}
+.feed-v4 .v4-latest-tag-bogey,
+.feed-v4 .v4-latest-tag-double {
+  background: oklch(0.94 0.04 28);
+  color: oklch(0.42 0.16 28);
 }
 .feed-v4 .v4-latest-tag-ace,
 .feed-v4 .v4-latest-tag-albatross {
