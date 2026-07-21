@@ -99,14 +99,51 @@ function mean(values: number[]): number {
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
+/** Median of a numeric array — used to anchor per-player relative
+ *  filtering below without pulling in a stats lib. */
+function medianOf(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? sorted[mid]
+    : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 /** Records may include pre-filter historical data (par 3s, 3-wood
- *  layups). Enforce the same shape-analysis constraints as
- *  getTournamentTeeShots at read time so profiles stay clean
- *  without re-backfilling. */
+ *  layups). Enforce the same absolute constraints as
+ *  getTournamentTeeShots at read time — so profiles stay clean
+ *  without re-backfilling — then layer a per-player relative filter
+ *  on top:
+ *
+ *  Layer 1 (absolute, matches ingest):
+ *    - par ≥ 4
+ *    - launch spin ≤ 3500 rpm  (drivers spin 2200–3000; 3-woods 3500+)
+ *    - ball speed ≥ 148 mph    (below this is almost never driver)
+ *
+ *  Layer 2 (per-player relative):
+ *    - ball speed ≥ (this player's median ball speed) − 15 mph
+ *    A slow driver (e.g. Steven Fisk, median ~168 mph) can still
+ *    show 158 mph layups that pass the absolute floor. Anchoring
+ *    on the player's own median catches those without over-
+ *    filtering big hitters. 15 mph = roughly 3σ of a tour player's
+ *    driver ball-speed distribution.
+ *
+ *  Layer 2 needs enough data to trust the median. With <20 records
+ *  we skip it — noisy median would over-filter. */
 function eligibleDrives(records: TeeShotRecord[]): TeeShotRecord[] {
-  return records.filter(
-    (r) => r.par >= 4 && r.ballSpeed >= 145,
+  const layer1 = records.filter(
+    (r) =>
+      r.par >= 4 &&
+      // spin=0 means the shot has no radar spin datum stored — don't
+      // penalise it via this layer, other filters still gate it.
+      (r.launchSpin === 0 || r.launchSpin <= 3500) &&
+      r.ballSpeed >= 148,
   );
+  if (layer1.length < 20) return layer1;
+  const medianBs = medianOf(layer1.map((r) => r.ballSpeed));
+  const floor = Math.max(148, medianBs - 15);
+  return layer1.filter((r) => r.ballSpeed >= floor);
 }
 
 export function buildProfile(

@@ -234,7 +234,9 @@ async function fetchTeeShots(tournamentId, requests) {
           ) {
             continue;
           }
-          if (radar.ballSpeed < 145) continue;
+          // Match lib/golf-api/pgatour.getTournamentTeeShots.
+          if (radar.launchSpin > 3500) continue;
+          if (radar.ballSpeed < 148) continue;
           out.push({
             playerId,
             playerName: nameById.get(playerId) ?? playerName,

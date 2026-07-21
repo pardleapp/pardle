@@ -1169,10 +1169,21 @@ export async function getTournamentTeeShots(
             continue;
           }
           // Even on par 4/5s, players sometimes lay up with a
-          // 3-wood or long iron. Cut anything under ~145 mph ball
-          // speed — tour driver mean is ~168 mph; the tail below
-          // 145 is dominated by fairway-wood/iron layups.
-          if (radar.ballSpeed < 145) continue;
+          // 3-wood or long iron. Two-layer rejection:
+          //   1. Launch spin ceiling — modern tour drivers spin
+          //      2200–3000 rpm; 3-wood is 3500+; long iron 4500+.
+          //      Cleanest single signal for club selection.
+          //   2. Absolute ball-speed floor — a driver almost never
+          //      registers under 148 mph on tour. Backstop for
+          //      shots where spin data is missing.
+          // Per-player relative filtering (catches slow drivers'
+          // layups) runs at read time in buildProfile.
+          if (
+            typeof radar.launchSpin === "number" &&
+            radar.launchSpin > 3500
+          )
+            continue;
+          if (radar.ballSpeed < 148) continue;
           out.push({
             playerId,
             playerName: nameByPlayerId.get(playerId) ?? playerName,
