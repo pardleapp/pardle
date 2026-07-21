@@ -13,6 +13,7 @@ import type {
   CoursePinHole,
   TournamentPuttSheet,
 } from "@/lib/golf-api/pgatour";
+import type { HoleBirdieData } from "@/lib/analysis/course-birdies";
 
 interface FetchResp {
   ok: boolean;
@@ -45,6 +46,14 @@ interface PuttsResp {
   error?: string;
 }
 
+interface BirdieHistResp {
+  ok: boolean;
+  cached?: boolean;
+  yearsCovered?: number[];
+  holes?: Record<string, HoleBirdieData>;
+  error?: string;
+}
+
 const POLL_MS = 60_000;
 type YearTab = "live" | "2025" | "2024" | "2023";
 const YEAR_TABS: YearTab[] = ["live", "2025", "2024", "2023"];
@@ -58,6 +67,10 @@ export default function Page() {
   const [putts, setPutts] = useState<TournamentPuttSheet | null>(null);
   const [puttsLoading, setPuttsLoading] = useState(false);
   const [openHole, setOpenHole] = useState<number | null>(null);
+  const [birdieHistoryByHole, setBirdieHistoryByHole] = useState<Record<
+    string,
+    HoleBirdieData
+  > | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -82,6 +95,7 @@ export default function Page() {
     setPutts(null);
     setPuttsLoading(false);
     setOpenHole(null);
+    setBirdieHistoryByHole(null);
     load();
     // Only the live tab polls; historical files never change.
     if (tab !== "live") return;
@@ -122,6 +136,20 @@ export default function Page() {
         /* putt overlay is non-fatal; modal will fall back to no overlay */
       } finally {
         setPuttsLoading(false);
+      }
+    })();
+    // Multi-season birdie history — cheap after warm cache, so fire
+    // right away rather than waiting for the modal to open.
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/course-pin-birdies?tournamentId=${encodeURIComponent(tid)}`,
+          { cache: "no-store" },
+        );
+        const json = (await res.json()) as BirdieHistResp;
+        if (json.ok && json.holes) setBirdieHistoryByHole(json.holes);
+      } catch {
+        /* history overlay is opt-in; failing silently is fine */
       }
     })();
   }, [data?.tournamentId, pinsForTournament]);
@@ -301,6 +329,9 @@ export default function Page() {
             putts?.greenImageByHole[openHoleData.holeNumber] ?? null
           }
           puttsLoading={puttsLoading && (putts?.puttsByHole[openHoleData.holeNumber]?.length ?? 0) === 0}
+          birdieHistory={
+            birdieHistoryByHole?.[String(openHoleData.holeNumber)] ?? null
+          }
           onClose={() => setOpenHole(null)}
         />
       )}

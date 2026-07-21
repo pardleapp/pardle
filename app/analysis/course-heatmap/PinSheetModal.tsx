@@ -14,6 +14,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CoursePinHole, HolePutt } from "@/lib/golf-api/pgatour";
+import type { HoleBirdieData } from "@/lib/analysis/course-birdies";
+import { fmtRate, rateColor } from "@/lib/analysis/course-birdies";
 import SlopeOverlay from "./SlopeOverlay";
 
 interface Props {
@@ -29,6 +31,11 @@ interface Props {
   /** True while the putt fetch is still in flight (first-open,
    *  cold cache). */
   puttsLoading?: boolean;
+  /** Multi-season birdie-or-better data for this hole. Present only
+   *  when the API has data for the tournament's family (currently
+   *  3M Open only). Toggling the "History" mode below renders these
+   *  pins in place of the round-labelled ones. */
+  birdieHistory?: HoleBirdieData | null;
   onClose: () => void;
 }
 
@@ -69,12 +76,16 @@ export default function PinSheetModal({
   puttsForHole,
   puttsGreenImageUrl,
   puttsLoading,
+  birdieHistory,
   onClose,
 }: Props) {
   /** eventId of the pin currently being hovered — null when not
    *  hovering. Renders a small tooltip anchored to that pin with
    *  the round's field scoring average. */
   const [hoverRound, setHoverRound] = useState<number | null>(null);
+  /** Index into birdieHistory.pins for the historical pin being
+   *  hovered. Null = none. */
+  const [hoverHistIdx, setHoverHistIdx] = useState<number | null>(null);
   /** Which round(s) of putts to draw. `null` = all rounds. Filter
    *  chip below the diagram flips this. */
   const [puttRoundFilter, setPuttRoundFilter] = useState<number | null>(null);
@@ -84,6 +95,10 @@ export default function PinSheetModal({
   const [madeOnly, setMadeOnly] = useState(false);
   /** True → overlay inferred slope arrows on the green. */
   const [showSlope, setShowSlope] = useState(false);
+  /** True → replace the round-labelled pins with multi-season
+   *  birdie-or-better pins colored by rate, and paint quadrant
+   *  overlays. Only meaningful when `birdieHistory` is present. */
+  const [showHistory, setShowHistory] = useState(false);
   useEffect(() => {
     if (!hole) return;
     const onKey = (e: KeyboardEvent) => {
@@ -209,6 +224,92 @@ export default function PinSheetModal({
           </button>
         </header>
 
+        {/* History mode toggle — visible whenever we have multi-season
+            birdie data for this hole. Off = current 4-round pins;
+            on = every pin across all seasons colored by birdie rate,
+            plus quadrant overlays. */}
+        {birdieHistory && birdieHistory.pins.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              padding: "8px 10px",
+              marginBottom: 10,
+              border: "1px solid oklch(0.94 0.008 95)",
+              borderRadius: 8,
+              background: "oklch(0.99 0.005 95)",
+              flexWrap: "wrap",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 12,
+                color: "oklch(0.4 0.02 150)",
+                fontFamily: "inherit",
+                display: "flex",
+                alignItems: "baseline",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
+              <strong
+                style={{
+                  fontSize: 11,
+                  letterSpacing: 0.5,
+                  textTransform: "uppercase",
+                  color: "oklch(0.3 0.02 150)",
+                }}
+              >
+                Birdie history
+              </strong>
+              <span
+                style={{
+                  fontFamily: "var(--font-mono, monospace)",
+                  fontSize: 11,
+                  color: "oklch(0.5 0.02 150)",
+                }}
+              >
+                {birdieHistory.pins.length} pins ·{" "}
+                {birdieHistory.yearsCovered.length} season
+                {birdieHistory.yearsCovered.length === 1 ? "" : "s"} (
+                {birdieHistory.yearsCovered.join(", ")}) · overall{" "}
+                <span
+                  style={{
+                    color: "oklch(0.28 0.02 150)",
+                    fontWeight: 700,
+                  }}
+                >
+                  {fmtRate(birdieHistory.overall.rate)}
+                </span>{" "}
+                birdies
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowHistory((v) => !v)}
+              aria-pressed={showHistory}
+              style={{
+                padding: "5px 12px",
+                fontSize: 11,
+                fontFamily: "inherit",
+                fontWeight: 700,
+                borderRadius: 999,
+                border: "1px solid oklch(0.85 0.013 95)",
+                background: showHistory
+                  ? "oklch(0.25 0.02 150)"
+                  : "white",
+                color: showHistory ? "white" : "oklch(0.3 0.02 150)",
+                cursor: "pointer",
+                letterSpacing: 0.3,
+              }}
+            >
+              {showHistory ? "Showing all seasons" : "Show all seasons"}
+            </button>
+          </div>
+        )}
+
         {diagramImageUrl ? (
           // Container's height is driven by the <img> (width:100%, height
           // auto) so pin dot percentages resolve against the image's
@@ -326,7 +427,145 @@ export default function PinSheetModal({
                 pinByRound={hole.pinByRound}
               />
             )}
-            {roundsWithPin.map((round) => {
+            {/* History mode: quadrant colour overlays + historical
+                pin dots. The four quadrant divs sit UNDER the pin
+                dots via z-index. */}
+            {showHistory && birdieHistory && (
+              <>
+                {(["TL", "TR", "BL", "BR"] as const).map((q) => {
+                  const s = birdieHistory.quadrants[q];
+                  const left = q === "TL" || q === "BL" ? "0%" : "50%";
+                  const top = q === "TL" || q === "TR" ? "0%" : "50%";
+                  return (
+                    <div
+                      key={`quad-${q}`}
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        left,
+                        top,
+                        width: "50%",
+                        height: "50%",
+                        background:
+                          s.total > 0
+                            ? rateColor(s.rate, 0.28)
+                            : "transparent",
+                        pointerEvents: "none",
+                        zIndex: 1,
+                      }}
+                    />
+                  );
+                })}
+                {birdieHistory.pins.map((pin, i) => {
+                  const active = hoverHistIdx === i;
+                  const dotColour = rateColor(pin.rate, 1);
+                  // Position tooltip flipped when the pin sits in the
+                  // bottom third so it doesn't fall off the diagram.
+                  const flipUp = pin.y > 0.62;
+                  return (
+                    <div
+                      key={`hp-${i}`}
+                      style={{
+                        position: "absolute",
+                        left: `${pin.x * 100}%`,
+                        top: `${pin.y * 100}%`,
+                        transform: "translate(-50%, -50%)",
+                        lineHeight: 1,
+                        zIndex: 2,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onMouseEnter={() => setHoverHistIdx(i)}
+                        onMouseLeave={() =>
+                          setHoverHistIdx((cur) => (cur === i ? null : cur))
+                        }
+                        onFocus={() => setHoverHistIdx(i)}
+                        onBlur={() =>
+                          setHoverHistIdx((cur) => (cur === i ? null : cur))
+                        }
+                        aria-label={`${pin.year} R${pin.round} pin — ${fmtRate(pin.rate)} birdie rate`}
+                        style={{
+                          width: active ? 20 : 14,
+                          height: active ? 20 : 14,
+                          borderRadius: "50%",
+                          background: dotColour,
+                          border: "2px solid white",
+                          boxShadow: active
+                            ? `0 0 0 2px ${dotColour}, 0 4px 10px rgba(0,0,0,0.4)`
+                            : `0 0 0 1px oklch(0.2 0.02 150 / 0.5), 0 2px 5px rgba(0,0,0,0.3)`,
+                          cursor: "pointer",
+                          padding: 0,
+                          transition: "width 120ms ease, height 120ms ease",
+                        }}
+                      />
+                      {active && (
+                        <div
+                          role="tooltip"
+                          style={{
+                            position: "absolute",
+                            left: "50%",
+                            top: flipUp ? "auto" : "calc(100% + 8px)",
+                            bottom: flipUp ? "calc(100% + 8px)" : "auto",
+                            transform: "translateX(-50%)",
+                            background: "oklch(0.18 0.02 150)",
+                            color: "white",
+                            padding: "6px 10px",
+                            borderRadius: 6,
+                            fontSize: 11,
+                            fontFamily:
+                              "var(--font-archivo), 'Archivo', system-ui, sans-serif",
+                            whiteSpace: "nowrap",
+                            boxShadow: "0 4px 14px rgba(0,0,0,0.35)",
+                            pointerEvents: "none",
+                            zIndex: 5,
+                            display: "flex",
+                            alignItems: "baseline",
+                            gap: 8,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontFamily:
+                                "var(--font-mono, monospace)",
+                              fontWeight: 800,
+                              color: dotColour,
+                              fontSize: 10,
+                              letterSpacing: 0.4,
+                            }}
+                          >
+                            {pin.year} R{pin.round}
+                          </span>
+                          <span
+                            style={{
+                              fontFamily:
+                                "var(--font-mono, monospace)",
+                              fontWeight: 800,
+                              fontSize: 13,
+                            }}
+                          >
+                            {fmtRate(pin.rate)}
+                          </span>
+                          <span
+                            style={{
+                              fontFamily:
+                                "var(--font-mono, monospace)",
+                              fontSize: 10,
+                              color: "oklch(0.72 0.02 150)",
+                            }}
+                          >
+                            {pin.birdies}/{pin.total}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+            {/* Solo mode — round-labelled pins for the current
+                tournament only. Hidden while showing history. */}
+            {!showHistory && roundsWithPin.map((round) => {
               const pin = hole.pinByRound[round];
               if (!pin) return null;
               const colour = ROUND_COLOURS[round] ?? "oklch(0.4 0.02 150)";
@@ -720,48 +959,189 @@ export default function PinSheetModal({
           </div>
         )}
 
-        <div
-          style={{
-            marginTop: 14,
-            display: "flex",
-            gap: 14,
-            flexWrap: "wrap",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          {[1, 2, 3, 4].map((r) => {
-            const has = hole.pinByRound[r] != null;
-            const colour = ROUND_COLOURS[r];
-            return (
-              <span
-                key={r}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: has ? "oklch(0.25 0.02 150)" : "oklch(0.65 0.008 95)",
-                  fontFamily: "var(--font-mono, monospace)",
-                  letterSpacing: 0.3,
-                }}
-              >
+        {/* Round legend — hidden in history mode; pins there are
+            keyed by rate, not by round. */}
+        {!showHistory && (
+          <div
+            style={{
+              marginTop: 14,
+              display: "flex",
+              gap: 14,
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {[1, 2, 3, 4].map((r) => {
+              const has = hole.pinByRound[r] != null;
+              const colour = ROUND_COLOURS[r];
+              return (
                 <span
+                  key={r}
                   style={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: "50%",
-                    background: has ? colour : "transparent",
-                    border: `2px solid ${has ? colour : "oklch(0.85 0.013 95)"}`,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: has ? "oklch(0.25 0.02 150)" : "oklch(0.65 0.008 95)",
+                    fontFamily: "var(--font-mono, monospace)",
+                    letterSpacing: 0.3,
                   }}
-                />
-                {ROUND_LABEL[r]}
-                {!has ? " · —" : ""}
-              </span>
-            );
-          })}
-        </div>
+                >
+                  <span
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: "50%",
+                      background: has ? colour : "transparent",
+                      border: `2px solid ${has ? colour : "oklch(0.85 0.013 95)"}`,
+                    }}
+                  />
+                  {ROUND_LABEL[r]}
+                  {!has ? " · —" : ""}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Quadrant summary panel — replaces the round legend in
+            history mode. Shows aggregate birdie rate per quadrant
+            plus overall, with sample sizes so readers can weight
+            confidence in the small-sample corners. */}
+        {showHistory && birdieHistory && (
+          <div
+            style={{
+              marginTop: 14,
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+              gap: 10,
+            }}
+          >
+            {(
+              [
+                { q: "TL", label: "Top-left" },
+                { q: "TR", label: "Top-right" },
+                { q: "BL", label: "Bottom-left" },
+                { q: "BR", label: "Bottom-right" },
+              ] as Array<{ q: "TL" | "TR" | "BL" | "BR"; label: string }>
+            ).map(({ q, label }) => {
+              const s = birdieHistory.quadrants[q];
+              const has = s.total > 0;
+              return (
+                <div
+                  key={q}
+                  style={{
+                    padding: "8px 10px",
+                    border: "1px solid oklch(0.94 0.008 95)",
+                    borderRadius: 8,
+                    background: has ? rateColor(s.rate, 0.12) : "white",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 10,
+                      letterSpacing: 0.5,
+                      textTransform: "uppercase",
+                      color: "oklch(0.42 0.02 150)",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {label}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono, monospace)",
+                      fontSize: 20,
+                      fontWeight: 800,
+                      color: has ? "oklch(0.2 0.02 150)" : "oklch(0.6 0.02 150)",
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
+                    {has ? fmtRate(s.rate) : "—"}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono, monospace)",
+                      fontSize: 10,
+                      color: "oklch(0.55 0.02 150)",
+                    }}
+                  >
+                    {s.pinCount} pin{s.pinCount === 1 ? "" : "s"} ·{" "}
+                    {s.birdies}/{s.total}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Rate colour scale — only meaningful in history mode. */}
+        {showHistory && birdieHistory && (
+          <div
+            style={{
+              marginTop: 10,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 10,
+              color: "oklch(0.5 0.02 150)",
+              fontFamily: "var(--font-mono, monospace)",
+              justifyContent: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <span>Rate scale</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span
+                style={{
+                  width: 14,
+                  height: 8,
+                  background: rateColor(0.05),
+                  borderRadius: 2,
+                }}
+              />
+              5%
+            </span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span
+                style={{
+                  width: 14,
+                  height: 8,
+                  background: rateColor(0.15),
+                  borderRadius: 2,
+                }}
+              />
+              15%
+            </span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span
+                style={{
+                  width: 14,
+                  height: 8,
+                  background: rateColor(0.25),
+                  borderRadius: 2,
+                }}
+              />
+              25%
+            </span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span
+                style={{
+                  width: 14,
+                  height: 8,
+                  background: rateColor(0.35),
+                  borderRadius: 2,
+                }}
+              />
+              35%+
+            </span>
+          </div>
+        )}
 
         <p
           style={{
@@ -771,11 +1151,9 @@ export default function PinSheetModal({
             textAlign: "center",
           }}
         >
-          Hover any pin to see the field&apos;s scoring average for that
-          round. Pin coordinates + green diagram from PGA Tour&apos;s
-          own broadcast feed. Rounds without a coloured dot
-          haven&apos;t been posted yet (or the round hasn&apos;t been
-          played).
+          {showHistory
+            ? "Every pin position from every stored round of this hole, coloured by that round's birdie-or-better rate. Quadrant tiles average all pins that fell in that zone; bigger pin counts = more trustworthy."
+            : "Hover any pin to see the field's scoring average for that round. Pin coordinates + green diagram from PGA Tour's own broadcast feed. Rounds without a coloured dot haven't been posted yet (or the round hasn't been played)."}
         </p>
       </div>
     </div>
