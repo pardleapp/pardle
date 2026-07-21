@@ -95,10 +95,16 @@ export default function PinSheetModal({
   const [madeOnly, setMadeOnly] = useState(false);
   /** True → overlay inferred slope arrows on the green. */
   const [showSlope, setShowSlope] = useState(false);
-  /** True → replace the round-labelled pins with multi-season
-   *  birdie-or-better pins colored by rate, and paint quadrant
-   *  overlays. Only meaningful when `birdieHistory` is present. */
+  /** True → switch the diagram off round-labelled pin dots and onto
+   *  the birdie-rate view: pin dots + optional cluster discs, all
+   *  colour-coded by the round's birdie-or-better rate. Only
+   *  meaningful when `birdieHistory` is present. */
   const [showHistory, setShowHistory] = useState(false);
+  /** Which season the rate view is filtered to. `null` = all
+   *  seasons combined (with cluster aggregation shown). A specific
+   *  year hides the cluster overlay and just shows that year's pin
+   *  dots. */
+  const [seasonFilter, setSeasonFilter] = useState<number | null>(null);
   useEffect(() => {
     if (!hole) return;
     const onKey = (e: KeyboardEvent) => {
@@ -114,6 +120,30 @@ export default function PinSheetModal({
   }, [hole, onClose]);
 
   if (!hole) return null;
+
+  // Pins visible in the birdie-rate view — either every season's
+  // (default) or only those from the filtered year. Cluster discs
+  // and the cluster panel only render when `all` is selected because
+  // clustering across one season's four pin positions is trivially
+  // "each pin is its own cluster" and adds no signal.
+  const filteredHistoryPins =
+    birdieHistory && seasonFilter != null
+      ? birdieHistory.pins.filter((p) => p.year === seasonFilter)
+      : birdieHistory?.pins ?? [];
+  // Overall rate/count over the filtered pins so the header stat
+  // reads correctly for both modes.
+  const filteredOverall = (() => {
+    if (!birdieHistory) return { birdies: 0, total: 0, rate: 0 };
+    if (seasonFilter == null) return birdieHistory.overall;
+    let birdies = 0;
+    let total = 0;
+    for (const p of filteredHistoryPins) {
+      birdies += p.birdies;
+      total += p.total;
+    }
+    return { birdies, total, rate: total > 0 ? birdies / total : 0 };
+  })();
+
   // Filter putts to the currently-selected round + made/missed pref.
   const filteredPutts = useMemo(() => {
     const list = puttsForHole ?? [];
@@ -290,42 +320,101 @@ export default function PinSheetModal({
                   color: "oklch(0.5 0.02 150)",
                 }}
               >
-                {birdieHistory.pins.length} pins ·{" "}
-                {birdieHistory.yearsCovered.length} season
-                {birdieHistory.yearsCovered.length === 1 ? "" : "s"} (
-                {birdieHistory.yearsCovered.join(", ")}) · overall{" "}
+                {filteredHistoryPins.length} pins ·{" "}
+                {seasonFilter != null
+                  ? `${seasonFilter}`
+                  : `${birdieHistory.yearsCovered.length} season${birdieHistory.yearsCovered.length === 1 ? "" : "s"} (${birdieHistory.yearsCovered.join(", ")})`}{" "}
+                · overall{" "}
                 <span
                   style={{
                     color: "oklch(0.28 0.02 150)",
                     fontWeight: 700,
                   }}
                 >
-                  {fmtRate(birdieHistory.overall.rate)}
+                  {fmtRate(filteredOverall.rate)}
                 </span>{" "}
                 birdies
               </span>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowHistory((v) => !v)}
-              aria-pressed={showHistory}
+            <div
               style={{
-                padding: "5px 12px",
-                fontSize: 11,
-                fontFamily: "inherit",
-                fontWeight: 700,
-                borderRadius: 999,
-                border: "1px solid oklch(0.85 0.013 95)",
-                background: showHistory
-                  ? "oklch(0.25 0.02 150)"
-                  : "white",
-                color: showHistory ? "white" : "oklch(0.3 0.02 150)",
-                cursor: "pointer",
-                letterSpacing: 0.3,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                flexWrap: "wrap",
               }}
             >
-              {showHistory ? "Showing all seasons" : "Show all seasons"}
-            </button>
+              {/* Season filter — only meaningful while the birdie-rate
+                  mode is active. Pills for each covered year + "All".
+                  Selecting a single year hides the cluster overlay in
+                  favour of that year's individual pin rates. */}
+              {showHistory && birdieHistory.yearsCovered.length > 1 && (
+                <div
+                  role="group"
+                  aria-label="Season filter"
+                  style={{ display: "flex", gap: 4, flexWrap: "wrap" }}
+                >
+                  {[
+                    { key: null as number | null, label: "All seasons" },
+                    ...birdieHistory.yearsCovered.map((y) => ({
+                      key: y,
+                      label: String(y),
+                    })),
+                  ].map((opt) => {
+                    const active = seasonFilter === opt.key;
+                    return (
+                      <button
+                        key={String(opt.key)}
+                        type="button"
+                        onClick={() => setSeasonFilter(opt.key)}
+                        style={{
+                          padding: "5px 10px",
+                          fontSize: 11,
+                          fontFamily: "inherit",
+                          fontWeight: 700,
+                          borderRadius: 999,
+                          border: "1px solid oklch(0.85 0.013 95)",
+                          background: active
+                            ? "oklch(0.22 0.03 150)"
+                            : "white",
+                          color: active ? "white" : "oklch(0.3 0.02 150)",
+                          cursor: "pointer",
+                          letterSpacing: 0.3,
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowHistory((v) => !v)}
+                aria-pressed={showHistory}
+                style={{
+                  padding: "5px 12px",
+                  fontSize: 11,
+                  fontFamily: "inherit",
+                  fontWeight: 700,
+                  borderRadius: 999,
+                  border: "1px solid oklch(0.85 0.013 95)",
+                  background: showHistory
+                    ? "oklch(0.25 0.02 150)"
+                    : "white",
+                  color: showHistory ? "white" : "oklch(0.3 0.02 150)",
+                  cursor: "pointer",
+                  letterSpacing: 0.3,
+                }}
+                title={
+                  showHistory
+                    ? "Currently showing per-pin birdie-or-better rates. Click for the standard pin sheet."
+                    : "Switch to the birdie-or-better rate view — pin dots + cluster tiles coloured by how often the field made birdie there."
+                }
+              >
+                {showHistory ? "Birdie rate mode" : "Birdie rate mode"}
+              </button>
+            </div>
           </div>
         )}
 
@@ -446,15 +535,14 @@ export default function PinSheetModal({
                 pinByRound={hole.pinByRound}
               />
             )}
-            {/* History mode: cluster colour overlays + historical
+            {/* Birdie-rate mode: cluster colour overlays + historical
                 pin dots. Cluster discs sit UNDER the pin dots via
-                z-index. Each cluster is a soft circle around the
-                mean position of the pins it contains, tinted by the
-                aggregate birdie rate — so nearby pins across years
-                read as one "location". */}
-            {showHistory && birdieHistory && (
+                z-index, and only when "All seasons" is the active
+                filter — for a single season each pin is trivially
+                its own cluster and the discs add no signal. */}
+            {showHistory && birdieHistory && seasonFilter == null && (
               <>
-                {birdieHistory.clusters.map((cluster) => {
+                {birdieHistory.clusters.map((cluster, ci) => {
                   const cx = cluster.centroid.x * 100;
                   const cy = cluster.centroid.y * 100;
                   // Pixel-space disc; use both axes' viewport-relative
@@ -489,7 +577,48 @@ export default function PinSheetModal({
                     />
                   );
                 })}
-                {birdieHistory.pins.map((pin, i) => {
+                {/* Cluster letter badges — small pill at each
+                    centroid, so the map cross-references the cluster
+                    cards below without needing anatomical labels. */}
+                {birdieHistory.clusters.map((cluster, ci) => {
+                  const letter = String.fromCharCode(65 + ci);
+                  return (
+                    <div
+                      key={`cluster-badge-${cluster.clusterId}`}
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        left: `${cluster.centroid.x * 100}%`,
+                        top: `${cluster.centroid.y * 100}%`,
+                        transform: "translate(-50%, -50%)",
+                        width: 28,
+                        height: 28,
+                        borderRadius: "50%",
+                        background: "oklch(0.16 0.02 150)",
+                        color: "white",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontWeight: 900,
+                        fontSize: 14,
+                        letterSpacing: 0.5,
+                        boxShadow:
+                          "0 0 0 2px white, 0 3px 8px rgba(0,0,0,0.35)",
+                        pointerEvents: "none",
+                        zIndex: 3,
+                        fontFamily:
+                          "var(--font-mono, monospace)",
+                      }}
+                    >
+                      {letter}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+            {showHistory && birdieHistory && (
+              <>
+                {filteredHistoryPins.map((pin, i) => {
                   const active = hoverHistIdx === i;
                   const dotColour = rateColor(pin.rate, 1);
                   // Position tooltip flipped when the pin sits in the
@@ -1039,12 +1168,11 @@ export default function PinSheetModal({
           </div>
         )}
 
-        {/* Cluster summary panel — replaces the round legend in
-            history mode. One card per proximity cluster (pins the
-            course-setup crew put in the same spot year to year).
-            Larger sample = the trustworthy pin location; the small
-            single-pin "clusters" are noisy neighbourhood outliers. */}
-        {showHistory && birdieHistory && (
+        {/* Cluster summary panel — one card per proximity cluster.
+            Letter matches the badge on the diagram, so users don't
+            need an anatomical label (which is ambiguous without
+            knowing which direction the fairway approaches from). */}
+        {showHistory && birdieHistory && seasonFilter == null && (
           <div
             style={{
               marginTop: 14,
@@ -1055,15 +1183,7 @@ export default function PinSheetModal({
           >
             {birdieHistory.clusters.map((cluster, i) => {
               const has = cluster.total > 0;
-              // Rough anatomical label from the centroid so the
-              // reader can find the cluster on the diagram — TPC
-              // Twin Cities greens read with the tee at the bottom
-              // of the frame, so y-large = closer to the tee (front).
-              const cx = cluster.centroid.x;
-              const cy = cluster.centroid.y;
-              const horiz = cx < 0.4 ? "Left" : cx > 0.6 ? "Right" : "Centre";
-              const vert = cy < 0.4 ? "Back" : cy > 0.6 ? "Front" : "Middle";
-              const location = `${vert} ${horiz.toLowerCase()}`;
+              const letter = String.fromCharCode(65 + i);
               return (
                 <div
                   key={cluster.clusterId}
@@ -1074,19 +1194,41 @@ export default function PinSheetModal({
                     background: has ? rateColor(cluster.rate, 0.14) : "white",
                     display: "flex",
                     flexDirection: "column",
-                    gap: 3,
+                    gap: 4,
                   }}
                 >
                   <span
                     style={{
-                      fontSize: 10,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontSize: 11,
                       letterSpacing: 0.5,
                       textTransform: "uppercase",
                       color: "oklch(0.42 0.02 150)",
                       fontWeight: 700,
                     }}
                   >
-                    Cluster {String.fromCharCode(65 + i)} · {location}
+                    <span
+                      aria-hidden
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        background: "oklch(0.16 0.02 150)",
+                        color: "white",
+                        fontWeight: 900,
+                        fontSize: 12,
+                        fontFamily: "var(--font-mono, monospace)",
+                        letterSpacing: 0,
+                      }}
+                    >
+                      {letter}
+                    </span>
+                    Cluster {letter}
                   </span>
                   <span
                     style={{
@@ -1109,6 +1251,70 @@ export default function PinSheetModal({
                     {cluster.pinCount} pin
                     {cluster.pinCount === 1 ? "" : "s"} ·{" "}
                     {cluster.birdies}/{cluster.total}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Per-pin list — shown when a single season is selected,
+            replacing the cluster panel. Every pin gets a card with
+            its round + individual birdie rate. */}
+        {showHistory && birdieHistory && seasonFilter != null && (
+          <div
+            style={{
+              marginTop: 14,
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+              gap: 10,
+            }}
+          >
+            {filteredHistoryPins.map((pin, i) => {
+              const has = pin.total > 0;
+              return (
+                <div
+                  key={`pin-card-${i}`}
+                  style={{
+                    padding: "10px 12px",
+                    border: "1px solid oklch(0.94 0.008 95)",
+                    borderRadius: 8,
+                    background: has ? rateColor(pin.rate, 0.14) : "white",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 3,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 11,
+                      letterSpacing: 0.5,
+                      textTransform: "uppercase",
+                      color: "oklch(0.42 0.02 150)",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {pin.year} R{pin.round}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono, monospace)",
+                      fontSize: 22,
+                      fontWeight: 800,
+                      color: has ? "oklch(0.2 0.02 150)" : "oklch(0.6 0.02 150)",
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
+                    {fmtRate(pin.rate)}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono, monospace)",
+                      fontSize: 11,
+                      color: "oklch(0.55 0.02 150)",
+                    }}
+                  >
+                    {pin.birdies}/{pin.total}
                   </span>
                 </div>
               );
@@ -1194,7 +1400,7 @@ export default function PinSheetModal({
           >
             This year&apos;s pin sheet uses an older coordinate frame that
             doesn&apos;t overlay on the green diagram — hit{" "}
-            <strong>Show all seasons</strong> above for the multi-season
+            <strong>Birdie rate mode</strong> above for the multi-season
             history that does.
           </p>
         )}
@@ -1207,7 +1413,9 @@ export default function PinSheetModal({
           }}
         >
           {showHistory
-            ? "Every pin position from every stored round of this hole, coloured by that round's birdie-or-better rate. Dashed circles mark proximity clusters — pins the course-setup crew puts in the same spot year to year get merged into one tile in the panel below. Bigger pin counts = more trustworthy."
+            ? seasonFilter != null
+              ? `Only ${seasonFilter} pin positions shown. Each dot is one round of that year, coloured by the field's birdie-or-better rate for that round. Switch to All seasons for the multi-year cluster view.`
+              : "Every pin position from every stored round of this hole, coloured by that round's birdie-or-better rate. Dashed circles mark proximity clusters — pins the course-setup crew puts in the same spot year to year get merged into one tile in the panel below. Bigger pin counts = more trustworthy."
             : "Hover any pin to see the field's scoring average for that round. Pin coordinates + green diagram from PGA Tour's own broadcast feed. Rounds without a coloured dot haven't been posted yet (or the round hasn't been played)."}
         </p>
       </div>
