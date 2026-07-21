@@ -1,31 +1,38 @@
 "use client";
 
 /**
- * The three visuals stacked on the profile page:
- *   1. Stat card — mean±std across the radar dimensions.
- *   2. Side & top view of the mean ball flight, reconstructed by
- *      evaluating xFit/yFit/zFit as polynomials over the profile's
- *      timeInterval. Side view = downrange distance vs height. Top
- *      view = downrange vs side offset (fade+/draw−).
- *   3. Shot cloud — every stored shot at (ball speed, carry side)
- *      so shape variance is visible at a glance.
+ * Dashboard-grade layout for the selected player's profile:
  *
- * All svgs are `viewBox`-driven; container width dictates rendered
- * size and no fixed pixel dimensions leak into the layout.
+ *   ┌──────────────────────────────────────────────────────┐
+ *   │  Player header (name · shot count · events)          │
+ *   ├──────────────────────┬───────────────────────────────┤
+ *   │  Stats grid (2-col)  │  Ball flight card             │
+ *   ├──────────────────────┤   (SIDE landscape stacked on  │
+ *   │  Similar drivers     │    TOP portrait, both animated) │
+ *   ├──────────────────────┴───────────────────────────────┤
+ *   │  Shot cloud — every drive, carry vs side              │
+ *   └──────────────────────────────────────────────────────┘
+ *
+ * The outer grid lives in globals.css (.ts-dashboard); this file
+ * just supplies the four area contents plus the ball animation
+ * ticker. Mobile ignores the grid areas and the cards stack in
+ * their DOM order.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PlayerDrivingProfile } from "@/lib/feed/tee-shots-profile";
+import SimilarList from "./SimilarList";
 
 interface Props {
   profile: PlayerDrivingProfile;
 }
 
 const FLIGHT_MS = 2800; // one loop of the ball animation
-const REST_MS = 900; // pause at landing before restart, so the eye can register the final side offset
+const REST_MS = 900;
 
-/** Lagrange quadratic through (0,0), (x1,y1), (x2,y2) — the
- *  smooth curve every arc panel below uses. */
+// ── Ball-flight sampling ────────────────────────────────────────────
+
+/** Lagrange quadratic through (0,0), (x1,y1), (x2,y2). */
 function lagrange(
   x: number,
   x1: number,
@@ -39,10 +46,9 @@ function lagrange(
   return y1 * l1 + y2 * l2;
 }
 
-/** Sample the average side profile (height vs downrange) from the
- *  three scalar points we have: launch, apex, landing. Piecewise
- *  parabolas that both peak at the apex point keep the peak in the
- *  right place instead of at midpoint. */
+/** Piecewise parabolas through launch → apex → landing so the peak
+ *  stays anchored to the mean apex range instead of drifting to the
+ *  arithmetic midpoint. */
 function sampleSide(
   carryYd: number,
   apexRangeFt: number,
@@ -50,8 +56,6 @@ function sampleSide(
   n = 60,
 ): Array<{ x: number; y: number }> {
   const carryFt = carryYd * 3;
-  // Guard against apex data that would collapse the piecewise
-  // parabolas (apex at 0 or beyond landing).
   const apexX = Math.max(1, Math.min(carryFt - 1, apexRangeFt));
   const out: Array<{ x: number; y: number }> = [];
   for (let i = 0; i <= n; i++) {
@@ -64,14 +68,11 @@ function sampleSide(
       const u = (xFt - apexX) / (carryFt - apexX);
       y = apexHeightFt * (1 - u * u);
     }
-    out.push({ x: xFt / 3, y }); // convert x back to yards for the axis
+    out.push({ x: xFt / 3, y });
   }
   return out;
 }
 
-/** Sample the average top profile (side offset vs downrange) as a
- *  quadratic through (0,0) → (apexRangeYd, apexSideYd) → (carry,
- *  carrySide). Captures the aim + curve of the shot. */
 function sampleTop(
   carryYd: number,
   apexRangeFt: number,
@@ -90,67 +91,234 @@ function sampleTop(
   return out;
 }
 
-/** Simple rounding, safe for negatives + missing values. */
+// ── Formatters ──────────────────────────────────────────────────────
+
 function fmt(v: number, digits = 1): string {
   if (!Number.isFinite(v)) return "—";
   return v.toFixed(digits);
 }
 
-function StatRow({
-  label,
-  mean,
-  std,
-  unit,
-  digits = 1,
-}: {
+function fmtSigned(v: number, digits = 1): string {
+  if (!Number.isFinite(v)) return "—";
+  if (Math.abs(v) < 0.05 && digits < 2) return "0";
+  return v > 0 ? `+${v.toFixed(digits)}` : `−${Math.abs(v).toFixed(digits)}`;
+}
+
+// ── Card chrome ────────────────────────────────────────────────────
+
+const CARD: React.CSSProperties = {
+  border: "1px solid oklch(0.9 0.008 95)",
+  borderRadius: 10,
+  background: "white",
+  padding: 14,
+  display: "flex",
+  flexDirection: "column",
+  minWidth: 0,
+};
+
+const CARD_TITLE: React.CSSProperties = {
+  fontSize: 11,
+  letterSpacing: 0.5,
+  textTransform: "uppercase",
+  fontWeight: 700,
+  color: "oklch(0.4 0.02 150)",
+  margin: 0,
+};
+
+const CARD_SUBTITLE: React.CSSProperties = {
+  fontSize: 11,
+  color: "oklch(0.5 0.02 150)",
+  margin: "3px 0 10px",
+  lineHeight: 1.35,
+};
+
+const MONO: React.CSSProperties = {
+  fontFamily:
+    "var(--font-plex-mono), 'IBM Plex Mono', ui-monospace, monospace",
+  fontVariantNumeric: "tabular-nums",
+};
+
+// ── Player header (spans full width) ────────────────────────────────
+
+function PlayerHeader({ profile }: { profile: PlayerDrivingProfile }) {
+  return (
+    <header
+      style={{
+        display: "flex",
+        alignItems: "baseline",
+        justifyContent: "space-between",
+        gap: 12,
+        padding: "0 2px 10px",
+        borderBottom: "1px solid oklch(0.92 0.008 95)",
+        marginBottom: 12,
+      }}
+    >
+      <h3
+        style={{
+          fontSize: 22,
+          margin: 0,
+          fontFamily:
+            "var(--font-archivo), 'Archivo', system-ui, sans-serif",
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {profile.playerName}
+      </h3>
+      <span
+        style={{
+          ...MONO,
+          fontSize: 12,
+          color: "oklch(0.5 0.02 150)",
+        }}
+      >
+        {profile.shotCount} drives · {profile.eventsCovered} events
+      </span>
+    </header>
+  );
+}
+
+// ── Stats card — dense 2-column grid ────────────────────────────────
+
+interface Stat {
   label: string;
   mean: number;
   std: number;
   unit: string;
   digits?: number;
-}) {
+  signed?: boolean;
+}
+
+function StatCell({ stat }: { stat: Stat }) {
+  const value = stat.signed
+    ? fmtSigned(stat.mean, stat.digits ?? 1)
+    : fmt(stat.mean, stat.digits ?? 1);
   return (
     <div
       style={{
         display: "grid",
         gridTemplateColumns: "1fr auto auto",
-        gap: 12,
-        padding: "6px 0",
-        borderBottom: "1px solid oklch(0.94 0.008 95)",
         alignItems: "baseline",
+        columnGap: 8,
+        padding: "6px 0",
+        borderBottom: "1px solid oklch(0.955 0.008 95)",
       }}
     >
-      <span style={{ fontSize: 12, color: "oklch(0.35 0.02 150)" }}>
-        {label}
-      </span>
       <span
         style={{
-          fontFamily:
-            "var(--font-plex-mono), 'IBM Plex Mono', ui-monospace, monospace",
-          fontSize: 14,
-          fontWeight: 600,
-          color: "oklch(0.2 0.02 150)",
-        }}
-      >
-        {fmt(mean, digits)} {unit}
-      </span>
-      <span
-        style={{
-          fontFamily:
-            "var(--font-plex-mono), 'IBM Plex Mono', ui-monospace, monospace",
           fontSize: 11,
-          color: "oklch(0.55 0.02 150)",
-          minWidth: 56,
-          textAlign: "right",
+          color: "oklch(0.45 0.02 150)",
+          letterSpacing: 0.2,
         }}
       >
-        ±{fmt(std, digits)}
+        {stat.label}
+      </span>
+      <span
+        style={{
+          ...MONO,
+          fontSize: 13,
+          fontWeight: 700,
+          color: "oklch(0.2 0.02 150)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {value}
+        <span
+          style={{ color: "oklch(0.55 0.02 150)", fontWeight: 400 }}
+        >{` ${stat.unit}`}</span>
+      </span>
+      <span
+        style={{
+          ...MONO,
+          fontSize: 10,
+          color: "oklch(0.6 0.02 150)",
+          minWidth: 44,
+          textAlign: "right",
+          whiteSpace: "nowrap",
+        }}
+      >
+        ±{fmt(stat.std, stat.digits ?? 1)}
       </span>
     </div>
   );
 }
 
-function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
+function StatsCard({ profile }: { profile: PlayerDrivingProfile }) {
+  const s = profile.stats;
+  const stats: Stat[] = [
+    { label: "Ball speed", mean: s.ballSpeed.mean, std: s.ballSpeed.std, unit: "mph" },
+    { label: "Carry", mean: s.carry.mean, std: s.carry.std, unit: "yd" },
+    {
+      label: "Apex height",
+      mean: s.apexHeight.mean,
+      std: s.apexHeight.std,
+      unit: "ft",
+      digits: 0,
+    },
+    {
+      label: "Launch angle",
+      mean: s.verticalLaunchAngle.mean,
+      std: s.verticalLaunchAngle.std,
+      unit: "°",
+    },
+    {
+      label: "Aim",
+      mean: s.horizontalLaunchAngle.mean,
+      std: s.horizontalLaunchAngle.std,
+      unit: "°",
+      signed: true,
+    },
+    {
+      label: "Curve",
+      mean: s.curve.mean,
+      std: s.curve.std,
+      unit: "yd",
+      signed: true,
+    },
+    {
+      label: "Landing side",
+      mean: s.carrySide.mean,
+      std: s.carrySide.std,
+      unit: "yd",
+      signed: true,
+    },
+    {
+      label: "Launch spin",
+      mean: s.launchSpin.mean,
+      std: s.launchSpin.std,
+      unit: "rpm",
+      digits: 0,
+    },
+    {
+      label: "Side spin",
+      mean: s.sideSpin.mean,
+      std: s.sideSpin.std,
+      unit: "rpm",
+      digits: 0,
+      signed: true,
+    },
+  ];
+  return (
+    <div style={CARD} className="ts-area-stats">
+      <h4 style={CARD_TITLE}>Radar profile</h4>
+      <p style={CARD_SUBTITLE}>Mean and ±1σ across every stored drive.</p>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          columnGap: 20,
+        }}
+      >
+        {stats.map((stat) => (
+          <StatCell key={stat.label} stat={stat} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Ball flight card ────────────────────────────────────────────────
+
+function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
   const { carry, apexHeight, apexRange, apexSide, carrySide } = profile.shape;
 
   const sideSamples = useMemo(
@@ -163,21 +331,16 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
   );
 
   const SIDE_W = 460;
-  const SIDE_H = 200;
-  // TOP is portrait — tee at bottom, ball flies up. Side drift
-  // reads as horizontal deviation, which is more intuitive than
-  // Y-axis deviation for "fade vs draw".
+  const SIDE_H = 180;
   const TOP_W = 260;
-  const TOP_H = 420;
-  const pad = { l: 44, r: 20, t: 14, b: 24 };
-  const topPad = { l: 30, r: 30, t: 22, b: 32 };
+  const TOP_H = 360;
+  const pad = { l: 44, r: 20, t: 12, b: 22 };
+  const topPad = { l: 26, r: 26, t: 22, b: 30 };
   const plotW = SIDE_W - pad.l - pad.r;
   const plotH = SIDE_H - pad.t - pad.b;
   const topPlotW = TOP_W - topPad.l - topPad.r;
   const topPlotH = TOP_H - topPad.t - topPad.b;
 
-  // Project the sampled arcs into SVG-space once; the animator
-  // interpolates within these arrays every frame.
   const geom = useMemo(() => {
     const xs = sideSamples.map((s) => s.x);
     const ys = sideSamples.map((s) => s.y);
@@ -189,9 +352,6 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
       x: pad.l + (s.x / xMax) * plotW,
       y: pad.t + (1 - s.y / yMax) * plotH,
     }));
-    // TOP: downrange runs bottom → top, side offset runs left ← 0
-    // → right. Positive z (fade for a right-hander) shows to the
-    // right of the centre line.
     const topPts = topSamples.map((s) => ({
       x:
         topPad.l +
@@ -213,8 +373,6 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
     topPlotH,
   ]);
 
-  // Ticker — a fraction in [0, 1) that loops every FLIGHT_MS with
-  // a REST_MS pause at the end. Positions the ball dot each frame.
   const [phase, setPhase] = useState(0);
   const rafRef = useRef<number | null>(null);
   useEffect(() => {
@@ -232,31 +390,28 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
   }, []);
-  // Reset the ball to the tee whenever the target player changes so
-  // the eye doesn't see it teleport to a new arc's midpoint.
   useEffect(() => {
     setPhase(0);
   }, [profile.playerId]);
 
-  if (!Number.isFinite(carry) || carry <= 0) return null;
+  if (!Number.isFinite(carry) || carry <= 0) {
+    return (
+      <div style={CARD} className="ts-area-ballflight">
+        <h4 style={CARD_TITLE}>Average ball flight</h4>
+        <p style={CARD_SUBTITLE}>Not enough radar data.</p>
+      </div>
+    );
+  }
 
   const { xMax, yMax, zAbs, sidePts, topPts } = geom;
 
   const sidePath = sidePts
-    .map(
-      (p, i) =>
-        `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`,
-    )
+    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
     .join(" ");
   const topPath = topPts
-    .map(
-      (p, i) =>
-        `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`,
-    )
+    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
     .join(" ");
 
-  // Ease-out on the ball so it decelerates near landing — feels
-  // right for a real drive dropping into the fairway.
   const eased = 1 - Math.pow(1 - phase, 1.6);
   const idx = Math.min(
     sidePts.length - 1,
@@ -265,288 +420,278 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
   const ballSide = sidePts[idx];
   const ballTop = topPts[idx];
 
-  // Landing marker on the (portrait) top view — sits at the top of
-  // the plot, offset horizontally by the mean carrySide.
   const landPx =
     topPad.l + topPlotW / 2 + (carrySide / zAbs) * (topPlotW / 2 - 6);
   const landPy = topPad.t;
-  // Tee marker sits at the bottom-centre.
   const teePx = topPad.l + topPlotW / 2;
   const teePy = topPad.t + topPlotH;
-  // Apex marker for the side view — the peak point of the arc.
   const apexPx = pad.l + (apexRange / 3 / xMax) * plotW;
   const apexPy = pad.t + (1 - apexHeight / yMax) * plotH;
 
   return (
     <div
       style={{
-        border: "1px solid oklch(0.9 0.008 95)",
-        borderRadius: 10,
-        background: "white",
-        padding: 14,
-        marginTop: 12,
+        ...CARD,
+        gap: 6,
+        // Fill vertical span so the card matches the stacked
+        // stats+similar column height.
+        height: "100%",
       }}
+      className="ts-area-ballflight"
     >
-      <h3 style={{ fontSize: 13, margin: "0 0 8px" }}>
-        Average ball flight
-      </h3>
-      <p
-        style={{
-          fontSize: 11,
-          color: "oklch(0.5 0.02 150)",
-          margin: "0 0 10px",
-        }}
-      >
-        Side view is height vs downrange; top view is the same downrange
-        axis with side drift. Curve to the right = fade, left = draw.
+      <h4 style={CARD_TITLE}>Average ball flight</h4>
+      <p style={CARD_SUBTITLE}>
+        Side view: height vs downrange. Top view: driver&apos;s-eye — ball
+        flies up, drift shows left/right.
       </p>
+
       <div
         style={{
-          display: "grid",
-          gap: 12,
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          fontSize: 10,
+          letterSpacing: 0.4,
+          color: "oklch(0.5 0.02 150)",
+          marginTop: 4,
         }}
       >
-        <div>
-          <div
-            style={{
-              fontSize: 10,
-              letterSpacing: 0.4,
-              color: "oklch(0.5 0.02 150)",
-              marginBottom: 4,
-            }}
-          >
-            SIDE
-          </div>
-          <svg
-            viewBox={`0 0 ${SIDE_W} ${SIDE_H}`}
-            style={{ width: "100%", height: "auto", display: "block" }}
-          >
-            <line
-              x1={pad.l}
-              y1={pad.t + plotH}
-              x2={pad.l + plotW}
-              y2={pad.t + plotH}
-              stroke="oklch(0.85 0.013 95)"
-              strokeWidth={1}
-            />
-            <line
-              x1={pad.l}
-              y1={pad.t}
-              x2={pad.l}
-              y2={pad.t + plotH}
-              stroke="oklch(0.85 0.013 95)"
-              strokeWidth={1}
-            />
-            <path
-              d={sidePath}
-              fill="none"
-              stroke="oklch(0.75 0.05 145)"
-              strokeWidth={1.5}
-              strokeLinecap="round"
-              strokeDasharray="3 4"
+        SIDE
+      </div>
+      <svg
+        viewBox={`0 0 ${SIDE_W} ${SIDE_H}`}
+        style={{ width: "100%", height: "auto", display: "block" }}
+      >
+        <line
+          x1={pad.l}
+          y1={pad.t + plotH}
+          x2={pad.l + plotW}
+          y2={pad.t + plotH}
+          stroke="oklch(0.85 0.013 95)"
+          strokeWidth={1}
+        />
+        <line
+          x1={pad.l}
+          y1={pad.t}
+          x2={pad.l}
+          y2={pad.t + plotH}
+          stroke="oklch(0.85 0.013 95)"
+          strokeWidth={1}
+        />
+        <path
+          d={sidePath}
+          fill="none"
+          stroke="oklch(0.75 0.05 145)"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeDasharray="3 4"
+        />
+        <circle
+          cx={apexPx}
+          cy={apexPy}
+          r={3}
+          fill="oklch(0.55 0.14 145)"
+        />
+        <text
+          x={apexPx}
+          y={apexPy - 6}
+          fontSize={10}
+          fill="oklch(0.3 0.02 150)"
+          textAnchor="middle"
+        >
+          apex {fmt(apexHeight, 0)} ft
+        </text>
+        {ballSide && (
+          <>
+            <circle
+              cx={ballSide.x}
+              cy={ballSide.y}
+              r={7}
+              fill="oklch(0.55 0.14 145 / 0.18)"
             />
             <circle
-              cx={apexPx}
-              cy={apexPy}
-              r={3}
-              fill="oklch(0.55 0.14 145)"
+              cx={ballSide.x}
+              cy={ballSide.y}
+              r={4.5}
+              fill="white"
+              stroke="oklch(0.25 0.02 150)"
+              strokeWidth={1.2}
             />
-            {ballSide && (
-              <>
-                <circle
-                  cx={ballSide.x}
-                  cy={ballSide.y}
-                  r={7}
-                  fill="oklch(0.55 0.14 145 / 0.18)"
-                />
-                <circle
-                  cx={ballSide.x}
-                  cy={ballSide.y}
-                  r={4.5}
-                  fill="white"
-                  stroke="oklch(0.25 0.02 150)"
-                  strokeWidth={1.2}
-                />
-              </>
-            )}
-            <text
-              x={apexPx}
-              y={apexPy - 6}
-              fontSize={10}
-              fill="oklch(0.3 0.02 150)"
-              textAnchor="middle"
-            >
-              apex {fmt(apexHeight, 0)} ft
-            </text>
-            <text
-              x={pad.l}
-              y={SIDE_H - 6}
-              fontSize={10}
-              fill="oklch(0.5 0.02 150)"
-            >
-              0
-            </text>
-            <text
-              x={pad.l + plotW}
-              y={SIDE_H - 6}
-              fontSize={10}
-              fill="oklch(0.5 0.02 150)"
-              textAnchor="end"
-            >
-              {fmt(carry, 0)} yd
-            </text>
-            <text
-              x={4}
-              y={pad.t + 8}
-              fontSize={10}
-              fill="oklch(0.5 0.02 150)"
-            >
-              {fmt(yMax, 0)} ft
-            </text>
-            <text
-              x={pad.l - 4}
-              y={pad.t + plotH}
-              fontSize={10}
-              fill="oklch(0.5 0.02 150)"
-              textAnchor="end"
-            >
-              0
-            </text>
-          </svg>
-        </div>
-        <div>
-          <div
-            style={{
-              fontSize: 10,
-              letterSpacing: 0.4,
-              color: "oklch(0.5 0.02 150)",
-              marginBottom: 4,
-            }}
+          </>
+        )}
+        <text
+          x={pad.l}
+          y={SIDE_H - 6}
+          fontSize={10}
+          fill="oklch(0.5 0.02 150)"
+        >
+          0
+        </text>
+        <text
+          x={pad.l + plotW}
+          y={SIDE_H - 6}
+          fontSize={10}
+          fill="oklch(0.5 0.02 150)"
+          textAnchor="end"
+        >
+          {fmt(carry, 0)} yd
+        </text>
+        <text x={4} y={pad.t + 8} fontSize={10} fill="oklch(0.5 0.02 150)">
+          {fmt(yMax, 0)} ft
+        </text>
+        <text
+          x={pad.l - 4}
+          y={pad.t + plotH}
+          fontSize={10}
+          fill="oklch(0.5 0.02 150)"
+          textAnchor="end"
+        >
+          0
+        </text>
+      </svg>
+
+      <div
+        style={{
+          fontSize: 10,
+          letterSpacing: 0.4,
+          color: "oklch(0.5 0.02 150)",
+          marginTop: 8,
+        }}
+      >
+        TOP
+      </div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          // Constrain TOP width so the tall portrait SVG doesn't
+          // dominate on very wide cards. The centering keeps it
+          // visually anchored while the card border stays flush.
+          alignSelf: "center",
+          width: "min(100%, 320px)",
+          flex: 1,
+        }}
+      >
+        <svg
+          viewBox={`0 0 ${TOP_W} ${TOP_H}`}
+          style={{
+            width: "100%",
+            height: "auto",
+            display: "block",
+          }}
+        >
+          <line
+            x1={topPad.l + topPlotW / 2}
+            y1={topPad.t}
+            x2={topPad.l + topPlotW / 2}
+            y2={topPad.t + topPlotH}
+            stroke="oklch(0.85 0.013 95)"
+            strokeWidth={1}
+            strokeDasharray="3 3"
+          />
+          <line
+            x1={topPad.l}
+            y1={topPad.t + topPlotH}
+            x2={topPad.l + topPlotW}
+            y2={topPad.t + topPlotH}
+            stroke="oklch(0.85 0.013 95)"
+            strokeWidth={1}
+          />
+          <path
+            d={topPath}
+            fill="none"
+            stroke="oklch(0.75 0.05 145)"
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeDasharray="3 4"
+          />
+          <circle
+            cx={teePx}
+            cy={teePy}
+            r={2.5}
+            fill="oklch(0.55 0.02 150)"
+          />
+          <circle
+            cx={landPx}
+            cy={landPy}
+            r={3}
+            fill="oklch(0.55 0.14 145)"
+          />
+          {ballTop && (
+            <>
+              <circle
+                cx={ballTop.x}
+                cy={ballTop.y}
+                r={7}
+                fill="oklch(0.55 0.14 145 / 0.18)"
+              />
+              <circle
+                cx={ballTop.x}
+                cy={ballTop.y}
+                r={4.5}
+                fill="white"
+                stroke="oklch(0.25 0.02 150)"
+                strokeWidth={1.2}
+              />
+            </>
+          )}
+          <text
+            x={landPx}
+            y={landPy - 8}
+            fontSize={10}
+            fill="oklch(0.3 0.02 150)"
+            textAnchor="middle"
           >
-            TOP
-          </div>
-          <svg
-            viewBox={`0 0 ${TOP_W} ${TOP_H}`}
-            style={{ width: "100%", height: "auto", display: "block" }}
+            {carrySide >= 0 ? "+" : "−"}
+            {fmt(Math.abs(carrySide), 1)} yd
+          </text>
+          <text
+            x={topPad.l + topPlotW / 2}
+            y={topPad.t + topPlotH + 14}
+            fontSize={10}
+            fill="oklch(0.5 0.02 150)"
+            textAnchor="middle"
           >
-            {/* Vertical centre line = aim / straight-ahead reference. */}
-            <line
-              x1={topPad.l + topPlotW / 2}
-              y1={topPad.t}
-              x2={topPad.l + topPlotW / 2}
-              y2={topPad.t + topPlotH}
-              stroke="oklch(0.85 0.013 95)"
-              strokeWidth={1}
-              strokeDasharray="3 3"
-            />
-            {/* Tee-box baseline. */}
-            <line
-              x1={topPad.l}
-              y1={topPad.t + topPlotH}
-              x2={topPad.l + topPlotW}
-              y2={topPad.t + topPlotH}
-              stroke="oklch(0.85 0.013 95)"
-              strokeWidth={1}
-            />
-            <path
-              d={topPath}
-              fill="none"
-              stroke="oklch(0.75 0.05 145)"
-              strokeWidth={1.5}
-              strokeLinecap="round"
-              strokeDasharray="3 4"
-            />
-            <circle
-              cx={teePx}
-              cy={teePy}
-              r={2.5}
-              fill="oklch(0.55 0.02 150)"
-            />
-            <circle
-              cx={landPx}
-              cy={landPy}
-              r={3}
-              fill="oklch(0.55 0.14 145)"
-            />
-            {ballTop && (
-              <>
-                <circle
-                  cx={ballTop.x}
-                  cy={ballTop.y}
-                  r={7}
-                  fill="oklch(0.55 0.14 145 / 0.18)"
-                />
-                <circle
-                  cx={ballTop.x}
-                  cy={ballTop.y}
-                  r={4.5}
-                  fill="white"
-                  stroke="oklch(0.25 0.02 150)"
-                  strokeWidth={1.2}
-                />
-              </>
-            )}
-            <text
-              x={landPx}
-              y={landPy - 8}
-              fontSize={10}
-              fill="oklch(0.3 0.02 150)"
-              textAnchor="middle"
-            >
-              {carrySide >= 0 ? "+" : "−"}
-              {fmt(Math.abs(carrySide), 1)} yd
-            </text>
-            <text
-              x={topPad.l + topPlotW / 2}
-              y={topPad.t + topPlotH + 14}
-              fontSize={10}
-              fill="oklch(0.5 0.02 150)"
-              textAnchor="middle"
-            >
-              tee
-            </text>
-            <text
-              x={topPad.l + topPlotW / 2}
-              y={topPad.t - 8}
-              fontSize={10}
-              fill="oklch(0.5 0.02 150)"
-              textAnchor="middle"
-            >
-              {fmt(carry, 0)} yd carry
-            </text>
-            {/* Side-offset scale — halfway markers on both edges. */}
-            <text
-              x={topPad.l - 4}
-              y={topPad.t + topPlotH / 2 + 3}
-              fontSize={10}
-              fill="oklch(0.5 0.02 150)"
-              textAnchor="end"
-            >
-              −{fmt(zAbs, 0)}
-            </text>
-            <text
-              x={topPad.l + topPlotW + 4}
-              y={topPad.t + topPlotH / 2 + 3}
-              fontSize={10}
-              fill="oklch(0.5 0.02 150)"
-            >
-              +{fmt(zAbs, 0)}
-            </text>
-          </svg>
-        </div>
+            tee
+          </text>
+          <text
+            x={topPad.l + topPlotW / 2}
+            y={topPad.t - 8}
+            fontSize={10}
+            fill="oklch(0.5 0.02 150)"
+            textAnchor="middle"
+          >
+            {fmt(carry, 0)} yd carry
+          </text>
+          <text
+            x={topPad.l - 4}
+            y={topPad.t + topPlotH / 2 + 3}
+            fontSize={10}
+            fill="oklch(0.5 0.02 150)"
+            textAnchor="end"
+          >
+            −{fmt(zAbs, 0)}
+          </text>
+          <text
+            x={topPad.l + topPlotW + 4}
+            y={topPad.t + topPlotH / 2 + 3}
+            fontSize={10}
+            fill="oklch(0.5 0.02 150)"
+          >
+            +{fmt(zAbs, 0)}
+          </text>
+        </svg>
       </div>
     </div>
   );
 }
 
-function ShotCloud({ profile }: { profile: PlayerDrivingProfile }) {
+// ── Scatter card — full-width shot cloud ─────────────────────────────
+
+function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
   const cloud = profile.cloud;
   if (cloud.length === 0) return null;
 
-  const W = 460;
-  const H = 260;
-  const pad = { l: 40, r: 16, t: 12, b: 28 };
+  const W = 800;
+  const H = 300;
+  const pad = { l: 44, r: 20, t: 12, b: 28 };
   const plotW = W - pad.l - pad.r;
   const plotH = H - pad.t - pad.b;
 
@@ -562,32 +707,28 @@ function ShotCloud({ profile }: { profile: PlayerDrivingProfile }) {
     pad.t + plotH / 2 - (v / yAbs) * (plotH / 2 - 8);
 
   return (
-    <div
-      style={{
-        border: "1px solid oklch(0.9 0.008 95)",
-        borderRadius: 10,
-        background: "white",
-        padding: 14,
-        marginTop: 12,
-      }}
-    >
-      <h3 style={{ fontSize: 13, margin: "0 0 8px" }}>
-        Every drive — carry vs side
-      </h3>
-      <p
+    <div style={CARD} className="ts-area-scatter">
+      <div
         style={{
-          fontSize: 11,
-          color: "oklch(0.5 0.02 150)",
-          margin: "0 0 10px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          gap: 8,
         }}
       >
-        One dot per stored tee shot. X = carry distance (yards), Y = side
-        offset at landing (right +, left −). Tight cluster = repeatable
-        shape; wide vertical spread = two-way shot dispersion.
+        <h4 style={CARD_TITLE}>Every drive — carry vs side</h4>
+        <span style={{ ...MONO, fontSize: 10, color: "oklch(0.55 0.02 150)" }}>
+          {cloud.length} shots
+        </span>
+      </div>
+      <p style={CARD_SUBTITLE}>
+        One dot per stored tee shot. X = carry (yd), Y = side offset at
+        landing (right +, left −).
       </p>
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        style={{ width: "100%", height: "auto", display: "block" }}
+        preserveAspectRatio="none"
+        style={{ width: "100%", height: 300, display: "block" }}
       >
         <line
           x1={pad.l}
@@ -619,7 +760,7 @@ function ShotCloud({ profile }: { profile: PlayerDrivingProfile }) {
             key={i}
             cx={px(c.carry)}
             cy={py(c.carrySide)}
-            r={2.4}
+            r={2.6}
             fill="oklch(0.55 0.12 145 / 0.55)"
           />
         ))}
@@ -663,99 +804,20 @@ function ShotCloud({ profile }: { profile: PlayerDrivingProfile }) {
   );
 }
 
+// ── The dashboard ───────────────────────────────────────────────────
+
 export default function ProfileVisuals({ profile }: Props) {
-  const s = profile.stats;
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          gap: 10,
-          marginBottom: 6,
-        }}
-      >
-        <h3 style={{ fontSize: 18, margin: 0 }}>{profile.playerName}</h3>
-        <span
-          style={{
-            fontSize: 11,
-            color: "oklch(0.5 0.02 150)",
-            fontFamily:
-              "var(--font-plex-mono), 'IBM Plex Mono', ui-monospace, monospace",
-          }}
-        >
-          {profile.shotCount} drives · {profile.eventsCovered} events
-        </span>
+      <PlayerHeader profile={profile} />
+      <div className="ts-dashboard">
+        <StatsCard profile={profile} />
+        <BallFlightCard profile={profile} />
+        <div className="ts-area-similar" style={{ minWidth: 0 }}>
+          <SimilarList playerId={profile.playerId} />
+        </div>
+        <ShotCloudCard profile={profile} />
       </div>
-      <div
-        style={{
-          border: "1px solid oklch(0.9 0.008 95)",
-          borderRadius: 10,
-          background: "white",
-          padding: "10px 14px 4px",
-        }}
-      >
-        <StatRow
-          label="Ball speed"
-          mean={s.ballSpeed.mean}
-          std={s.ballSpeed.std}
-          unit="mph"
-        />
-        <StatRow
-          label="Carry"
-          mean={s.carry.mean}
-          std={s.carry.std}
-          unit="yd"
-        />
-        <StatRow
-          label="Apex height"
-          mean={s.apexHeight.mean}
-          std={s.apexHeight.std}
-          unit="ft"
-          digits={0}
-        />
-        <StatRow
-          label="Launch angle"
-          mean={s.verticalLaunchAngle.mean}
-          std={s.verticalLaunchAngle.std}
-          unit="°"
-        />
-        <StatRow
-          label="Aim (horiz. launch)"
-          mean={s.horizontalLaunchAngle.mean}
-          std={s.horizontalLaunchAngle.std}
-          unit="°"
-        />
-        <StatRow
-          label="Curve (draw− / fade+)"
-          mean={s.curve.mean}
-          std={s.curve.std}
-          unit="yd"
-        />
-        <StatRow
-          label="Landing side (left− / right+)"
-          mean={s.carrySide.mean}
-          std={s.carrySide.std}
-          unit="yd"
-        />
-        <StatRow
-          label="Launch spin"
-          mean={s.launchSpin.mean}
-          std={s.launchSpin.std}
-          unit="rpm"
-          digits={0}
-        />
-        <StatRow
-          label="Side spin (derived)"
-          mean={s.sideSpin.mean}
-          std={s.sideSpin.std}
-          unit="rpm"
-          digits={0}
-        />
-      </div>
-      <TrajectoryPanel profile={profile} />
-      <ShotCloud profile={profile} />
     </div>
   );
 }

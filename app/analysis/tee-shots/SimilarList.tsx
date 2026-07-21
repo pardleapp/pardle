@@ -104,23 +104,37 @@ export default function SimilarList({ playerId }: Props) {
         borderRadius: 10,
         background: "white",
         padding: 14,
-        marginTop: 12,
+        // Fill the dashboard grid cell so this card visually terminates
+        // at the same y as the neighbouring ball-flight card.
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        minWidth: 0,
       }}
     >
-      <h3 style={{ fontSize: 13, margin: "0 0 4px" }}>
+      <h4
+        style={{
+          fontSize: 11,
+          letterSpacing: 0.5,
+          textTransform: "uppercase",
+          fontWeight: 700,
+          color: "oklch(0.4 0.02 150)",
+          margin: 0,
+        }}
+      >
         Closest drivers on tour
-      </h3>
+      </h4>
       <p
         style={{
           fontSize: 11,
           color: "oklch(0.5 0.02 150)",
-          margin: "0 0 10px",
+          margin: "3px 0 10px",
+          lineHeight: 1.35,
         }}
       >
-        Ranked by how far each player&apos;s mean radar profile sits from
-        this one in normalised distance space — smaller number = more
-        similar. The line beside each name calls out the two biggest
-        differences.
+        Std-normalised distance across the radar profile — smaller =
+        more similar. Line under each name calls out the two biggest
+        gaps.
       </p>
       {loading ? (
         <p style={{ fontSize: 12, color: "oklch(0.5 0.02 150)" }}>

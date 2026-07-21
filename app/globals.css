@@ -21356,18 +21356,82 @@ html.pv-theme-body .auth-chip-btn {
       minmax(560px, 1fr)
       clamp(320px, 24vw, 400px);
   }
-  /* /analysis/tee-shots is a data-dense two-pane page (player
-     picker + profile / trajectory / cloud / similar list). The
-     default shell caps the middle track at ~580px which leaves the
-     picker and the right pane both squeezed. Bump the middle to
-     ~60vw and slim both rails so the surface reads at the size the
-     visualisations were designed for. */
+  /* /analysis/tee-shots is a full-width analytics dashboard —
+     picker + stats + ball-flight + shot cloud + similar-drivers
+     ranking. Middle track uses 1fr so it absorbs every pixel of
+     slack; rails are slimmed so the useful data area gets the
+     lion's share. This mirrors the fluid-shell approach the /bets
+     dashboard uses. */
   body:has(main.analysis-tee-shots-shell) .desktop-shell {
     grid-template-columns:
-      clamp(180px, 14vw, 220px)
-      minmax(620px, 60vw)
-      clamp(280px, 20vw, 360px);
+      clamp(180px, 13vw, 210px)
+      minmax(680px, 1fr)
+      clamp(240px, 17vw, 300px);
+    column-gap: clamp(16px, 1.6vw, 24px);
   }
+
+  /* Desktop-only picker + dashboard split inside the middle track.
+     Mobile ignores these rules and the surface stacks in natural
+     block order (aside → content) with the picker at full width. */
+  .ts-shell {
+    display: grid;
+    grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+  .ts-picker {
+    position: sticky;
+    top: 12px;
+  }
+  .ts-picker-list {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 0;
+    max-height: calc(100dvh - 120px);
+    overflow-y: auto;
+    border: 1px solid oklch(0.9 0.008 95);
+    border-radius: 8px;
+    background: white;
+  }
+  /* Dashboard grid: two columns.
+     Row A: [Stats | Ball-flight]
+     Row B: [Similar | Ball-flight]   ← ball-flight spans both rows
+     Row C: [Scatter (spans both)]
+     Filling the "empty lower right" by having the tall Ball-flight
+     card sit alongside stacked Stats + Similar so both columns
+     terminate at roughly the same y, and Scatter caps the whole
+     thing across the full width. */
+  .ts-dashboard {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "stats ballflight"
+      "similar ballflight"
+      "scatter scatter";
+    gap: 12px;
+    align-items: stretch;
+  }
+  .ts-area-stats { grid-area: stats; }
+  .ts-area-ballflight { grid-area: ballflight; }
+  .ts-area-similar { grid-area: similar; }
+  .ts-area-scatter { grid-area: scatter; }
+}
+
+@media (max-width: 1023.98px) {
+  /* Mobile: keep the picker list capped to prevent it eating the
+     whole viewport before the profile card renders, but keep the
+     natural stack — no grid, no sticky. */
+  .ts-picker-list {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 0;
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid oklch(0.9 0.008 95);
+    border-radius: 8px;
+    background: white;
+  }
+}
   /* Strip the page's mobile horizontal padding — the column itself
      is the gutter on desktop. */
   .bets-pv {

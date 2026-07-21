@@ -7,7 +7,6 @@ import AuthChip from "@/app/live/auth/AuthChip";
 import { BRAND } from "@/lib/brand";
 import type { PlayerDrivingProfile } from "@/lib/feed/tee-shots-profile";
 import ProfileVisuals from "./ProfileVisuals";
-import SimilarList from "./SimilarList";
 
 interface RankedPlayer {
   playerId: string;
@@ -162,15 +161,8 @@ export default function Page() {
             to populate the archive.
           </p>
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(220px, 260px) 1fr",
-              gap: 24,
-              marginTop: 20,
-            }}
-          >
-            <aside>
+          <div className="ts-shell" style={{ marginTop: 20 }}>
+            <aside className="ts-picker">
               <input
                 type="search"
                 value={query}
@@ -186,18 +178,8 @@ export default function Page() {
                   boxSizing: "border-box",
                 }}
               />
-              <ul
-                style={{
-                  listStyle: "none",
-                  padding: 0,
-                  margin: "8px 0 0",
-                  maxHeight: 560,
-                  overflowY: "auto",
-                  border: "1px solid oklch(0.9 0.008 95)",
-                  borderRadius: 8,
-                  background: "white",
-                }}
-              >
+              <ul className="ts-picker-list">
+
                 {filtered.map((p) => {
                   const active = p.playerId === selected;
                   return (
@@ -263,7 +245,7 @@ export default function Page() {
                 )}
               </ul>
             </aside>
-            <div>
+            <div className="ts-content">
               {loadingProfile ? (
                 <p>Loading profile…</p>
               ) : profileError ? (
@@ -271,10 +253,7 @@ export default function Page() {
                   Couldn&apos;t load: {profileError}
                 </p>
               ) : profile ? (
-                <>
-                  <ProfileVisuals profile={profile} />
-                  <SimilarList playerId={profile.playerId} />
-                </>
+                <ProfileVisuals profile={profile} />
               ) : (
                 <p style={{ color: "oklch(0.55 0.02 150)" }}>
                   Pick a player.
