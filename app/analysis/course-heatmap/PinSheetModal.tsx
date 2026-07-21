@@ -175,8 +175,13 @@ export default function PinSheetModal({
           background: "white",
           borderRadius: 12,
           padding: 20,
-          width: "100%",
-          maxWidth: 720,
+          // Desktop-first sizing — ~75% of viewport as the primary
+          // canvas so the green diagram + quadrant panel have room
+          // to breathe, capped at 1400 px on very wide screens.
+          // On phones the min() lets it shrink to 96vw before hitting
+          // the 720 baseline.
+          width: "min(1400px, 75vw)",
+          minWidth: "min(720px, 96vw)",
           maxHeight: "92vh",
           overflowY: "auto",
           boxSizing: "border-box",

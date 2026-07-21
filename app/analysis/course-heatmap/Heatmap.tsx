@@ -161,12 +161,14 @@ export default function Heatmap({
 
   const holes = Array.from({ length: 18 }, (_, i) => i + 1);
 
-  // 1-hour buckets → ~10-12 columns per round. Sized to fit the
-  // desktop shell's middle grid column (~580px cap) without touching
-  // the right rail: 44px label + 11 * 40 + 24 padding ≈ 508px. Mobile
-  // still gets the always-visible scrollbar on narrow viewports.
-  const CELL_W = 40;
-  const CELL_H = 26;
+  // Now that the analysis shell is full-width (right rail hidden),
+  // the middle track is ~1200-1400 px on desktop. Widen cells so the
+  // heatmap spreads to fill it instead of hugging the left edge:
+  // 60px label + ~12 * 68 + 90 round col ≈ 966 px, with the container
+  // stretching wider yet at bigger viewports. Mobile still gets the
+  // always-visible horizontal scrollbar for narrower screens.
+  const CELL_W = 68;
+  const CELL_H = 36;
 
   return (
     <div style={{ marginTop: 12 }}>
@@ -286,7 +288,7 @@ export default function Heatmap({
           >
             <thead>
             <tr>
-              <th style={{ width: 44 }} />
+              <th style={{ width: 60 }} />
               {buckets.map((t, i) => {
                 // Show the label only every N cells to prevent overlap
                 // when cells are narrow.
@@ -297,11 +299,11 @@ export default function Heatmap({
                     key={t}
                     style={{
                       width: CELL_W,
-                      fontSize: 10,
+                      fontSize: 12,
                       color: "oklch(0.5 0.02 150)",
-                      fontWeight: 500,
+                      fontWeight: 600,
                       fontFamily: "var(--font-mono, monospace)",
-                      paddingBottom: 4,
+                      paddingBottom: 6,
                       verticalAlign: "bottom",
                       textAlign: "left",
                     }}
@@ -313,16 +315,16 @@ export default function Heatmap({
               {/* Rightmost column: per-hole average for this round. */}
               <th
                 style={{
-                  width: CELL_W + 12,
-                  fontSize: 10,
+                  width: CELL_W + 20,
+                  fontSize: 12,
                   color: "oklch(0.35 0.02 150)",
                   fontWeight: 800,
                   fontFamily: "var(--font-mono, monospace)",
-                  paddingBottom: 4,
-                  paddingLeft: 10,
+                  paddingBottom: 6,
+                  paddingLeft: 14,
                   verticalAlign: "bottom",
                   textAlign: "center",
-                  letterSpacing: 0.4,
+                  letterSpacing: 0.5,
                   textTransform: "uppercase",
                   borderLeft: "2px solid oklch(0.88 0.012 95)",
                 }}
@@ -337,12 +339,12 @@ export default function Heatmap({
               <tr key={h}>
                 <td
                   style={{
-                    width: 58,
-                    fontSize: 11,
+                    width: 72,
+                    fontSize: 13,
                     fontWeight: 700,
                     color: "oklch(0.3 0.02 150)",
                     fontFamily: "var(--font-mono, monospace)",
-                    paddingRight: 8,
+                    paddingRight: 10,
                     textAlign: "right",
                     verticalAlign: "middle",
                   }}
@@ -408,7 +410,7 @@ export default function Heatmap({
                           : cell
                             ? "1px solid oklch(0.94 0.008 95)"
                             : "1px dashed oklch(0.94 0.008 95)",
-                        fontSize: 9,
+                        fontSize: 13,
                         color: cell ? textOn(cell.avgVsPar) : "transparent",
                         fontFamily: "var(--font-mono, monospace)",
                         fontWeight: 700,
@@ -442,9 +444,9 @@ export default function Heatmap({
                           : `H${h} · not enough data yet`
                       }
                       style={{
-                        width: CELL_W + 12,
+                        width: CELL_W + 20,
                         height: CELL_H,
-                        paddingLeft: 10,
+                        paddingLeft: 14,
                         borderLeft: "2px solid oklch(0.88 0.012 95)",
                         boxSizing: "border-box",
                       }}
@@ -455,7 +457,7 @@ export default function Heatmap({
                           color: has ? textOn(mean.avgVsPar) : "oklch(0.65 0.008 95)",
                           fontFamily: "var(--font-mono, monospace)",
                           fontWeight: 800,
-                          fontSize: 11,
+                          fontSize: 13,
                           border: has
                             ? "1px solid oklch(0.88 0.012 95)"
                             : "1px dashed oklch(0.92 0.008 95)",
@@ -479,16 +481,16 @@ export default function Heatmap({
             <tr>
               <td
                 style={{
-                  width: 44,
-                  fontSize: 10,
+                  width: 60,
+                  fontSize: 11,
                   fontWeight: 800,
                   color: "oklch(0.35 0.02 150)",
                   fontFamily: "var(--font-mono, monospace)",
-                  paddingRight: 8,
-                  paddingTop: 8,
+                  paddingRight: 10,
+                  paddingTop: 10,
                   textAlign: "right",
                   verticalAlign: "middle",
-                  letterSpacing: 0.4,
+                  letterSpacing: 0.5,
                   textTransform: "uppercase",
                   borderTop: "2px solid oklch(0.88 0.012 95)",
                 }}

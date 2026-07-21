@@ -882,8 +882,8 @@ function ChartCore({
                 type="button"
                 onClick={() => setRoundFilter(f)}
                 style={{
-                  padding: "4px 10px",
-                  fontSize: 12,
+                  padding: "8px 14px",
+                  fontSize: 14,
                   fontWeight: 700,
                   borderRadius: 6,
                   border: "1px solid oklch(0.85 0.013 95)",
@@ -1018,9 +1018,9 @@ function ChartCore({
       <div
         style={{
           border: "1px solid oklch(0.9 0.008 95)",
-          borderRadius: 8,
-          padding: "8px 10px 10px",
-          marginBottom: 8,
+          borderRadius: 10,
+          padding: "14px 16px 16px",
+          marginBottom: 12,
           background: "oklch(0.985 0.005 95)",
         }}
       >
@@ -1029,12 +1029,12 @@ function ChartCore({
             display: "flex",
             alignItems: "baseline",
             justifyContent: "space-between",
-            marginBottom: 6,
-            gap: 8,
+            marginBottom: 10,
+            gap: 10,
             flexWrap: "wrap",
           }}
         >
-          <strong style={{ fontSize: 12, letterSpacing: 0.3 }}>
+          <strong style={{ fontSize: 15, letterSpacing: 0.3 }}>
             Wave average ·{" "}
             <span style={{ color: "oklch(0.4 0.02 150)", fontWeight: 500 }}>
               {showAdjusted ? "skill adjusted" : "raw to par"}
@@ -1042,7 +1042,7 @@ function ChartCore({
           </strong>
           <span
             style={{
-              fontSize: 11,
+              fontSize: 12,
               color: "oklch(0.5 0.02 150)",
             }}
           >
@@ -1054,7 +1054,7 @@ function ChartCore({
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 8,
+            gap: 10,
           }}
         >
           {([1, 2, 3, 4] as const).map((r) => {
@@ -1077,11 +1077,11 @@ function ChartCore({
                 key={r}
                 style={{
                   border: "1px solid oklch(0.92 0.008 95)",
-                  borderRadius: 6,
-                  padding: "6px 8px",
+                  borderRadius: 8,
+                  padding: "12px 14px",
                   background: "white",
                   fontFamily: "var(--font-mono, monospace)",
-                  fontSize: 12,
+                  fontSize: 14,
                 }}
               >
                 <div
@@ -1089,13 +1089,13 @@ function ChartCore({
                     display: "flex",
                     alignItems: "baseline",
                     justifyContent: "space-between",
-                    marginBottom: 4,
+                    marginBottom: 8,
                   }}
                 >
                   <strong
                     style={{
                       color: style.color,
-                      fontSize: 12,
+                      fontSize: 15,
                       fontFamily:
                         "var(--font-archivo), 'Archivo', system-ui, sans-serif",
                       letterSpacing: 0.3,
@@ -1105,7 +1105,7 @@ function ChartCore({
                   </strong>
                   <span
                     style={{
-                      fontSize: 10,
+                      fontSize: 11,
                       color: "oklch(0.55 0.02 150)",
                     }}
                   >
@@ -1116,23 +1116,24 @@ function ChartCore({
                   style={{
                     display: "grid",
                     gridTemplateColumns: "auto 1fr",
-                    columnGap: 8,
-                    rowGap: 2,
+                    columnGap: 10,
+                    rowGap: 6,
                   }}
                 >
-                  <span style={{ color: "oklch(0.5 0.02 150)" }}>Early</span>
-                  <span style={{ textAlign: "right", fontWeight: 700 }}>
+                  <span style={{ color: "oklch(0.5 0.02 150)", fontSize: 13 }}>Early</span>
+                  <span style={{ textAlign: "right", fontWeight: 700, fontSize: 17 }}>
                     {wave.early != null ? formatSigned(wave.early) : "—"}
                   </span>
-                  <span style={{ color: "oklch(0.5 0.02 150)" }}>Late</span>
-                  <span style={{ textAlign: "right", fontWeight: 700 }}>
+                  <span style={{ color: "oklch(0.5 0.02 150)", fontSize: 13 }}>Late</span>
+                  <span style={{ textAlign: "right", fontWeight: 700, fontSize: 17 }}>
                     {wave.late != null ? formatSigned(wave.late) : "—"}
                   </span>
-                  <span style={{ color: "oklch(0.5 0.02 150)" }}>Δ</span>
+                  <span style={{ color: "oklch(0.5 0.02 150)", fontSize: 13 }}>Δ</span>
                   <span
                     style={{
                       textAlign: "right",
                       fontWeight: 800,
+                      fontSize: 18,
                       color: deltaColor,
                     }}
                   >
@@ -1489,13 +1490,13 @@ function ChartCore({
 }
 
 const btnStyle: React.CSSProperties = {
-  padding: "4px 10px",
-  fontSize: 13,
+  padding: "8px 14px",
+  fontSize: 14,
   fontWeight: 700,
   border: "1px solid oklch(0.85 0.013 95)",
   borderRadius: 6,
   background: "white",
   cursor: "pointer",
   color: "oklch(0.3 0.02 150)",
-  minWidth: 34,
+  minWidth: 42,
 };
