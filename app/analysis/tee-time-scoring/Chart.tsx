@@ -490,12 +490,21 @@ function ChartCore({
   const waveByRound = useMemo(() => {
     const out: Record<
       RoundNum,
-      { early: number | null; late: number | null; count: number }
+      {
+        early: number | null;
+        late: number | null;
+        count: number;
+        // x-range each half spans on the tee-time axis, so we can
+        // draw the wave average as a horizontal reference line
+        // covering exactly the tee times it summarises.
+        earlyRange: [number, number] | null;
+        lateRange: [number, number] | null;
+      }
     > = {
-      1: { early: null, late: null, count: 0 },
-      2: { early: null, late: null, count: 0 },
-      3: { early: null, late: null, count: 0 },
-      4: { early: null, late: null, count: 0 },
+      1: { early: null, late: null, count: 0, earlyRange: null, lateRange: null },
+      2: { early: null, late: null, count: 0, earlyRange: null, lateRange: null },
+      3: { early: null, late: null, count: 0, earlyRange: null, lateRange: null },
+      4: { early: null, late: null, count: 0, earlyRange: null, lateRange: null },
     };
     ([1, 2, 3, 4] as const).forEach((r) => {
       const roundRows = rows.filter((row) => row.round === r);
@@ -510,10 +519,16 @@ function ChartCore({
         arr.length === 0
           ? null
           : arr.reduce((s, x) => s + yOf(x), 0) / arr.length;
+      const rangeOf = (arr: Row[]): [number, number] | null =>
+        arr.length === 0
+          ? null
+          : [arr[0].teeMinutes, arr[arr.length - 1].teeMinutes];
       out[r] = {
         early: meanOf(early),
         late: meanOf(late),
         count: sorted.length,
+        earlyRange: rangeOf(early),
+        lateRange: rangeOf(late),
       };
     });
     return out;
@@ -1047,7 +1062,10 @@ function ChartCore({
             }}
           >
             Split each round&apos;s field in half at the median tee time.
-            Δ = late − early.
+            Δ = late − early. Chart shows the same numbers as short
+            dotted reference lines at each half&apos;s tee-time range;
+            the smooth trend rarely touches them because Gaussian
+            smoothing pulls extremes toward the middle.
           </span>
         </div>
         <div
@@ -1251,6 +1269,57 @@ function ChartCore({
         </text>
 
         <g clipPath="url(#chart-clip)">
+          {/* Wave-average reference lines — thin horizontal
+              segments at each half's arithmetic mean, spanning the
+              tee-time range that half covers. Draws under the trend
+              lines so the smoothed curve still reads as the main
+              signal; the flat lines make it obvious when the wave
+              mean sits below/above what the trend is showing
+              (Gaussian smoothing pulls extremes back toward the
+              middle, so trend rarely touches the wave mean). */}
+          {activeRounds.map((r) => {
+            const style = ROUND_STYLE[r];
+            const wave = waveByRound[r];
+            const segments: Array<{
+              y: number;
+              x1: number;
+              x2: number;
+              tag: "early" | "late";
+            }> = [];
+            if (wave.early != null && wave.earlyRange) {
+              segments.push({
+                y: wave.early,
+                x1: wave.earlyRange[0],
+                x2: wave.earlyRange[1],
+                tag: "early",
+              });
+            }
+            if (wave.late != null && wave.lateRange) {
+              segments.push({
+                y: wave.late,
+                x1: wave.lateRange[0],
+                x2: wave.lateRange[1],
+                tag: "late",
+              });
+            }
+            return (
+              <g key={`wave-${r}`}>
+                {segments.map((seg) => (
+                  <line
+                    key={`wave-${r}-${seg.tag}`}
+                    x1={xFor(seg.x1)}
+                    x2={xFor(seg.x2)}
+                    y1={yFor(seg.y)}
+                    y2={yFor(seg.y)}
+                    stroke={style.color}
+                    strokeWidth={1.6}
+                    strokeDasharray="2 4"
+                    opacity={0.65}
+                  />
+                ))}
+              </g>
+            );
+          })}
           {/* Per-round trend lines. Each round contributes an actual
               (solid, style-specific dash) and optional projected
               (thinner dash, lower opacity) segment. Loop over the
