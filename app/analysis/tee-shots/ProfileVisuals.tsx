@@ -183,62 +183,142 @@ interface Stat {
   label: string;
   mean: number;
   std: number;
+  min: number;
+  max: number;
   unit: string;
   digits?: number;
   signed?: boolean;
 }
 
 function StatCell({ stat }: { stat: Stat }) {
+  const digits = stat.digits ?? 1;
   const value = stat.signed
-    ? fmtSigned(stat.mean, stat.digits ?? 1)
-    : fmt(stat.mean, stat.digits ?? 1);
+    ? fmtSigned(stat.mean, digits)
+    : fmt(stat.mean, digits);
+  // Position the mean marker within the min→max range so the tiny
+  // bar shows where the player's average sits inside their spread.
+  const span = Math.max(stat.max - stat.min, 1e-6);
+  const meanPct = Math.max(
+    0,
+    Math.min(100, ((stat.mean - stat.min) / span) * 100),
+  );
   return (
     <div
       style={{
-        display: "grid",
-        gridTemplateColumns: "1fr auto auto",
-        alignItems: "baseline",
-        columnGap: 12,
-        padding: "10px 0",
+        display: "flex",
+        flexDirection: "column",
+        padding: "12px 4px",
         borderBottom: "1px solid oklch(0.945 0.008 95)",
+        gap: 8,
+        minWidth: 0,
       }}
     >
-      <span
+      <div
         style={{
-          fontSize: 13,
-          color: "oklch(0.42 0.02 150)",
-          letterSpacing: 0.2,
+          display: "grid",
+          gridTemplateColumns: "1fr auto auto",
+          alignItems: "baseline",
+          columnGap: 12,
         }}
       >
-        {stat.label}
-      </span>
-      <span
-        style={{
-          ...MONO,
-          fontSize: 17,
-          fontWeight: 700,
-          color: "oklch(0.18 0.02 150)",
-          whiteSpace: "nowrap",
-          letterSpacing: "-0.01em",
-        }}
-      >
-        {value}
         <span
-          style={{ color: "oklch(0.55 0.02 150)", fontWeight: 400, fontSize: 13 }}
-        >{` ${stat.unit}`}</span>
-      </span>
-      <span
+          style={{
+            fontSize: 13,
+            color: "oklch(0.42 0.02 150)",
+            letterSpacing: 0.2,
+          }}
+        >
+          {stat.label}
+        </span>
+        <span
+          style={{
+            ...MONO,
+            fontSize: 17,
+            fontWeight: 700,
+            color: "oklch(0.18 0.02 150)",
+            whiteSpace: "nowrap",
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {value}
+          <span
+            style={{
+              color: "oklch(0.55 0.02 150)",
+              fontWeight: 400,
+              fontSize: 13,
+            }}
+          >{` ${stat.unit}`}</span>
+        </span>
+        <span
+          style={{
+            ...MONO,
+            fontSize: 12,
+            color: "oklch(0.58 0.02 150)",
+            minWidth: 54,
+            textAlign: "right",
+            whiteSpace: "nowrap",
+          }}
+        >
+          ±{fmt(stat.std, digits)}
+        </span>
+      </div>
+      {/* Range bar — bounded by min and max with a green mean dot. */}
+      <div
         style={{
-          ...MONO,
-          fontSize: 12,
-          color: "oklch(0.58 0.02 150)",
-          minWidth: 54,
-          textAlign: "right",
-          whiteSpace: "nowrap",
+          display: "grid",
+          gridTemplateColumns: "auto 1fr auto",
+          alignItems: "center",
+          gap: 8,
         }}
       >
-        ±{fmt(stat.std, stat.digits ?? 1)}
-      </span>
+        <span
+          style={{
+            ...MONO,
+            fontSize: 10,
+            color: "oklch(0.6 0.02 150)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {stat.signed
+            ? fmtSigned(stat.min, digits)
+            : fmt(stat.min, digits)}
+        </span>
+        <div
+          style={{
+            position: "relative",
+            height: 4,
+            background: "oklch(0.94 0.008 95)",
+            borderRadius: 999,
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              left: `${meanPct}%`,
+              top: -3,
+              width: 8,
+              height: 10,
+              background: "oklch(0.5 0.14 145)",
+              borderRadius: 999,
+              transform: "translateX(-50%)",
+              border: "1.5px solid white",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+        <span
+          style={{
+            ...MONO,
+            fontSize: 10,
+            color: "oklch(0.6 0.02 150)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {stat.signed
+            ? fmtSigned(stat.max, digits)
+            : fmt(stat.max, digits)}
+        </span>
+      </div>
     </div>
   );
 }
@@ -246,12 +326,28 @@ function StatCell({ stat }: { stat: Stat }) {
 function StatsCard({ profile }: { profile: PlayerDrivingProfile }) {
   const s = profile.stats;
   const stats: Stat[] = [
-    { label: "Ball speed", mean: s.ballSpeed.mean, std: s.ballSpeed.std, unit: "mph" },
-    { label: "Carry", mean: s.carry.mean, std: s.carry.std, unit: "yd" },
+    {
+      label: "Ball speed",
+      mean: s.ballSpeed.mean,
+      std: s.ballSpeed.std,
+      min: s.ballSpeed.min,
+      max: s.ballSpeed.max,
+      unit: "mph",
+    },
+    {
+      label: "Carry",
+      mean: s.carry.mean,
+      std: s.carry.std,
+      min: s.carry.min,
+      max: s.carry.max,
+      unit: "yd",
+    },
     {
       label: "Apex height",
       mean: s.apexHeight.mean,
       std: s.apexHeight.std,
+      min: s.apexHeight.min,
+      max: s.apexHeight.max,
       unit: "ft",
       digits: 0,
     },
@@ -259,12 +355,16 @@ function StatsCard({ profile }: { profile: PlayerDrivingProfile }) {
       label: "Launch angle",
       mean: s.verticalLaunchAngle.mean,
       std: s.verticalLaunchAngle.std,
+      min: s.verticalLaunchAngle.min,
+      max: s.verticalLaunchAngle.max,
       unit: "°",
     },
     {
       label: "Aim",
       mean: s.horizontalLaunchAngle.mean,
       std: s.horizontalLaunchAngle.std,
+      min: s.horizontalLaunchAngle.min,
+      max: s.horizontalLaunchAngle.max,
       unit: "°",
       signed: true,
     },
@@ -272,6 +372,8 @@ function StatsCard({ profile }: { profile: PlayerDrivingProfile }) {
       label: "Curve",
       mean: s.curve.mean,
       std: s.curve.std,
+      min: s.curve.min,
+      max: s.curve.max,
       unit: "yd",
       signed: true,
     },
@@ -282,6 +384,8 @@ function StatsCard({ profile }: { profile: PlayerDrivingProfile }) {
       label: "Landing vs pin",
       mean: s.carrySide.mean,
       std: s.carrySide.std,
+      min: s.carrySide.min,
+      max: s.carrySide.max,
       unit: "yd",
       signed: true,
     },
@@ -289,6 +393,8 @@ function StatsCard({ profile }: { profile: PlayerDrivingProfile }) {
       label: "Launch spin",
       mean: s.launchSpin.mean,
       std: s.launchSpin.std,
+      min: s.launchSpin.min,
+      max: s.launchSpin.max,
       unit: "rpm",
       digits: 0,
     },
@@ -296,6 +402,8 @@ function StatsCard({ profile }: { profile: PlayerDrivingProfile }) {
       label: "Side spin",
       mean: s.sideSpin.mean,
       std: s.sideSpin.std,
+      min: s.sideSpin.min,
+      max: s.sideSpin.max,
       unit: "rpm",
       digits: 0,
       signed: true,
@@ -304,12 +412,20 @@ function StatsCard({ profile }: { profile: PlayerDrivingProfile }) {
   return (
     <div style={CARD} className="ts-area-stats">
       <h4 style={CARD_TITLE}>Radar profile</h4>
-      <p style={CARD_SUBTITLE}>Mean and ±1σ across every stored drive.</p>
+      <p style={CARD_SUBTITLE}>
+        Mean and ±1σ across every stored drive. Bar shows the min→max
+        range with the mean dot inside it.
+      </p>
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          columnGap: 20,
+          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+          columnGap: 24,
+          // Distribute the stat rows across the card's full height so
+          // there's no dead space below when the ball-flight column
+          // makes this card stretch taller than its natural size.
+          alignContent: "space-between",
+          flex: 1,
         }}
       >
         {stats.map((stat) => (
