@@ -23,11 +23,27 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PlayerDrivingProfile } from "@/lib/feed/tee-shots-profile";
 import SimilarList from "./SimilarList";
 
+/** Field-average shape drawn as a faint reference under the player
+ *  arcs on the ball-flight card. Fetched once at page mount. */
+export interface TourAverage {
+  shape: {
+    carry: number;
+    carrySide: number;
+    apexHeight: number;
+    apexRange: number;
+    apexSide: number;
+    curve: number;
+  };
+  aimDeg: number;
+  playerCount: number;
+}
+
 interface Props {
   /** Ordered — index 0 is the primary player (drives stats,
    *  scatter, similar list). Extra profiles overlay their arcs on
    *  the ball-flight card only. */
   profiles: PlayerDrivingProfile[];
+  tourAverage?: TourAverage | null;
 }
 
 const FLIGHT_MS = 2800; // one loop of the ball animation
@@ -506,7 +522,13 @@ interface Arc {
   curve: number;
 }
 
-function BallFlightCard({ profiles }: { profiles: PlayerDrivingProfile[] }) {
+function BallFlightCard({
+  profiles,
+  tourAverage,
+}: {
+  profiles: PlayerDrivingProfile[];
+  tourAverage: TourAverage | null;
+}) {
   const primary = profiles[0];
 
   const SIDE_W = 460;
@@ -536,24 +558,78 @@ function BallFlightCard({ profiles }: { profiles: PlayerDrivingProfile[] }) {
     });
   }, [profiles]);
 
-  // Shared axes — max across all profiles so multiple arcs stay in
-  // the same reference frame and can be compared visually.
+  // Tour-average sample — same math as a player profile, but the
+  // shape/aim numbers come from the pre-computed field mean.
+  const tourSamples = useMemo(() => {
+    if (!tourAverage) return null;
+    const { carry, apexHeight, apexRange, apexSide, curve } =
+      tourAverage.shape;
+    const aimDeg = tourAverage.aimDeg;
+    const apexSideAimFt =
+      apexSide - apexRange * Math.tan((aimDeg * Math.PI) / 180);
+    return {
+      side: sampleSide(carry, apexRange, apexHeight, 80),
+      top: sampleTop(carry, apexRange, apexSideAimFt, curve, 80),
+    };
+  }, [tourAverage]);
+
+  // Shared axes — max across all profiles + tour average so every
+  // arc stays in the same reference frame.
   const axes = useMemo(() => {
     let xMax = 1;
     let yMax = 20;
     let zAbs = 10;
-    for (const s of samples) {
-      for (const p of s.side) {
+    const allSideSets = [
+      ...samples.map((s) => s.side),
+      ...(tourSamples ? [tourSamples.side] : []),
+    ];
+    const allTopSets = [
+      ...samples.map((s) => s.top),
+      ...(tourSamples ? [tourSamples.top] : []),
+    ];
+    for (const set of allSideSets) {
+      for (const p of set) {
         if (p.x > xMax) xMax = p.x;
         if (p.y > yMax) yMax = p.y;
       }
-      for (const p of s.top) {
+    }
+    for (const set of allTopSets) {
+      for (const p of set) {
         const abs = Math.abs(p.z);
         if (abs > zAbs) zAbs = abs;
       }
     }
     return { xMax, yMax: yMax * 1.1, zAbs };
-  }, [samples]);
+  }, [samples, tourSamples]);
+
+  // Project the tour-average arc into the shared SVG frame so we
+  // can render it as a faint reference. No apex/landing markers,
+  // no animation — just the flight lines.
+  const tourArc = useMemo(() => {
+    if (!tourSamples) return null;
+    const sidePts = tourSamples.side.map((p) => ({
+      x: pad.l + (p.x / axes.xMax) * plotW,
+      y: pad.t + (1 - p.y / axes.yMax) * plotH,
+    }));
+    const topPts = tourSamples.top.map((p) => ({
+      x:
+        topPad.l +
+        topPlotW / 2 +
+        (p.z / axes.zAbs) * (topPlotW / 2 - 6),
+      y: topPad.t + topPlotH - (p.x / axes.xMax) * topPlotH,
+    }));
+    const toPath = (pts: Array<{ x: number; y: number }>) =>
+      pts
+        .map(
+          (pt, j) =>
+            `${j === 0 ? "M" : "L"}${pt.x.toFixed(1)},${pt.y.toFixed(1)}`,
+        )
+        .join(" ");
+    return {
+      sidePath: toPath(sidePts),
+      topPath: toPath(topPts),
+    };
+  }, [tourSamples, axes, pad.l, pad.t, plotW, plotH, topPad.l, topPad.t, topPlotW, topPlotH]);
 
   // Per-profile projected paths + landmark positions.
   const arcs = useMemo<Arc[]>(() => {
@@ -682,8 +758,33 @@ function BallFlightCard({ profiles }: { profiles: PlayerDrivingProfile[] }) {
     >
       <h4 style={CARD_TITLE}>Average ball flight</h4>
       <p style={CARD_SUBTITLE}>
-        Side view: height vs downrange. Top view: driver&apos;s-eye — ball
-        flies up, drift shows left/right.
+        Side view: height vs downrange. Top view: driver&apos;s-eye —
+        ball flies up, drift shows left/right.
+        {tourArc && (
+          <>
+            {" "}
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                marginLeft: 4,
+                color: "oklch(0.5 0.015 150)",
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  display: "inline-block",
+                  width: 22,
+                  borderTop: "1.5px dashed oklch(0.5 0.015 150)",
+                  opacity: 0.6,
+                }}
+              />
+              tour average
+            </span>
+          </>
+        )}
       </p>
 
       <div
@@ -718,6 +819,19 @@ function BallFlightCard({ profiles }: { profiles: PlayerDrivingProfile[] }) {
           stroke="oklch(0.85 0.013 95)"
           strokeWidth={1}
         />
+        {/* Tour-average reference arc — sits UNDER the player arcs
+            so the player's own flight stays the primary read. */}
+        {tourArc && (
+          <path
+            d={tourArc.sidePath}
+            fill="none"
+            stroke="oklch(0.5 0.015 150)"
+            strokeWidth={1.2}
+            strokeLinecap="round"
+            strokeDasharray="2 5"
+            opacity={0.4}
+          />
+        )}
         {/* One dashed arc per profile, primary last so it renders on top. */}
         {arcs
           .slice(1)
@@ -852,6 +966,18 @@ function BallFlightCard({ profiles }: { profiles: PlayerDrivingProfile[] }) {
             stroke="oklch(0.85 0.013 95)"
             strokeWidth={1}
           />
+          {/* Tour-average reference arc — muted, sits under player arcs. */}
+          {tourArc && (
+            <path
+              d={tourArc.topPath}
+              fill="none"
+              stroke="oklch(0.5 0.015 150)"
+              strokeWidth={1.2}
+              strokeLinecap="round"
+              strokeDasharray="2 5"
+              opacity={0.4}
+            />
+          )}
           {/* One top-view arc per profile — non-primaries first so
               the primary sits on top. */}
           {arcs
@@ -1138,7 +1264,7 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
 
 // ── The dashboard ───────────────────────────────────────────────────
 
-export default function ProfileVisuals({ profiles }: Props) {
+export default function ProfileVisuals({ profiles, tourAverage }: Props) {
   const primary = profiles[0];
   if (!primary) return null;
   return (
@@ -1146,7 +1272,7 @@ export default function ProfileVisuals({ profiles }: Props) {
       <PlayerHeader profiles={profiles} />
       <div className="ts-dashboard">
         <StatsCard profile={primary} />
-        <BallFlightCard profiles={profiles} />
+        <BallFlightCard profiles={profiles} tourAverage={tourAverage ?? null} />
         <div className="ts-area-similar" style={{ minWidth: 0 }}>
           <SimilarList playerId={primary.playerId} />
         </div>

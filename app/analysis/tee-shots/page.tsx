@@ -6,7 +6,10 @@ import MainNav from "@/app/MainNav";
 import AuthChip from "@/app/live/auth/AuthChip";
 import { BRAND } from "@/lib/brand";
 import type { PlayerDrivingProfile } from "@/lib/feed/tee-shots-profile";
-import ProfileVisuals, { COMPARE_COLORS } from "./ProfileVisuals";
+import ProfileVisuals, {
+  COMPARE_COLORS,
+  type TourAverage,
+} from "./ProfileVisuals";
 
 interface RankedPlayer {
   playerId: string;
@@ -38,6 +41,44 @@ export default function Page() {
   const [profiles, setProfiles] = useState<PlayerDrivingProfile[]>([]);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
+  /** Field-wide mean shape — drawn as a faint reference arc under
+   *  whichever player is selected so viewers can eyeball tour
+   *  deltas. Loaded once at mount and cached client-side. */
+  const [tourAverage, setTourAverage] = useState<TourAverage | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/tee-shot-tour-average", {
+          cache: "no-store",
+        });
+        const json = (await res.json()) as {
+          ok: boolean;
+          shape?: TourAverage["shape"];
+          aimDeg?: number;
+          playerCount?: number;
+        };
+        if (
+          alive &&
+          json.ok &&
+          json.shape &&
+          typeof json.aimDeg === "number"
+        ) {
+          setTourAverage({
+            shape: json.shape,
+            aimDeg: json.aimDeg,
+            playerCount: json.playerCount ?? 0,
+          });
+        }
+      } catch {
+        /* silent — the reference arc is a nice-to-have */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Load the ranked player index on mount.
   useEffect(() => {
@@ -405,7 +446,7 @@ export default function Page() {
                   Couldn&apos;t load: {profileError}
                 </p>
               ) : profiles.length > 0 ? (
-                <ProfileVisuals profiles={profiles} />
+                <ProfileVisuals profiles={profiles} tourAverage={tourAverage} />
               ) : (
                 <p style={{ color: "oklch(0.55 0.02 150)" }}>
                   Pick a player.
