@@ -47,6 +47,23 @@ export interface QuadrantSummary extends BirdieCount {
   pinCount: number;
 }
 
+/** A proximity-cluster of pins that all landed within a small
+ *  distance of each other across seasons. Rate + counts are the
+ *  aggregate over every pin in the cluster; centroid + radius are
+ *  the visual anchor / span for drawing an overlay disc. */
+export interface PinCluster extends BirdieCount {
+  clusterId: string;
+  centroid: { x: number; y: number };
+  /** Distance (0-1 normalised) from centroid to the furthest pin
+   *  in the cluster — the "how big is this location's neighbourhood"
+   *  signal used to size the disc on the diagram. */
+  radius: number;
+  pinCount: number;
+  /** Indices into the parent hole's `pins` array so the modal can
+   *  highlight the individual pins that make up this cluster. */
+  memberIndices: number[];
+}
+
 /** Everything the pin-sheet modal needs for one hole. */
 export interface HoleBirdieData {
   holeNumber: number;
@@ -55,6 +72,11 @@ export interface HoleBirdieData {
   greenImageUrl: string;
   pins: PinBirdie[];
   quadrants: Record<Quadrant, QuadrantSummary>;
+  /** Proximity clusters — the primary aggregation surface now that
+   *  we know pin positions repeat year-to-year (course setup places
+   *  pins in similar spots). Quadrants retained for backward-compat
+   *  callers but the modal reads clusters. */
+  clusters: PinCluster[];
   overall: QuadrantSummary;
   /** Range of years contributing (min, max) — handy for a
    *  "3 seasons · 12 pins" strapline in the UI. */
@@ -145,6 +167,106 @@ const EMPTY_QUAD: QuadrantSummary = {
   pinCount: 0,
 };
 
+/** Proximity threshold in normalised (0-1) diagram coordinates.
+ *  Two pins closer than this collapse into the same cluster. Tuned
+ *  from empirical pin sheets: a modern PGA green is roughly 30 yd
+ *  across, so 0.1 ≈ 3 yd — a tight "same location" definition that
+ *  keeps distinct pin positions separated while merging the year-
+ *  to-year repeats course-setup crews put in the same spot. */
+const CLUSTER_THRESHOLD = 0.1;
+
+function dist(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): number {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function centroidOf(pts: Array<{ x: number; y: number }>): {
+  x: number;
+  y: number;
+} {
+  if (pts.length === 0) return { x: 0, y: 0 };
+  let sx = 0;
+  let sy = 0;
+  for (const p of pts) {
+    sx += p.x;
+    sy += p.y;
+  }
+  return { x: sx / pts.length, y: sy / pts.length };
+}
+
+/** Agglomerative clustering with centroid linkage — start with each
+ *  pin as its own cluster, then iteratively merge the closest pair
+ *  until the shortest inter-centroid distance exceeds the threshold.
+ *  O(N²·log N) but N ≤ ~20 pins per hole so this is trivial. */
+function clusterPins(pins: PinBirdie[]): PinCluster[] {
+  if (pins.length === 0) return [];
+  // Track by original index so the returned memberIndices point back
+  // into the caller's pins array.
+  interface Bucket {
+    memberIndices: number[];
+    centroid: { x: number; y: number };
+  }
+  let buckets: Bucket[] = pins.map((p, i) => ({
+    memberIndices: [i],
+    centroid: { x: p.x, y: p.y },
+  }));
+  while (buckets.length > 1) {
+    let minD = Infinity;
+    let a = -1;
+    let b = -1;
+    for (let i = 0; i < buckets.length; i++) {
+      for (let j = i + 1; j < buckets.length; j++) {
+        const d = dist(buckets[i].centroid, buckets[j].centroid);
+        if (d < minD) {
+          minD = d;
+          a = i;
+          b = j;
+        }
+      }
+    }
+    if (minD > CLUSTER_THRESHOLD) break;
+    // Merge bucket b into a; drop b.
+    const merged = [...buckets[a].memberIndices, ...buckets[b].memberIndices];
+    const mergedPts = merged.map((i) => ({ x: pins[i].x, y: pins[i].y }));
+    buckets[a] = {
+      memberIndices: merged,
+      centroid: centroidOf(mergedPts),
+    };
+    buckets = buckets.filter((_, k) => k !== b);
+  }
+  // Sort by descending pin count so the "biggest neighbourhood"
+  // clusters come first (nice default for a summary list).
+  buckets.sort((x, y) => y.memberIndices.length - x.memberIndices.length);
+  return buckets.map((bucket, i) => {
+    const members = bucket.memberIndices.map((idx) => pins[idx]);
+    let birdies = 0;
+    let total = 0;
+    let radius = 0;
+    for (const m of members) {
+      birdies += m.birdies;
+      total += m.total;
+      const d = dist(bucket.centroid, m);
+      if (d > radius) radius = d;
+    }
+    return {
+      clusterId: `c${i}`,
+      centroid: bucket.centroid,
+      // Give a tiny minimum radius so single-pin clusters still
+      // render as a visible disc rather than a zero-radius glitch.
+      radius: Math.max(radius, 0.02),
+      birdies,
+      total,
+      rate: total > 0 ? birdies / total : 0,
+      pinCount: members.length,
+      memberIndices: bucket.memberIndices,
+    };
+  });
+}
+
 export function buildHoleBirdieData(
   holeNumber: number,
   events: EventInput[],
@@ -205,6 +327,7 @@ export function buildHoleBirdieData(
   quadrants.BL = summarise(byQuad.BL);
   quadrants.BR = summarise(byQuad.BR);
   const overall = summarise(pins);
+  const clusters = clusterPins(pins);
 
   return {
     holeNumber,
@@ -213,6 +336,7 @@ export function buildHoleBirdieData(
     greenImageUrl,
     pins,
     quadrants,
+    clusters,
     overall,
     yearsCovered: [...yearsCovered].sort((a, b) => a - b),
   };

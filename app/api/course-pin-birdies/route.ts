@@ -167,13 +167,11 @@ async function familyFor(tournamentId: string): Promise<FamilyDef | null> {
 // ── Endpoint ────────────────────────────────────────────────────────
 
 function cacheKey(tournamentId: string): string {
-  // v4 — reverted the raw fallback in parseCoursePinsPayload (raw
-  // x/y is in a different reference frame per hole than enhanced
-  // x/y, so a raw pin plotted on the enhanced-frame image landed in
-  // the wrong place, and quadrant classifications differed across
-  // years). 2023 pins are dropped again; v3 aggregations that
-  // included them must not be re-served.
-  return `feed:pin-birdies:v4:${tournamentId}`;
+  // v5 — added proximity-clustered aggregation (pin sets close in
+  // coordinate space are treated as the same "location" year to
+  // year). Pre-v5 responses have no `clusters` field, so the
+  // modal's cluster panel would render empty; bump so we refetch.
+  return `feed:pin-birdies:v5:${tournamentId}`;
 }
 
 export async function GET(req: Request) {

@@ -446,31 +446,45 @@ export default function PinSheetModal({
                 pinByRound={hole.pinByRound}
               />
             )}
-            {/* History mode: quadrant colour overlays + historical
-                pin dots. The four quadrant divs sit UNDER the pin
-                dots via z-index. */}
+            {/* History mode: cluster colour overlays + historical
+                pin dots. Cluster discs sit UNDER the pin dots via
+                z-index. Each cluster is a soft circle around the
+                mean position of the pins it contains, tinted by the
+                aggregate birdie rate — so nearby pins across years
+                read as one "location". */}
             {showHistory && birdieHistory && (
               <>
-                {(["TL", "TR", "BL", "BR"] as const).map((q) => {
-                  const s = birdieHistory.quadrants[q];
-                  const left = q === "TL" || q === "BL" ? "0%" : "50%";
-                  const top = q === "TL" || q === "TR" ? "0%" : "50%";
+                {birdieHistory.clusters.map((cluster) => {
+                  const cx = cluster.centroid.x * 100;
+                  const cy = cluster.centroid.y * 100;
+                  // Pixel-space disc; use both axes' viewport-relative
+                  // size so the disc scales with the rendered image.
+                  // Add a small buffer so single pins still have a
+                  // visible halo, then clamp so massive clusters don't
+                  // dominate.
+                  const r = Math.max(0.06, Math.min(0.25, cluster.radius + 0.05));
                   return (
                     <div
-                      key={`quad-${q}`}
+                      key={`cluster-${cluster.clusterId}`}
                       aria-hidden
                       style={{
                         position: "absolute",
-                        left,
-                        top,
-                        width: "50%",
-                        height: "50%",
+                        left: `${cx - r * 100}%`,
+                        top: `${cy - r * 100}%`,
+                        width: `${r * 200}%`,
+                        height: `${r * 200}%`,
+                        borderRadius: "50%",
                         background:
-                          s.total > 0
-                            ? rateColor(s.rate, 0.28)
+                          cluster.total > 0
+                            ? rateColor(cluster.rate, 0.32)
                             : "transparent",
+                        border:
+                          cluster.total > 0
+                            ? `1.5px dashed ${rateColor(cluster.rate, 0.7)}`
+                            : "none",
                         pointerEvents: "none",
                         zIndex: 1,
+                        boxSizing: "border-box",
                       }}
                     />
                   );
@@ -1025,40 +1039,42 @@ export default function PinSheetModal({
           </div>
         )}
 
-        {/* Quadrant summary panel — replaces the round legend in
-            history mode. Shows aggregate birdie rate per quadrant
-            plus overall, with sample sizes so readers can weight
-            confidence in the small-sample corners. */}
+        {/* Cluster summary panel — replaces the round legend in
+            history mode. One card per proximity cluster (pins the
+            course-setup crew put in the same spot year to year).
+            Larger sample = the trustworthy pin location; the small
+            single-pin "clusters" are noisy neighbourhood outliers. */}
         {showHistory && birdieHistory && (
           <div
             style={{
               marginTop: 14,
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
               gap: 10,
             }}
           >
-            {(
-              [
-                { q: "TL", label: "Top-left" },
-                { q: "TR", label: "Top-right" },
-                { q: "BL", label: "Bottom-left" },
-                { q: "BR", label: "Bottom-right" },
-              ] as Array<{ q: "TL" | "TR" | "BL" | "BR"; label: string }>
-            ).map(({ q, label }) => {
-              const s = birdieHistory.quadrants[q];
-              const has = s.total > 0;
+            {birdieHistory.clusters.map((cluster, i) => {
+              const has = cluster.total > 0;
+              // Rough anatomical label from the centroid so the
+              // reader can find the cluster on the diagram — TPC
+              // Twin Cities greens read with the tee at the bottom
+              // of the frame, so y-large = closer to the tee (front).
+              const cx = cluster.centroid.x;
+              const cy = cluster.centroid.y;
+              const horiz = cx < 0.4 ? "Left" : cx > 0.6 ? "Right" : "Centre";
+              const vert = cy < 0.4 ? "Back" : cy > 0.6 ? "Front" : "Middle";
+              const location = `${vert} ${horiz.toLowerCase()}`;
               return (
                 <div
-                  key={q}
+                  key={cluster.clusterId}
                   style={{
-                    padding: "8px 10px",
+                    padding: "10px 12px",
                     border: "1px solid oklch(0.94 0.008 95)",
                     borderRadius: 8,
-                    background: has ? rateColor(s.rate, 0.12) : "white",
+                    background: has ? rateColor(cluster.rate, 0.14) : "white",
                     display: "flex",
                     flexDirection: "column",
-                    gap: 2,
+                    gap: 3,
                   }}
                 >
                   <span
@@ -1070,28 +1086,29 @@ export default function PinSheetModal({
                       fontWeight: 700,
                     }}
                   >
-                    {label}
+                    Cluster {String.fromCharCode(65 + i)} · {location}
                   </span>
                   <span
                     style={{
                       fontFamily: "var(--font-mono, monospace)",
-                      fontSize: 20,
+                      fontSize: 22,
                       fontWeight: 800,
                       color: has ? "oklch(0.2 0.02 150)" : "oklch(0.6 0.02 150)",
                       letterSpacing: "-0.01em",
                     }}
                   >
-                    {has ? fmtRate(s.rate) : "—"}
+                    {has ? fmtRate(cluster.rate) : "—"}
                   </span>
                   <span
                     style={{
                       fontFamily: "var(--font-mono, monospace)",
-                      fontSize: 10,
+                      fontSize: 11,
                       color: "oklch(0.55 0.02 150)",
                     }}
                   >
-                    {s.pinCount} pin{s.pinCount === 1 ? "" : "s"} ·{" "}
-                    {s.birdies}/{s.total}
+                    {cluster.pinCount} pin
+                    {cluster.pinCount === 1 ? "" : "s"} ·{" "}
+                    {cluster.birdies}/{cluster.total}
                   </span>
                 </div>
               );
@@ -1190,7 +1207,7 @@ export default function PinSheetModal({
           }}
         >
           {showHistory
-            ? "Every pin position from every stored round of this hole, coloured by that round's birdie-or-better rate. Quadrant tiles average all pins that fell in that zone; bigger pin counts = more trustworthy."
+            ? "Every pin position from every stored round of this hole, coloured by that round's birdie-or-better rate. Dashed circles mark proximity clusters — pins the course-setup crew puts in the same spot year to year get merged into one tile in the panel below. Bigger pin counts = more trustworthy."
             : "Hover any pin to see the field's scoring average for that round. Pin coordinates + green diagram from PGA Tour's own broadcast feed. Rounds without a coloured dot haven't been posted yet (or the round hasn't been played)."}
         </p>
       </div>
