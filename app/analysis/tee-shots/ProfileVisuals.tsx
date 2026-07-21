@@ -14,11 +14,15 @@
  * size and no fixed pixel dimensions leak into the layout.
  */
 
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PlayerDrivingProfile } from "@/lib/feed/tee-shots-profile";
 
 interface Props {
   profile: PlayerDrivingProfile;
 }
+
+const FLIGHT_MS = 2800; // one loop of the ball animation
+const REST_MS = 900; // pause at landing before restart, so the eye can register the final side offset
 
 /** Lagrange quadratic through (0,0), (x1,y1), (x2,y2) — the
  *  smooth curve every arc panel below uses. */
@@ -148,19 +152,15 @@ function StatRow({
 
 function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
   const { carry, apexHeight, apexRange, apexSide, carrySide } = profile.shape;
-  if (!Number.isFinite(carry) || carry <= 0) return null;
 
-  const sideSamples = sampleSide(carry, apexRange, apexHeight, 80);
-  const topSamples = sampleTop(carry, apexRange, apexSide, carrySide, 80);
-
-  const xs = sideSamples.map((s) => s.x);
-  const ys = sideSamples.map((s) => s.y);
-  const zs = topSamples.map((s) => s.z);
-  const xMax = Math.max(1, Math.max(...xs));
-  const yMax = Math.max(20, Math.max(...ys) * 1.1);
-  // Side axis bounds — at least ±10 yd so the axis isn't crushed
-  // when a straight hitter shows almost no drift.
-  const zAbs = Math.max(10, ...zs.map(Math.abs));
+  const sideSamples = useMemo(
+    () => sampleSide(carry, apexRange, apexHeight, 80),
+    [carry, apexRange, apexHeight],
+  );
+  const topSamples = useMemo(
+    () => sampleTop(carry, apexRange, apexSide, carrySide, 80),
+    [carry, apexRange, apexSide, carrySide],
+  );
 
   const SIDE_W = 460;
   const SIDE_H = 200;
@@ -171,22 +171,79 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
   const plotH = SIDE_H - pad.t - pad.b;
   const topPlotH = TOP_H - pad.t - pad.b;
 
-  const sidePath = sideSamples
-    .map((s, i) => {
-      const px = pad.l + (s.x / xMax) * plotW;
-      const py = pad.t + (1 - s.y / yMax) * plotH;
-      return `${i === 0 ? "M" : "L"}${px.toFixed(1)},${py.toFixed(1)}`;
-    })
-    .join(" ");
-  const topPath = topSamples
-    .map((s, i) => {
-      const px = pad.l + (s.x / xMax) * plotW;
+  // Project the sampled arcs into SVG-space once; the animator
+  // interpolates within these arrays every frame.
+  const geom = useMemo(() => {
+    const xs = sideSamples.map((s) => s.x);
+    const ys = sideSamples.map((s) => s.y);
+    const zs = topSamples.map((s) => s.z);
+    const xMax = Math.max(1, Math.max(...xs));
+    const yMax = Math.max(20, Math.max(...ys) * 1.1);
+    const zAbs = Math.max(10, ...zs.map(Math.abs));
+    const sidePts = sideSamples.map((s) => ({
+      x: pad.l + (s.x / xMax) * plotW,
+      y: pad.t + (1 - s.y / yMax) * plotH,
+    }));
+    const topPts = topSamples.map((s) => ({
+      x: pad.l + (s.x / xMax) * plotW,
       // z centred: 0 at midline, ±zAbs at edges. Positive z = right
       // (fade for a right-hander).
-      const py = pad.t + topPlotH / 2 - (s.z / zAbs) * (topPlotH / 2 - 6);
-      return `${i === 0 ? "M" : "L"}${px.toFixed(1)},${py.toFixed(1)}`;
-    })
+      y: pad.t + topPlotH / 2 - (s.z / zAbs) * (topPlotH / 2 - 6),
+    }));
+    return { xMax, yMax, zAbs, sidePts, topPts };
+  }, [sideSamples, topSamples, pad.l, pad.t, plotW, plotH, topPlotH]);
+
+  // Ticker — a fraction in [0, 1) that loops every FLIGHT_MS with
+  // a REST_MS pause at the end. Positions the ball dot each frame.
+  const [phase, setPhase] = useState(0);
+  const rafRef = useRef<number | null>(null);
+  useEffect(() => {
+    let start: number | null = null;
+    const cycle = FLIGHT_MS + REST_MS;
+    const step = (now: number) => {
+      if (start == null) start = now;
+      const elapsed = (now - start) % cycle;
+      const p = elapsed < FLIGHT_MS ? elapsed / FLIGHT_MS : 1;
+      setPhase(p);
+      rafRef.current = requestAnimationFrame(step);
+    };
+    rafRef.current = requestAnimationFrame(step);
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+  // Reset the ball to the tee whenever the target player changes so
+  // the eye doesn't see it teleport to a new arc's midpoint.
+  useEffect(() => {
+    setPhase(0);
+  }, [profile.playerId]);
+
+  if (!Number.isFinite(carry) || carry <= 0) return null;
+
+  const { xMax, yMax, zAbs, sidePts, topPts } = geom;
+
+  const sidePath = sidePts
+    .map(
+      (p, i) =>
+        `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`,
+    )
     .join(" ");
+  const topPath = topPts
+    .map(
+      (p, i) =>
+        `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`,
+    )
+    .join(" ");
+
+  // Ease-out on the ball so it decelerates near landing — feels
+  // right for a real drive dropping into the fairway.
+  const eased = 1 - Math.pow(1 - phase, 1.6);
+  const idx = Math.min(
+    sidePts.length - 1,
+    Math.floor(eased * (sidePts.length - 1)),
+  );
+  const ballSide = sidePts[idx];
+  const ballTop = topPts[idx];
 
   // Landing marker on the top view — draws attention to where the
   // ball actually finishes on the side axis.
@@ -260,16 +317,35 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
             <path
               d={sidePath}
               fill="none"
-              stroke="oklch(0.5 0.14 145)"
-              strokeWidth={2}
+              stroke="oklch(0.75 0.05 145)"
+              strokeWidth={1.5}
               strokeLinecap="round"
+              strokeDasharray="3 4"
             />
             <circle
               cx={apexPx}
               cy={apexPy}
-              r={3.5}
-              fill="oklch(0.4 0.16 145)"
+              r={3}
+              fill="oklch(0.55 0.14 145)"
             />
+            {ballSide && (
+              <>
+                <circle
+                  cx={ballSide.x}
+                  cy={ballSide.y}
+                  r={7}
+                  fill="oklch(0.55 0.14 145 / 0.18)"
+                />
+                <circle
+                  cx={ballSide.x}
+                  cy={ballSide.y}
+                  r={4.5}
+                  fill="white"
+                  stroke="oklch(0.25 0.02 150)"
+                  strokeWidth={1.2}
+                />
+              </>
+            )}
             <text
               x={apexPx}
               y={apexPy - 6}
@@ -350,16 +426,35 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
             <path
               d={topPath}
               fill="none"
-              stroke="oklch(0.5 0.14 145)"
-              strokeWidth={2}
+              stroke="oklch(0.75 0.05 145)"
+              strokeWidth={1.5}
               strokeLinecap="round"
+              strokeDasharray="3 4"
             />
             <circle
               cx={landPx}
               cy={landPy}
-              r={3.5}
-              fill="oklch(0.4 0.16 145)"
+              r={3}
+              fill="oklch(0.55 0.14 145)"
             />
+            {ballTop && (
+              <>
+                <circle
+                  cx={ballTop.x}
+                  cy={ballTop.y}
+                  r={7}
+                  fill="oklch(0.55 0.14 145 / 0.18)"
+                />
+                <circle
+                  cx={ballTop.x}
+                  cy={ballTop.y}
+                  r={4.5}
+                  fill="white"
+                  stroke="oklch(0.25 0.02 150)"
+                  strokeWidth={1.2}
+                />
+              </>
+            )}
             <text
               x={landPx - 6}
               y={landPy + (carrySide >= 0 ? -6 : 12)}

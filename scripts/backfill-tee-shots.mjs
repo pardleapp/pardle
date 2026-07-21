@@ -34,10 +34,12 @@ import { Redis } from "@upstash/redis";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
 
-// ── Env loading — mirror scripts/fetch-3m-historical.mjs ───────────
-async function loadEnvLocal() {
+// ── Env loading ────────────────────────────────────────────────────
+// .env.local for local secrets and .env.vercel.production for the
+// prod Redis creds (which live only in the Vercel-pulled file).
+async function loadEnvFile(path) {
   try {
-    const text = await readFile(resolve(REPO_ROOT, ".env.local"), "utf-8");
+    const text = await readFile(path, "utf-8");
     for (const raw of text.split("\n")) {
       const line = raw.trim();
       if (!line || line.startsWith("#")) continue;
@@ -51,18 +53,26 @@ async function loadEnvLocal() {
       if (!process.env[k]) process.env[k] = v;
     }
   } catch {
-    // env file absent
+    // env file absent — ignore
   }
 }
-await loadEnvLocal();
+await loadEnvFile(resolve(REPO_ROOT, ".env.local"));
+await loadEnvFile(resolve(REPO_ROOT, ".env.vercel.production"));
 
 const PGA_KEY =
   process.env.PGATOUR_API_KEY || "da2-gsrx5bibzbb4njvhl7t37wqyl4";
-const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL;
-const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+// Both Vercel KV and raw Upstash naming schemes ship the same
+// Upstash REST endpoint — accept either so this runs against local
+// and production creds without ceremony.
+const REDIS_URL =
+  process.env.UPSTASH_REDIS_REST_URL ||
+  process.env.KV_REST_API_URL;
+const REDIS_TOKEN =
+  process.env.UPSTASH_REDIS_REST_TOKEN ||
+  process.env.KV_REST_API_TOKEN;
 if (!REDIS_URL || !REDIS_TOKEN) {
   console.error(
-    "[backfill-tee-shots] UPSTASH_REDIS_REST_URL / _TOKEN must be set",
+    "[backfill-tee-shots] Redis creds missing — expected KV_REST_API_URL/_TOKEN (or UPSTASH_REDIS_REST_URL/_TOKEN) in .env.local or .env.vercel.production",
   );
   process.exit(1);
 }
@@ -209,6 +219,9 @@ async function fetchTeeShots(tournamentId, requests) {
           if (!stroke) continue;
           if (stroke.fromLocationCode !== "OTB") continue;
           if (stroke.strokeNumber !== 1) continue;
+          // Match lib/golf-api/pgatour.getTournamentTeeShots — no
+          // par-3 tee shots, no non-driver layups.
+          if (hole.par === 3) continue;
           const radar = stroke.radarData;
           if (!radar) continue;
           const traj = radar.normalizedTrajectoryV2?.[0];
@@ -221,6 +234,7 @@ async function fetchTeeShots(tournamentId, requests) {
           ) {
             continue;
           }
+          if (radar.ballSpeed < 145) continue;
           out.push({
             playerId,
             playerName: nameById.get(playerId) ?? playerName,

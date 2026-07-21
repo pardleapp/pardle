@@ -1153,6 +1153,9 @@ export async function getTournamentTeeShots(
           if (!stroke) continue;
           if (stroke.fromLocationCode !== "OTB") continue;
           if (stroke.strokeNumber !== 1) continue;
+          // Par 3 tees are irons/wedges by definition — never a
+          // driver. Exclude to keep the "driving profile" clean.
+          if (hole.par === 3) continue;
           const radar = stroke.radarData;
           if (!radar) continue;
           const traj = radar.normalizedTrajectoryV2?.[0];
@@ -1165,6 +1168,11 @@ export async function getTournamentTeeShots(
           ) {
             continue;
           }
+          // Even on par 4/5s, players sometimes lay up with a
+          // 3-wood or long iron. Cut anything under ~145 mph ball
+          // speed — tour driver mean is ~168 mph; the tail below
+          // 145 is dominated by fairway-wood/iron layups.
+          if (radar.ballSpeed < 145) continue;
           out.push({
             playerId,
             playerName: nameByPlayerId.get(playerId) ?? playerName,

@@ -99,12 +99,23 @@ function mean(values: number[]): number {
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
+/** Records may include pre-filter historical data (par 3s, 3-wood
+ *  layups). Enforce the same shape-analysis constraints as
+ *  getTournamentTeeShots at read time so profiles stay clean
+ *  without re-backfilling. */
+function eligibleDrives(records: TeeShotRecord[]): TeeShotRecord[] {
+  return records.filter(
+    (r) => r.par >= 4 && r.ballSpeed >= 145,
+  );
+}
+
 export function buildProfile(
   playerId: string,
   playerName: string,
-  records: TeeShotRecord[],
+  allRecords: TeeShotRecord[],
   cloudCap = 400,
 ): PlayerDrivingProfile {
+  const records = eligibleDrives(allRecords);
   const stats = {} as Record<ProfileDimension, StatSummary>;
   for (const dim of PROFILE_DIMENSIONS) {
     stats[dim] = summarize(records.map((r) => valueOf(r, dim)));
