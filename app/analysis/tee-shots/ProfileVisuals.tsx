@@ -276,7 +276,10 @@ function StatsCard({ profile }: { profile: PlayerDrivingProfile }) {
       signed: true,
     },
     {
-      label: "Landing side",
+      // Pin-relative offset — negative because tour players aim
+      // left of the pin to allow for their natural fade. Distinct
+      // from Curve (aim-relative shot shape).
+      label: "Landing vs pin",
       mean: s.carrySide.mean,
       std: s.carrySide.std,
       unit: "yd",
@@ -320,15 +323,25 @@ function StatsCard({ profile }: { profile: PlayerDrivingProfile }) {
 // ── Ball flight card ────────────────────────────────────────────────
 
 function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
-  const { carry, apexHeight, apexRange, apexSide, carrySide } = profile.shape;
+  const { carry, apexHeight, apexRange, apexSide, curve } = profile.shape;
+  // Re-express side offsets in the AIM frame — carrySide/apexSide
+  // in the raw record are measured from the pin/target direction, so
+  // the mean naturally comes out left for the whole tour (players
+  // aim left to allow for their fade). Convert to aim-relative so
+  // the top view visualises the shot's actual fade/draw shape:
+  //   landing offset from aim  = curve (already in aim frame)
+  //   apex offset from aim     = apexSide − apexRange × tan(aim°)
+  const aimDeg = profile.stats.horizontalLaunchAngle.mean;
+  const apexSideAimFt =
+    apexSide - apexRange * Math.tan((aimDeg * Math.PI) / 180);
 
   const sideSamples = useMemo(
     () => sampleSide(carry, apexRange, apexHeight, 80),
     [carry, apexRange, apexHeight],
   );
   const topSamples = useMemo(
-    () => sampleTop(carry, apexRange, apexSide, carrySide, 80),
-    [carry, apexRange, apexSide, carrySide],
+    () => sampleTop(carry, apexRange, apexSideAimFt, curve, 80),
+    [carry, apexRange, apexSideAimFt, curve],
   );
 
   const SIDE_W = 460;
@@ -421,8 +434,9 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
   const ballSide = sidePts[idx];
   const ballTop = topPts[idx];
 
+  // Landing marker uses curve (aim-relative), matching topSamples.
   const landPx =
-    topPad.l + topPlotW / 2 + (carrySide / zAbs) * (topPlotW / 2 - 6);
+    topPad.l + topPlotW / 2 + (curve / zAbs) * (topPlotW / 2 - 6);
   const landPy = topPad.t;
   const teePx = topPad.l + topPlotW / 2;
   const teePy = topPad.t + topPlotH;
@@ -644,8 +658,8 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
             fill="oklch(0.3 0.02 150)"
             textAnchor="middle"
           >
-            {carrySide >= 0 ? "+" : "−"}
-            {fmt(Math.abs(carrySide), 1)} yd
+            {curve >= 0 ? "+" : "−"}
+            {fmt(Math.abs(curve), 1)} yd {curve >= 0 ? "fade" : "draw"}
           </text>
           <text
             x={topPad.l + topPlotW / 2}
@@ -704,7 +718,12 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
   const plotH = H - pad.t - pad.b;
 
   const carries = cloud.map((c) => c.carry);
-  const sides = cloud.map((c) => c.carrySide);
+  // X axis is CURVE (aim-relative fade/draw), not carrySide
+  // (pin-relative). carrySide's whole tour mean is systematically
+  // left because players aim left to allow for their natural fade
+  // — the wrong signal for a "did the ball go left or right of
+  // where they aimed?" scatter. Curve gives ~50/50 fade vs draw.
+  const sides = cloud.map((c) => c.curve);
   const yMin = Math.min(...carries) - 5;
   const yMax = Math.max(...carries) + 5;
   const xAbs = Math.max(...sides.map((s) => Math.abs(s)), 10);
@@ -716,7 +735,7 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
   const py = (carry: number) =>
     pad.t + plotH - ((carry - yMin) / (yMax - yMin || 1)) * plotH;
 
-  const meanSide = profile.shape.carrySide;
+  const meanSide = profile.shape.curve;
   const meanCarry = profile.shape.carry;
 
   return (
@@ -735,9 +754,9 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
         </span>
       </div>
       <p style={CARD_SUBTITLE}>
-        Top-down view. Vertical dashed line = aim. Dots left of it
-        landed left of aim, dots right of it landed right. Height on
-        the plot = carry distance.
+        Top-down view. Vertical dashed line = the aim direction of
+        the shot. Dots left of it are draws, dots right are fades;
+        height on the plot = carry distance.
       </p>
       <svg
         viewBox={`0 0 ${W} ${H}`}
@@ -808,7 +827,7 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
           fontSize={13}
           fill="oklch(0.5 0.02 150)"
         >
-          ← left {fmt(xAbs, 0)} yd
+          ← draw {fmt(xAbs, 0)} yd
         </text>
         <text
           x={pad.l + plotW / 2}
@@ -818,7 +837,7 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
           textAnchor="middle"
           fontWeight={700}
         >
-          aim
+          aim / straight
         </text>
         <text
           x={pad.l + plotW}
@@ -827,7 +846,7 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
           fill="oklch(0.5 0.02 150)"
           textAnchor="end"
         >
-          right {fmt(xAbs, 0)} yd →
+          fade {fmt(xAbs, 0)} yd →
         </text>
         {/* Y-axis (carry) labels. */}
         <text
@@ -858,8 +877,8 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
           fontWeight={700}
         >
           mean {meanSide >= 0 ? "+" : "−"}
-          {fmt(Math.abs(meanSide), 1)} yd ·{" "}
-          {fmt(meanCarry, 0)} yd carry
+          {fmt(Math.abs(meanSide), 1)} yd{" "}
+          {meanSide >= 0 ? "fade" : "draw"} · {fmt(meanCarry, 0)} yd carry
         </text>
       </svg>
     </div>
