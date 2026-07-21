@@ -114,43 +114,62 @@ function countsFromScorecards(
 }
 
 // ── Tournament-family lookup ────────────────────────────────────────
-// We know 3M Open historically (3 seasons on file). Other events fall
-// back to just their own live data. Adding more courses = adding a
-// slug + expected historical id per year.
+// We know 3M Open historically (3 seasons on file + the live event).
+// Other events fall back to just their own single-tournament data.
+// Adding more courses = adding a slug, its historical ids per year,
+// and its known current-year id(s).
 
 interface FamilyDef {
   slug: string;
+  familyNames: string[]; // lowercased tournament names that map here
   historical: Array<{ year: number; tournamentId: string }>;
+  /** Extra tournamentIds (typically the current-season id) that
+   *  aren't in the historical list but still belong to this family. */
+  otherIds: string[];
 }
 
-const TOURNAMENT_FAMILIES: Record<string, FamilyDef> = {
-  "3m open": {
+const TOURNAMENT_FAMILIES: FamilyDef[] = [
+  {
     slug: "3m-open",
+    familyNames: ["3m open"],
     historical: [
       { year: 2023, tournamentId: "R2023525" },
       { year: 2024, tournamentId: "R2024525" },
       { year: 2025, tournamentId: "R2025525" },
     ],
+    otherIds: ["R2026525"],
   },
-};
+];
 
-/** Look up the family a tournamentId belongs to by name-matching
- *  against the current-year schedule. Returns null when we don't
- *  yet have a family definition. */
+/** Find the family a tournamentId belongs to.
+ *  Try the hardcoded id lists first (works for any historical id
+ *  without hitting the network); fall back to a name lookup against
+ *  the current-year schedule so brand-new live ids still resolve
+ *  before we've had a chance to hardcode them. */
 async function familyFor(tournamentId: string): Promise<FamilyDef | null> {
+  const hardcoded = TOURNAMENT_FAMILIES.find(
+    (f) =>
+      f.otherIds.includes(tournamentId) ||
+      f.historical.some((h) => h.tournamentId === tournamentId),
+  );
+  if (hardcoded) return hardcoded;
+
   const year = String(new Date().getUTCFullYear());
   const sched = await getSchedule(year);
   const match = [...sched.completed, ...sched.upcoming].find(
     (t) => t.id === tournamentId,
   );
   if (!match) return null;
-  return TOURNAMENT_FAMILIES[match.name.toLowerCase().trim()] ?? null;
+  const name = match.name.toLowerCase().trim();
+  return TOURNAMENT_FAMILIES.find((f) => f.familyNames.includes(name)) ?? null;
 }
 
 // ── Endpoint ────────────────────────────────────────────────────────
 
 function cacheKey(tournamentId: string): string {
-  return `feed:pin-birdies:v1:${tournamentId}`;
+  // v2 — familyFor now matches historical ids, so the pre-fix cached
+  // "1 season only" payloads must not be re-served.
+  return `feed:pin-birdies:v2:${tournamentId}`;
 }
 
 export async function GET(req: Request) {
