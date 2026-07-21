@@ -482,6 +482,43 @@ function ChartCore({
     4: buildSplitPaths(smoothByRound[4], byRound[4].boundary),
   };
 
+  // Per-round wave averages — split each round's field in half at
+  // its median tee time and mean the current y-metric. Uses `rows`
+  // (not `points`) so all four rounds show even when the round
+  // filter is narrowed to one; `yOf` is folded in so the numbers
+  // track the Skill-adjusted toggle without a re-render dance.
+  const waveByRound = useMemo(() => {
+    const out: Record<
+      RoundNum,
+      { early: number | null; late: number | null; count: number }
+    > = {
+      1: { early: null, late: null, count: 0 },
+      2: { early: null, late: null, count: 0 },
+      3: { early: null, late: null, count: 0 },
+      4: { early: null, late: null, count: 0 },
+    };
+    ([1, 2, 3, 4] as const).forEach((r) => {
+      const roundRows = rows.filter((row) => row.round === r);
+      if (roundRows.length === 0) return;
+      const sorted = [...roundRows].sort(
+        (a, b) => a.teeMinutes - b.teeMinutes,
+      );
+      const half = Math.floor(sorted.length / 2);
+      const early = sorted.slice(0, half);
+      const late = sorted.slice(half);
+      const meanOf = (arr: Row[]) =>
+        arr.length === 0
+          ? null
+          : arr.reduce((s, x) => s + yOf(x), 0) / arr.length;
+      out[r] = {
+        early: meanOf(early),
+        late: meanOf(late),
+        count: sorted.length,
+      };
+    });
+    return out;
+  }, [rows, yOf]);
+
   const trendReadouts = useMemo(() => {
     if (cursorX == null) return [] as Array<{ round: RoundNum; value: number }>;
     const out: Array<{ round: RoundNum; value: number }> = [];
@@ -974,7 +1011,138 @@ function ChartCore({
           {formatClock(extent.xMin)}–{formatClock(extent.xMax)}
         </span>
       </div>
-      <div style={{ display: "none" }}>
+      {/* Wave averages — early vs late half of each round's field.
+          Uses yOf so the numbers flip with the Skill-adjusted toggle.
+          Δ = late − early; negative = late wave scored better; that's
+          the "afternoon had it easier" signal. */}
+      <div
+        style={{
+          border: "1px solid oklch(0.9 0.008 95)",
+          borderRadius: 8,
+          padding: "8px 10px 10px",
+          marginBottom: 8,
+          background: "oklch(0.985 0.005 95)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            marginBottom: 6,
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          <strong style={{ fontSize: 12, letterSpacing: 0.3 }}>
+            Wave average ·{" "}
+            <span style={{ color: "oklch(0.4 0.02 150)", fontWeight: 500 }}>
+              {showAdjusted ? "skill adjusted" : "raw to par"}
+            </span>
+          </strong>
+          <span
+            style={{
+              fontSize: 11,
+              color: "oklch(0.5 0.02 150)",
+            }}
+          >
+            Split each round&apos;s field in half at the median tee time.
+            Δ = late − early.
+          </span>
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 8,
+          }}
+        >
+          {([1, 2, 3, 4] as const).map((r) => {
+            const wave = waveByRound[r];
+            const style = ROUND_STYLE[r];
+            const delta =
+              wave.early != null && wave.late != null
+                ? wave.late - wave.early
+                : null;
+            const deltaColor =
+              delta == null
+                ? "oklch(0.5 0.02 150)"
+                : delta < -0.15
+                  ? "#059669"
+                  : delta > 0.15
+                    ? "#dc2626"
+                    : "#334155";
+            return (
+              <div
+                key={r}
+                style={{
+                  border: "1px solid oklch(0.92 0.008 95)",
+                  borderRadius: 6,
+                  padding: "6px 8px",
+                  background: "white",
+                  fontFamily: "var(--font-mono, monospace)",
+                  fontSize: 12,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "baseline",
+                    justifyContent: "space-between",
+                    marginBottom: 4,
+                  }}
+                >
+                  <strong
+                    style={{
+                      color: style.color,
+                      fontSize: 12,
+                      fontFamily:
+                        "var(--font-archivo), 'Archivo', system-ui, sans-serif",
+                      letterSpacing: 0.3,
+                    }}
+                  >
+                    {ROUND_LABEL[r]}
+                  </strong>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      color: "oklch(0.55 0.02 150)",
+                    }}
+                  >
+                    {wave.count} rounds
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "auto 1fr",
+                    columnGap: 8,
+                    rowGap: 2,
+                  }}
+                >
+                  <span style={{ color: "oklch(0.5 0.02 150)" }}>Early</span>
+                  <span style={{ textAlign: "right", fontWeight: 700 }}>
+                    {wave.early != null ? formatSigned(wave.early) : "—"}
+                  </span>
+                  <span style={{ color: "oklch(0.5 0.02 150)" }}>Late</span>
+                  <span style={{ textAlign: "right", fontWeight: 700 }}>
+                    {wave.late != null ? formatSigned(wave.late) : "—"}
+                  </span>
+                  <span style={{ color: "oklch(0.5 0.02 150)" }}>Δ</span>
+                  <span
+                    style={{
+                      textAlign: "right",
+                      fontWeight: 800,
+                      color: deltaColor,
+                    }}
+                  >
+                    {delta != null ? formatSigned(delta) : "—"}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <svg
