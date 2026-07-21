@@ -164,12 +164,17 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
 
   const SIDE_W = 460;
   const SIDE_H = 200;
-  const TOP_W = 460;
-  const TOP_H = 200;
+  // TOP is portrait — tee at bottom, ball flies up. Side drift
+  // reads as horizontal deviation, which is more intuitive than
+  // Y-axis deviation for "fade vs draw".
+  const TOP_W = 260;
+  const TOP_H = 420;
   const pad = { l: 44, r: 20, t: 14, b: 24 };
+  const topPad = { l: 30, r: 30, t: 22, b: 32 };
   const plotW = SIDE_W - pad.l - pad.r;
   const plotH = SIDE_H - pad.t - pad.b;
-  const topPlotH = TOP_H - pad.t - pad.b;
+  const topPlotW = TOP_W - topPad.l - topPad.r;
+  const topPlotH = TOP_H - topPad.t - topPad.b;
 
   // Project the sampled arcs into SVG-space once; the animator
   // interpolates within these arrays every frame.
@@ -184,14 +189,29 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
       x: pad.l + (s.x / xMax) * plotW,
       y: pad.t + (1 - s.y / yMax) * plotH,
     }));
+    // TOP: downrange runs bottom → top, side offset runs left ← 0
+    // → right. Positive z (fade for a right-hander) shows to the
+    // right of the centre line.
     const topPts = topSamples.map((s) => ({
-      x: pad.l + (s.x / xMax) * plotW,
-      // z centred: 0 at midline, ±zAbs at edges. Positive z = right
-      // (fade for a right-hander).
-      y: pad.t + topPlotH / 2 - (s.z / zAbs) * (topPlotH / 2 - 6),
+      x:
+        topPad.l +
+        topPlotW / 2 +
+        (s.z / zAbs) * (topPlotW / 2 - 6),
+      y: topPad.t + topPlotH - (s.x / xMax) * topPlotH,
     }));
     return { xMax, yMax, zAbs, sidePts, topPts };
-  }, [sideSamples, topSamples, pad.l, pad.t, plotW, plotH, topPlotH]);
+  }, [
+    sideSamples,
+    topSamples,
+    pad.l,
+    pad.t,
+    plotW,
+    plotH,
+    topPad.l,
+    topPad.t,
+    topPlotW,
+    topPlotH,
+  ]);
 
   // Ticker — a fraction in [0, 1) that loops every FLIGHT_MS with
   // a REST_MS pause at the end. Positions the ball dot each frame.
@@ -245,10 +265,14 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
   const ballSide = sidePts[idx];
   const ballTop = topPts[idx];
 
-  // Landing marker on the top view — draws attention to where the
-  // ball actually finishes on the side axis.
-  const landPx = pad.l + plotW;
-  const landPy = pad.t + topPlotH / 2 - (carrySide / zAbs) * (topPlotH / 2 - 6);
+  // Landing marker on the (portrait) top view — sits at the top of
+  // the plot, offset horizontally by the mean carrySide.
+  const landPx =
+    topPad.l + topPlotW / 2 + (carrySide / zAbs) * (topPlotW / 2 - 6);
+  const landPy = topPad.t;
+  // Tee marker sits at the bottom-centre.
+  const teePx = topPad.l + topPlotW / 2;
+  const teePy = topPad.t + topPlotH;
   // Apex marker for the side view — the peak point of the arc.
   const apexPx = pad.l + (apexRange / 3 / xMax) * plotW;
   const apexPy = pad.t + (1 - apexHeight / yMax) * plotH;
@@ -406,20 +430,22 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
             viewBox={`0 0 ${TOP_W} ${TOP_H}`}
             style={{ width: "100%", height: "auto", display: "block" }}
           >
+            {/* Vertical centre line = aim / straight-ahead reference. */}
             <line
-              x1={pad.l}
-              y1={pad.t + topPlotH / 2}
-              x2={pad.l + plotW}
-              y2={pad.t + topPlotH / 2}
+              x1={topPad.l + topPlotW / 2}
+              y1={topPad.t}
+              x2={topPad.l + topPlotW / 2}
+              y2={topPad.t + topPlotH}
               stroke="oklch(0.85 0.013 95)"
               strokeWidth={1}
               strokeDasharray="3 3"
             />
+            {/* Tee-box baseline. */}
             <line
-              x1={pad.l}
-              y1={pad.t}
-              x2={pad.l}
-              y2={pad.t + topPlotH}
+              x1={topPad.l}
+              y1={topPad.t + topPlotH}
+              x2={topPad.l + topPlotW}
+              y2={topPad.t + topPlotH}
               stroke="oklch(0.85 0.013 95)"
               strokeWidth={1}
             />
@@ -430,6 +456,12 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
               strokeWidth={1.5}
               strokeLinecap="round"
               strokeDasharray="3 4"
+            />
+            <circle
+              cx={teePx}
+              cy={teePy}
+              r={2.5}
+              fill="oklch(0.55 0.02 150)"
             />
             <circle
               cx={landPx}
@@ -456,49 +488,50 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
               </>
             )}
             <text
-              x={landPx - 6}
-              y={landPy + (carrySide >= 0 ? -6 : 12)}
+              x={landPx}
+              y={landPy - 8}
               fontSize={10}
               fill="oklch(0.3 0.02 150)"
-              textAnchor="end"
+              textAnchor="middle"
             >
               {carrySide >= 0 ? "+" : "−"}
               {fmt(Math.abs(carrySide), 1)} yd
             </text>
             <text
-              x={pad.l}
-              y={TOP_H - 6}
+              x={topPad.l + topPlotW / 2}
+              y={topPad.t + topPlotH + 14}
               fontSize={10}
               fill="oklch(0.5 0.02 150)"
+              textAnchor="middle"
             >
-              0
+              tee
             </text>
             <text
-              x={pad.l + plotW}
-              y={TOP_H - 6}
+              x={topPad.l + topPlotW / 2}
+              y={topPad.t - 8}
               fontSize={10}
               fill="oklch(0.5 0.02 150)"
-              textAnchor="end"
+              textAnchor="middle"
             >
-              {fmt(carry, 0)} yd
+              {fmt(carry, 0)} yd carry
             </text>
+            {/* Side-offset scale — halfway markers on both edges. */}
             <text
-              x={pad.l - 4}
-              y={pad.t + 10}
-              fontSize={10}
-              fill="oklch(0.5 0.02 150)"
-              textAnchor="end"
-            >
-              +{fmt(zAbs, 0)} yd
-            </text>
-            <text
-              x={pad.l - 4}
-              y={pad.t + topPlotH - 2}
+              x={topPad.l - 4}
+              y={topPad.t + topPlotH / 2 + 3}
               fontSize={10}
               fill="oklch(0.5 0.02 150)"
               textAnchor="end"
             >
               −{fmt(zAbs, 0)}
+            </text>
+            <text
+              x={topPad.l + topPlotW + 4}
+              y={topPad.t + topPlotH / 2 + 3}
+              fontSize={10}
+              fill="oklch(0.5 0.02 150)"
+            >
+              +{fmt(zAbs, 0)}
             </text>
           </svg>
         </div>
