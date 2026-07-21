@@ -157,7 +157,7 @@ export default function Page() {
   }, [selectedIds]);
 
   return (
-    <main className="container container-wide v4-theme pv-theme analysis-tee-shots-shell">
+    <main className="container container-wide v4-theme pv-theme analysis-full-shell">
       <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
         <div className="brand-nav">

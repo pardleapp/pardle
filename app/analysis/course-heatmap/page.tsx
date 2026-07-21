@@ -187,7 +187,7 @@ export default function Page() {
   })();
 
   return (
-    <main className="container container-wide v4-theme pv-theme">
+    <main className="container container-wide v4-theme pv-theme analysis-full-shell">
       <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
         <div className="brand-nav">
@@ -197,10 +197,10 @@ export default function Page() {
       </header>
       <section
         style={{
-          width: "100%",
-          maxWidth: "100%",
-          margin: "0 auto",
-          padding: "20px 16px 60px",
+          // Fill the shell's middle grid track edge-to-edge — the
+          // shell column-gap already provides the gutter between the
+          // nav rail and this content.
+          padding: "20px 4px 60px",
           fontFamily:
             "var(--font-archivo), 'Archivo', system-ui, -apple-system, sans-serif",
           color: "oklch(0.2 0.02 150)",

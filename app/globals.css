@@ -21377,18 +21377,20 @@ html.pv-theme-body .auth-chip-btn {
      slack; rails are slimmed so the useful data area gets the
      lion's share. This mirrors the fluid-shell approach the /bets
      dashboard uses. */
-  /* On tee-shots the right context rail (Now playing / leaderboard
-     / live bets) is mostly empty and stealing horizontal width from
-     the analytics surface. Hide it entirely and drop the shell to a
-     2-column grid so the dashboard gets the full width minus the
-     left nav. */
-  body:has(main.analysis-tee-shots-shell) .desktop-shell {
+  /* Analysis dashboards use a wider 2-column shell — the right
+     context rail (Now playing / leaderboard / live bets) doesn't
+     add value on a numbers-heavy analytics surface and steals
+     horizontal width from the charts. Shared across:
+     /analysis/tee-shots, /analysis/course-heatmap,
+     /analysis/tee-time-scoring — anything that opts in via the
+     `analysis-full-shell` class on its <main>. */
+  body:has(main.analysis-full-shell) .desktop-shell {
     grid-template-columns:
       clamp(180px, 13vw, 210px)
       minmax(680px, 1fr);
     column-gap: clamp(16px, 1.6vw, 24px);
   }
-  body:has(main.analysis-tee-shots-shell) .desktop-ctx {
+  body:has(main.analysis-full-shell) .desktop-ctx {
     display: none;
   }
 
