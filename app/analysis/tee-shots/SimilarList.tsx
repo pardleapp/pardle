@@ -126,10 +126,10 @@ export default function SimilarList({ playerId }: Props) {
       </h4>
       <p
         style={{
-          fontSize: 11,
+          fontSize: 13,
           color: "oklch(0.5 0.02 150)",
-          margin: "3px 0 10px",
-          lineHeight: 1.35,
+          margin: "4px 0 12px",
+          lineHeight: 1.4,
         }}
       >
         Std-normalised distance across the radar profile — smaller =
@@ -137,15 +137,15 @@ export default function SimilarList({ playerId }: Props) {
         gaps.
       </p>
       {loading ? (
-        <p style={{ fontSize: 12, color: "oklch(0.5 0.02 150)" }}>
+        <p style={{ fontSize: 14, color: "oklch(0.5 0.02 150)" }}>
           Comparing profiles…
         </p>
       ) : error ? (
-        <p style={{ fontSize: 12, color: "oklch(0.5 0.16 25)" }}>
+        <p style={{ fontSize: 14, color: "oklch(0.5 0.16 25)" }}>
           {error}
         </p>
       ) : !data?.matches?.length ? (
-        <p style={{ fontSize: 12, color: "oklch(0.5 0.02 150)" }}>
+        <p style={{ fontSize: 14, color: "oklch(0.5 0.02 150)" }}>
           No matches found — need more players in the archive.
         </p>
       ) : (
@@ -155,7 +155,7 @@ export default function SimilarList({ playerId }: Props) {
             padding: 0,
             margin: 0,
             display: "grid",
-            gap: 6,
+            gap: 8,
           }}
         >
           {data.matches.map((m, i) => (
@@ -164,19 +164,19 @@ export default function SimilarList({ playerId }: Props) {
               style={{
                 display: "grid",
                 gridTemplateColumns: "auto 1fr auto",
-                gap: 10,
+                gap: 14,
                 alignItems: "baseline",
-                padding: "6px 4px",
+                padding: "12px 6px",
                 borderBottom: "1px solid oklch(0.94 0.008 95)",
               }}
             >
               <span
                 style={{
-                  fontSize: 11,
+                  fontSize: 14,
                   color: "oklch(0.5 0.02 150)",
                   fontFamily:
                     "var(--font-plex-mono), 'IBM Plex Mono', ui-monospace, monospace",
-                  width: 22,
+                  width: 26,
                 }}
               >
                 {i + 1}
@@ -184,20 +184,22 @@ export default function SimilarList({ playerId }: Props) {
               <div style={{ minWidth: 0 }}>
                 <div
                   style={{
-                    fontSize: 13,
+                    fontSize: 17,
                     fontWeight: 600,
                     color: "oklch(0.2 0.02 150)",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
+                    letterSpacing: "-0.005em",
                   }}
                 >
                   {m.playerName}
                 </div>
                 <div
                   style={{
-                    fontSize: 11,
+                    fontSize: 13,
                     color: "oklch(0.5 0.02 150)",
+                    marginTop: 2,
                   }}
                 >
                   {gapSummary(m)}
@@ -205,8 +207,9 @@ export default function SimilarList({ playerId }: Props) {
               </div>
               <span
                 style={{
-                  fontSize: 11,
-                  color: "oklch(0.35 0.02 150)",
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: "oklch(0.28 0.02 150)",
                   fontFamily:
                     "var(--font-plex-mono), 'IBM Plex Mono', ui-monospace, monospace",
                   textAlign: "right",

@@ -258,9 +258,9 @@ function StatCell({ stat }: { stat: Stat }) {
       style={{
         display: "flex",
         flexDirection: "column",
-        padding: "12px 4px",
+        padding: "16px 6px",
         borderBottom: "1px solid oklch(0.945 0.008 95)",
-        gap: 8,
+        gap: 10,
         minWidth: 0,
       }}
     >
@@ -269,12 +269,12 @@ function StatCell({ stat }: { stat: Stat }) {
           display: "grid",
           gridTemplateColumns: "1fr auto auto",
           alignItems: "baseline",
-          columnGap: 12,
+          columnGap: 14,
         }}
       >
         <span
           style={{
-            fontSize: 13,
+            fontSize: 15,
             color: "oklch(0.42 0.02 150)",
             letterSpacing: 0.2,
           }}
@@ -284,7 +284,7 @@ function StatCell({ stat }: { stat: Stat }) {
         <span
           style={{
             ...MONO,
-            fontSize: 17,
+            fontSize: 22,
             fontWeight: 700,
             color: "oklch(0.18 0.02 150)",
             whiteSpace: "nowrap",
@@ -296,16 +296,16 @@ function StatCell({ stat }: { stat: Stat }) {
             style={{
               color: "oklch(0.55 0.02 150)",
               fontWeight: 400,
-              fontSize: 13,
+              fontSize: 15,
             }}
           >{` ${stat.unit}`}</span>
         </span>
         <span
           style={{
             ...MONO,
-            fontSize: 12,
+            fontSize: 14,
             color: "oklch(0.58 0.02 150)",
-            minWidth: 54,
+            minWidth: 60,
             textAlign: "right",
             whiteSpace: "nowrap",
           }}
@@ -325,7 +325,7 @@ function StatCell({ stat }: { stat: Stat }) {
         <span
           style={{
             ...MONO,
-            fontSize: 10,
+            fontSize: 12,
             color: "oklch(0.6 0.02 150)",
             whiteSpace: "nowrap",
           }}
@@ -337,7 +337,7 @@ function StatCell({ stat }: { stat: Stat }) {
         <div
           style={{
             position: "relative",
-            height: 4,
+            height: 6,
             background: "oklch(0.94 0.008 95)",
             borderRadius: 999,
           }}
@@ -346,9 +346,9 @@ function StatCell({ stat }: { stat: Stat }) {
             style={{
               position: "absolute",
               left: `${meanPct}%`,
-              top: -3,
-              width: 8,
-              height: 10,
+              top: -4,
+              width: 11,
+              height: 14,
               background: "oklch(0.5 0.14 145)",
               borderRadius: 999,
               transform: "translateX(-50%)",
@@ -360,7 +360,7 @@ function StatCell({ stat }: { stat: Stat }) {
         <span
           style={{
             ...MONO,
-            fontSize: 10,
+            fontSize: 12,
             color: "oklch(0.6 0.02 150)",
             whiteSpace: "nowrap",
           }}
