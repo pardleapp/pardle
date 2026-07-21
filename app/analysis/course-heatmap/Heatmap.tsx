@@ -37,10 +37,12 @@ interface Props {
   birdieHistoryByHole?: Record<string, HoleBirdieData> | null;
 }
 
-/** Threshold for the pin-variance flag: how far a single cluster's
- *  birdie rate can deviate (relatively) from the mean of all clusters
- *  before we call it out. 0.2 = ±20% of the mean; a "22% birdie"
- *  cluster on a hole averaging 18% is 22.2% above and fires. */
+/** Threshold for the pin-variance flag — ABSOLUTE percentage-point
+ *  gap between a single cluster's birdie rate and the mean of all
+ *  clusters on the hole. 0.2 = ±20 percentage points; a hole
+ *  averaging 30% birdie fires when a cluster is above 50% or below
+ *  10%. Absolute (not relative) so the number reads the same way
+ *  you'd say it out loud: "20% higher than the average". */
 const PIN_VARIANCE_THRESHOLD = 0.2;
 
 /** Threshold for the tee-movement flag — max-minus-min yardage across
@@ -115,12 +117,12 @@ function pinFlagFor(birdie: HoleBirdieData | undefined): PinFlag | null {
     .map((c) => c.rate);
   if (rates.length < 2) return null;
   const mean = rates.reduce((a, b) => a + b, 0) / rates.length;
-  if (mean <= 0) return null;
   let best: PinFlag | null = null;
   let bestAbs = PIN_VARIANCE_THRESHOLD; // enforce minimum to fire
   birdie.clusters.forEach((c, i) => {
     if (c.total === 0) return;
-    const delta = (c.rate - mean) / mean;
+    // Absolute percentage-point delta from the hole's cluster mean.
+    const delta = c.rate - mean;
     if (Math.abs(delta) > bestAbs) {
       bestAbs = Math.abs(delta);
       best = {
@@ -441,10 +443,10 @@ export default function Heatmap({
                   borderLeft: "2px solid oklch(0.88 0.012 95)",
                 }}
                 title={
-                  "Cluster spread — biggest deviation of any pin cluster's " +
-                  "birdie-or-better rate from the mean of all clusters on " +
-                  "the hole (across every season we have data for). " +
-                  "Fires when it exceeds ±20% of the mean."
+                  "Cluster spread — biggest gap between any pin " +
+                  "cluster's birdie-or-better rate and the mean of all " +
+                  "clusters on the hole (across every stored season). " +
+                  "Fires when the gap is more than ±20 percentage points."
                 }
               >
                 PIN Δ
@@ -641,7 +643,7 @@ export default function Heatmap({
                       key="pin-flag"
                       title={
                         has
-                          ? `H${h} · Cluster ${flag.clusterLetter} birdie rate ${(flag.clusterRate * 100).toFixed(1)}% vs hole cluster mean ${(flag.meanRate * 100).toFixed(1)}% (${pct})`
+                          ? `H${h} · Cluster ${flag.clusterLetter} birdie rate ${(flag.clusterRate * 100).toFixed(1)}% vs hole cluster mean ${(flag.meanRate * 100).toFixed(1)}% (${pct} percentage points)`
                           : `H${h} · no significant pin cluster variance`
                       }
                       style={{
