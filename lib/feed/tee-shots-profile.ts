@@ -70,15 +70,18 @@ export interface PlayerDrivingProfile {
   shotCount: number;
   eventsCovered: number;
   stats: Record<ProfileDimension, StatSummary>;
-  /** Element-wise mean of every shot's fit polynomials — the
-   *  "average trajectory" the UI draws. */
-  averageTrajectory: {
-    xFit: number[];
-    yFit: number[];
-    zFit: number[];
-    /** Union of all shots' timeIntervals: use the median max end
-     *  so the drawn curve doesn't overshoot into extrapolation. */
-    timeInterval: [number, number];
+  /** Scalar means of the geometric parameters that let the UI
+   *  reconstruct an "average" ball flight — an arc through
+   *  launch → apex → landing in real units, not from averaged
+   *  polynomials (those cancel because each shot's peak lives at a
+   *  different time index). */
+  shape: {
+    carry: number; // yd, forward distance at landing
+    carrySide: number; // yd, side offset at landing (+right / −left)
+    apexHeight: number; // ft, peak height
+    apexRange: number; // ft, forward distance to apex
+    apexSide: number; // ft, side offset at apex (+right / −left)
+    curve: number; // yd, apex-to-landing lateral drift
   };
   /** Where individual shots landed relative to the aim line — used
    *  for the shot-cloud scatter. Bounded to keep payload small. */
@@ -91,30 +94,9 @@ export interface PlayerDrivingProfile {
   }>;
 }
 
-/** Element-wise mean of a set of vectors, padded to the longest
- *  length. Vectors of length 0 are skipped. */
-function meanVectors(vectors: number[][]): number[] {
-  const usable = vectors.filter((v) => v.length > 0);
-  if (usable.length === 0) return [];
-  const maxLen = Math.max(...usable.map((v) => v.length));
-  const sums = new Array(maxLen).fill(0);
-  const counts = new Array(maxLen).fill(0);
-  for (const v of usable) {
-    for (let i = 0; i < v.length; i++) {
-      sums[i] += v[i];
-      counts[i] += 1;
-    }
-  }
-  return sums.map((s, i) => (counts[i] > 0 ? s / counts[i] : 0));
-}
-
-function median(values: number[]): number {
+function mean(values: number[]): number {
   if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2
-    ? sorted[mid]
-    : (sorted[mid - 1] + sorted[mid]) / 2;
+  return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
 export function buildProfile(
@@ -127,14 +109,15 @@ export function buildProfile(
   for (const dim of PROFILE_DIMENSIONS) {
     stats[dim] = summarize(records.map((r) => valueOf(r, dim)));
   }
-  const xFit = meanVectors(records.map((r) => r.xFit));
-  const yFit = meanVectors(records.map((r) => r.yFit));
-  const zFit = meanVectors(records.map((r) => r.zFit));
-  const endTimes = records
-    .map((r) => r.timeInterval[1])
-    .filter((v) => Number.isFinite(v) && v > 0);
-  const timeInterval: [number, number] = [0, median(endTimes) || 7];
   const events = new Set(records.map((r) => r.tournamentId));
+  const shape = {
+    carry: mean(records.map((r) => r.carry)),
+    carrySide: mean(records.map((r) => r.carrySide)),
+    apexHeight: mean(records.map((r) => r.apexHeight)),
+    apexRange: mean(records.map((r) => r.apexRange)),
+    apexSide: mean(records.map((r) => r.apexSide)),
+    curve: mean(records.map((r) => r.curve)),
+  };
   // Down-sample the cloud so payloads stay reasonable for players
   // with 2 000+ shots (keep every k'th record).
   let cloud = records.map((r) => ({
@@ -154,7 +137,7 @@ export function buildProfile(
     shotCount: records.length,
     eventsCovered: events.size,
     stats,
-    averageTrajectory: { xFit, yFit, zFit, timeInterval },
+    shape,
     cloud,
   };
 }

@@ -20,34 +20,68 @@ interface Props {
   profile: PlayerDrivingProfile;
 }
 
-/** Evaluate a polynomial [a0,a1,a2,...] at t via Horner's method. */
-function polyEval(coeffs: number[], t: number): number {
-  let acc = 0;
-  for (let i = coeffs.length - 1; i >= 0; i--) {
-    acc = acc * t + coeffs[i];
-  }
-  return acc;
+/** Lagrange quadratic through (0,0), (x1,y1), (x2,y2) — the
+ *  smooth curve every arc panel below uses. */
+function lagrange(
+  x: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+): number {
+  if (x1 === 0 || x2 === 0 || x1 === x2) return 0;
+  const l1 = (x * (x - x2)) / (x1 * (x1 - x2));
+  const l2 = (x * (x - x1)) / (x2 * (x2 - x1));
+  return y1 * l1 + y2 * l2;
 }
 
-/** Sample the mean trajectory as (x, y, z) triples along its
- *  timeInterval. Coords come out in the PGA Tour's normalised frame
- *  (rough yards downrange, feet height, yards side); we don't try
- *  to fold in course-specific units. */
-function sampleTrajectory(
-  profile: PlayerDrivingProfile,
+/** Sample the average side profile (height vs downrange) from the
+ *  three scalar points we have: launch, apex, landing. Piecewise
+ *  parabolas that both peak at the apex point keep the peak in the
+ *  right place instead of at midpoint. */
+function sampleSide(
+  carryYd: number,
+  apexRangeFt: number,
+  apexHeightFt: number,
   n = 60,
-): Array<{ t: number; x: number; y: number; z: number }> {
-  const [t0, t1] = profile.averageTrajectory.timeInterval;
-  const { xFit, yFit, zFit } = profile.averageTrajectory;
-  const out: Array<{ t: number; x: number; y: number; z: number }> = [];
+): Array<{ x: number; y: number }> {
+  const carryFt = carryYd * 3;
+  // Guard against apex data that would collapse the piecewise
+  // parabolas (apex at 0 or beyond landing).
+  const apexX = Math.max(1, Math.min(carryFt - 1, apexRangeFt));
+  const out: Array<{ x: number; y: number }> = [];
   for (let i = 0; i <= n; i++) {
-    const t = t0 + (t1 - t0) * (i / n);
-    out.push({
-      t,
-      x: polyEval(xFit, t),
-      y: polyEval(yFit, t),
-      z: polyEval(zFit, t),
-    });
+    const xFt = (i / n) * carryFt;
+    let y = 0;
+    if (xFt <= apexX) {
+      const u = (apexX - xFt) / apexX;
+      y = apexHeightFt * (1 - u * u);
+    } else {
+      const u = (xFt - apexX) / (carryFt - apexX);
+      y = apexHeightFt * (1 - u * u);
+    }
+    out.push({ x: xFt / 3, y }); // convert x back to yards for the axis
+  }
+  return out;
+}
+
+/** Sample the average top profile (side offset vs downrange) as a
+ *  quadratic through (0,0) → (apexRangeYd, apexSideYd) → (carry,
+ *  carrySide). Captures the aim + curve of the shot. */
+function sampleTop(
+  carryYd: number,
+  apexRangeFt: number,
+  apexSideFt: number,
+  carrySideYd: number,
+  n = 60,
+): Array<{ x: number; z: number }> {
+  const apexRangeYd = apexRangeFt / 3;
+  const apexSideYd = apexSideFt / 3;
+  const out: Array<{ x: number; z: number }> = [];
+  for (let i = 0; i <= n; i++) {
+    const x = (i / n) * carryYd;
+    const z = lagrange(x, apexRangeYd, apexSideYd, carryYd, carrySideYd);
+    out.push({ x, z });
   }
   return out;
 }
@@ -113,32 +147,38 @@ function StatRow({
 }
 
 function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
-  const samples = sampleTrajectory(profile, 80);
-  if (samples.length === 0) return null;
-  const xs = samples.map((s) => s.x);
-  const ys = samples.map((s) => s.y);
-  const zs = samples.map((s) => s.z);
+  const { carry, apexHeight, apexRange, apexSide, carrySide } = profile.shape;
+  if (!Number.isFinite(carry) || carry <= 0) return null;
+
+  const sideSamples = sampleSide(carry, apexRange, apexHeight, 80);
+  const topSamples = sampleTop(carry, apexRange, apexSide, carrySide, 80);
+
+  const xs = sideSamples.map((s) => s.x);
+  const ys = sideSamples.map((s) => s.y);
+  const zs = topSamples.map((s) => s.z);
   const xMax = Math.max(1, Math.max(...xs));
-  const yMax = Math.max(1, Math.max(...ys));
-  const zAbs = Math.max(...zs.map(Math.abs), 5);
+  const yMax = Math.max(20, Math.max(...ys) * 1.1);
+  // Side axis bounds — at least ±10 yd so the axis isn't crushed
+  // when a straight hitter shows almost no drift.
+  const zAbs = Math.max(10, ...zs.map(Math.abs));
 
   const SIDE_W = 460;
   const SIDE_H = 200;
   const TOP_W = 460;
   const TOP_H = 200;
-  const pad = { l: 40, r: 20, t: 12, b: 24 };
+  const pad = { l: 44, r: 20, t: 14, b: 24 };
   const plotW = SIDE_W - pad.l - pad.r;
   const plotH = SIDE_H - pad.t - pad.b;
   const topPlotH = TOP_H - pad.t - pad.b;
 
-  const sidePath = samples
+  const sidePath = sideSamples
     .map((s, i) => {
       const px = pad.l + (s.x / xMax) * plotW;
       const py = pad.t + (1 - s.y / yMax) * plotH;
       return `${i === 0 ? "M" : "L"}${px.toFixed(1)},${py.toFixed(1)}`;
     })
     .join(" ");
-  const topPath = samples
+  const topPath = topSamples
     .map((s, i) => {
       const px = pad.l + (s.x / xMax) * plotW;
       // z centred: 0 at midline, ±zAbs at edges. Positive z = right
@@ -147,6 +187,14 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
       return `${i === 0 ? "M" : "L"}${px.toFixed(1)},${py.toFixed(1)}`;
     })
     .join(" ");
+
+  // Landing marker on the top view — draws attention to where the
+  // ball actually finishes on the side axis.
+  const landPx = pad.l + plotW;
+  const landPy = pad.t + topPlotH / 2 - (carrySide / zAbs) * (topPlotH / 2 - 6);
+  // Apex marker for the side view — the peak point of the arc.
+  const apexPx = pad.l + (apexRange / 3 / xMax) * plotW;
+  const apexPy = pad.t + (1 - apexHeight / yMax) * plotH;
 
   return (
     <div
@@ -216,6 +264,21 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
               strokeWidth={2}
               strokeLinecap="round"
             />
+            <circle
+              cx={apexPx}
+              cy={apexPy}
+              r={3.5}
+              fill="oklch(0.4 0.16 145)"
+            />
+            <text
+              x={apexPx}
+              y={apexPy - 6}
+              fontSize={10}
+              fill="oklch(0.3 0.02 150)"
+              textAnchor="middle"
+            >
+              apex {fmt(apexHeight, 0)} ft
+            </text>
             <text
               x={pad.l}
               y={SIDE_H - 6}
@@ -231,7 +294,7 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
               fill="oklch(0.5 0.02 150)"
               textAnchor="end"
             >
-              {fmt(xMax, 0)} yd
+              {fmt(carry, 0)} yd
             </text>
             <text
               x={4}
@@ -242,10 +305,11 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
               {fmt(yMax, 0)} ft
             </text>
             <text
-              x={4}
+              x={pad.l - 4}
               y={pad.t + plotH}
               fontSize={10}
               fill="oklch(0.5 0.02 150)"
+              textAnchor="end"
             >
               0
             </text>
@@ -290,6 +354,22 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
               strokeWidth={2}
               strokeLinecap="round"
             />
+            <circle
+              cx={landPx}
+              cy={landPy}
+              r={3.5}
+              fill="oklch(0.4 0.16 145)"
+            />
+            <text
+              x={landPx - 6}
+              y={landPy + (carrySide >= 0 ? -6 : 12)}
+              fontSize={10}
+              fill="oklch(0.3 0.02 150)"
+              textAnchor="end"
+            >
+              {carrySide >= 0 ? "+" : "−"}
+              {fmt(Math.abs(carrySide), 1)} yd
+            </text>
             <text
               x={pad.l}
               y={TOP_H - 6}
@@ -305,7 +385,7 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
               fill="oklch(0.5 0.02 150)"
               textAnchor="end"
             >
-              {fmt(xMax, 0)} yd
+              {fmt(carry, 0)} yd
             </text>
             <text
               x={pad.l - 4}
@@ -314,7 +394,7 @@ function TrajectoryPanel({ profile }: { profile: PlayerDrivingProfile }) {
               fill="oklch(0.5 0.02 150)"
               textAnchor="end"
             >
-              +{fmt(zAbs, 0)}
+              +{fmt(zAbs, 0)} yd
             </text>
             <text
               x={pad.l - 4}
