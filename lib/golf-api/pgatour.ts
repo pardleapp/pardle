@@ -1018,3 +1018,187 @@ export async function getTournamentPutts(
     puttsByHole,
   };
 }
+
+// ──────────────────────────────────────────────────────────────────
+// Tee-shot radar data — per-shot TrackMan-style output from
+// `shotDetailsV3(..., includeRadar:true)`. Powers the driving-shape
+// analysis page: apex, launch angles, ball speed, spin, curve,
+// carry, side offset, and the polynomial fit for the flight path.
+// Coverage: ~96% of tee shots on modern PGA Tour events.
+// ──────────────────────────────────────────────────────────────────
+
+/** One tee shot's radar record. All measurements in tour units
+ *  (ball speed mph, angles degrees, heights feet, yards for distance).
+ *  Missing / non-radar shots are omitted before this record ever
+ *  materialises. */
+export interface TeeShotRecord {
+  playerId: string;
+  playerName: string;
+  tournamentId: string;
+  round: number;
+  hole: number;
+  par: number;
+  ballSpeed: number; // mph
+  apexHeight: number; // ft
+  apexRange: number; // ft downrange to apex
+  apexSide: number; // ft side offset at apex — sign carries fade/draw direction
+  verticalLaunchAngle: number; // deg
+  horizontalLaunchAngle: number; // deg — signed, +right / −left aim
+  launchSpin: number; // rpm total
+  spinAxis: number; // deg
+  actualFlightTime: number; // seconds
+  carry: number; // yards
+  carrySide: number; // yards, signed side offset at landing
+  curve: number; // yards, signed apex-to-landing lateral drift (fade+/draw−)
+  maxHeight: number; // yards (peak height along trajectory)
+  timeInterval: [number, number];
+  xFit: number[];
+  yFit: number[];
+  zFit: number[];
+}
+
+interface RadarNode {
+  ballSpeed?: number | null;
+  apexHeight?: number | null;
+  apexRange?: number | null;
+  apexSide?: number | null;
+  verticalLaunchAngle?: number | null;
+  horizontalLaunchAngle?: number | null;
+  launchSpin?: number | null;
+  spinAxis?: number | null;
+  actualFlightTime?: number | null;
+  normalizedTrajectoryV2?:
+    | Array<{
+        valid?: boolean | null;
+        carry?: number | null;
+        carrySide?: number | null;
+        curve?: number | null;
+        maxHeight?: number | null;
+        spinAxis?: number | null;
+        xFit?: number[] | null;
+        yFit?: number[] | null;
+        zFit?: number[] | null;
+        timeInterval?: number[] | null;
+      } | null>
+    | null;
+}
+
+interface RadarShotDetailNode {
+  holes?: Array<{
+    holeNumber: number;
+    par: number;
+    strokes?: Array<{
+      strokeNumber: number;
+      fromLocationCode?: string;
+      radarData?: RadarNode | null;
+    } | null> | null;
+  } | null> | null;
+}
+
+/** Fetch every tee shot's radar record for a slice of the field ×
+ *  round set in one tournament. Chunk 3 aliased shotDetailsV3 calls
+ *  per GraphQL request. Filters to `fromLocationCode === "OTB"` and
+ *  only records with populated radarData + a normalizedTrajectoryV2
+ *  entry (skips putts / archived shots without radar). */
+export async function getTournamentTeeShots(
+  tournamentId: string,
+  requests: { playerId: string; playerName: string; round: number }[],
+): Promise<TeeShotRecord[]> {
+  if (requests.length === 0) return [];
+  const chunks: typeof requests[] = [];
+  for (let i = 0; i < requests.length; i += SHOT_CHUNK_SIZE) {
+    chunks.push(requests.slice(i, i + SHOT_CHUNK_SIZE));
+  }
+
+  const nameByPlayerId = new Map<string, string>();
+  for (const r of requests) nameByPlayerId.set(r.playerId, r.playerName);
+
+  const RADAR_QUERY_FIELDS = `holes {
+    holeNumber par
+    strokes {
+      strokeNumber
+      fromLocationCode
+      radarData {
+        ballSpeed
+        apexHeight apexRange apexSide
+        verticalLaunchAngle horizontalLaunchAngle
+        launchSpin spinAxis
+        actualFlightTime
+        normalizedTrajectoryV2 {
+          valid carry carrySide curve maxHeight spinAxis
+          xFit yFit zFit timeInterval
+        }
+      }
+    }
+  }`;
+
+  const fetchChunk = async (
+    chunk: typeof requests,
+  ): Promise<TeeShotRecord[]> => {
+    const aliases = chunk
+      .map(
+        ({ playerId, round }) =>
+          `s${playerId}_${round}: shotDetailsV3(tournamentId: "${tournamentId}", playerId: "${playerId}", round: ${round}, includeRadar: true) { ${RADAR_QUERY_FIELDS} }`,
+      )
+      .join("\n");
+    const data = await gql<Record<string, RadarShotDetailNode | null>>(
+      `{ ${aliases} }`,
+    );
+    const out: TeeShotRecord[] = [];
+    for (const { playerId, round, playerName } of chunk) {
+      const node = data?.[`s${playerId}_${round}`] ?? null;
+      for (const hole of node?.holes ?? []) {
+        if (!hole) continue;
+        for (const stroke of hole.strokes ?? []) {
+          if (!stroke) continue;
+          if (stroke.fromLocationCode !== "OTB") continue;
+          if (stroke.strokeNumber !== 1) continue;
+          const radar = stroke.radarData;
+          if (!radar) continue;
+          const traj = radar.normalizedTrajectoryV2?.[0];
+          if (!traj || traj.valid === false) continue;
+          if (
+            typeof radar.ballSpeed !== "number" ||
+            typeof radar.apexHeight !== "number" ||
+            typeof radar.horizontalLaunchAngle !== "number" ||
+            typeof traj.carry !== "number"
+          ) {
+            continue;
+          }
+          out.push({
+            playerId,
+            playerName: nameByPlayerId.get(playerId) ?? playerName,
+            tournamentId,
+            round,
+            hole: hole.holeNumber,
+            par: hole.par,
+            ballSpeed: radar.ballSpeed,
+            apexHeight: radar.apexHeight,
+            apexRange: radar.apexRange ?? 0,
+            apexSide: radar.apexSide ?? 0,
+            verticalLaunchAngle: radar.verticalLaunchAngle ?? 0,
+            horizontalLaunchAngle: radar.horizontalLaunchAngle,
+            launchSpin: radar.launchSpin ?? 0,
+            spinAxis: radar.spinAxis ?? 0,
+            actualFlightTime: radar.actualFlightTime ?? 0,
+            carry: traj.carry,
+            carrySide: traj.carrySide ?? 0,
+            curve: traj.curve ?? 0,
+            maxHeight: traj.maxHeight ?? 0,
+            timeInterval: [
+              traj.timeInterval?.[0] ?? 0,
+              traj.timeInterval?.[1] ?? radar.actualFlightTime ?? 0,
+            ],
+            xFit: Array.isArray(traj.xFit) ? traj.xFit : [],
+            yFit: Array.isArray(traj.yFit) ? traj.yFit : [],
+            zFit: Array.isArray(traj.zFit) ? traj.zFit : [],
+          });
+        }
+      }
+    }
+    return out;
+  };
+
+  const results = await Promise.all(chunks.map(fetchChunk));
+  return results.flat();
+}

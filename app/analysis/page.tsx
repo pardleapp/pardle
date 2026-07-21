@@ -33,6 +33,13 @@ const CARDS: Card[] = [
       "Field scoring vs par per hole per hour, per-round summary, weather, and click into any hole for that week's pin positions on the green with the field's putt paths layered on top.",
     status: "live",
   },
+  {
+    href: "/analysis/tee-shots",
+    title: "Off-the-tee shot shape",
+    blurb:
+      "Every driver-off-the-tee ball flight from the last two seasons. Pick a player to see their average shape, dispersion cloud, and the closest matches in the field ranked by radar profile.",
+    status: "live",
+  },
 ];
 
 export default function AnalysisIndex() {
