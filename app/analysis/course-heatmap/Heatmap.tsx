@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import WeatherStrip, {
   type DailyWeatherView,
 } from "../_components/WeatherStrip";
+import type { CoursePinHole } from "@/lib/golf-api/pgatour";
+import type { HoleBirdieData } from "@/lib/analysis/course-birdies";
 
 export interface Cell {
   round: number;
@@ -26,7 +28,26 @@ interface Props {
   /** True when the pin sheet has loaded, so the label styling can hint
    *  clickability. When false, labels are plain text. */
   pinsAvailable?: boolean;
+  /** Per-hole raw pin sheet — used to read yardsByRound for the
+   *  tee-movement flag column. */
+  pinsByHole?: Map<number, CoursePinHole>;
+  /** Per-hole multi-season birdie data — used to read cluster rates
+   *  for the pin-variance flag column. Keyed by hole number as a
+   *  string (matches the API response). */
+  birdieHistoryByHole?: Record<string, HoleBirdieData> | null;
 }
+
+/** Threshold for the pin-variance flag: how far a single cluster's
+ *  birdie rate can deviate (relatively) from the mean of all clusters
+ *  before we call it out. 0.2 = ±20% of the mean; a "22% birdie"
+ *  cluster on a hole averaging 18% is 22.2% above and fires. */
+const PIN_VARIANCE_THRESHOLD = 0.2;
+
+/** Threshold for the tee-movement flag — max-minus-min yardage across
+ *  the played rounds, in yards. 30 yd is Tom's calibration: a
+ *  meaningful "we moved the tees" signal, not just tournament
+ *  rounding noise. */
+const TEE_MOVE_THRESHOLD_YARDS = 30;
 
 /** Diverging colour scale — cool green for easier, neutral gray at
  *  par, warm red for harder. Two hues + gray midpoint per the
@@ -66,12 +87,84 @@ function formatSigned(v: number): string {
   return v > 0 ? `+${v.toFixed(2)}` : `−${Math.abs(v).toFixed(2)}`;
 }
 
+interface PinFlag {
+  /** Signed relative delta of the most extreme cluster from the
+   *  mean of all clusters — e.g. +0.24 = 24% above, −0.31 = 31%
+   *  below. */
+  delta: number;
+  clusterLetter: string;
+  clusterRate: number;
+  meanRate: number;
+}
+
+interface TeeFlag {
+  spread: number; // max − min yardage across played rounds
+  minYards: number;
+  maxYards: number;
+  minRound: number;
+  maxRound: number;
+}
+
+/** Compute the pin-variance flag for a hole, if any of its clusters
+ *  deviates from the cluster-rate mean by more than the threshold.
+ *  Returns null when no cluster crosses the line. */
+function pinFlagFor(birdie: HoleBirdieData | undefined): PinFlag | null {
+  if (!birdie || birdie.clusters.length < 2) return null;
+  const rates = birdie.clusters
+    .filter((c) => c.total > 0)
+    .map((c) => c.rate);
+  if (rates.length < 2) return null;
+  const mean = rates.reduce((a, b) => a + b, 0) / rates.length;
+  if (mean <= 0) return null;
+  let best: PinFlag | null = null;
+  let bestAbs = PIN_VARIANCE_THRESHOLD; // enforce minimum to fire
+  birdie.clusters.forEach((c, i) => {
+    if (c.total === 0) return;
+    const delta = (c.rate - mean) / mean;
+    if (Math.abs(delta) > bestAbs) {
+      bestAbs = Math.abs(delta);
+      best = {
+        delta,
+        clusterLetter: String.fromCharCode(65 + i),
+        clusterRate: c.rate,
+        meanRate: mean,
+      };
+    }
+  });
+  return best;
+}
+
+/** Compute the tee-movement flag for a hole — the spread of max-min
+ *  yardage across the played rounds. Returns null when the spread
+ *  is under the threshold or fewer than 2 rounds have data. */
+function teeFlagFor(pin: CoursePinHole | undefined): TeeFlag | null {
+  if (!pin || !pin.yardsByRound) return null;
+  const entries = Object.entries(pin.yardsByRound)
+    .map(([r, y]) => ({ round: Number(r), yards: y }))
+    .filter((e) => Number.isFinite(e.round) && Number.isFinite(e.yards));
+  if (entries.length < 2) return null;
+  const sorted = [...entries].sort((a, b) => a.yards - b.yards);
+  const minE = sorted[0];
+  const maxE = sorted[sorted.length - 1];
+  const spread = maxE.yards - minE.yards;
+  if (spread <= TEE_MOVE_THRESHOLD_YARDS) return null;
+  return {
+    spread,
+    minYards: minE.yards,
+    maxYards: maxE.yards,
+    minRound: minE.round,
+    maxRound: maxE.round,
+  };
+}
+
 export default function Heatmap({
   cells,
   bucketMinutes,
   weatherByRound,
   onHoleClick,
   pinsAvailable,
+  pinsByHole,
+  birdieHistoryByHole,
 }: Props) {
   const [round, setRound] = useState<RoundFilter>("1");
   const [hover, setHover] = useState<Cell | null>(null);
@@ -332,6 +425,52 @@ export default function Heatmap({
               >
                 ROUND
               </th>
+              <th
+                style={{
+                  width: 84,
+                  fontSize: 11,
+                  color: "oklch(0.35 0.02 150)",
+                  fontWeight: 800,
+                  fontFamily: "var(--font-mono, monospace)",
+                  paddingBottom: 6,
+                  paddingLeft: 10,
+                  verticalAlign: "bottom",
+                  textAlign: "center",
+                  letterSpacing: 0.5,
+                  textTransform: "uppercase",
+                  borderLeft: "2px solid oklch(0.88 0.012 95)",
+                }}
+                title={
+                  "Cluster spread — biggest deviation of any pin cluster's " +
+                  "birdie-or-better rate from the mean of all clusters on " +
+                  "the hole (across every season we have data for). " +
+                  "Fires when it exceeds ±20% of the mean."
+                }
+              >
+                PIN Δ
+              </th>
+              <th
+                style={{
+                  width: 84,
+                  fontSize: 11,
+                  color: "oklch(0.35 0.02 150)",
+                  fontWeight: 800,
+                  fontFamily: "var(--font-mono, monospace)",
+                  paddingBottom: 6,
+                  paddingLeft: 10,
+                  verticalAlign: "bottom",
+                  textAlign: "center",
+                  letterSpacing: 0.5,
+                  textTransform: "uppercase",
+                }}
+                title={
+                  "Tee movement — max-minus-min yardage across this " +
+                  "tournament's played rounds. Fires when the spread is " +
+                  "over 30 yd, i.e. someone moved the tee blocks."
+                }
+              >
+                TEE Δ
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -470,6 +609,130 @@ export default function Heatmap({
                         }}
                       >
                         {has ? formatSigned(mean.avgVsPar) : "—"}
+                      </div>
+                    </td>
+                  );
+                })()}
+                {/* PIN Δ flag cell — cluster variance signal. */}
+                {(() => {
+                  const flag = pinFlagFor(
+                    birdieHistoryByHole?.[String(h)] ?? undefined,
+                  );
+                  const has = flag != null;
+                  const sign = has ? (flag.delta > 0 ? "+" : "−") : "";
+                  const pct = has
+                    ? `${sign}${Math.round(Math.abs(flag.delta) * 100)}%`
+                    : "";
+                  // Green tint when a cluster is much EASIER than the
+                  // hole average (positive delta = higher birdie rate);
+                  // red tint when much harder.
+                  const bg = has
+                    ? flag.delta > 0
+                      ? "oklch(0.87 0.15 150 / 0.55)"
+                      : "oklch(0.85 0.16 28 / 0.55)"
+                    : "transparent";
+                  const fg = has
+                    ? flag.delta > 0
+                      ? "oklch(0.25 0.15 150)"
+                      : "oklch(0.28 0.16 28)"
+                    : "oklch(0.75 0.008 95)";
+                  return (
+                    <td
+                      key="pin-flag"
+                      title={
+                        has
+                          ? `H${h} · Cluster ${flag.clusterLetter} birdie rate ${(flag.clusterRate * 100).toFixed(1)}% vs hole cluster mean ${(flag.meanRate * 100).toFixed(1)}% (${pct})`
+                          : `H${h} · no significant pin cluster variance`
+                      }
+                      style={{
+                        width: 84,
+                        height: CELL_H,
+                        paddingLeft: 10,
+                        borderLeft: "2px solid oklch(0.88 0.012 95)",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      <div
+                        style={{
+                          background: bg,
+                          color: fg,
+                          fontFamily: "var(--font-mono, monospace)",
+                          fontWeight: 800,
+                          fontSize: 12,
+                          border: has
+                            ? "1px solid oklch(0.88 0.012 95)"
+                            : "1px dashed oklch(0.94 0.008 95)",
+                          borderRadius: 3,
+                          padding: "4px 6px",
+                          minHeight: CELL_H,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 4,
+                        }}
+                      >
+                        {has ? (
+                          <>
+                            <span>{pct}</span>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                opacity: 0.7,
+                                fontWeight: 700,
+                              }}
+                            >
+                              {flag.clusterLetter}
+                            </span>
+                          </>
+                        ) : (
+                          "—"
+                        )}
+                      </div>
+                    </td>
+                  );
+                })()}
+                {/* TEE Δ flag cell — spread of yardage across rounds. */}
+                {(() => {
+                  const flag = teeFlagFor(pinsByHole?.get(h) ?? undefined);
+                  const has = flag != null;
+                  return (
+                    <td
+                      key="tee-flag"
+                      title={
+                        has
+                          ? `H${h} · yards moved from ${flag.minYards} yd (R${flag.minRound}) to ${flag.maxYards} yd (R${flag.maxRound}) — Δ ${flag.spread} yd`
+                          : `H${h} · no significant tee movement`
+                      }
+                      style={{
+                        width: 84,
+                        height: CELL_H,
+                        paddingLeft: 4,
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      <div
+                        style={{
+                          background: has
+                            ? "oklch(0.9 0.05 260 / 0.45)"
+                            : "transparent",
+                          color: has
+                            ? "oklch(0.3 0.13 260)"
+                            : "oklch(0.75 0.008 95)",
+                          fontFamily: "var(--font-mono, monospace)",
+                          fontWeight: 800,
+                          fontSize: 12,
+                          border: has
+                            ? "1px solid oklch(0.88 0.012 95)"
+                            : "1px dashed oklch(0.94 0.008 95)",
+                          borderRadius: 3,
+                          padding: "4px 6px",
+                          minHeight: CELL_H,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {has ? `${flag.spread}yd` : "—"}
                       </div>
                     </td>
                   );
@@ -638,6 +901,25 @@ export default function Heatmap({
                   </td>
                 );
               })()}
+              {/* Empty spacers under the two flag columns so the
+                  header stays aligned. */}
+              <td
+                key="pin-flag-foot"
+                style={{
+                  width: 84,
+                  paddingTop: 8,
+                  borderTop: "2px solid oklch(0.88 0.012 95)",
+                  borderLeft: "2px solid oklch(0.88 0.012 95)",
+                }}
+              />
+              <td
+                key="tee-flag-foot"
+                style={{
+                  width: 84,
+                  paddingTop: 8,
+                  borderTop: "2px solid oklch(0.88 0.012 95)",
+                }}
+              />
             </tr>
           </tfoot>
         </table>

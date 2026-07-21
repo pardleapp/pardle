@@ -317,6 +317,12 @@ export default function Page() {
               weatherByRound={data.weatherByRound}
               onHoleClick={pins ? (h) => setOpenHole(h) : undefined}
               pinsAvailable={pins != null}
+              pinsByHole={
+                pins
+                  ? new Map(pins.holes.map((h) => [h.holeNumber, h]))
+                  : undefined
+              }
+              birdieHistoryByHole={birdieHistoryByHole}
             />
           </>
         )}

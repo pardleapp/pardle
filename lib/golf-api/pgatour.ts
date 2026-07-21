@@ -566,6 +566,11 @@ export interface CoursePinHole {
   yards: number | null;
   greenImageUrl: string;
   pinByRound: Record<number, PinCoord>;
+  /** Per-round yardage — the orchestrator's courseStats endpoint
+   *  reports a distinct yards value for every (hole, round). Tee-
+   *  movement analysis reads from here directly instead of guessing
+   *  from a static hole-length. */
+  yardsByRound: Record<number, number>;
   /** Per-round scoring average + vs-par. Keys match pinByRound
    *  (1-4). Rounds not yet played will be missing. */
   scoringByRound: Record<number, HoleScoringSummary>;
@@ -725,8 +730,12 @@ function parseCoursePinsPayload(
         yards: typeof hs.yards === "number" ? hs.yards : null,
         greenImageUrl: upscalePickle(img),
         pinByRound: {},
+        yardsByRound: {},
         scoringByRound: {},
       };
+      if (typeof hs.yards === "number" && hs.yards > 0) {
+        target.yardsByRound[round] = hs.yards;
+      }
       if (!target.greenImageUrl && img) target.greenImageUrl = upscalePickle(img);
       if (target.par == null && Number.isFinite(parNum)) target.par = parNum;
       if (target.yards == null && typeof hs.yards === "number") target.yards = hs.yards;
@@ -845,11 +854,15 @@ export async function getCoursePins(
           yards: typeof hs.yards === "number" ? hs.yards : null,
           greenImageUrl: upscalePickle(img),
           pinByRound: {},
+          yardsByRound: {},
           scoringByRound: {},
         };
       if (!target.greenImageUrl && img) target.greenImageUrl = upscalePickle(img);
       if (target.par == null && Number.isFinite(parNum)) target.par = parNum;
       if (target.yards == null && typeof hs.yards === "number") target.yards = hs.yards;
+      if (typeof hs.yards === "number" && hs.yards > 0) {
+        target.yardsByRound[round] = hs.yards;
+      }
       if (
         typeof x === "number" &&
         typeof y === "number" &&
