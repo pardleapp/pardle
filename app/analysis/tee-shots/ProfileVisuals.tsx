@@ -694,26 +694,30 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
   const cloud = profile.cloud;
   if (cloud.length === 0) return null;
 
-  // Wide-aspect viewBox (4:1) so the scatter looks natural at the
-  // full-width scatter row and dots stay circular. Was 800×300 with
-  // preserveAspectRatio="none" which stretched circles into ellipses
-  // on wider viewports.
+  // Rotated so side offset lives on the horizontal axis — dots
+  // literally sit LEFT or RIGHT of the vertical aim line, matching
+  // the top-view convention. Y is carry distance, growing upward.
   const W = 1200;
-  const H = 300;
-  const pad = { l: 56, r: 24, t: 18, b: 36 };
+  const H = 340;
+  const pad = { l: 56, r: 60, t: 22, b: 42 };
   const plotW = W - pad.l - pad.r;
   const plotH = H - pad.t - pad.b;
 
   const carries = cloud.map((c) => c.carry);
   const sides = cloud.map((c) => c.carrySide);
-  const xMin = Math.min(...carries) - 5;
-  const xMax = Math.max(...carries) + 5;
-  const yAbs = Math.max(...sides.map((s) => Math.abs(s)), 10);
+  const yMin = Math.min(...carries) - 5;
+  const yMax = Math.max(...carries) + 5;
+  const xAbs = Math.max(...sides.map((s) => Math.abs(s)), 10);
 
-  const px = (v: number) =>
-    pad.l + ((v - xMin) / (xMax - xMin || 1)) * plotW;
-  const py = (v: number) =>
-    pad.t + plotH / 2 - (v / yAbs) * (plotH / 2 - 8);
+  // px(side) — 0 sits at the horizontal centre of the plot.
+  const px = (side: number) =>
+    pad.l + plotW / 2 + (side / xAbs) * (plotW / 2 - 8);
+  // py(carry) — larger carry = higher on the plot (smaller SVG y).
+  const py = (carry: number) =>
+    pad.t + plotH - ((carry - yMin) / (yMax - yMin || 1)) * plotH;
+
+  const meanSide = profile.shape.carrySide;
+  const meanCarry = profile.shape.carry;
 
   return (
     <div style={CARD} className="ts-area-scatter">
@@ -725,28 +729,31 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
           gap: 8,
         }}
       >
-        <h4 style={CARD_TITLE}>Every drive — carry vs side</h4>
+        <h4 style={CARD_TITLE}>Every drive — landing pattern</h4>
         <span style={{ ...MONO, fontSize: 12, color: "oklch(0.55 0.02 150)" }}>
           {cloud.length} shots
         </span>
       </div>
       <p style={CARD_SUBTITLE}>
-        One dot per stored tee shot. X = carry (yd), Y = side offset at
-        landing (right +, left −).
+        Top-down view. Vertical dashed line = aim. Dots left of it
+        landed left of aim, dots right of it landed right. Height on
+        the plot = carry distance.
       </p>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         style={{ width: "100%", height: "auto", display: "block" }}
       >
+        {/* Aim reference — vertical dashed centre line at side = 0. */}
         <line
-          x1={pad.l}
-          y1={pad.t + plotH / 2}
-          x2={pad.l + plotW}
-          y2={pad.t + plotH / 2}
+          x1={pad.l + plotW / 2}
+          y1={pad.t}
+          x2={pad.l + plotW / 2}
+          y2={pad.t + plotH}
           stroke="oklch(0.85 0.013 95)"
           strokeWidth={1}
           strokeDasharray="4 5"
         />
+        {/* Left y-axis (carry scale). */}
         <line
           x1={pad.l}
           y1={pad.t}
@@ -755,6 +762,7 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
           stroke="oklch(0.85 0.013 95)"
           strokeWidth={1}
         />
+        {/* Bottom axis (side scale). */}
         <line
           x1={pad.l}
           y1={pad.t + plotH}
@@ -763,40 +771,73 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
           stroke="oklch(0.85 0.013 95)"
           strokeWidth={1}
         />
+        {/* Mean marker — vertical coloured line at the mean side
+             offset, so the "-10.3 yd" is instantly visible against
+             the scatter. */}
+        <line
+          x1={px(meanSide)}
+          y1={pad.t}
+          x2={px(meanSide)}
+          y2={pad.t + plotH}
+          stroke="oklch(0.55 0.14 145)"
+          strokeWidth={1.5}
+          strokeDasharray="6 4"
+        />
+        {/* Mean dot at (meanSide, meanCarry). */}
+        <circle
+          cx={px(meanSide)}
+          cy={py(meanCarry)}
+          r={5.5}
+          fill="oklch(0.5 0.14 145)"
+          stroke="white"
+          strokeWidth={2}
+        />
         {cloud.map((c, i) => (
           <circle
             key={i}
-            cx={px(c.carry)}
-            cy={py(c.carrySide)}
+            cx={px(c.carrySide)}
+            cy={py(c.carry)}
             r={3.6}
             fill="oklch(0.55 0.12 145 / 0.55)"
           />
         ))}
+        {/* X-axis (side) labels. */}
         <text
           x={pad.l}
-          y={H - 10}
+          y={H - 8}
           fontSize={13}
           fill="oklch(0.5 0.02 150)"
         >
-          {fmt(xMin, 0)}
+          ← left {fmt(xAbs, 0)} yd
+        </text>
+        <text
+          x={pad.l + plotW / 2}
+          y={H - 8}
+          fontSize={12}
+          fill="oklch(0.35 0.02 150)"
+          textAnchor="middle"
+          fontWeight={700}
+        >
+          aim
         </text>
         <text
           x={pad.l + plotW}
-          y={H - 10}
+          y={H - 8}
           fontSize={13}
           fill="oklch(0.5 0.02 150)"
           textAnchor="end"
         >
-          {fmt(xMax, 0)} yd
+          right {fmt(xAbs, 0)} yd →
         </text>
+        {/* Y-axis (carry) labels. */}
         <text
           x={pad.l - 6}
-          y={pad.t + 12}
+          y={pad.t + 10}
           fontSize={13}
           fill="oklch(0.5 0.02 150)"
           textAnchor="end"
         >
-          +{fmt(yAbs, 0)}
+          {fmt(yMax, 0)} yd
         </text>
         <text
           x={pad.l - 6}
@@ -805,7 +846,20 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
           fill="oklch(0.5 0.02 150)"
           textAnchor="end"
         >
-          −{fmt(yAbs, 0)}
+          {fmt(yMin, 0)}
+        </text>
+        {/* Mean readout at top-right. */}
+        <text
+          x={pad.l + plotW - 4}
+          y={pad.t + 14}
+          fontSize={13}
+          fill="oklch(0.35 0.14 145)"
+          textAnchor="end"
+          fontWeight={700}
+        >
+          mean {meanSide >= 0 ? "+" : "−"}
+          {fmt(Math.abs(meanSide), 1)} yd ·{" "}
+          {fmt(meanCarry, 0)} yd carry
         </text>
       </svg>
     </div>
