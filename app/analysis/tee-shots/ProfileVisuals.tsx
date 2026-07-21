@@ -117,19 +117,19 @@ const CARD: React.CSSProperties = {
 };
 
 const CARD_TITLE: React.CSSProperties = {
-  fontSize: 11,
-  letterSpacing: 0.5,
+  fontSize: 12,
+  letterSpacing: 0.6,
   textTransform: "uppercase",
   fontWeight: 700,
-  color: "oklch(0.4 0.02 150)",
+  color: "oklch(0.35 0.02 150)",
   margin: 0,
 };
 
 const CARD_SUBTITLE: React.CSSProperties = {
-  fontSize: 11,
+  fontSize: 13,
   color: "oklch(0.5 0.02 150)",
-  margin: "3px 0 10px",
-  lineHeight: 1.35,
+  margin: "4px 0 14px",
+  lineHeight: 1.4,
 };
 
 const MONO: React.CSSProperties = {
@@ -198,15 +198,15 @@ function StatCell({ stat }: { stat: Stat }) {
         display: "grid",
         gridTemplateColumns: "1fr auto auto",
         alignItems: "baseline",
-        columnGap: 8,
-        padding: "6px 0",
-        borderBottom: "1px solid oklch(0.955 0.008 95)",
+        columnGap: 12,
+        padding: "10px 0",
+        borderBottom: "1px solid oklch(0.945 0.008 95)",
       }}
     >
       <span
         style={{
-          fontSize: 11,
-          color: "oklch(0.45 0.02 150)",
+          fontSize: 13,
+          color: "oklch(0.42 0.02 150)",
           letterSpacing: 0.2,
         }}
       >
@@ -215,23 +215,24 @@ function StatCell({ stat }: { stat: Stat }) {
       <span
         style={{
           ...MONO,
-          fontSize: 13,
+          fontSize: 17,
           fontWeight: 700,
-          color: "oklch(0.2 0.02 150)",
+          color: "oklch(0.18 0.02 150)",
           whiteSpace: "nowrap",
+          letterSpacing: "-0.01em",
         }}
       >
         {value}
         <span
-          style={{ color: "oklch(0.55 0.02 150)", fontWeight: 400 }}
+          style={{ color: "oklch(0.55 0.02 150)", fontWeight: 400, fontSize: 13 }}
         >{` ${stat.unit}`}</span>
       </span>
       <span
         style={{
           ...MONO,
-          fontSize: 10,
-          color: "oklch(0.6 0.02 150)",
-          minWidth: 44,
+          fontSize: 12,
+          color: "oklch(0.58 0.02 150)",
+          minWidth: 54,
           textAlign: "right",
           whiteSpace: "nowrap",
         }}
@@ -447,10 +448,12 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
 
       <div
         style={{
-          fontSize: 10,
-          letterSpacing: 0.4,
-          color: "oklch(0.5 0.02 150)",
+          fontSize: 11,
+          letterSpacing: 0.6,
+          fontWeight: 700,
+          color: "oklch(0.42 0.02 150)",
           marginTop: 4,
+          textTransform: "uppercase",
         }}
       >
         SIDE
@@ -492,7 +495,7 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
         <text
           x={apexPx}
           y={apexPy - 6}
-          fontSize={10}
+          fontSize={12}
           fill="oklch(0.3 0.02 150)"
           textAnchor="middle"
         >
@@ -519,7 +522,7 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
         <text
           x={pad.l}
           y={SIDE_H - 6}
-          fontSize={10}
+          fontSize={12}
           fill="oklch(0.5 0.02 150)"
         >
           0
@@ -527,19 +530,19 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
         <text
           x={pad.l + plotW}
           y={SIDE_H - 6}
-          fontSize={10}
+          fontSize={12}
           fill="oklch(0.5 0.02 150)"
           textAnchor="end"
         >
           {fmt(carry, 0)} yd
         </text>
-        <text x={4} y={pad.t + 8} fontSize={10} fill="oklch(0.5 0.02 150)">
+        <text x={4} y={pad.t + 8} fontSize={12} fill="oklch(0.5 0.02 150)">
           {fmt(yMax, 0)} ft
         </text>
         <text
           x={pad.l - 4}
           y={pad.t + plotH}
-          fontSize={10}
+          fontSize={12}
           fill="oklch(0.5 0.02 150)"
           textAnchor="end"
         >
@@ -549,10 +552,12 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
 
       <div
         style={{
-          fontSize: 10,
-          letterSpacing: 0.4,
-          color: "oklch(0.5 0.02 150)",
-          marginTop: 8,
+          fontSize: 11,
+          letterSpacing: 0.6,
+          fontWeight: 700,
+          color: "oklch(0.42 0.02 150)",
+          marginTop: 12,
+          textTransform: "uppercase",
         }}
       >
         TOP
@@ -635,7 +640,7 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
           <text
             x={landPx}
             y={landPy - 8}
-            fontSize={10}
+            fontSize={12}
             fill="oklch(0.3 0.02 150)"
             textAnchor="middle"
           >
@@ -645,7 +650,7 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
           <text
             x={topPad.l + topPlotW / 2}
             y={topPad.t + topPlotH + 14}
-            fontSize={10}
+            fontSize={12}
             fill="oklch(0.5 0.02 150)"
             textAnchor="middle"
           >
@@ -654,7 +659,7 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
           <text
             x={topPad.l + topPlotW / 2}
             y={topPad.t - 8}
-            fontSize={10}
+            fontSize={12}
             fill="oklch(0.5 0.02 150)"
             textAnchor="middle"
           >
@@ -663,7 +668,7 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
           <text
             x={topPad.l - 4}
             y={topPad.t + topPlotH / 2 + 3}
-            fontSize={10}
+            fontSize={12}
             fill="oklch(0.5 0.02 150)"
             textAnchor="end"
           >
@@ -672,7 +677,7 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
           <text
             x={topPad.l + topPlotW + 4}
             y={topPad.t + topPlotH / 2 + 3}
-            fontSize={10}
+            fontSize={12}
             fill="oklch(0.5 0.02 150)"
           >
             +{fmt(zAbs, 0)}
@@ -689,9 +694,13 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
   const cloud = profile.cloud;
   if (cloud.length === 0) return null;
 
-  const W = 800;
+  // Wide-aspect viewBox (4:1) so the scatter looks natural at the
+  // full-width scatter row and dots stay circular. Was 800×300 with
+  // preserveAspectRatio="none" which stretched circles into ellipses
+  // on wider viewports.
+  const W = 1200;
   const H = 300;
-  const pad = { l: 44, r: 20, t: 12, b: 28 };
+  const pad = { l: 56, r: 24, t: 18, b: 36 };
   const plotW = W - pad.l - pad.r;
   const plotH = H - pad.t - pad.b;
 
@@ -717,7 +726,7 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
         }}
       >
         <h4 style={CARD_TITLE}>Every drive — carry vs side</h4>
-        <span style={{ ...MONO, fontSize: 10, color: "oklch(0.55 0.02 150)" }}>
+        <span style={{ ...MONO, fontSize: 12, color: "oklch(0.55 0.02 150)" }}>
           {cloud.length} shots
         </span>
       </div>
@@ -727,8 +736,7 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
       </p>
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        preserveAspectRatio="none"
-        style={{ width: "100%", height: 300, display: "block" }}
+        style={{ width: "100%", height: "auto", display: "block" }}
       >
         <line
           x1={pad.l}
@@ -737,7 +745,7 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
           y2={pad.t + plotH / 2}
           stroke="oklch(0.85 0.013 95)"
           strokeWidth={1}
-          strokeDasharray="3 3"
+          strokeDasharray="4 5"
         />
         <line
           x1={pad.l}
@@ -760,40 +768,40 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
             key={i}
             cx={px(c.carry)}
             cy={py(c.carrySide)}
-            r={2.6}
+            r={3.6}
             fill="oklch(0.55 0.12 145 / 0.55)"
           />
         ))}
         <text
           x={pad.l}
-          y={H - 6}
-          fontSize={10}
+          y={H - 10}
+          fontSize={13}
           fill="oklch(0.5 0.02 150)"
         >
           {fmt(xMin, 0)}
         </text>
         <text
           x={pad.l + plotW}
-          y={H - 6}
-          fontSize={10}
+          y={H - 10}
+          fontSize={13}
           fill="oklch(0.5 0.02 150)"
           textAnchor="end"
         >
           {fmt(xMax, 0)} yd
         </text>
         <text
-          x={pad.l - 4}
-          y={pad.t + 10}
-          fontSize={10}
+          x={pad.l - 6}
+          y={pad.t + 12}
+          fontSize={13}
           fill="oklch(0.5 0.02 150)"
           textAnchor="end"
         >
           +{fmt(yAbs, 0)}
         </text>
         <text
-          x={pad.l - 4}
+          x={pad.l - 6}
           y={pad.t + plotH - 2}
-          fontSize={10}
+          fontSize={13}
           fill="oklch(0.5 0.02 150)"
           textAnchor="end"
         >
