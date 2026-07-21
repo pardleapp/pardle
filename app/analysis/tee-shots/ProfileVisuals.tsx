@@ -24,11 +24,23 @@ import type { PlayerDrivingProfile } from "@/lib/feed/tee-shots-profile";
 import SimilarList from "./SimilarList";
 
 interface Props {
-  profile: PlayerDrivingProfile;
+  /** Ordered — index 0 is the primary player (drives stats,
+   *  scatter, similar list). Extra profiles overlay their arcs on
+   *  the ball-flight card only. */
+  profiles: PlayerDrivingProfile[];
 }
 
 const FLIGHT_MS = 2800; // one loop of the ball animation
 const REST_MS = 900;
+
+/** Distinct colours used to identify each player in compare mode.
+ *  Kept high-chroma so overlaps stay legible on the paper surface. */
+export const COMPARE_COLORS = [
+  "oklch(0.5 0.14 145)", // primary — emerald (matches solo mode)
+  "oklch(0.55 0.18 25)", // 2 — coral / red-orange
+  "oklch(0.5 0.15 250)", // 3 — blue
+  "oklch(0.55 0.16 320)", // 4 — magenta
+] as const;
 
 // ── Ball-flight sampling ────────────────────────────────────────────
 
@@ -140,7 +152,9 @@ const MONO: React.CSSProperties = {
 
 // ── Player header (spans full width) ────────────────────────────────
 
-function PlayerHeader({ profile }: { profile: PlayerDrivingProfile }) {
+function PlayerHeader({ profiles }: { profiles: PlayerDrivingProfile[] }) {
+  const primary = profiles[0];
+  const others = profiles.slice(1);
   return (
     <header
       style={{
@@ -151,19 +165,56 @@ function PlayerHeader({ profile }: { profile: PlayerDrivingProfile }) {
         padding: "0 2px 10px",
         borderBottom: "1px solid oklch(0.92 0.008 95)",
         marginBottom: 12,
+        flexWrap: "wrap",
       }}
     >
-      <h3
-        style={{
-          fontSize: 22,
-          margin: 0,
-          fontFamily:
-            "var(--font-archivo), 'Archivo', system-ui, sans-serif",
-          letterSpacing: "-0.01em",
-        }}
-      >
-        {profile.playerName}
-      </h3>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+        <h3
+          style={{
+            fontSize: 22,
+            margin: 0,
+            fontFamily:
+              "var(--font-archivo), 'Archivo', system-ui, sans-serif",
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {primary.playerName}
+        </h3>
+        {others.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              fontSize: 13,
+              color: "oklch(0.4 0.02 150)",
+            }}
+          >
+            <span style={{ fontSize: 11, letterSpacing: 0.4 }}>vs</span>
+            {others.map((p, i) => (
+              <span
+                key={p.playerId}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 999,
+                    background: COMPARE_COLORS[(i + 1) % COMPARE_COLORS.length],
+                  }}
+                />
+                {p.playerName}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
       <span
         style={{
           ...MONO,
@@ -171,7 +222,7 @@ function PlayerHeader({ profile }: { profile: PlayerDrivingProfile }) {
           color: "oklch(0.5 0.02 150)",
         }}
       >
-        {profile.shotCount} drives · {profile.eventsCovered} events
+        {primary.shotCount} drives · {primary.eventsCovered} events
       </span>
     </header>
   );
@@ -438,27 +489,25 @@ function StatsCard({ profile }: { profile: PlayerDrivingProfile }) {
 
 // ── Ball flight card ────────────────────────────────────────────────
 
-function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
-  const { carry, apexHeight, apexRange, apexSide, curve } = profile.shape;
-  // Re-express side offsets in the AIM frame — carrySide/apexSide
-  // in the raw record are measured from the pin/target direction, so
-  // the mean naturally comes out left for the whole tour (players
-  // aim left to allow for their fade). Convert to aim-relative so
-  // the top view visualises the shot's actual fade/draw shape:
-  //   landing offset from aim  = curve (already in aim frame)
-  //   apex offset from aim     = apexSide − apexRange × tan(aim°)
-  const aimDeg = profile.stats.horizontalLaunchAngle.mean;
-  const apexSideAimFt =
-    apexSide - apexRange * Math.tan((aimDeg * Math.PI) / 180);
+/** One player's arc rendered in a single colour. Computed as
+ *  screen-space paths + landmark positions ready to hand to SVG. */
+interface Arc {
+  playerId: string;
+  playerName: string;
+  color: string;
+  sidePath: string;
+  topPath: string;
+  sidePts: Array<{ x: number; y: number }>;
+  topPts: Array<{ x: number; y: number }>;
+  apex: { x: number; y: number; label: string };
+  landing: { x: number; y: number; label: string };
+  carry: number;
+  apexHeight: number;
+  curve: number;
+}
 
-  const sideSamples = useMemo(
-    () => sampleSide(carry, apexRange, apexHeight, 80),
-    [carry, apexRange, apexHeight],
-  );
-  const topSamples = useMemo(
-    () => sampleTop(carry, apexRange, apexSideAimFt, curve, 80),
-    [carry, apexRange, apexSideAimFt, curve],
-  );
+function BallFlightCard({ profiles }: { profiles: PlayerDrivingProfile[] }) {
+  const primary = profiles[0];
 
   const SIDE_W = 460;
   const SIDE_H = 180;
@@ -471,28 +520,100 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
   const topPlotW = TOP_W - topPad.l - topPad.r;
   const topPlotH = TOP_H - topPad.t - topPad.b;
 
-  const geom = useMemo(() => {
-    const xs = sideSamples.map((s) => s.x);
-    const ys = sideSamples.map((s) => s.y);
-    const zs = topSamples.map((s) => s.z);
-    const xMax = Math.max(1, Math.max(...xs));
-    const yMax = Math.max(20, Math.max(...ys) * 1.1);
-    const zAbs = Math.max(10, ...zs.map(Math.abs));
-    const sidePts = sideSamples.map((s) => ({
-      x: pad.l + (s.x / xMax) * plotW,
-      y: pad.t + (1 - s.y / yMax) * plotH,
-    }));
-    const topPts = topSamples.map((s) => ({
-      x:
-        topPad.l +
-        topPlotW / 2 +
-        (s.z / zAbs) * (topPlotW / 2 - 6),
-      y: topPad.t + topPlotH - (s.x / xMax) * topPlotH,
-    }));
-    return { xMax, yMax, zAbs, sidePts, topPts };
+  // Per-profile sample arrays. Kept keyed by playerId so React can
+  // reuse them if the ordering changes.
+  const samples = useMemo(() => {
+    return profiles.map((p) => {
+      const { carry, apexHeight, apexRange, apexSide, curve } = p.shape;
+      const aimDeg = p.stats.horizontalLaunchAngle.mean;
+      const apexSideAimFt =
+        apexSide - apexRange * Math.tan((aimDeg * Math.PI) / 180);
+      return {
+        profile: p,
+        side: sampleSide(carry, apexRange, apexHeight, 80),
+        top: sampleTop(carry, apexRange, apexSideAimFt, curve, 80),
+      };
+    });
+  }, [profiles]);
+
+  // Shared axes — max across all profiles so multiple arcs stay in
+  // the same reference frame and can be compared visually.
+  const axes = useMemo(() => {
+    let xMax = 1;
+    let yMax = 20;
+    let zAbs = 10;
+    for (const s of samples) {
+      for (const p of s.side) {
+        if (p.x > xMax) xMax = p.x;
+        if (p.y > yMax) yMax = p.y;
+      }
+      for (const p of s.top) {
+        const abs = Math.abs(p.z);
+        if (abs > zAbs) zAbs = abs;
+      }
+    }
+    return { xMax, yMax: yMax * 1.1, zAbs };
+  }, [samples]);
+
+  // Per-profile projected paths + landmark positions.
+  const arcs = useMemo<Arc[]>(() => {
+    return samples.map((s, i): Arc => {
+      const color = COMPARE_COLORS[i % COMPARE_COLORS.length];
+      const sidePts = s.side.map((p) => ({
+        x: pad.l + (p.x / axes.xMax) * plotW,
+        y: pad.t + (1 - p.y / axes.yMax) * plotH,
+      }));
+      const topPts = s.top.map((p) => ({
+        x:
+          topPad.l +
+          topPlotW / 2 +
+          (p.z / axes.zAbs) * (topPlotW / 2 - 6),
+        y: topPad.t + topPlotH - (p.x / axes.xMax) * topPlotH,
+      }));
+      const sidePath = sidePts
+        .map(
+          (pt, j) =>
+            `${j === 0 ? "M" : "L"}${pt.x.toFixed(1)},${pt.y.toFixed(1)}`,
+        )
+        .join(" ");
+      const topPath = topPts
+        .map(
+          (pt, j) =>
+            `${j === 0 ? "M" : "L"}${pt.x.toFixed(1)},${pt.y.toFixed(1)}`,
+        )
+        .join(" ");
+      const { carry, apexHeight, apexRange, curve } = s.profile.shape;
+      const apex = {
+        x: pad.l + (apexRange / 3 / axes.xMax) * plotW,
+        y: pad.t + (1 - apexHeight / axes.yMax) * plotH,
+        label: `apex ${fmt(apexHeight, 0)} ft`,
+      };
+      const landing = {
+        x:
+          topPad.l +
+          topPlotW / 2 +
+          (curve / axes.zAbs) * (topPlotW / 2 - 6),
+        y: topPad.t,
+        label: `${curve >= 0 ? "+" : "−"}${fmt(Math.abs(curve), 1)} yd ${curve >= 0 ? "fade" : "draw"}`,
+      };
+      return {
+        playerId: s.profile.playerId,
+        playerName: s.profile.playerName,
+        color,
+        sidePath,
+        topPath,
+        sidePts,
+        topPts,
+        apex,
+        landing,
+        carry,
+        apexHeight,
+        curve,
+      };
+    });
   }, [
-    sideSamples,
-    topSamples,
+    samples,
+    axes,
     pad.l,
     pad.t,
     plotW,
@@ -503,6 +624,8 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
     topPlotH,
   ]);
 
+  // Only the primary player's ball is animated — overlaying multiple
+  // animated balls gets busy and steals attention from the arcs.
   const [phase, setPhase] = useState(0);
   const rafRef = useRef<number | null>(null);
   useEffect(() => {
@@ -522,9 +645,9 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
   }, []);
   useEffect(() => {
     setPhase(0);
-  }, [profile.playerId]);
+  }, [primary?.playerId]);
 
-  if (!Number.isFinite(carry) || carry <= 0) {
+  if (!primary || !Number.isFinite(primary.shape.carry) || primary.shape.carry <= 0) {
     return (
       <div style={CARD} className="ts-area-ballflight">
         <h4 style={CARD_TITLE}>Average ball flight</h4>
@@ -533,31 +656,18 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
     );
   }
 
-  const { xMax, yMax, zAbs, sidePts, topPts } = geom;
-
-  const sidePath = sidePts
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-    .join(" ");
-  const topPath = topPts
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-    .join(" ");
-
+  const primaryArc = arcs[0];
   const eased = 1 - Math.pow(1 - phase, 1.6);
   const idx = Math.min(
-    sidePts.length - 1,
-    Math.floor(eased * (sidePts.length - 1)),
+    primaryArc.sidePts.length - 1,
+    Math.floor(eased * (primaryArc.sidePts.length - 1)),
   );
-  const ballSide = sidePts[idx];
-  const ballTop = topPts[idx];
+  const ballSide = primaryArc.sidePts[idx];
+  const ballTop = primaryArc.topPts[idx];
 
-  // Landing marker uses curve (aim-relative), matching topSamples.
-  const landPx =
-    topPad.l + topPlotW / 2 + (curve / zAbs) * (topPlotW / 2 - 6);
-  const landPy = topPad.t;
   const teePx = topPad.l + topPlotW / 2;
   const teePy = topPad.t + topPlotH;
-  const apexPx = pad.l + (apexRange / 3 / xMax) * plotW;
-  const apexPy = pad.t + (1 - apexHeight / yMax) * plotH;
+  const { xMax, yMax, zAbs } = axes;
 
   return (
     <div
@@ -608,28 +718,41 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
           stroke="oklch(0.85 0.013 95)"
           strokeWidth={1}
         />
-        <path
-          d={sidePath}
-          fill="none"
-          stroke="oklch(0.75 0.05 145)"
-          strokeWidth={1.5}
-          strokeLinecap="round"
-          strokeDasharray="3 4"
-        />
-        <circle
-          cx={apexPx}
-          cy={apexPy}
-          r={3}
-          fill="oklch(0.55 0.14 145)"
-        />
+        {/* One dashed arc per profile, primary last so it renders on top. */}
+        {arcs
+          .slice(1)
+          .concat(arcs[0])
+          .map((arc) => (
+            <path
+              key={`side-${arc.playerId}`}
+              d={arc.sidePath}
+              fill="none"
+              stroke={arc.color}
+              strokeWidth={arc.playerId === primaryArc.playerId ? 1.8 : 1.4}
+              strokeLinecap="round"
+              strokeDasharray="3 4"
+              opacity={arc.playerId === primaryArc.playerId ? 0.9 : 0.75}
+            />
+          ))}
+        {/* Apex markers — one per profile so users see height diff. */}
+        {arcs.map((arc) => (
+          <circle
+            key={`apex-${arc.playerId}`}
+            cx={arc.apex.x}
+            cy={arc.apex.y}
+            r={3}
+            fill={arc.color}
+          />
+        ))}
+        {/* Apex label — only the primary; extras clutter. */}
         <text
-          x={apexPx}
-          y={apexPy - 6}
+          x={primaryArc.apex.x}
+          y={primaryArc.apex.y - 6}
           fontSize={12}
           fill="oklch(0.3 0.02 150)"
           textAnchor="middle"
         >
-          apex {fmt(apexHeight, 0)} ft
+          {primaryArc.apex.label}
         </text>
         {ballSide && (
           <>
@@ -664,7 +787,7 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
           fill="oklch(0.5 0.02 150)"
           textAnchor="end"
         >
-          {fmt(carry, 0)} yd
+          {fmt(xMax, 0)} yd
         </text>
         <text x={4} y={pad.t + 8} fontSize={12} fill="oklch(0.5 0.02 150)">
           {fmt(yMax, 0)} ft
@@ -729,26 +852,39 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
             stroke="oklch(0.85 0.013 95)"
             strokeWidth={1}
           />
-          <path
-            d={topPath}
-            fill="none"
-            stroke="oklch(0.75 0.05 145)"
-            strokeWidth={1.5}
-            strokeLinecap="round"
-            strokeDasharray="3 4"
-          />
+          {/* One top-view arc per profile — non-primaries first so
+              the primary sits on top. */}
+          {arcs
+            .slice(1)
+            .concat(arcs[0])
+            .map((arc) => (
+              <path
+                key={`top-${arc.playerId}`}
+                d={arc.topPath}
+                fill="none"
+                stroke={arc.color}
+                strokeWidth={arc.playerId === primaryArc.playerId ? 1.8 : 1.4}
+                strokeLinecap="round"
+                strokeDasharray="3 4"
+                opacity={arc.playerId === primaryArc.playerId ? 0.9 : 0.75}
+              />
+            ))}
           <circle
             cx={teePx}
             cy={teePy}
             r={2.5}
             fill="oklch(0.55 0.02 150)"
           />
-          <circle
-            cx={landPx}
-            cy={landPy}
-            r={3}
-            fill="oklch(0.55 0.14 145)"
-          />
+          {/* Landing markers — one per profile so users see side diff. */}
+          {arcs.map((arc) => (
+            <circle
+              key={`land-${arc.playerId}`}
+              cx={arc.landing.x}
+              cy={arc.landing.y}
+              r={3}
+              fill={arc.color}
+            />
+          ))}
           {ballTop && (
             <>
               <circle
@@ -768,14 +904,13 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
             </>
           )}
           <text
-            x={landPx}
-            y={landPy - 8}
+            x={primaryArc.landing.x}
+            y={primaryArc.landing.y - 8}
             fontSize={12}
             fill="oklch(0.3 0.02 150)"
             textAnchor="middle"
           >
-            {curve >= 0 ? "+" : "−"}
-            {fmt(Math.abs(curve), 1)} yd {curve >= 0 ? "fade" : "draw"}
+            {primaryArc.landing.label}
           </text>
           <text
             x={topPad.l + topPlotW / 2}
@@ -793,7 +928,7 @@ function BallFlightCard({ profile }: { profile: PlayerDrivingProfile }) {
             fill="oklch(0.5 0.02 150)"
             textAnchor="middle"
           >
-            {fmt(carry, 0)} yd carry
+            {fmt(primaryArc.carry, 0)} yd carry
           </text>
           <text
             x={topPad.l - 4}
@@ -1003,17 +1138,19 @@ function ShotCloudCard({ profile }: { profile: PlayerDrivingProfile }) {
 
 // ── The dashboard ───────────────────────────────────────────────────
 
-export default function ProfileVisuals({ profile }: Props) {
+export default function ProfileVisuals({ profiles }: Props) {
+  const primary = profiles[0];
+  if (!primary) return null;
   return (
     <div>
-      <PlayerHeader profile={profile} />
+      <PlayerHeader profiles={profiles} />
       <div className="ts-dashboard">
-        <StatsCard profile={profile} />
-        <BallFlightCard profile={profile} />
+        <StatsCard profile={primary} />
+        <BallFlightCard profiles={profiles} />
         <div className="ts-area-similar" style={{ minWidth: 0 }}>
-          <SimilarList playerId={profile.playerId} />
+          <SimilarList playerId={primary.playerId} />
         </div>
-        <ShotCloudCard profile={profile} />
+        <ShotCloudCard profile={primary} />
       </div>
     </div>
   );

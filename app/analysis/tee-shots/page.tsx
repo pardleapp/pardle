@@ -6,7 +6,7 @@ import MainNav from "@/app/MainNav";
 import AuthChip from "@/app/live/auth/AuthChip";
 import { BRAND } from "@/lib/brand";
 import type { PlayerDrivingProfile } from "@/lib/feed/tee-shots-profile";
-import ProfileVisuals from "./ProfileVisuals";
+import ProfileVisuals, { COMPARE_COLORS } from "./ProfileVisuals";
 
 interface RankedPlayer {
   playerId: string;
@@ -25,11 +25,17 @@ interface ProfileResp {
   error?: string;
 }
 
+const MAX_COMPARE = 4;
+
 export default function Page() {
   const [players, setPlayers] = useState<RankedPlayer[] | null>(null);
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
-  const [profile, setProfile] = useState<PlayerDrivingProfile | null>(null);
+  // Ordered list of selected player IDs. Index 0 is the "primary"
+  // (drives stats card, similar list, scatter). Additional entries
+  // only overlay their arcs on the ball-flight card.
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [compareMode, setCompareMode] = useState(false);
+  const [profiles, setProfiles] = useState<PlayerDrivingProfile[]>([]);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
 
@@ -42,8 +48,9 @@ export default function Page() {
         const json = (await res.json()) as IndexResp;
         if (alive && json.ok && json.players) {
           setPlayers(json.players);
-          // Auto-select the leader — usually gives an immediate visual.
-          setSelected(json.players[0]?.playerId ?? null);
+          if (json.players[0]) {
+            setSelectedIds([json.players[0].playerId]);
+          }
         }
       } catch {
         // ignored — surfaces as "no data yet"
@@ -54,29 +61,42 @@ export default function Page() {
     };
   }, []);
 
-  // Fetch profile whenever the selected player changes.
+  // Fetch every selected player's profile in parallel whenever the
+  // selection list changes. Results preserve the selection order so
+  // the primary player stays at index 0.
   useEffect(() => {
-    if (!selected) return;
+    if (selectedIds.length === 0) {
+      setProfiles([]);
+      return;
+    }
     let alive = true;
     setLoadingProfile(true);
     setProfileError(null);
     (async () => {
       try {
-        const res = await fetch(
-          `/api/tee-shot-profile?playerId=${encodeURIComponent(selected)}`,
-          { cache: "no-store" },
+        const results = await Promise.all(
+          selectedIds.map((id) =>
+            fetch(
+              `/api/tee-shot-profile?playerId=${encodeURIComponent(id)}`,
+              { cache: "no-store" },
+            )
+              .then((r) => r.json() as Promise<ProfileResp>)
+              .catch(() => ({ ok: false }) as ProfileResp),
+          ),
         );
-        const json = (await res.json()) as ProfileResp;
         if (!alive) return;
-        if (json.ok && json.profile) {
-          setProfile(json.profile);
+        const loaded = results
+          .map((r) => (r.ok && r.profile ? r.profile : null))
+          .filter((p): p is PlayerDrivingProfile => p != null);
+        if (loaded.length === 0) {
+          setProfiles([]);
+          setProfileError("no data");
         } else {
-          setProfile(null);
-          setProfileError(json.error ?? "no data");
+          setProfiles(loaded);
         }
       } catch (err) {
         if (alive) {
-          setProfile(null);
+          setProfiles([]);
           setProfileError(
             err instanceof Error ? err.message : "network error",
           );
@@ -88,7 +108,7 @@ export default function Page() {
     return () => {
       alive = false;
     };
-  }, [selected]);
+  }, [selectedIds]);
 
   const filtered = useMemo(() => {
     if (!players) return [];
@@ -98,6 +118,43 @@ export default function Page() {
       .filter((p) => p.name.toLowerCase().includes(q))
       .slice(0, 60);
   }, [players, query]);
+
+  const onPickPlayer = useCallback(
+    (playerId: string) => {
+      setSelectedIds((prev) => {
+        if (!compareMode) {
+          return prev[0] === playerId ? prev : [playerId];
+        }
+        // Compare mode — toggle inclusion (respecting the cap).
+        if (prev.includes(playerId)) {
+          const next = prev.filter((id) => id !== playerId);
+          // Never leave the selection empty; fall back to the
+          // deselected player as primary if it was the last one.
+          return next.length > 0 ? next : [playerId];
+        }
+        if (prev.length >= MAX_COMPARE) return prev;
+        return [...prev, playerId];
+      });
+    },
+    [compareMode],
+  );
+
+  const onToggleCompare = useCallback(() => {
+    setCompareMode((prev) => {
+      const next = !prev;
+      // Leaving compare mode drops back to the primary player.
+      if (!next) {
+        setSelectedIds((ids) => (ids.length > 1 ? [ids[0]] : ids));
+      }
+      return next;
+    });
+  }, []);
+
+  const selectionIndex = useMemo(() => {
+    const map = new Map<string, number>();
+    selectedIds.forEach((id, i) => map.set(id, i));
+    return map;
+  }, [selectedIds]);
 
   return (
     <main className="container container-wide v4-theme pv-theme analysis-tee-shots-shell">
@@ -110,9 +167,6 @@ export default function Page() {
       </header>
       <section
         style={{
-          // No maxWidth — fill the shell's middle grid track edge-to-edge.
-          // Padding is a small proportional gutter so the content
-          // sits ~24-32px inside the nav rail with no dead band.
           padding: "20px 4px 60px",
           fontFamily:
             "var(--font-archivo), 'Archivo', system-ui, -apple-system, sans-serif",
@@ -138,8 +192,8 @@ export default function Page() {
         </h2>
         <p style={{ fontSize: 13, color: "oklch(0.5 0.02 150)", margin: 0 }}>
           Every driver-off-the-tee ball flight from the last two seasons of
-          PGA Tour events. Pick a player to see their average shape — height,
-          launch angles, spin, curve — and the closest matches in the field.
+          PGA Tour events. Pick a player to see their average shape — or turn
+          on Compare to overlay up to {MAX_COMPARE} players&apos; flight paths.
         </p>
 
         {!players ? (
@@ -179,47 +233,142 @@ export default function Page() {
                   boxSizing: "border-box",
                 }}
               />
+              <button
+                type="button"
+                onClick={onToggleCompare}
+                aria-pressed={compareMode}
+                style={{
+                  width: "100%",
+                  marginTop: 8,
+                  padding: "8px 10px",
+                  fontSize: 12,
+                  fontFamily: "inherit",
+                  fontWeight: 700,
+                  letterSpacing: 0.3,
+                  border: "1px solid oklch(0.85 0.013 95)",
+                  borderRadius: 6,
+                  background: compareMode
+                    ? "oklch(0.25 0.02 150)"
+                    : "white",
+                  color: compareMode ? "white" : "oklch(0.3 0.02 150)",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
+                }}
+                title={
+                  compareMode
+                    ? "Compare on — click players to add/remove"
+                    : "Compare off — click to pick multiple players"
+                }
+              >
+                <span>
+                  Compare{" "}
+                  {compareMode && selectedIds.length > 1
+                    ? `· ${selectedIds.length}/${MAX_COMPARE}`
+                    : ""}
+                </span>
+                <span
+                  style={{
+                    width: 22,
+                    height: 12,
+                    background: compareMode ? "white" : "oklch(0.88 0.013 95)",
+                    borderRadius: 999,
+                    position: "relative",
+                    transition: "background 100ms",
+                  }}
+                >
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 1,
+                      left: compareMode ? 11 : 1,
+                      width: 10,
+                      height: 10,
+                      background: compareMode
+                        ? "oklch(0.25 0.02 150)"
+                        : "white",
+                      border: "1px solid oklch(0.7 0.013 95)",
+                      borderRadius: 999,
+                      transition: "left 100ms",
+                    }}
+                  />
+                </span>
+              </button>
               <ul className="ts-picker-list">
-
                 {filtered.map((p) => {
-                  const active = p.playerId === selected;
+                  const selIdx = selectionIndex.get(p.playerId);
+                  const active = selIdx != null;
+                  const isPrimary = selIdx === 0;
+                  const color =
+                    selIdx != null
+                      ? COMPARE_COLORS[selIdx % COMPARE_COLORS.length]
+                      : null;
                   return (
                     <li key={p.playerId}>
                       <button
                         type="button"
-                        onClick={() => setSelected(p.playerId)}
+                        onClick={() => onPickPlayer(p.playerId)}
                         style={{
                           width: "100%",
                           padding: "8px 10px",
                           fontSize: 13,
                           fontFamily: "inherit",
                           textAlign: "left",
-                          background: active
+                          background: isPrimary
                             ? "oklch(0.25 0.02 150)"
-                            : "transparent",
-                          color: active ? "white" : "oklch(0.25 0.02 150)",
+                            : active
+                              ? "oklch(0.96 0.008 95)"
+                              : "transparent",
+                          color: isPrimary
+                            ? "white"
+                            : "oklch(0.25 0.02 150)",
                           border: "none",
-                          borderBottom: "1px solid oklch(0.94 0.008 95)",
+                          borderBottom:
+                            "1px solid oklch(0.94 0.008 95)",
                           cursor: "pointer",
                           display: "flex",
                           justifyContent: "space-between",
-                          alignItems: "baseline",
+                          alignItems: "center",
                           gap: 8,
                         }}
                       >
                         <span
                           style={{
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                            minWidth: 0,
                           }}
                         >
-                          {p.name}
+                          <span
+                            aria-hidden
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: 999,
+                              flexShrink: 0,
+                              background: color ?? "transparent",
+                              border: color
+                                ? "none"
+                                : "1px solid oklch(0.85 0.013 95)",
+                            }}
+                          />
+                          <span
+                            style={{
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {p.name}
+                          </span>
                         </span>
                         <span
                           style={{
                             fontSize: 11,
-                            color: active
+                            color: isPrimary
                               ? "oklch(0.85 0.02 150)"
                               : "oklch(0.55 0.02 150)",
                             fontFamily:
@@ -247,14 +396,14 @@ export default function Page() {
               </ul>
             </aside>
             <div className="ts-content">
-              {loadingProfile ? (
+              {loadingProfile && profiles.length === 0 ? (
                 <p>Loading profile…</p>
-              ) : profileError ? (
+              ) : profileError && profiles.length === 0 ? (
                 <p style={{ color: "oklch(0.5 0.16 25)" }}>
                   Couldn&apos;t load: {profileError}
                 </p>
-              ) : profile ? (
-                <ProfileVisuals profile={profile} />
+              ) : profiles.length > 0 ? (
+                <ProfileVisuals profiles={profiles} />
               ) : (
                 <p style={{ color: "oklch(0.55 0.02 150)" }}>
                   Pick a player.
