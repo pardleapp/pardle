@@ -167,9 +167,10 @@ async function familyFor(tournamentId: string): Promise<FamilyDef | null> {
 // ── Endpoint ────────────────────────────────────────────────────────
 
 function cacheKey(tournamentId: string): string {
-  // v2 — familyFor now matches historical ids, so the pre-fix cached
-  // "1 season only" payloads must not be re-served.
-  return `feed:pin-birdies:v2:${tournamentId}`;
+  // v3 — parseCoursePinsPayload now honours the raw x/y when
+  // enhancedX/Y is the -1 sentinel, so pre-v3 aggregations that
+  // silently dropped 2023 pins must not be re-served.
+  return `feed:pin-birdies:v3:${tournamentId}`;
 }
 
 export async function GET(req: Request) {
@@ -194,6 +195,7 @@ export async function GET(req: Request) {
     }
   }
 
+  const refreshPins = url.searchParams.get("refreshPins") === "1";
   const family = await familyFor(tournamentId);
 
   // Build the list of events we'll aggregate. Order matters — earlier
@@ -220,11 +222,16 @@ export async function GET(req: Request) {
   for (const ev of eventsToLoad) {
     // Pins — hit the shared cache from /api/course-pins first so we
     // aren't paying orchestrator twice for a hot tournament.
+    // refreshPins=1 bypasses the read to force a fresh orchestrator
+    // fetch (used when the cached payload was populated by a buggy
+    // parser and needs to be replaced).
     let pins: CoursePinSheet | null = null;
-    try {
-      pins = await redis.get<CoursePinSheet>(`feed:pins:${ev.tournamentId}`);
-    } catch {
-      /* cache miss */
+    if (!refreshPins) {
+      try {
+        pins = await redis.get<CoursePinSheet>(`feed:pins:${ev.tournamentId}`);
+      } catch {
+        /* cache miss */
+      }
     }
     if (!pins) {
       try {

@@ -701,8 +701,19 @@ function parseCoursePinsPayload(
       const holeNum = hs.courseHoleNum;
       if (typeof holeNum !== "number") continue;
       const coords = hs.pinGreen?.leftToRightCoords;
-      const x = coords?.enhancedX ?? coords?.x;
-      const y = coords?.enhancedY ?? coords?.y;
+      // Older seasons (e.g. 2023) return enhancedX/Y as the sentinel
+      // `-1` when the enhanced tracer wasn't populated, but the raw
+      // x/y is still valid. `??` would happily return -1 and the
+      // later `x >= 0` guard would drop the pin — so treat -1 as
+      // "not populated" and fall back to raw explicitly.
+      const enhX = coords?.enhancedX;
+      const enhY = coords?.enhancedY;
+      const rawX = coords?.x;
+      const rawY = coords?.y;
+      const x =
+        typeof enhX === "number" && enhX >= 0 ? enhX : rawX;
+      const y =
+        typeof enhY === "number" && enhY >= 0 ? enhY : rawY;
       const img = hs.holePickle?.greenLeftToRight ?? "";
       const parNum =
         typeof hs.parValue === "string" && hs.parValue
@@ -809,8 +820,19 @@ export async function getCoursePins(
       const holeNum = hs.courseHoleNum;
       if (typeof holeNum !== "number") continue;
       const coords = hs.pinGreen?.leftToRightCoords;
-      const x = coords?.enhancedX ?? coords?.x;
-      const y = coords?.enhancedY ?? coords?.y;
+      // Older seasons (e.g. 2023) return enhancedX/Y as the sentinel
+      // `-1` when the enhanced tracer wasn't populated, but the raw
+      // x/y is still valid. `??` would happily return -1 and the
+      // later `x >= 0` guard would drop the pin — so treat -1 as
+      // "not populated" and fall back to raw explicitly.
+      const enhX = coords?.enhancedX;
+      const enhY = coords?.enhancedY;
+      const rawX = coords?.x;
+      const rawY = coords?.y;
+      const x =
+        typeof enhX === "number" && enhX >= 0 ? enhX : rawX;
+      const y =
+        typeof enhY === "number" && enhY >= 0 ? enhY : rawY;
       const img = hs.holePickle?.greenLeftToRight ?? "";
       // parValue is a String on this type — parse it to number.
       const parNum =
