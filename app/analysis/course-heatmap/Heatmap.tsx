@@ -39,11 +39,11 @@ interface Props {
 
 /** Threshold for the pin-variance flag — ABSOLUTE percentage-point
  *  gap between a single cluster's birdie rate and the mean of all
- *  clusters on the hole. 0.2 = ±20 percentage points; a hole
- *  averaging 30% birdie fires when a cluster is above 50% or below
- *  10%. Absolute (not relative) so the number reads the same way
- *  you'd say it out loud: "20% higher than the average". */
-const PIN_VARIANCE_THRESHOLD = 0.2;
+ *  clusters on the hole. 0.1 = ±10 percentage points; a hole
+ *  averaging 30% birdie fires when a cluster is above 40% or below
+ *  20%. Absolute (not relative) so the number reads the same way
+ *  you'd say it out loud: "10% higher than the average". */
+const PIN_VARIANCE_THRESHOLD = 0.1;
 
 /** Threshold for the tee-movement flag — max-minus-min yardage across
  *  the played rounds, in yards. 30 yd is Tom's calibration: a
@@ -446,7 +446,7 @@ export default function Heatmap({
                   "Cluster spread — biggest gap between any pin " +
                   "cluster's birdie-or-better rate and the mean of all " +
                   "clusters on the hole (across every stored season). " +
-                  "Fires when the gap is more than ±20 percentage points."
+                  "Fires when the gap is more than ±10 percentage points."
                 }
               >
                 PIN Δ
