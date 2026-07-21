@@ -101,7 +101,7 @@ export default function Page() {
   }, [players, query]);
 
   return (
-    <main className="container container-wide v4-theme pv-theme">
+    <main className="container container-wide v4-theme pv-theme analysis-tee-shots-shell">
       <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
         <div className="brand-nav">

@@ -21356,6 +21356,18 @@ html.pv-theme-body .auth-chip-btn {
       minmax(560px, 1fr)
       clamp(320px, 24vw, 400px);
   }
+  /* /analysis/tee-shots is a data-dense two-pane page (player
+     picker + profile / trajectory / cloud / similar list). The
+     default shell caps the middle track at ~580px which leaves the
+     picker and the right pane both squeezed. Bump the middle to
+     ~60vw and slim both rails so the surface reads at the size the
+     visualisations were designed for. */
+  body:has(main.analysis-tee-shots-shell) .desktop-shell {
+    grid-template-columns:
+      clamp(180px, 14vw, 220px)
+      minmax(620px, 60vw)
+      clamp(280px, 20vw, 360px);
+  }
   /* Strip the page's mobile horizontal padding — the column itself
      is the gutter on desktop. */
   .bets-pv {
