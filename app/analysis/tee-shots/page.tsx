@@ -110,9 +110,10 @@ export default function Page() {
       </header>
       <section
         style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          padding: "20px 16px 60px",
+          // No maxWidth — fill the shell's middle grid track edge-to-edge.
+          // Padding is a small proportional gutter so the content
+          // sits ~24-32px inside the nav rail with no dead band.
+          padding: "20px 4px 60px",
           fontFamily:
             "var(--font-archivo), 'Archivo', system-ui, -apple-system, sans-serif",
           color: "oklch(0.2 0.02 150)",
