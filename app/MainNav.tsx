@@ -12,11 +12,11 @@ import Link from "next/link";
 export type MainNavTab =
   | "live"
   | "bets"
-  | "leaderboard"
   | "course"
   | "sharp"
   | "games"
   | "analysis"
+  | "commentary"
   /** Page is not itself one of the nav tabs (e.g. tipster channel,
    *  bet detail) but still wants the nav visible so visitors can
    *  navigate to other surfaces. No tab is highlighted. */
@@ -29,10 +29,10 @@ export type MainNavTab =
 const TABS: Array<{ key: MainNavTab; href: string; label: string }> = [
   { key: "live", href: "/", label: "Feed" },
   { key: "bets", href: "/bets", label: "Bets" },
-  { key: "leaderboard", href: "/leaderboard", label: "Leaderboard" },
   { key: "sharp", href: "/sharp", label: "Sharp" },
   { key: "games", href: "/games", label: "Games" },
   { key: "analysis", href: "/analysis", label: "Analysis" },
+  { key: "commentary", href: "/commentary", label: "Commentary" },
 ];
 
 export default function MainNav({ active }: { active: MainNavTab }) {

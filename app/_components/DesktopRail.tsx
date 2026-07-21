@@ -5,9 +5,9 @@
  * (min-width: 1024px). The mobile bottom-nav is unchanged and stays
  * the primary nav under 1024px; this rail is the desktop replacement.
  *
- * Same 5 primary destinations as BottomNav (Sweats / My bets /
- * Leaders / Groups / Sharp) plus a secondary block for Games and
- * Notifications. Visibility is purely CSS-driven via
+ * Same primary destinations as BottomNav (Sweats / My bets /
+ * Commentary / Groups / Sharp) plus a secondary block for Games,
+ * Analysis and Notifications. Visibility is purely CSS-driven via
  * `.desktop-rail { display: none }` outside the desktop media query
  * — the React tree is still rendered on every breakpoint, but it
  * doesn't paint on mobile.
@@ -52,15 +52,13 @@ const PRIMARY: Item[] = [
     ),
   },
   {
-    href: "/leaderboard",
-    label: "Leaders",
-    matches: ["/leaderboard"],
+    href: "/commentary",
+    label: "Commentary",
+    matches: ["/commentary"],
     iconPath: (
       <>
-        <path d="M4 20h16" />
-        <rect x="6" y="11" width="3.4" height="7" />
-        <rect x="14.6" y="7" width="3.4" height="11" />
-        <rect x="10.3" y="13" width="3.4" height="5" />
+        <path d="M4 6h11l4 4v9a1 1 0 0 1-1 1H4z" />
+        <path d="M7 11h9M7 15h6" />
       </>
     ),
   },

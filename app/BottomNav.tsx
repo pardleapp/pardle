@@ -1,10 +1,12 @@
 "use client";
 
 /**
- * BottomNav — fixed-position mobile nav strip with 5 tabs matching
- * the design-handoff prototype: Sweats / My bets / Leaders / Groups
- * / Sharp. Hidden on desktop (>=768px) via CSS; the existing top
- * MainNav handles desktop routing.
+ * BottomNav — fixed-position mobile nav strip. Tabs (as of the
+ * Commentary launch): Sweats / My bets / Commentary / Groups / Sharp
+ * / Analysis. Leaders was retired — the /leaderboard route still
+ * exists for old bookmarks but is no longer promoted. Hidden on
+ * desktop (>=768px) via CSS; the existing top MainNav handles
+ * desktop routing.
  *
  * Groups doesn't exist yet (handoff build order step 4) — its tab
  * routes to /groups which renders a coming-soon page.
@@ -48,15 +50,13 @@ const TABS: Tab[] = [
     ),
   },
   {
-    href: "/leaderboard",
-    label: "Leaders",
-    matches: ["/leaderboard"],
+    href: "/commentary",
+    label: "Commentary",
+    matches: ["/commentary"],
     iconPath: (
       <>
-        <path d="M4 20h16" />
-        <rect x="6" y="11" width="3.4" height="7" />
-        <rect x="14.6" y="7" width="3.4" height="11" />
-        <rect x="10.3" y="13" width="3.4" height="5" />
+        <path d="M4 6h11l4 4v9a1 1 0 0 1-1 1H4z" />
+        <path d="M7 11h9M7 15h6" />
       </>
     ),
   },

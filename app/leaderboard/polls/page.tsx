@@ -104,7 +104,7 @@ export default function PollsLeaderboardPage() {
       <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
         <div className="brand-nav">
-          <MainNav active="leaderboard" />
+          <MainNav active="none" />
           <AuthChip />
         </div>
       </header>
