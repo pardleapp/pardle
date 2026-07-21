@@ -133,7 +133,21 @@ export default function PinSheetModal({
     return map;
   }, [puttsForHole]);
 
-  const diagramImageUrl = puttsGreenImageUrl || hole?.greenImageUrl || "";
+  // Fall back to the birdie-history image when the current
+  // tournament's pin sheet has no diagram of its own (e.g. 2023
+  // 3M Open — PGA Tour's older payloads don't include the enhanced
+  // hole-pickle asset). The birdie-history image is pulled from a
+  // more recent year of the same course, so the greens shape reads
+  // the same even if this year's pin dots can't be plotted on it.
+  const diagramImageUrl =
+    puttsGreenImageUrl ||
+    hole?.greenImageUrl ||
+    birdieHistory?.greenImageUrl ||
+    "";
+  const usingHistoryFallbackImage =
+    !puttsGreenImageUrl &&
+    !hole?.greenImageUrl &&
+    Boolean(birdieHistory?.greenImageUrl);
   const roundsWithPin = Object.keys(hole.pinByRound)
     .map((k) => Number(k))
     .filter((r) => Number.isFinite(r))
@@ -1143,6 +1157,25 @@ export default function PinSheetModal({
           </div>
         )}
 
+        {usingHistoryFallbackImage && !showHistory && (
+          <p
+            style={{
+              marginTop: 10,
+              fontSize: 11,
+              color: "oklch(0.55 0.02 150)",
+              textAlign: "center",
+              padding: "8px 12px",
+              border: "1px dashed oklch(0.88 0.013 95)",
+              borderRadius: 8,
+              background: "oklch(0.99 0.005 95)",
+            }}
+          >
+            This year&apos;s pin sheet uses an older coordinate frame that
+            doesn&apos;t overlay on the green diagram — hit{" "}
+            <strong>Show all seasons</strong> above for the multi-season
+            history that does.
+          </p>
+        )}
         <p
           style={{
             marginTop: 14,

@@ -167,10 +167,13 @@ async function familyFor(tournamentId: string): Promise<FamilyDef | null> {
 // ── Endpoint ────────────────────────────────────────────────────────
 
 function cacheKey(tournamentId: string): string {
-  // v3 — parseCoursePinsPayload now honours the raw x/y when
-  // enhancedX/Y is the -1 sentinel, so pre-v3 aggregations that
-  // silently dropped 2023 pins must not be re-served.
-  return `feed:pin-birdies:v3:${tournamentId}`;
+  // v4 — reverted the raw fallback in parseCoursePinsPayload (raw
+  // x/y is in a different reference frame per hole than enhanced
+  // x/y, so a raw pin plotted on the enhanced-frame image landed in
+  // the wrong place, and quadrant classifications differed across
+  // years). 2023 pins are dropped again; v3 aggregations that
+  // included them must not be re-served.
+  return `feed:pin-birdies:v4:${tournamentId}`;
 }
 
 export async function GET(req: Request) {

@@ -701,19 +701,18 @@ function parseCoursePinsPayload(
       const holeNum = hs.courseHoleNum;
       if (typeof holeNum !== "number") continue;
       const coords = hs.pinGreen?.leftToRightCoords;
-      // Older seasons (e.g. 2023) return enhancedX/Y as the sentinel
-      // `-1` when the enhanced tracer wasn't populated, but the raw
-      // x/y is still valid. `??` would happily return -1 and the
-      // later `x >= 0` guard would drop the pin — so treat -1 as
-      // "not populated" and fall back to raw explicitly.
+      // Only use the enhanced tracer coords — the raw x/y is in a
+      // DIFFERENT reference frame per hole (comparing raw vs
+      // enhanced for a modern season shows offsets of 0.05-0.25 in
+      // both axes, so a raw pin plotted on the enhanced-frame green
+      // image lands in the wrong place). Older seasons that only
+      // populate raw (e.g. 2023) get their pins dropped here — the
+      // scoring still flows through the birdies endpoint but there's
+      // no safe way to overlay the pin dots on the same image.
       const enhX = coords?.enhancedX;
       const enhY = coords?.enhancedY;
-      const rawX = coords?.x;
-      const rawY = coords?.y;
-      const x =
-        typeof enhX === "number" && enhX >= 0 ? enhX : rawX;
-      const y =
-        typeof enhY === "number" && enhY >= 0 ? enhY : rawY;
+      const x = typeof enhX === "number" ? enhX : undefined;
+      const y = typeof enhY === "number" ? enhY : undefined;
       const img = hs.holePickle?.greenLeftToRight ?? "";
       const parNum =
         typeof hs.parValue === "string" && hs.parValue
@@ -820,19 +819,18 @@ export async function getCoursePins(
       const holeNum = hs.courseHoleNum;
       if (typeof holeNum !== "number") continue;
       const coords = hs.pinGreen?.leftToRightCoords;
-      // Older seasons (e.g. 2023) return enhancedX/Y as the sentinel
-      // `-1` when the enhanced tracer wasn't populated, but the raw
-      // x/y is still valid. `??` would happily return -1 and the
-      // later `x >= 0` guard would drop the pin — so treat -1 as
-      // "not populated" and fall back to raw explicitly.
+      // Only use the enhanced tracer coords — the raw x/y is in a
+      // DIFFERENT reference frame per hole (comparing raw vs
+      // enhanced for a modern season shows offsets of 0.05-0.25 in
+      // both axes, so a raw pin plotted on the enhanced-frame green
+      // image lands in the wrong place). Older seasons that only
+      // populate raw (e.g. 2023) get their pins dropped here — the
+      // scoring still flows through the birdies endpoint but there's
+      // no safe way to overlay the pin dots on the same image.
       const enhX = coords?.enhancedX;
       const enhY = coords?.enhancedY;
-      const rawX = coords?.x;
-      const rawY = coords?.y;
-      const x =
-        typeof enhX === "number" && enhX >= 0 ? enhX : rawX;
-      const y =
-        typeof enhY === "number" && enhY >= 0 ? enhY : rawY;
+      const x = typeof enhX === "number" ? enhX : undefined;
+      const y = typeof enhY === "number" ? enhY : undefined;
       const img = hs.holePickle?.greenLeftToRight ?? "";
       // parValue is a String on this type — parse it to number.
       const parNum =
