@@ -21346,6 +21346,21 @@ html.pv-theme-body .auth-chip-btn {
   flex-direction: column;
   gap: 8px;
 }
+
+/* /analysis/tee-shots picker list base styling — always on so
+   mobile keeps the bordered scroll-list. Desktop overrides
+   max-height inside the @media (min-width: 1024px) block. */
+.ts-picker-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid oklch(0.9 0.008 95);
+  border-radius: 8px;
+  background: white;
+}
+
 @media (min-width: 1024px) {
   /* Widen the /bets middle column at the expense of the right rail
      — the bets surface is a dashboard, the rail-as-is-elsewhere
@@ -21415,23 +21430,7 @@ html.pv-theme-body .auth-chip-btn {
   .ts-area-ballflight { grid-area: ballflight; }
   .ts-area-similar { grid-area: similar; }
   .ts-area-scatter { grid-area: scatter; }
-}
 
-@media (max-width: 1023.98px) {
-  /* Mobile: keep the picker list capped to prevent it eating the
-     whole viewport before the profile card renders, but keep the
-     natural stack — no grid, no sticky. */
-  .ts-picker-list {
-    list-style: none;
-    padding: 0;
-    margin: 8px 0 0;
-    max-height: 400px;
-    overflow-y: auto;
-    border: 1px solid oklch(0.9 0.008 95);
-    border-radius: 8px;
-    background: white;
-  }
-}
   /* Strip the page's mobile horizontal padding — the column itself
      is the gutter on desktop. */
   .bets-pv {
