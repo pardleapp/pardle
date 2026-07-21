@@ -113,10 +113,12 @@ export default function Page() {
   const filtered = useMemo(() => {
     if (!players) return [];
     const q = query.trim().toLowerCase();
-    if (!q) return players.slice(0, 60);
-    return players
-      .filter((p) => p.name.toLowerCase().includes(q))
-      .slice(0, 60);
+    // Default view: every player with a big-enough sample to trust
+    // their radar profile. Search view: broader — any match, even
+    // low-sample players, because the user has typed a name.
+    const MIN_SHOTS = 100;
+    if (!q) return players.filter((p) => p.shotCount >= MIN_SHOTS);
+    return players.filter((p) => p.name.toLowerCase().includes(q));
   }, [players, query]);
 
   const onPickPlayer = useCallback(

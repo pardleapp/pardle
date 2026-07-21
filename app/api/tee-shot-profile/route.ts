@@ -29,7 +29,11 @@ export async function GET(req: Request) {
   const wantsIndex = !playerId;
 
   if (wantsIndex) {
-    const ranked = await listRankedPlayers(300);
+    // Bumped to 1000 so the picker returns every backfilled player,
+    // not just the top-300 by shot count. The client filters to
+    // ≥100 shots for its default view but still needs the full list
+    // for name-search matches.
+    const ranked = await listRankedPlayers(1000);
     const withNames = await Promise.all(
       ranked.map(async (r) => ({
         ...r,
