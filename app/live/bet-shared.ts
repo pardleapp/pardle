@@ -141,11 +141,38 @@ export interface TopFinishBet extends BetSettlementFields {
   placedAt: number;
 }
 
+/**
+ * "Winner without X" market. Common when there's a heavy favourite:
+ * the market ignores X (and X's outcome) entirely and pays whoever
+ * has the lowest total among the REMAINING players. If X wins the
+ * tournament outright and Y finishes 2nd (solo), a Y backer in the
+ * "without X" market wins. If Y and Z tie for lowest score without
+ * X, both are winning backers (dead-heat).
+ *
+ * Excluded player is captured at placement; edits after placement
+ * would break the market semantics. Validation at bet-post enforces
+ * playerId !== withoutPlayerId.
+ */
+export interface WithoutBet extends BetSettlementFields {
+  id: string;
+  kind: "without";
+  playerId: string;
+  playerName: string;
+  /** The excluded ("without") player. */
+  withoutPlayerId: string;
+  withoutPlayerName: string;
+  oddsTaken: number;
+  oddsTakenLabel: string;
+  stake: number;
+  placedAt: number;
+}
+
 export type TrackedBet =
   | OutrightBet
   | RoundScoreBet
   | WinningScoreBet
-  | TopFinishBet;
+  | TopFinishBet
+  | WithoutBet;
 
 export interface TournamentProjection {
   /** Model-expected final 4-round total strokes. */
@@ -854,6 +881,10 @@ export interface PlayerForSettlement {
   position: string;
   thru: string;
   playerState?: string;
+  /** Score to par as a string ("−16", "-16", "+2", "E"). Optional
+   *  only for back-compat with older callers; "winner without X"
+   *  settlement needs it to compare non-X totals. */
+  total?: string;
 }
 
 const INACTIVE_LEADERBOARD_STATES = new Set([
@@ -1005,6 +1036,66 @@ export function topFinishSettlement(
 }
 
 /**
+ * Parse a leaderboard "total" string ("-16", "+2", "E", or the
+ * Unicode minus "−") to a numeric score-to-par. Returns null for
+ * anything unparseable (CUT, WD, empty).
+ */
+export function parseLeaderboardTotal(s: string | null | undefined): number | null {
+  if (!s) return null;
+  const trimmed = s.trim();
+  if (trimmed === "" || trimmed === "-" || trimmed === "—") return null;
+  if (trimmed === "E" || trimmed === "e") return 0;
+  // Normalise Unicode minus U+2212 → hyphen so parseFloat sees a
+  // signed number. Same normaliser used everywhere else that reads
+  // orchestrator "total" strings.
+  const cleaned = trimmed.replace(/−/g, "-").replace(/[+]/, "");
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * "Winner without X" settlement — the bet on Y wins iff Y has the
+ * lowest total score among every player EXCEPT the excluded X. Ties
+ * for lowest count as won (dead-heat) for any player at that total.
+ *
+ * X's own outcome is completely ignored: X can win the tournament,
+ * miss the cut, WD — irrelevant. The grading is strictly among the
+ * remaining players.
+ *
+ * Gates on the same isLeaderboardFinal check as outright so we don't
+ * settle mid-tournament.
+ */
+export function withoutSettlement(
+  bet: WithoutBet,
+  players: PlayerForSettlement[],
+  playerRoundStates: Record<string, PlayerRoundState>,
+): { won: boolean } | null {
+  if (!isLeaderboardFinal(players, playerRoundStates)) return null;
+  // Filter to players eligible for the "without" grading:
+  //   - not the excluded player X
+  //   - not inactive (CUT/WD/MC/DQ/DNS/WITHDRAWN) — a missed-cut
+  //     player can't be the "winner without X"
+  //   - has a parseable total (excludes stray rows without a score)
+  type Candidate = { playerId: string; total: number };
+  const candidates: Candidate[] = [];
+  for (const p of players) {
+    if (p.playerId === bet.withoutPlayerId) continue;
+    if (p.playerState && INACTIVE_LEADERBOARD_STATES.has(p.playerState)) continue;
+    if (p.thru === "—" || p.thru === "-") continue;
+    const total = parseLeaderboardTotal(p.total);
+    if (total == null) continue;
+    candidates.push({ playerId: p.playerId, total });
+  }
+  if (candidates.length === 0) return { won: false };
+  let minTotal = Infinity;
+  for (const c of candidates) if (c.total < minTotal) minTotal = c.total;
+  const winnerIds = new Set(
+    candidates.filter((c) => c.total === minTotal).map((c) => c.playerId),
+  );
+  return { won: winnerIds.has(bet.playerId) };
+}
+
+/**
  * Winning-score bet settlement — once the tournament's settled we
  * read the winner's actual final stroke total from the projection
  * (variance collapses to 0 when all 4 rounds are in, so mean = the
@@ -1064,6 +1155,9 @@ export function detectBetSettlement(
       tournamentProjections,
     );
     return r ? { won: r.won } : null;
+  }
+  if (bet.kind === "without") {
+    return withoutSettlement(bet, players, playerRoundStates);
   }
   return null;
 }
@@ -1200,7 +1294,8 @@ export function currentValueForBet(
     if (
       b.kind === "outright" ||
       b.kind === "top-finish" ||
-      b.kind === "winning-score"
+      b.kind === "winning-score" ||
+      b.kind === "without"
     ) {
       return settled.won ? b.stake * b.oddsTaken : 0;
     }
@@ -1209,6 +1304,24 @@ export function currentValueForBet(
     const fair = currentOdds[resolvedPid || b.playerId];
     if (!Number.isFinite(fair) || fair <= 1) return null;
     return b.stake * (b.oddsTaken / fair);
+  }
+  if (b.kind === "without") {
+    // Approximate live pricing: P(Y wins without X) ≈ P(Y wins) /
+    // (1 − P(X wins)) — the conditional prob that Y wins given X
+    // doesn't. Undercounts the case where X wins and Y is 2nd (still
+    // a "without X" win) so the true value is a bit higher, but the
+    // approximation is closer than pretending "without" behaves like
+    // outright. Falls back to the odds-at-placement line if either
+    // player's market is thin. Settlement is exact regardless.
+    const yFair = currentOdds[resolvedPid || b.playerId];
+    const xFair = currentOdds[b.withoutPlayerId];
+    if (!Number.isFinite(yFair) || yFair <= 1) return null;
+    const py = 1 / yFair;
+    const px =
+      Number.isFinite(xFair) && xFair > 1 ? 1 / xFair : 0;
+    if (px >= 1) return null; // X has 100% implied — nonsense
+    const conditional = py / (1 - px);
+    return b.stake * b.oddsTaken * conditional;
   }
   if (b.kind === "top-finish") {
     const prob = probForCutoff(
@@ -1706,6 +1819,28 @@ export function reconstructHistory(
             : last?.prob;
         series.push({ t: chartNow, v: nowValue, prob: nowProb });
       }
+    }
+    return trimTrailingFlat(series);
+  }
+
+  if (bet.kind === "without") {
+    // v1 chart: anchor the placement value and (if we have a current
+    // value) the "now" point. We don't yet track "without X" fair
+    // odds trajectory over time — the market is derived, not stored
+    // — so the chart reads as a flat line at placement odds until
+    // settlement.
+    series.push({
+      t: bet.placedAt,
+      v: bet.stake,
+      prob: 1 / bet.oddsTaken,
+    });
+    if (nowValue != null) {
+      const maxPayout = bet.stake * bet.oddsTaken;
+      const nowProb =
+        maxPayout > 0
+          ? Math.max(0, Math.min(1, nowValue / maxPayout))
+          : 1 / bet.oddsTaken;
+      series.push({ t: chartNow, v: nowValue, prob: nowProb });
     }
     return trimTrailingFlat(series);
   }

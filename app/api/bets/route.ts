@@ -21,6 +21,7 @@ const VALID_KINDS = new Set([
   "round-score",
   "winning-score",
   "top-finish",
+  "without",
 ]);
 const VALID_SIDES = new Set(["under", "over"]);
 const VALID_TOP_CUTOFFS = new Set([5, 10, 20]);
@@ -68,12 +69,30 @@ function validateBet(bet: Record<string, unknown>): string | null {
     return "bad-currency";
   }
 
-  if (kind === "outright" || kind === "round-score" || kind === "top-finish") {
+  if (
+    kind === "outright" ||
+    kind === "round-score" ||
+    kind === "top-finish" ||
+    kind === "without"
+  ) {
     const playerId = bet.playerId;
     if (typeof playerId !== "string" || !PLAYER_ID_RE.test(playerId)) {
       return "bad-playerId";
     }
     if (!isOptString(bet.playerName, 80)) return "bad-playerName";
+  }
+  if (kind === "without") {
+    const withoutPlayerId = bet.withoutPlayerId;
+    if (
+      typeof withoutPlayerId !== "string" ||
+      !PLAYER_ID_RE.test(withoutPlayerId)
+    ) {
+      return "bad-withoutPlayerId";
+    }
+    if (!isOptString(bet.withoutPlayerName, 80)) return "bad-withoutPlayerName";
+    // The market breaks semantically if the bet is on the excluded
+    // player — this is either a UI bug or a hand-crafted bad request.
+    if (bet.playerId === withoutPlayerId) return "same-player-without";
   }
   if (kind === "round-score") {
     if (

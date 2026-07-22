@@ -181,6 +181,8 @@ export default function SharedBetView({ bet, ownerName }: Props) {
       ? `Winning score · ${bet.side} ${bet.line}`
       : bet.kind === "top-finish"
       ? `Top ${bet.cutoff} finish`
+      : bet.kind === "without"
+      ? `Winner without ${bet.withoutPlayerName}`
       : `Round-score · ${bet.side} ${bet.line}${
           bet.round != null ? ` · R${bet.round}` : ""
         }`;
@@ -188,9 +190,12 @@ export default function SharedBetView({ bet, ownerName }: Props) {
   const subject =
     bet.kind === "winning-score"
       ? "Tournament total"
-      : bet.kind === "outright" || bet.kind === "round-score" || bet.kind === "top-finish"
-      ? bet.playerName
-      : "—";
+      : bet.kind === "outright" ||
+          bet.kind === "round-score" ||
+          bet.kind === "top-finish" ||
+          bet.kind === "without"
+        ? bet.playerName
+        : "—";
 
   return (
     <section className="bd-wrap">

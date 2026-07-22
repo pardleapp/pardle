@@ -106,6 +106,9 @@ function marketLabel(bet: TrackedBet): string {
     const round = bet.round != null ? ` · R${bet.round}` : "";
     return `${bet.side.toUpperCase()} ${bet.line}${round}`;
   }
+  if (bet.kind === "without") {
+    return `WITHOUT ${bet.withoutPlayerName.toUpperCase()}`;
+  }
   return `${bet.side.toUpperCase()} ${bet.line} · TOT`;
 }
 

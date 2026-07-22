@@ -36,7 +36,9 @@ import type {
   TopFinishBet,
   TrackedBet,
   WinningScoreBet,
+  WithoutBet,
 } from "@/app/live/bet-shared";
+import { parseLeaderboardTotal } from "@/app/live/bet-shared";
 import type { HistoricalSettleResult } from "./historical-settlement";
 
 const redis = Redis.fromEnv();
@@ -223,6 +225,35 @@ export async function settleBetFromOrchestrator(
       return { settled: true, won, reason: "orch:winning-score" };
     }
     return { settled: false, reason: "orch:winner-scorecard-unavailable" };
+  }
+
+  if (bet.kind === "without") {
+    const b = bet as WithoutBet;
+    // Filter the leaderboard down to the "without" candidate pool:
+    // no X, no cut/WD, has a parseable total. Then find min total.
+    type Candidate = { playerId: string; total: number };
+    const candidates: Candidate[] = [];
+    for (const r of leaderboard) {
+      if (r.playerId === b.withoutPlayerId) continue;
+      if (TERMINAL_STATES.has(r.playerState) && r.playerState !== "COMPLETE" && r.playerState !== "FINISHED") continue;
+      if (r.thru === "-" || r.thru === "—") continue;
+      const total = parseLeaderboardTotal(r.total);
+      if (total == null) continue;
+      candidates.push({ playerId: r.playerId, total });
+    }
+    if (candidates.length === 0) {
+      return { settled: false, reason: "orch:without-no-candidates" };
+    }
+    let min = Infinity;
+    for (const c of candidates) if (c.total < min) min = c.total;
+    const winners = new Set(
+      candidates.filter((c) => c.total === min).map((c) => c.playerId),
+    );
+    return {
+      settled: true,
+      won: winners.has(b.playerId),
+      reason: "orch:without",
+    };
   }
 
   if (bet.kind === "round-score") {

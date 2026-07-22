@@ -40,6 +40,7 @@ import type {
   TopFinishBet,
   TrackedBet,
   WinningScoreBet,
+  WithoutBet,
 } from "@/app/live/bet-shared";
 
 function normaliseName(s: string): string {
@@ -238,6 +239,36 @@ async function settleBetFromDataGolf(
     }
     const won = ws.side === "under" ? total < ws.line : total >= ws.line;
     return { settled: true, won };
+  }
+
+  if (bet.kind === "without") {
+    const wb = bet as WithoutBet;
+    // DG doesn't have orchestrator playerIds — the excluded player X
+    // is identified by NAME in the DG rows. Find each row's numeric
+    // position and total strokes, then rank the non-X pool.
+    const targetNorm = normaliseName(wb.playerName);
+    const excludedNorm = normaliseName(wb.withoutPlayerName);
+    type Candidate = { normName: string; total: number };
+    const candidates: Candidate[] = [];
+    for (const r of rows) {
+      const norm = normaliseName(flipName(r.player_name));
+      if (norm === excludedNorm) continue;
+      const finish = parseFinish(r.fin_text);
+      // parseFinish returns null for CUT/WD/MC — those don't qualify
+      if (finish == null) continue;
+      const total = totalStrokes(r);
+      if (total === 0) continue; // incomplete/missing rounds
+      candidates.push({ normName: norm, total });
+    }
+    if (candidates.length === 0) {
+      return { settled: false, reason: "dg:without-no-candidates" };
+    }
+    let min = Infinity;
+    for (const c of candidates) if (c.total < min) min = c.total;
+    const winners = new Set(
+      candidates.filter((c) => c.total === min).map((c) => c.normName),
+    );
+    return { settled: true, won: winners.has(targetNorm) };
   }
 
   return { settled: false, reason: "dg:unknown-bet-kind" };

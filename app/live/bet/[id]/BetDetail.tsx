@@ -135,6 +135,8 @@ function buildShareText(
       line = `${bet.playerName}${r} ${bet.side} ${bet.line} @ ${odds}`;
     } else if (bet.kind === "winning-score") {
       line = `winning score ${bet.side} ${bet.line} @ ${odds}`;
+    } else if (bet.kind === "without") {
+      line = `${bet.playerName} to win without ${bet.withoutPlayerName} @ ${odds}`;
     } else {
       line = `${bet.playerName} top ${bet.cutoff} @ ${odds}`;
     }
@@ -148,6 +150,8 @@ function buildShareText(
     line = `${stake} on ${bet.playerName}${r} ${bet.side} ${bet.line} @ ${odds}`;
   } else if (bet.kind === "winning-score") {
     line = `${stake} on the winning score ${bet.side} ${bet.line} @ ${odds}`;
+  } else if (bet.kind === "without") {
+    line = `${stake} on ${bet.playerName} to win without ${bet.withoutPlayerName} @ ${odds}`;
   } else {
     line = `${stake} on ${bet.playerName} top ${bet.cutoff} @ ${odds}`;
   }
@@ -805,6 +809,8 @@ export default function BetDetail({ betId }: { betId: string }) {
               ? `Winning score · ${bet.side} ${bet.line}`
               : bet.kind === "top-finish"
               ? `Top ${bet.cutoff} finish`
+              : bet.kind === "without"
+              ? `Winner without ${bet.withoutPlayerName}`
               : `Round-score · ${bet.side} ${bet.line}${
                   bet.round != null ? ` · R${bet.round}` : ""
                 }`}

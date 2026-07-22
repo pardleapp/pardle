@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   findOutrightWinner,
   detectBetSettlement,
+  withoutSettlement,
+  parseLeaderboardTotal,
   type PlayerForSettlement,
   type PlayerRoundState,
 } from "./bet-shared";
-import type { OutrightBet } from "./bet-shared";
+import type { OutrightBet, WithoutBet } from "./bet-shared";
 
 function rs(currentRound: number, holesRemaining: number): PlayerRoundState {
   return {
@@ -192,5 +194,146 @@ describe("findOutrightWinner — round-aware leaderboard finality", () => {
     ];
     const states = { fox: rs(4, 0) };
     expect(findOutrightWinner(players, states)).toBeNull();
+  });
+});
+
+describe("parseLeaderboardTotal", () => {
+  it("parses negative to-par", () => {
+    expect(parseLeaderboardTotal("-16")).toBe(-16);
+    expect(parseLeaderboardTotal("−16")).toBe(-16); // Unicode minus
+  });
+  it("parses positive to-par with + sign", () => {
+    expect(parseLeaderboardTotal("+2")).toBe(2);
+  });
+  it("parses even", () => {
+    expect(parseLeaderboardTotal("E")).toBe(0);
+    expect(parseLeaderboardTotal("e")).toBe(0);
+  });
+  it("returns null for placeholders / CUT / empty", () => {
+    expect(parseLeaderboardTotal("-")).toBeNull();
+    expect(parseLeaderboardTotal("—")).toBeNull();
+    expect(parseLeaderboardTotal("")).toBeNull();
+    expect(parseLeaderboardTotal(null)).toBeNull();
+    expect(parseLeaderboardTotal("CUT")).toBeNull();
+  });
+});
+
+describe("withoutSettlement — winner without X", () => {
+  const finalPlayers = (): PlayerForSettlement[] => [
+    // X (Scheffler) wins outright at -20
+    { playerId: "scheffler", position: "1", thru: "F", playerState: "COMPLETE", total: "-20" },
+    // Y solo 2nd at -16 — should be the "without X" winner
+    { playerId: "rory", position: "2", thru: "F", playerState: "COMPLETE", total: "-16" },
+    { playerId: "young", position: "T3", thru: "F", playerState: "COMPLETE", total: "-14" },
+    { playerId: "burns", position: "T3", thru: "F", playerState: "COMPLETE", total: "-14" },
+    // Cut / WD (skipped)
+    { playerId: "cutguy", position: "—", thru: "-", playerState: "COMPLETE", total: "+8" },
+    { playerId: "wdguy", position: "—", thru: "-", playerState: "WITHDRAWN" },
+  ];
+  const allR4Done = () => ({
+    scheffler: rs(4, 0),
+    rory: rs(4, 0),
+    young: rs(4, 0),
+    burns: rs(4, 0),
+  });
+  const mkBet = (playerId: string, withoutPlayerId: string): WithoutBet => ({
+    id: "b",
+    kind: "without",
+    playerId,
+    playerName: playerId,
+    withoutPlayerId,
+    withoutPlayerName: withoutPlayerId,
+    oddsTaken: 5,
+    oddsTakenLabel: "+400",
+    stake: 10,
+    placedAt: 0,
+    settledAt: null,
+    settledWon: null,
+  });
+
+  it("Y solo 2nd behind X wins the 'without X' bet", () => {
+    const players = finalPlayers();
+    const states = allR4Done();
+    const bet = mkBet("rory", "scheffler");
+    expect(withoutSettlement(bet, players, states)).toEqual({ won: true });
+    expect(detectBetSettlement(bet, players, states, {})).toEqual({ won: true });
+  });
+
+  it("Y outside the top of 'without X' pool loses", () => {
+    const players = finalPlayers();
+    const states = allR4Done();
+    const bet = mkBet("young", "scheffler"); // Young is T3 without X
+    expect(withoutSettlement(bet, players, states)).toEqual({ won: false });
+  });
+
+  it("dead-heat: two non-X players tied for lowest total both win", () => {
+    // Scheffler wins outright, Rory and Young tie at -18
+    const players: PlayerForSettlement[] = [
+      { playerId: "scheffler", position: "1", thru: "F", playerState: "COMPLETE", total: "-20" },
+      { playerId: "rory", position: "T2", thru: "F", playerState: "COMPLETE", total: "-18" },
+      { playerId: "young", position: "T2", thru: "F", playerState: "COMPLETE", total: "-18" },
+      { playerId: "burns", position: "4", thru: "F", playerState: "COMPLETE", total: "-15" },
+    ];
+    const states = { scheffler: rs(4, 0), rory: rs(4, 0), young: rs(4, 0), burns: rs(4, 0) };
+    expect(withoutSettlement(mkBet("rory", "scheffler"), players, states)).toEqual({
+      won: true,
+    });
+    expect(withoutSettlement(mkBet("young", "scheffler"), players, states)).toEqual({
+      won: true,
+    });
+    expect(withoutSettlement(mkBet("burns", "scheffler"), players, states)).toEqual({
+      won: false,
+    });
+  });
+
+  it("Y wins the tournament outright → still wins the 'without X' bet (X irrelevant)", () => {
+    // Rory wins, Scheffler is 2nd. Rory bet without Scheffler still wins.
+    const players: PlayerForSettlement[] = [
+      { playerId: "rory", position: "1", thru: "F", playerState: "COMPLETE", total: "-20" },
+      { playerId: "scheffler", position: "2", thru: "F", playerState: "COMPLETE", total: "-18" },
+      { playerId: "young", position: "3", thru: "F", playerState: "COMPLETE", total: "-15" },
+    ];
+    const states = { rory: rs(4, 0), scheffler: rs(4, 0), young: rs(4, 0) };
+    expect(withoutSettlement(mkBet("rory", "scheffler"), players, states)).toEqual({
+      won: true,
+    });
+  });
+
+  it("X missed the cut → market grades identically to a straight outright on Y", () => {
+    // Scheffler MC'd. Rory wins the tournament. Rory bet without Scheffler wins.
+    const players: PlayerForSettlement[] = [
+      { playerId: "rory", position: "1", thru: "F", playerState: "COMPLETE", total: "-18" },
+      { playerId: "young", position: "2", thru: "F", playerState: "COMPLETE", total: "-15" },
+      { playerId: "scheffler", position: "—", thru: "-", playerState: "MC", total: "+2" },
+    ];
+    const states = { rory: rs(4, 0), young: rs(4, 0) };
+    expect(withoutSettlement(mkBet("rory", "scheffler"), players, states)).toEqual({
+      won: true,
+    });
+    expect(withoutSettlement(mkBet("young", "scheffler"), players, states)).toEqual({
+      won: false,
+    });
+  });
+
+  it("Y missed the cut → loses regardless", () => {
+    const players: PlayerForSettlement[] = [
+      { playerId: "scheffler", position: "1", thru: "F", playerState: "COMPLETE", total: "-20" },
+      { playerId: "young", position: "2", thru: "F", playerState: "COMPLETE", total: "-16" },
+      { playerId: "rory", position: "—", thru: "-", playerState: "CUT" },
+    ];
+    const states = { scheffler: rs(4, 0), young: rs(4, 0) };
+    expect(withoutSettlement(mkBet("rory", "scheffler"), players, states)).toEqual({
+      won: false,
+    });
+  });
+
+  it("mid-tournament returns null (gated on isLeaderboardFinal)", () => {
+    // R4 in progress
+    const players: PlayerForSettlement[] = [
+      { playerId: "scheffler", position: "1", thru: "F", playerState: "ACTIVE", total: "-20" },
+      { playerId: "rory", position: "T2", thru: "13", playerState: "ACTIVE", total: "-14" },
+    ];
+    const states = { scheffler: rs(4, 0), rory: rs(4, 5) };
+    expect(withoutSettlement(mkBet("rory", "scheffler"), players, states)).toBeNull();
   });
 });

@@ -29,6 +29,7 @@ import {
   type TournamentProjection,
   type TrackedBet,
   type WinningScoreBet,
+  type WithoutBet,
 } from "./bet-shared";
 import { useAuth } from "./auth/useAuth";
 import { useToast } from "./Toast";
@@ -373,6 +374,19 @@ export default function BetTracker({
           key={b.id}
           bet={b}
           probs={topFinishCurrent?.[b.playerId]}
+          oddsFormat={oddsFormat}
+          settled={settledByBet.get(b.id) ?? null}
+          onRemove={() => removeBet(b.id)}
+          recentForm={recentForm}
+          handStatus={handStatus}
+        />
+      );
+    if (b.kind === "without")
+      return (
+        <WithoutRow
+          key={b.id}
+          bet={b}
+          currentOdds={currentOdds}
           oddsFormat={oddsFormat}
           settled={settledByBet.get(b.id) ?? null}
           onRemove={() => removeBet(b.id)}
@@ -749,6 +763,89 @@ function OutrightRow({
             ) : (
               haveFair && <> · now {formatOdds(fair, oddsFormat)}</>
             )}
+          </p>
+        </div>
+        <div className={`bets-row-value ${profitClass}`}>
+          {currentValue !== null ? (
+            <>
+              <strong>{formatBetCurrency(currentValue, bet.currency)}</strong>
+              <span>
+                {profit !== null && profit >= 0 ? "+" : ""}
+                {profit !== null ? formatBetCurrency(profit, bet.currency) : ""}
+              </span>
+            </>
+          ) : (
+            <span className="bets-row-pending">—</span>
+          )}
+        </div>
+      </Link>
+      <button
+        type="button"
+        className="bets-row-x bets-row-x-detached"
+        onClick={onRemove}
+        aria-label="Remove bet"
+        title="Remove this bet"
+      >
+        ✕
+      </button>
+    </li>
+  );
+}
+
+function WithoutRow({
+  bet,
+  currentOdds,
+  oddsFormat,
+  settled,
+  onRemove,
+  recentForm,
+  handStatus,
+}: {
+  bet: WithoutBet;
+  currentOdds: Record<string, number>;
+  oddsFormat: OddsFormat;
+  settled: { won: boolean } | null;
+  onRemove: () => void;
+  recentForm: Record<string, RecentFormEntry> | undefined;
+  handStatus: Record<string, "hot" | "cold"> | undefined;
+}) {
+  // Fair current value via the same conditional-outright approximation
+  // used in currentValueForBet: P(Y wins without X) ≈ P(Y) / (1 - P(X)).
+  const yFair = currentOdds[bet.playerId];
+  const xFair = currentOdds[bet.withoutPlayerId];
+  const haveModel = Number.isFinite(yFair) && yFair > 1;
+  const py = haveModel ? 1 / yFair : null;
+  const px = Number.isFinite(xFair) && xFair > 1 ? 1 / xFair : 0;
+  const currentValue = settled
+    ? settled.won
+      ? bet.stake * bet.oddsTaken
+      : 0
+    : py != null && px < 1
+      ? bet.stake * bet.oddsTaken * (py / (1 - px))
+      : null;
+  const profit = currentValue !== null ? currentValue - bet.stake : null;
+  const profitClass =
+    profit === null
+      ? ""
+      : profit > 0
+        ? "bets-profit-up"
+        : profit < 0
+          ? "bets-profit-down"
+          : "";
+  return (
+    <li className="bets-row-wrap">
+      <Link href={`/live/bet/${bet.id}`} className="bets-row bets-row-link">
+        <div className="bets-row-main">
+          <PlayerRowName
+            bet={bet}
+            recentForm={recentForm}
+            handStatus={handStatus}
+          />
+          <p className="bets-row-meta">
+            Win without {bet.withoutPlayerName} @{" "}
+            {formatOdds(bet.oddsTaken, oddsFormat)} ·{" "}
+            {formatBetCurrency(bet.stake, bet.currency)}
+            {settled && <> · {settled.won ? "won ✓" : "lost"}</>}
           </p>
         </div>
         <div className={`bets-row-value ${profitClass}`}>

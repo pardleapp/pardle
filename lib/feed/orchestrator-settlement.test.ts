@@ -8,6 +8,7 @@ import type {
   RoundScoreBet,
   TopFinishBet,
   WinningScoreBet,
+  WithoutBet,
 } from "@/app/live/bet-shared";
 
 // Mock Redis to a bump-and-return in-memory shim — the module reads
@@ -32,9 +33,10 @@ vi.mock("@upstash/redis", () => {
   };
 });
 
-const mockLb = vi.fn<[string], Promise<PGALeaderboardRow[]>>();
-const mockScorecards =
-  vi.fn<[string, string[]], Promise<Record<string, PGAScorecard>>>();
+const mockLb = vi.fn<(id: string) => Promise<PGALeaderboardRow[]>>();
+const mockScorecards = vi.fn<
+  (id: string, ids: string[]) => Promise<Record<string, PGAScorecard>>
+>();
 
 vi.mock("@/lib/golf-api/pgatour", () => ({
   getLeaderboard: (id: string) => mockLb(id),
@@ -283,7 +285,7 @@ describe("settleBetFromOrchestrator", () => {
       },
     });
     // Total is 18*4 = 72 per round × 4 = 288
-    const under: WinningScoreBet = baseBet({
+    const under: WinningScoreBet = baseBet<WinningScoreBet>({
       id: "b",
       kind: "winning-score",
       side: "under",
@@ -337,7 +339,7 @@ describe("settleBetFromOrchestrator", () => {
       },
     });
     // R1 total = 68
-    const under70: RoundScoreBet = baseBet({
+    const under70: RoundScoreBet = baseBet<RoundScoreBet>({
       id: "b1",
       kind: "round-score",
       playerId: "fox",
@@ -400,5 +402,109 @@ describe("settleBetFromOrchestrator", () => {
     const res = await settleBetFromOrchestrator(bet);
     expect(res.settled).toBe(false);
     expect(res.reason).toBe("orch:no-leaderboard");
+  });
+
+  it("settles 'without X' as won when Y has lowest total excluding X", async () => {
+    // Scheffler wins outright at -20; Rory 2nd at -16. Rory-without-Scheffler wins.
+    mockLb.mockResolvedValue([
+      lbRow({ playerId: "scheffler", position: "1", total: "-20" }),
+      lbRow({ playerId: "rory", position: "2", total: "-16" }),
+      lbRow({ playerId: "young", position: "T3", total: "-14" }),
+      lbRow({ playerId: "burns", position: "T3", total: "-14" }),
+      lbRow({ playerId: "cutguy", position: "T85", total: "+8", thru: "-", currentRound: 2 }),
+    ]);
+    const bet = baseBet<WithoutBet>({
+      id: "b",
+      kind: "without",
+      playerId: "rory",
+      playerName: "Rory McIlroy",
+      withoutPlayerId: "scheffler",
+      withoutPlayerName: "Scottie Scheffler",
+      oddsTaken: 5,
+      oddsTakenLabel: "+400",
+      stake: 10,
+      placedAt: 0,
+      settledAt: null,
+      settledWon: null,
+    });
+    expect(await settleBetFromOrchestrator(bet)).toEqual({
+      settled: true,
+      won: true,
+      reason: "orch:without",
+    });
+  });
+
+  it("settles 'without X' dead-heat correctly (both tied non-X players win)", async () => {
+    // Scheffler solo 1st; Rory + Young tie at -18
+    mockLb.mockResolvedValue([
+      lbRow({ playerId: "scheffler", position: "1", total: "-20" }),
+      lbRow({ playerId: "rory", position: "T2", total: "-18" }),
+      lbRow({ playerId: "young", position: "T2", total: "-18" }),
+    ]);
+    const rory = baseBet<WithoutBet>({
+      id: "b1",
+      kind: "without",
+      playerId: "rory",
+      playerName: "Rory",
+      withoutPlayerId: "scheffler",
+      withoutPlayerName: "Scheffler",
+      oddsTaken: 5,
+      oddsTakenLabel: "+400",
+      stake: 10,
+      placedAt: 0,
+      settledAt: null,
+      settledWon: null,
+    });
+    const young = { ...rory, id: "b2", playerId: "young" };
+    const scheffler = { ...rory, id: "b3", playerId: "scheffler" }; // absurd but should lose
+    expect((await settleBetFromOrchestrator(rory)).won).toBe(true);
+    expect((await settleBetFromOrchestrator(young)).won).toBe(true);
+    expect((await settleBetFromOrchestrator(scheffler)).won).toBe(false);
+  });
+
+  it("settles 'without X' when Y wins outright (X irrelevant)", async () => {
+    // Rory wins the tournament, Scheffler is 2nd. Rory-without-Scheffler still wins.
+    mockLb.mockResolvedValue([
+      lbRow({ playerId: "rory", position: "1", total: "-20" }),
+      lbRow({ playerId: "scheffler", position: "2", total: "-18" }),
+    ]);
+    const bet = baseBet<WithoutBet>({
+      id: "b",
+      kind: "without",
+      playerId: "rory",
+      playerName: "Rory",
+      withoutPlayerId: "scheffler",
+      withoutPlayerName: "Scheffler",
+      oddsTaken: 5,
+      oddsTakenLabel: "+400",
+      stake: 10,
+      placedAt: 0,
+      settledAt: null,
+      settledWon: null,
+    });
+    expect((await settleBetFromOrchestrator(bet)).won).toBe(true);
+  });
+
+  it("'without X' Y outside top of the non-X pool loses", async () => {
+    mockLb.mockResolvedValue([
+      lbRow({ playerId: "scheffler", position: "1", total: "-20" }),
+      lbRow({ playerId: "rory", position: "2", total: "-16" }),
+      lbRow({ playerId: "young", position: "3", total: "-14" }),
+    ]);
+    const bet = baseBet<WithoutBet>({
+      id: "b",
+      kind: "without",
+      playerId: "young",
+      playerName: "Young",
+      withoutPlayerId: "scheffler",
+      withoutPlayerName: "Scheffler",
+      oddsTaken: 20,
+      oddsTakenLabel: "+1900",
+      stake: 10,
+      placedAt: 0,
+      settledAt: null,
+      settledWon: null,
+    });
+    expect((await settleBetFromOrchestrator(bet)).won).toBe(false);
   });
 });

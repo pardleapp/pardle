@@ -94,6 +94,10 @@ function sharpCategoryFor(kind: string): SharpCategory | null {
   if (kind === "top-finish") return "bet-top-finish";
   if (kind === "round-score") return "bet-round-score";
   if (kind === "winning-score") return "bet-winning-score";
+  // "Without X" is a variant of the outright market — same Sharp
+  // score bucket, so a good outright picker who prefers without-X
+  // lines still accrues credit in one place.
+  if (kind === "without") return "bet-outright";
   return null;
 }
 
@@ -292,6 +296,9 @@ function subjectFor(bet: TrackedBet): string {
   }
   if (bet.kind === "winning-score") {
     return `Winning score ${bet.side} ${bet.line}`;
+  }
+  if (bet.kind === "without") {
+    return `${bet.playerName} to win without ${bet.withoutPlayerName}`;
   }
   return `${bet.playerName} top ${bet.cutoff}`;
 }
@@ -1103,6 +1110,20 @@ function currentProbFor(
       : bet.cutoff === 10
       ? p.top10
       : p.top20;
+  }
+  if (bet.kind === "without") {
+    // Conditional-outright approximation — see the matching branch in
+    // currentValueForBet for the rationale. Underestimates the
+    // scenario where X wins and Y is solo 2nd, but is directionally
+    // right during the tournament and settles from the leaderboard
+    // exactly at the end.
+    const yFair = currentOdds[bet.playerId];
+    const xFair = currentOdds[bet.withoutPlayerId];
+    if (!Number.isFinite(yFair) || yFair <= 1) return null;
+    const py = 1 / yFair;
+    const px = Number.isFinite(xFair) && xFair > 1 ? 1 / xFair : 0;
+    if (px >= 1) return null;
+    return py / (1 - px);
   }
   return null;
 }
