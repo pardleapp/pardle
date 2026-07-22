@@ -27,13 +27,12 @@ const redis = Redis.fromEnv();
 const TTL_SECONDS = 6 * 60 * 60;
 
 function cacheKey(tournamentId: string): string {
-  // v7 — augmentYardsFromHistorical now ALSO merges per-round pin
-  // coords from data/historical/*.json's new pinsByRoundByHole
-  // field (unlocks real per-round pin positions for 2019-2022,
-  // where courseStats only had a single roundless pin the parser
-  // replicated to R1-R4). Old v6 payloads still have the
-  // replicated coords; bump so the fresh compute swaps them out.
-  return `feed:pins:v7:${tournamentId}`;
+  // v8 — v7 was populated during the deploy window BEFORE the
+  // regenerated JSONs with pinsByRoundByHole reached the serverless
+  // bundle, so the merge no-op'd and the cache stored replicated
+  // pins across R1-R4. Bump so a fresh compute reads the now-in-
+  // bundle JSONs and swaps in real per-round pins.
+  return `feed:pins:v8:${tournamentId}`;
 }
 
 /** Map a tournamentId like "R2020525" back to the historical JSON
@@ -73,6 +72,63 @@ interface HistFile {
    *  into the enhanced-frame green image at render time. Populated
    *  for every season 2019+ once the fetch script is re-run. */
   pinsByRoundByHole?: Record<string, Record<string, { x: number; y: number }>>;
+}
+
+/** Detects the "cached during a deploy window before the JSON
+ *  landed" failure mode: a cache row where every hole's
+ *  pinByRound is fully replicated across R1-R4, but the current
+ *  historical JSON on disk has real per-round pins that would
+ *  have replaced them. In that case we discard the cache and
+ *  force a fresh compute. Safe to skip when the JSON doesn't
+ *  carry pinsByRoundByHole (older writes or non-3M events). */
+async function cachedSheetLooksStale(
+  sheet: CoursePinSheet,
+  tournamentId: string,
+): Promise<boolean> {
+  const ref = historicalRefFor(tournamentId);
+  if (!ref) return false;
+  const filePath = path.join(
+    process.cwd(),
+    "data",
+    "historical",
+    `${ref.slug}-${ref.year}.json`,
+  );
+  let hist: HistFile;
+  try {
+    const text = await readFile(filePath, "utf-8");
+    hist = JSON.parse(text) as HistFile;
+  } catch {
+    return false;
+  }
+  const perRound = hist.pinsByRoundByHole ?? null;
+  if (!perRound) return false;
+  // Does the JSON carry any (round, hole) with real per-round pin?
+  let anyPerRound = false;
+  for (const byHole of Object.values(perRound)) {
+    if (byHole && Object.keys(byHole).length > 0) {
+      anyPerRound = true;
+      break;
+    }
+  }
+  if (!anyPerRound) return false;
+  // Is every hole's cached pinByRound fully replicated across R1-R4?
+  // If yes AND the JSON has per-round data, the cache is stale.
+  const allReplicated = sheet.holes.every((h) => {
+    const entries = Object.entries(h.pinByRound);
+    if (entries.length < 2) return true; // insufficient data — treat as OK
+    const first = entries[0][1];
+    for (let i = 1; i < entries.length; i++) {
+      const p = entries[i][1];
+      if (
+        Math.abs(p.x - first.x) > 0.001 ||
+        Math.abs(p.y - first.y) > 0.001
+      ) {
+        return false;
+      }
+    }
+    return true;
+  });
+  return allReplicated;
 }
 
 /** Merge per-round per-hole yardage from the historical JSON into
@@ -226,11 +282,21 @@ export async function GET(req: Request) {
 
   // Cache lookup first — pin data is stable for the day. Skip when
   // ?debug=1 so we can inspect the raw orchestrator response.
+  //
+  // Defensive: reject a cached sheet whose pinByRound looks
+  // "replicated" (all four rounds coincide) IF a historical file
+  // that could have supplied real per-round pins exists on disk.
+  // That guards against cache poisoning during deploy windows
+  // when the code+data land in different commits — a fresh
+  // compute against the current bundle takes over automatically.
   if (!debug) {
     try {
       const cached = await redis.get<CoursePinSheet>(cacheKey(tournamentId));
       if (cached) {
-        return NextResponse.json({ ok: true, cached: true, pins: cached });
+        const stale = await cachedSheetLooksStale(cached, tournamentId);
+        if (!stale) {
+          return NextResponse.json({ ok: true, cached: true, pins: cached });
+        }
       }
     } catch {
       /* cache-miss safe to ignore */
