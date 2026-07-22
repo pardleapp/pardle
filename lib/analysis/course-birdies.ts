@@ -158,6 +158,18 @@ export interface EventInput {
   pins: CoursePinHole[];
   /** Per (hole, round) → { birdies, total, rate }. */
   counts: PerHoleRoundCounts;
+  /** Optional (raw, enh) coord pairs per hole, contributed by any
+   *  event that carries paired data. Powers the per-hole affine
+   *  calibration that transforms older-year raw-only pins into the
+   *  enhanced-frame image. Green stroke pairs from putt sheets are
+   *  the primary source — they're distributed across the whole
+   *  green so the affine doesn't extrapolate at the edges.
+   *  Undefined when no putt data was fetched (e.g. we only pulled
+   *  pins). */
+  extraCalibrationPairs?: Record<
+    number,
+    Array<{ rawX: number; rawY: number; x: number; y: number }>
+  >;
 }
 
 const EMPTY_QUAD: QuadrantSummary = {
@@ -417,6 +429,15 @@ export function buildHoleBirdieData(
         total,
       });
       yearsCovered.add(ev.year);
+    }
+    // Fold in any extra (raw, enh) coord pairs the caller supplied
+    // for this hole. Typically thousands of green stroke pairs
+    // from a modern-year putt sheet, which spread across the whole
+    // green and turn a fragile 8-pair extrapolation into a robust
+    // interior fit.
+    const extras = ev.extraCalibrationPairs?.[holeNumber];
+    if (extras && extras.length > 0) {
+      for (const p of extras) calibPairs.push(p);
     }
   }
 

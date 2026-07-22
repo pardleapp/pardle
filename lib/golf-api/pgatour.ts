@@ -371,6 +371,21 @@ export interface PGAStroke {
   greenFromY: number;
   greenToX: number;
   greenToY: number;
+  /** Raw x/y from the orchestrator payload, preserved when both raw
+   *  and enh green coords are populated (2024+). Used by the birdie
+   *  aggregator's per-hole affine calibration — thousands of green
+   *  stroke pairs per hole, distributed across the whole green, so
+   *  the affine fit doesn't extrapolate at the edges the way an
+   *  8-pin-pair-only fit does. Undefined on 2019-2022 events where
+   *  enh is the -1 sentinel and only raw is populated. */
+  greenFromRawX?: number;
+  greenFromRawY?: number;
+  greenFromEnhX?: number;
+  greenFromEnhY?: number;
+  greenToRawX?: number;
+  greenToRawY?: number;
+  greenToEnhX?: number;
+  greenToEnhY?: number;
 }
 
 export interface PGAShotHole {
@@ -514,6 +529,19 @@ export async function getShotDetailsBatch(
           const [tx, ty] = pick(ltr?.toCoords);
           const [gfx, gfy] = pick(grn?.fromCoords);
           const [gtx, gty] = pick(grn?.toCoords);
+          // Preserve the raw+enh pair on the green blob so downstream
+          // consumers (e.g. the birdie aggregator's per-hole affine
+          // calibration) can use hundreds of green stroke coords per
+          // hole as calibration source data instead of the 8 pin
+          // pairs it had before.
+          const greenFromRawX = grn?.fromCoords?.x;
+          const greenFromRawY = grn?.fromCoords?.y;
+          const greenFromEnhX = grn?.fromCoords?.enhancedX;
+          const greenFromEnhY = grn?.fromCoords?.enhancedY;
+          const greenToRawX = grn?.toCoords?.x;
+          const greenToRawY = grn?.toCoords?.y;
+          const greenToEnhX = grn?.toCoords?.enhancedX;
+          const greenToEnhY = grn?.toCoords?.enhancedY;
           return {
             strokeNumber: s.strokeNumber,
             strokeType: s.strokeType,
@@ -529,6 +557,22 @@ export async function getShotDetailsBatch(
             greenFromY: gfy,
             greenToX: gtx,
             greenToY: gty,
+            greenFromRawX:
+              typeof greenFromRawX === "number" ? greenFromRawX : undefined,
+            greenFromRawY:
+              typeof greenFromRawY === "number" ? greenFromRawY : undefined,
+            greenFromEnhX:
+              typeof greenFromEnhX === "number" ? greenFromEnhX : undefined,
+            greenFromEnhY:
+              typeof greenFromEnhY === "number" ? greenFromEnhY : undefined,
+            greenToRawX:
+              typeof greenToRawX === "number" ? greenToRawX : undefined,
+            greenToRawY:
+              typeof greenToRawY === "number" ? greenToRawY : undefined,
+            greenToEnhX:
+              typeof greenToEnhX === "number" ? greenToEnhX : undefined,
+            greenToEnhY:
+              typeof greenToEnhY === "number" ? greenToEnhY : undefined,
           };
         }),
       }));

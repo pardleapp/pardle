@@ -26,6 +26,7 @@ import { Redis } from "@upstash/redis";
 import {
   getCoursePins,
   getScorecards,
+  getShotDetailsBatch,
   getLeaderboard,
   getSchedule,
   type CoursePinSheet,
@@ -44,6 +45,67 @@ export const revalidate = 0;
 
 const redis = Redis.fromEnv();
 const CACHE_TTL = 6 * 60 * 60;
+
+/** Pull shot-details for 20 finishers × 4 rounds of a modern
+ *  tournament and extract (rawX, rawY, enhX, enhY) pairs from every
+ *  on-green stroke where both frames are populated. That's several
+ *  hundred pairs per hole distributed across the whole green — a
+ *  much richer calibration source than the 4 pin coords per year
+ *  courseStats gives us. Returns per-hole pair arrays; empty when
+ *  the tournament doesn't have paired green coord data. */
+async function gatherGreenCalibrationPairs(
+  tournamentId: string,
+): Promise<
+  Record<number, Array<{ rawX: number; rawY: number; x: number; y: number }>>
+> {
+  const lb = await getLeaderboard(tournamentId);
+  const players = lb.slice(0, 20).map((r) => r.playerId);
+  const requests: Array<{ playerId: string; round: number }> = [];
+  for (const pid of players) {
+    for (let r = 1; r <= 4; r++) requests.push({ playerId: pid, round: r });
+  }
+  const shots = await getShotDetailsBatch(tournamentId, requests);
+  const perHole: Record<
+    number,
+    Array<{ rawX: number; rawY: number; x: number; y: number }>
+  > = {};
+  const push = (
+    hole: number,
+    rawX?: number,
+    rawY?: number,
+    x?: number,
+    y?: number,
+  ) => {
+    const ok = (n: unknown): n is number =>
+      typeof n === "number" && Number.isFinite(n) && n !== -1 && n >= 0;
+    if (!ok(rawX) || !ok(rawY) || !ok(x) || !ok(y)) return;
+    (perHole[hole] ??= []).push({ rawX, rawY, x, y });
+  };
+  for (const holes of Object.values(shots)) {
+    for (const hole of holes ?? []) {
+      const holeNum = hole.holeNumber;
+      if (typeof holeNum !== "number") continue;
+      for (const s of hole.strokes ?? []) {
+        if (s.fromLocationCode !== "OGR") continue;
+        push(
+          holeNum,
+          s.greenFromRawX,
+          s.greenFromRawY,
+          s.greenFromEnhX,
+          s.greenFromEnhY,
+        );
+        push(
+          holeNum,
+          s.greenToRawX,
+          s.greenToRawY,
+          s.greenToEnhX,
+          s.greenToEnhY,
+        );
+      }
+    }
+  }
+  return perHole;
+}
 
 // ── Historical file schema (matches scripts/fetch-3m-historical.mjs) ─
 interface HistPlayerHole {
@@ -179,10 +241,14 @@ async function familyFor(tournamentId: string): Promise<FamilyDef | null> {
 // ── Endpoint ────────────────────────────────────────────────────────
 
 function cacheKey(tournamentId: string): string {
-  // v10 — same story as feed:pins:v8. Bump so the birdie
-  // aggregation runs against the fresh v8 pin caches carrying
-  // real per-round positions for 2019-2022.
-  return `feed:pin-birdies:v10:${tournamentId}`;
+  // v11 — the per-hole affine calibration now pulls green stroke
+  // (raw, enh) coord pairs from a modern-year putt sheet as
+  // additional calibration data. Old 8-pin-pair fits extrapolated
+  // poorly at hole edges (H18 2019 R2/R3/R4 landed off the green);
+  // the enriched fit puts every 2019-2022 pin in the correct
+  // enhanced-frame position. Bump so a fresh compute picks up the
+  // richer calibration input.
+  return `feed:pin-birdies:v11:${tournamentId}`;
 }
 
 export async function GET(req: Request) {
@@ -289,6 +355,29 @@ export async function GET(req: Request) {
       pins: pins.holes,
       counts,
     });
+  }
+
+  // Enrich the calibration inputs with green stroke (raw, enh) pairs
+  // from a modern-year putt sheet. Every on-green stroke gives us
+  // TWO calibration data points (from-coord and to-coord), and
+  // there are hundreds per hole, spread across the whole green —
+  // enough that the per-hole affine fit doesn't extrapolate at the
+  // edges the way an 8-pin-pair-only fit does (H18 2019 R2/R3/R4
+  // landed off the green with only pin pairs). Pick the newest
+  // events we have on file that carry paired data; fall through
+  // silently on any fetch error.
+  const calibrationSourceEvents = inputs
+    .filter((i) => i.year >= 2024)
+    .slice(-2);
+  for (const src of calibrationSourceEvents) {
+    try {
+      const pairs = await gatherGreenCalibrationPairs(src.tournamentId);
+      if (Object.keys(pairs).length > 0) {
+        src.extraCalibrationPairs = pairs;
+      }
+    } catch {
+      /* calibration enrichment is best-effort */
+    }
   }
 
   if (inputs.length === 0) {
