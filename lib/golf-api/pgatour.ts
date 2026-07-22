@@ -608,7 +608,11 @@ interface CourseStatsHoleStats {
   } | null;
 }
 interface CourseStatsRoundHole {
-  roundNum?: number;
+  // Orchestrator emits `null` for older seasons (2019-2022 3M Open,
+  // for one) that only carry a single "final pin" per hole rather
+  // than per-round positions. parseCoursePinsPayload handles that
+  // case by replicating the roundless pin across R1-R4.
+  roundNum?: number | null;
   holeStats?: (CourseStatsHoleStats | null)[];
 }
 interface CourseStatsCourse {

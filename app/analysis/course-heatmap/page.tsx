@@ -55,8 +55,25 @@ interface BirdieHistResp {
 }
 
 const POLL_MS = 60_000;
-type YearTab = "live" | "2025" | "2024" | "2023";
-const YEAR_TABS: YearTab[] = ["live", "2025", "2024", "2023"];
+type YearTab =
+  | "live"
+  | "2025"
+  | "2024"
+  | "2023"
+  | "2022"
+  | "2021"
+  | "2020"
+  | "2019";
+const YEAR_TABS: YearTab[] = [
+  "live",
+  "2025",
+  "2024",
+  "2023",
+  "2022",
+  "2021",
+  "2020",
+  "2019",
+];
 
 export default function Page() {
   const [tab, setTab] = useState<YearTab>("live");
