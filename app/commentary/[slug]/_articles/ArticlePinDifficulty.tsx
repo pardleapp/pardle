@@ -213,20 +213,20 @@ interface PinRow {
 }
 
 const HARDER: PinRow[] = [
-  { hole: 2,  position: "lower-right", observed: 12.7, expected: 18.2, delta: -5.5, sample: 669 },
-  { hole: 12, position: "lower-center", observed: 49.4, expected: 54.9, delta: -5.4, sample: 908 },
-  { hole: 17, position: "upper-center", observed: 10.6, expected: 14.3, delta: -3.7, sample: 669 },
-  { hole: 10, position: "lower-center", observed: 21.0, expected: 24.6, delta: -3.6, sample: 309 },
-  { hole: 13, position: "lower-center", observed: 8.0, expected: 11.2, delta: -3.2, sample: 514 },
+  { hole: 2,  position: "front-right", observed: 12.7, expected: 18.2, delta: -5.5, sample: 669 },
+  { hole: 12, position: "front-center", observed: 49.4, expected: 54.9, delta: -5.4, sample: 908 },
+  { hole: 17, position: "back-center", observed: 10.6, expected: 14.3, delta: -3.7, sample: 669 },
+  { hole: 10, position: "front-center", observed: 21.0, expected: 24.6, delta: -3.6, sample: 309 },
+  { hole: 13, position: "front-center", observed: 8.0, expected: 11.2, delta: -3.2, sample: 514 },
   { hole: 18, position: "middle-left", observed: 36.4, expected: 39.6, delta: -3.1, sample: 516 },
 ];
 
 const EASIER: PinRow[] = [
   { hole: 12, position: "middle-left", observed: 64.8, expected: 56.0, delta: 8.8, sample: 528 },
   { hole: 2,  position: "middle-right", observed: 25.9, expected: 17.7, delta: 8.1, sample: 673 },
-  { hole: 18, position: "upper-center", observed: 42.0, expected: 37.3, delta: 4.7, sample: 514 },
-  { hole: 10, position: "upper-right", observed: 24.4, expected: 20.7, delta: 3.7, sample: 509 },
-  { hole: 9,  position: "upper-left", observed: 13.5, expected: 10.3, delta: 3.2, sample: 594 },
+  { hole: 18, position: "back-center", observed: 42.0, expected: 37.3, delta: 4.7, sample: 514 },
+  { hole: 10, position: "back-right", observed: 24.4, expected: 20.7, delta: 3.7, sample: 509 },
+  { hole: 9,  position: "back-left", observed: 13.5, expected: 10.3, delta: 3.2, sample: 594 },
 ];
 
 function PinRowRender({ p }: { p: PinRow }) {
@@ -412,7 +412,7 @@ export default function ArticlePinDifficulty() {
       </P>
       <PinList rows={HARDER} label="Plays harder" />
       <P>
-        The signal on <b>hole 12 lower-center</b> is the most
+        The signal on <b>hole 12 front-center</b> is the most
         statistically solid one on this list — 908 putts of exposure
         across seven pin positions. Twelve is a par-5, so the raw
         49% birdie rate looks fine on the leaderboard; the read
@@ -429,7 +429,7 @@ export default function ArticlePinDifficulty() {
       <PinList rows={EASIER} label="Plays easier" />
       <P>
         <b>Hole 12 middle-left</b> is the clearest positive
-        signal on the course. Combined with the lower-center flag
+        signal on the course. Combined with the front-center flag
         being 5.4pp harder than expected, that's a <b>~15
         percentage-point swing in birdie probability between
         these two pins on the same green</b>, in the same
@@ -439,7 +439,7 @@ export default function ArticlePinDifficulty() {
       <GreenCompare
         hole={12}
         easy={{ x: 0.403, y: 0.482, label: "middle-left flag", delta: 8.8 }}
-        hard={{ x: 0.520, y: 0.684, label: "lower-center flag", delta: -5.4 }}
+        hard={{ x: 0.520, y: 0.684, label: "front-center flag", delta: -5.4 }}
       />
       <div
         style={{
@@ -451,20 +451,20 @@ export default function ArticlePinDifficulty() {
         }}
       >
         Same green, same conditions: the middle-left flag plays 15pp
-        easier than the lower-center flag for birdie probability.
+        easier than the front-center flag for birdie probability.
       </div>
       <P>
-        <b>Hole 2 middle-right</b> and <b>hole 2 lower-right</b>
+        <b>Hole 2 middle-right</b> and <b>hole 2 front-right</b>
         tell the same story in miniature: pins that look
         superficially similar on the map produce a 14pp swing
         after conditions. The green tilts front-to-back and
-        away from the middle-right shelf; the lower-right flag
+        away from the middle-right shelf; the front-right flag
         pulls the ball into the false-front runoff.
       </P>
       <GreenCompare
         hole={2}
         easy={{ x: 0.569, y: 0.449, label: "middle-right flag", delta: 8.1 }}
-        hard={{ x: 0.581, y: 0.725, label: "lower-right flag", delta: -5.5 }}
+        hard={{ x: 0.581, y: 0.725, label: "front-right flag", delta: -5.5 }}
       />
       <div
         style={{
@@ -476,7 +476,7 @@ export default function ArticlePinDifficulty() {
         }}
       >
         Two pins on the same right side of the second green — the
-        upper one is a green light, the lower one a trap.
+        middle-right one is a green light, the front-right one a trap.
       </div>
       <P>
         <b>Hole 18 back-center</b> is the flag you want to see
@@ -526,7 +526,7 @@ export default function ArticlePinDifficulty() {
           Hole 12 middle-left flag → lean birdie-heavy
         </li>
         <li style={{ marginBottom: 6 }}>
-          Hole 12 lower-center flag → fade eagle/birdie parlays
+          Hole 12 front-center flag → fade eagle/birdie parlays
         </li>
         <li style={{ marginBottom: 6 }}>
           Hole 18 back-center flag, calm forecast → real birdie chance
@@ -535,7 +535,7 @@ export default function ArticlePinDifficulty() {
           Hole 18 middle-left flag, any wind → treat as bogey-neutral
         </li>
         <li style={{ marginBottom: 6 }}>
-          Hole 2 middle-right → soft; lower-right → hard
+          Hole 2 middle-right → soft; front-right → hard
         </li>
       </ul>
       <P>
