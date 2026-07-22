@@ -318,6 +318,22 @@ function adaptToSettled(bet: TrackedBet): MockBetSettled {
     settledAt: bet.settledAt ?? undefined,
     tournamentId: bet.tournamentId,
     tournamentName: bet.tournamentName,
+    // Export-only enrichments — CSV builder reads these directly so
+    // spreadsheet columns stay first-class (numeric odds, per-market
+    // line/side/round/cutoff, excluded-player for without X).
+    oddsDecimal: bet.oddsTaken,
+    round: bet.kind === "round-score" ? bet.round : undefined,
+    line:
+      bet.kind === "round-score" || bet.kind === "winning-score"
+        ? bet.line
+        : undefined,
+    side:
+      bet.kind === "round-score" || bet.kind === "winning-score"
+        ? bet.side
+        : undefined,
+    cutoff: bet.kind === "top-finish" ? bet.cutoff : undefined,
+    withoutPlayerName:
+      bet.kind === "without" ? bet.withoutPlayerName : undefined,
   };
 }
 

@@ -73,6 +73,37 @@ function timeframeStartMs(tf: TimeframeFilter, now: number): number {
   return jan1.getTime();
 }
 
+/** RFC-4180 safe CSV cell — wraps in quotes when the value contains
+ *  a comma, quote, or newline; doubles any embedded quote. Empty and
+ *  numeric values pass through untouched. */
+function csvCell(v: string | number | undefined | null): string {
+  if (v == null) return "";
+  const s = String(v);
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+/** ISO date in the user's timezone, minute precision — human-readable
+ *  in Excel and still sortable as text. */
+function csvDate(ms: number | undefined): string {
+  if (!ms) return "";
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
+/** Parse a formatted P&L string ("+£340", "−u2.5") back into a signed
+ *  number for CSV export. Unicode minus and ASCII hyphen both count
+ *  as negative. */
+function csvPnlNumber(pl: string): number {
+  const sign = pl.startsWith("−") || pl.startsWith("-") ? -1 : 1;
+  const abs = parseFloat(pl.replace(/[^0-9.]/g, "")) || 0;
+  return sign * abs;
+}
+
 /** Build the settlement-modal data from a MockBetSettled — derives
  *  returnedLabel for wins (stake × odds), books a mock daily P&L
  *  + group rank string. Will swap to real settlement engine output
@@ -357,6 +388,82 @@ export default function BetsClient() {
     setTimeframeFilter("all");
   };
 
+  /** Export the current filtered slice to a CSV that Excel opens
+   *  natively. Uses the filters the user has active — including
+   *  "all" — so the button always reflects what's on-screen. The
+   *  file is generated client-side (no server round-trip) so the
+   *  export lands instantly and never leaves the device. */
+  const exportCsv = () => {
+    if (typeof window === "undefined") return;
+    if (filteredSettled.length === 0) return;
+    const headers = [
+      "Placed at",
+      "Settled at",
+      "Tournament",
+      "Market",
+      "Player",
+      "Excluded (Without X)",
+      "Side",
+      "Round",
+      "Line",
+      "Top-N cutoff",
+      "Odds (decimal)",
+      "Odds (label)",
+      "Stake",
+      "Currency",
+      "Result",
+      "P&L",
+    ];
+    const rows = filteredSettled.map((b) => [
+      csvDate(b.placedAt),
+      csvDate(b.settledAt),
+      b.tournamentName ?? "",
+      b.mkt,
+      b.who,
+      b.withoutPlayerName ?? "",
+      b.side ?? "",
+      b.round ?? "",
+      b.line ?? "",
+      b.cutoff ?? "",
+      b.oddsDecimal != null ? b.oddsDecimal.toFixed(2) : "",
+      b.odds,
+      b.stake,
+      b.cur,
+      b.result,
+      csvPnlNumber(b.pl).toFixed(2),
+    ]);
+    // Filename encodes the filter context so a downloaded file's
+    // identity survives out of the browser.
+    const parts = [
+      "pardle-bets",
+      marketFilter !== "all" ? marketFilter : null,
+      tournamentFilter !== "all"
+        ? (tournamentOptions
+            .find((t) => t.id === tournamentFilter)
+            ?.name.toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "") ?? tournamentFilter)
+        : null,
+      timeframeFilter !== "all" ? timeframeFilter : null,
+      new Date().toISOString().slice(0, 10),
+    ].filter(Boolean);
+    const filename = `${parts.join("-")}.csv`;
+    // BOM keeps Excel on Windows from misreading the Unicode minus
+    // in the P&L column as Latin-1.
+    const csv =
+      "﻿" +
+      [headers, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   /** Format a per-currency dict into "+£120 · −$40" style. Handles
    *  units ("u" as suffix) and the empty case ("—"). */
   const formatByCurWithSign = (
@@ -613,15 +720,33 @@ export default function BetsClient() {
                     ))}
                   </div>
                 </div>
-                {filtersActive && (
+                <div className="bets-filter-actions">
+                  {filtersActive && (
+                    <button
+                      type="button"
+                      className="bets-filter-clear"
+                      onClick={clearFilters}
+                    >
+                      Clear filters
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className="bets-filter-clear"
-                    onClick={clearFilters}
+                    className="bets-filter-export"
+                    onClick={exportCsv}
+                    disabled={filteredSettled.length === 0}
+                    title={
+                      filteredSettled.length === 0
+                        ? "No settled bets in this slice to export"
+                        : `Export ${filteredSettled.length} bets to CSV`
+                    }
                   >
-                    Clear filters
+                    <span aria-hidden="true">↓</span> Export CSV
+                    {filtersActive
+                      ? ` (${filteredSettled.length})`
+                      : ""}
                   </button>
-                )}
+                </div>
               </div>
             )}
             {/* Filtered stats strip — 6-up grid, wraps to 2 cols on

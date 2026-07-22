@@ -69,6 +69,16 @@ export interface MockBetSettled {
    *  tournament filter. */
   tournamentId?: string;
   tournamentName?: string;
+  // ── Export-only fields — populated on real bets so CSV export can
+  //    emit spreadsheet-friendly rows (decimal odds, per-market
+  //    line/side/round/cutoff, excluded-player for without X).
+  //    Everything's optional so demo rows still type-check. ─────
+  oddsDecimal?: number;
+  round?: number | null;
+  line?: number;
+  side?: "under" | "over";
+  cutoff?: number;
+  withoutPlayerName?: string;
 }
 
 export const MOCK_BETS_LIVE: MockBetLive[] = [
