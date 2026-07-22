@@ -419,9 +419,10 @@ export default function ArticlePinDifficulty() {
         here is that <i>relative to the other par-5 pins on the
         same green</i>, this one costs the field roughly five
         percentage points. Same logic on <b>hole 18
-        upper-right</b>: it's the flag on the closing green that
-        pulls the shot closest to the water short-right, and the
-        field over-corrects into the fringe long-left.
+        middle-left</b>: birdie rate looks reasonable in isolation,
+        but sat next to what the wind and yardage on those days
+        should have produced it's the pin the field keeps
+        under-performing at.
       </P>
 
       <H3>Pins that play easier than they look</H3>
