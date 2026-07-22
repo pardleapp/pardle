@@ -133,6 +133,18 @@ const TOURNAMENT_FAMILIES: FamilyDef[] = [
     slug: "3m-open",
     familyNames: ["3m open"],
     historical: [
+      // First 3M Open at TPC Twin Cities was 2019 — every year on
+      // file since. 2019-2022 orchestrator payloads only carry a
+      // roundless pin per hole (parser replicates it across R1-R4);
+      // 2023 carries per-round pins in raw coords only (enhanced
+      // fields are the -1 sentinel); 2024/2025 have full per-round
+      // enhanced coords. See pgatour.ts pickPinCoord for the coord
+      // priority — all four seasons contribute birdie counts either
+      // way.
+      { year: 2019, tournamentId: "R2019525" },
+      { year: 2020, tournamentId: "R2020525" },
+      { year: 2021, tournamentId: "R2021525" },
+      { year: 2022, tournamentId: "R2022525" },
       { year: 2023, tournamentId: "R2023525" },
       { year: 2024, tournamentId: "R2024525" },
       { year: 2025, tournamentId: "R2025525" },
@@ -167,11 +179,11 @@ async function familyFor(tournamentId: string): Promise<FamilyDef | null> {
 // ── Endpoint ────────────────────────────────────────────────────────
 
 function cacheKey(tournamentId: string): string {
-  // v5 — added proximity-clustered aggregation (pin sets close in
-  // coordinate space are treated as the same "location" year to
-  // year). Pre-v5 responses have no `clusters` field, so the
-  // modal's cluster panel would render empty; bump so we refetch.
-  return `feed:pin-birdies:v5:${tournamentId}`;
+  // v6 — parser now falls back to raw coords when enhanced are the
+  // -1 sentinel (unlocks 2023) and replicates roundless pins across
+  // R1-R4 (unlocks 2019-2022). Old v5 responses were computed with
+  // 2023-2025 only; bump so we recompute with 7 seasons of data.
+  return `feed:pin-birdies:v6:${tournamentId}`;
 }
 
 export async function GET(req: Request) {
@@ -229,7 +241,7 @@ export async function GET(req: Request) {
     let pins: CoursePinSheet | null = null;
     if (!refreshPins) {
       try {
-        pins = await redis.get<CoursePinSheet>(`feed:pins:${ev.tournamentId}`);
+        pins = await redis.get<CoursePinSheet>(`feed:pins:v2:${ev.tournamentId}`);
       } catch {
         /* cache miss */
       }
@@ -239,7 +251,7 @@ export async function GET(req: Request) {
         pins = await getCoursePins(ev.tournamentId);
         if (pins) {
           try {
-            await redis.set(`feed:pins:${ev.tournamentId}`, pins, {
+            await redis.set(`feed:pins:v2:${ev.tournamentId}`, pins, {
               ex: CACHE_TTL,
             });
           } catch {

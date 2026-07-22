@@ -36,7 +36,13 @@ const REPO_ROOT = resolve(__dirname, "..");
 const OUT_DIR = resolve(REPO_ROOT, "data", "historical");
 
 // ── Config ─────────────────────────────────────────────────────────
-const YEARS = [2023, 2024, 2025];
+// Every 3M Open since inception. 2019 was the first year at TPC Twin
+// Cities; every subsequent edition has landed at the same course, so
+// pin positions + par + green images stay comparable across the run.
+// The parser (lib/golf-api/pgatour.parseCoursePinsPayload) handles
+// the older seasons' coord quirks (raw-only in 2019-2023, roundless
+// pins in 2019-2022) transparently.
+const YEARS = [2019, 2020, 2021, 2022, 2023, 2024, 2025];
 const EVENT_NAME_MATCH = /3\s*m\s*open/i; // "3M Open"
 // TPC Twin Cities, Blaine MN — the 3M Open venue in every year we
 // cover. Kept in sync with lib/weather/course-coords.ts (used by the

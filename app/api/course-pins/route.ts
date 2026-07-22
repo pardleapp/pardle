@@ -25,7 +25,12 @@ const redis = Redis.fromEnv();
 const TTL_SECONDS = 6 * 60 * 60;
 
 function cacheKey(tournamentId: string): string {
-  return `feed:pins:${tournamentId}`;
+  // v2 — pgatour.parseCoursePinsPayload now falls back to raw coords
+  // when enhanced are absent (unlocks 2023) and replicates roundless
+  // pins across R1-R4 (unlocks 2019-2022). Old cached sheets for
+  // those years have empty pinByRound; bump the key so a fresh
+  // orchestrator pull runs through the new parser.
+  return `feed:pins:v2:${tournamentId}`;
 }
 
 export async function GET(req: Request) {

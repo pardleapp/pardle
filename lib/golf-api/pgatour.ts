@@ -688,7 +688,46 @@ export async function getCoursePinsWithDiag(
   return { sheet, raw, error };
 }
 
-function parseCoursePinsPayload(
+/** Pick a usable (x, y) from a leftToRightCoords blob.
+ *  Preference order:
+ *    1. Enhanced tracer coords — matches the green image's reference
+ *       frame exactly, so plotted dots land where they should.
+ *    2. Raw coords — a different frame per hole (2024/2025 shows the
+ *       enhanced-vs-raw offset ranges 0.02–0.25 in either axis), so
+ *       pin dots may sit a few percent off the true position on the
+ *       enhanced-frame image. Used as fallback for older seasons
+ *       (2019-2023) where enhanced is unpopulated. The birdie counts
+ *       and aggregate quadrant / cluster rates are still correct
+ *       because clustering merges nearby pins.
+ *
+ *  Both fields use `-1` as a sentinel-missing marker on some seasons
+ *  (e.g. every 2023 pin has enhancedX = enhancedY = -1); we treat
+ *  that as absent.
+ */
+export function pickPinCoord(
+  coords:
+    | {
+        x?: number | null;
+        y?: number | null;
+        enhancedX?: number | null;
+        enhancedY?: number | null;
+      }
+    | undefined
+    | null,
+): { x: number; y: number } | null {
+  if (!coords) return null;
+  const isReal = (n: unknown): n is number =>
+    typeof n === "number" && Number.isFinite(n) && n !== -1 && n >= 0;
+  if (isReal(coords.enhancedX) && isReal(coords.enhancedY)) {
+    return { x: coords.enhancedX, y: coords.enhancedY };
+  }
+  if (isReal(coords.x) && isReal(coords.y)) {
+    return { x: coords.x, y: coords.y };
+  }
+  return null;
+}
+
+export function parseCoursePinsPayload(
   tournamentId: string,
   raw: CourseStatsResp | null,
 ): CoursePinSheet | null {
@@ -698,26 +737,22 @@ function parseCoursePinsPayload(
   if (!primary) return null;
 
   const holeMap = new Map<number, CoursePinHole>();
+  // Fallback pin per hole for events (2019-2022) where the
+  // orchestrator only emits a single "roundNum: null" entry per hole
+  // rather than R1-R4 pin positions. We stash them here and replicate
+  // to R1-R4 at the end, but only for holes/rounds that have no
+  // per-round pin.
+  const fallbackPins = new Map<number, { x: number; y: number }>();
   for (const rh of primary.roundHoleStats ?? []) {
-    const round = rh?.roundNum;
-    if (typeof round !== "number") continue;
+    const roundRaw = rh?.roundNum;
+    const isRoundless =
+      roundRaw === null || roundRaw === undefined;
+    if (!isRoundless && typeof roundRaw !== "number") continue;
     for (const hs of rh?.holeStats ?? []) {
       if (!hs) continue;
       const holeNum = hs.courseHoleNum;
       if (typeof holeNum !== "number") continue;
-      const coords = hs.pinGreen?.leftToRightCoords;
-      // Only use the enhanced tracer coords — the raw x/y is in a
-      // DIFFERENT reference frame per hole (comparing raw vs
-      // enhanced for a modern season shows offsets of 0.05-0.25 in
-      // both axes, so a raw pin plotted on the enhanced-frame green
-      // image lands in the wrong place). Older seasons that only
-      // populate raw (e.g. 2023) get their pins dropped here — the
-      // scoring still flows through the birdies endpoint but there's
-      // no safe way to overlay the pin dots on the same image.
-      const enhX = coords?.enhancedX;
-      const enhY = coords?.enhancedY;
-      const x = typeof enhX === "number" ? enhX : undefined;
-      const y = typeof enhY === "number" ? enhY : undefined;
+      const coord = pickPinCoord(hs.pinGreen?.leftToRightCoords);
       const img = hs.holePickle?.greenLeftToRight ?? "";
       const parNum =
         typeof hs.parValue === "string" && hs.parValue
@@ -733,20 +768,20 @@ function parseCoursePinsPayload(
         yardsByRound: {},
         scoringByRound: {},
       };
-      if (typeof hs.yards === "number" && hs.yards > 0) {
-        target.yardsByRound[round] = hs.yards;
-      }
       if (!target.greenImageUrl && img) target.greenImageUrl = upscalePickle(img);
       if (target.par == null && Number.isFinite(parNum)) target.par = parNum;
       if (target.yards == null && typeof hs.yards === "number") target.yards = hs.yards;
-      if (
-        typeof x === "number" &&
-        typeof y === "number" &&
-        x >= 0 &&
-        y >= 0
-      ) {
-        target.pinByRound[round] = { x, y };
+
+      if (isRoundless) {
+        if (coord) fallbackPins.set(holeNum, coord);
+        holeMap.set(holeNum, target);
+        continue;
       }
+      const round = roundRaw as number;
+      if (typeof hs.yards === "number" && hs.yards > 0) {
+        target.yardsByRound[round] = hs.yards;
+      }
+      if (coord) target.pinByRound[round] = coord;
       // Per-round scoring — comes as strings on this type. Parse
       // defensively; "0" (all pars) is still valid.
       const avgStr = hs.scoringAverage;
@@ -766,6 +801,17 @@ function parseCoursePinsPayload(
         };
       }
       holeMap.set(holeNum, target);
+    }
+  }
+  // Fill R1-R4 gaps with the roundless fallback pin. Only touches
+  // rounds that HAVE no per-round pin — years with real per-round
+  // data (2023-2025) get their proper pins; years without (2019-2022)
+  // get the same pin replicated to R1-R4 so per-round scoring joins.
+  for (const [holeNum, coord] of fallbackPins) {
+    const target = holeMap.get(holeNum);
+    if (!target) continue;
+    for (const r of [1, 2, 3, 4]) {
+      if (!target.pinByRound[r]) target.pinByRound[r] = coord;
     }
   }
   const holes = [...holeMap.values()].sort((a, b) => a.holeNumber - b.holeNumber);
