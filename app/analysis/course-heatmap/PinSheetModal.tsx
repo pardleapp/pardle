@@ -126,10 +126,55 @@ export default function PinSheetModal({
   // and the cluster panel only render when `all` is selected because
   // clustering across one season's four pin positions is trivially
   // "each pin is its own cluster" and adds no signal.
-  const filteredHistoryPins =
+  const filteredHistoryPinsRaw =
     birdieHistory && seasonFilter != null
       ? birdieHistory.pins.filter((p) => p.year === seasonFilter)
       : birdieHistory?.pins ?? [];
+  // 2019-2022 orchestrator payloads only carry ONE roundless pin
+  // per hole, which the parser replicates across R1-R4 so per-round
+  // birdie counts still join. Rendered raw, all 4 dots stack on top
+  // of each other and read as a single position — the modal shows
+  // 4 rate cards below but only 1 dot on the green. Detect any
+  // group of coincident pins (same year, same coord) and fan them
+  // out in a compass rose so each round's dot is visible + hoverable
+  // in its own right. Preserves the "we only have one true position"
+  // truth (they still cluster around the same point) while surfacing
+  // per-round rate colour.
+  const filteredHistoryPins = (() => {
+    if (filteredHistoryPinsRaw.length === 0) return filteredHistoryPinsRaw;
+    // Group by (year, integer-quantised x/y) so nearly-identical
+    // coords (raw-replicated pins are byte-identical; enhanced-pair
+    // pins already move round-to-round) collapse into one bucket.
+    const buckets = new Map<string, typeof filteredHistoryPinsRaw>();
+    for (const p of filteredHistoryPinsRaw) {
+      const key = `${p.year}:${p.x.toFixed(3)}:${p.y.toFixed(3)}`;
+      const arr = buckets.get(key) ?? [];
+      arr.push(p);
+      buckets.set(key, arr);
+    }
+    const out: typeof filteredHistoryPinsRaw = [];
+    // 4-point compass offsets (N/E/S/W) at ~2% of the diagram. Small
+    // enough to stay tight around the true location, big enough that
+    // adjacent 14px dots don't visually merge.
+    const OFFSETS: Array<[number, number]> = [
+      [0, -0.022], // R1 → north
+      [0.022, 0],  // R2 → east
+      [0, 0.022],  // R3 → south
+      [-0.022, 0], // R4 → west
+    ];
+    for (const arr of buckets.values()) {
+      if (arr.length <= 1) {
+        out.push(...arr);
+        continue;
+      }
+      arr.sort((a, b) => a.round - b.round);
+      for (const p of arr) {
+        const [dx, dy] = OFFSETS[(p.round - 1) % OFFSETS.length];
+        out.push({ ...p, x: p.x + dx, y: p.y + dy });
+      }
+    }
+    return out;
+  })();
   // Overall rate/count over the filtered pins so the header stat
   // reads correctly for both modes.
   const filteredOverall = (() => {
