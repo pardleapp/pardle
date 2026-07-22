@@ -27,14 +27,11 @@ const redis = Redis.fromEnv();
 const TTL_SECONDS = 6 * 60 * 60;
 
 function cacheKey(tournamentId: string): string {
-  // v3 — sheet now merges yardsByRound from data/historical/*.json
-  // for older seasons whose courseStats only carry a single
-  // roundless yardage. TEE Δ column stayed empty for 2019-2022
-  // without this merge because per-round yards weren't in the
-  // orchestrator's courseStats for those years — the scorecardV3
-  // endpoint has them and we now bake them into the historical
-  // JSONs and layer them in here.
-  return `feed:pins:v3:${tournamentId}`;
+  // v4 — earlier v3 deploys briefly cached empty sheets for the
+  // 2019-2022 tournamentIds because getCoursePins was still using
+  // a duplicated old parser that skipped roundless entries. Bump
+  // so those empty-cached rows get thrown away.
+  return `feed:pins:v4:${tournamentId}`;
 }
 
 /** Map a tournamentId like "R2020525" back to the historical JSON

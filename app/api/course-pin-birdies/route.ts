@@ -241,7 +241,7 @@ export async function GET(req: Request) {
     let pins: CoursePinSheet | null = null;
     if (!refreshPins) {
       try {
-        pins = await redis.get<CoursePinSheet>(`feed:pins:v3:${ev.tournamentId}`);
+        pins = await redis.get<CoursePinSheet>(`feed:pins:v4:${ev.tournamentId}`);
       } catch {
         /* cache miss */
       }
@@ -251,7 +251,7 @@ export async function GET(req: Request) {
         pins = await getCoursePins(ev.tournamentId);
         if (pins) {
           try {
-            await redis.set(`feed:pins:v3:${ev.tournamentId}`, pins, {
+            await redis.set(`feed:pins:v4:${ev.tournamentId}`, pins, {
               ex: CACHE_TTL,
             });
           } catch {
