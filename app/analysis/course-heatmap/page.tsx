@@ -347,6 +347,7 @@ export default function Page() {
       {openHoleData && (
         <PinSheetModal
           hole={openHoleData}
+          currentTournamentId={data?.tournamentId ?? null}
           puttsForHole={putts?.puttsByHole[openHoleData.holeNumber] ?? []}
           puttsGreenImageUrl={
             putts?.greenImageByHole[openHoleData.holeNumber] ?? null

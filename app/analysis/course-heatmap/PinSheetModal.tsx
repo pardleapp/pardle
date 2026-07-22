@@ -20,6 +20,11 @@ import SlopeOverlay from "./SlopeOverlay";
 
 interface Props {
   hole: CoursePinHole | null;
+  /** Orchestrator tournamentId the current year tab is showing.
+   *  Used to look up this-year's pins in birdieHistory when the
+   *  hole's raw pin sheet lacks enhanced-frame coords (older
+   *  seasons only). */
+  currentTournamentId?: string | null;
   /** All putts on this hole across the field × rounds. Empty when
    *  data hasn't loaded / no coverage. */
   puttsForHole?: HolePutt[];
@@ -73,6 +78,7 @@ function scoringColour(v: number | null | undefined): string {
 
 export default function PinSheetModal({
   hole,
+  currentTournamentId,
   puttsForHole,
   puttsGreenImageUrl,
   puttsLoading,
@@ -223,10 +229,76 @@ export default function PinSheetModal({
     !puttsGreenImageUrl &&
     !hole?.greenImageUrl &&
     Boolean(birdieHistory?.greenImageUrl);
-  const roundsWithPin = Object.keys(hole.pinByRound)
-    .map((k) => Number(k))
-    .filter((r) => Number.isFinite(r))
-    .sort((a, b) => a - b);
+  // Solo-mode pin source. For 2024+ tabs, hole.pinByRound is already
+  // in the green-image (enhanced) frame — render it as-is. For
+  // 2019-2023 tabs the raw pins don't overlay the enhanced-frame
+  // image and (for 2019-2022) all four rounds share the same coord,
+  // so we substitute the calibrated + already-differentiated
+  // versions from birdieHistory.pins for the current tournament.
+  // Every year gets birdie rates from the same source, so tooltips
+  // read consistently.
+  const yearPinsFromHistory = birdieHistory && currentTournamentId
+    ? birdieHistory.pins.filter((p) => p.tournamentId === currentTournamentId)
+    : [];
+  const soloUsesHistoryPins = (() => {
+    // Use history-pin source when the raw hole.pinByRound is not in
+    // the enhanced frame AND we have history pins to substitute.
+    if (yearPinsFromHistory.length === 0) return false;
+    const anyRoundHasEnhFrame = Object.values(hole.pinByRound).some(
+      (p) => (p as { frameEnh?: boolean }).frameEnh === true,
+    );
+    return !anyRoundHasEnhFrame;
+  })();
+  // Per-round pin resolved from whichever source solo mode is using.
+  const soloPinForRound = (round: number):
+    | { x: number; y: number; rate?: number; birdies?: number; total?: number }
+    | null => {
+    if (soloUsesHistoryPins) {
+      const p = yearPinsFromHistory.find((hp) => hp.round === round);
+      if (!p) return null;
+      return { x: p.x, y: p.y, rate: p.rate, birdies: p.birdies, total: p.total };
+    }
+    const p = hole.pinByRound[round];
+    if (!p) return null;
+    return { x: p.x, y: p.y };
+  };
+  const roundsWithPin = (soloUsesHistoryPins
+    ? Array.from(new Set(yearPinsFromHistory.map((p) => p.round)))
+    : Object.keys(hole.pinByRound)
+        .map((k) => Number(k))
+        .filter((r) => Number.isFinite(r))
+  ).sort((a, b) => a - b);
+
+  // Solo-mode fan-out: pre-compute a per-round display offset for
+  // rounds whose pins share the exact same coord (2019-2022, where
+  // the orchestrator only shipped one roundless pin that the parser
+  // replicated to R1-R4). Without the fan-out all four round dots
+  // stack byte-for-byte and read as a single position, hiding the
+  // round-specific colouring the R1-R4 legend advertises. Rounds
+  // with genuinely distinct per-round coords (2023 raw-per-round,
+  // 2024+ enhanced-per-round) don't coincide, so no offset fires.
+  const SOLO_FAN_OFFSETS: Array<[number, number]> = [
+    [0, -0.022], // R1 → north
+    [0.022, 0], // R2 → east
+    [0, 0.022], // R3 → south
+    [-0.022, 0], // R4 → west
+  ];
+  const soloPinOffset = (round: number): [number, number] => {
+    const pin = soloPinForRound(round);
+    if (!pin) return [0, 0];
+    let coincident = false;
+    for (const other of roundsWithPin) {
+      if (other === round) continue;
+      const op = soloPinForRound(other);
+      if (!op) continue;
+      if (Math.abs(op.x - pin.x) < 0.001 && Math.abs(op.y - pin.y) < 0.001) {
+        coincident = true;
+        break;
+      }
+    }
+    if (!coincident) return [0, 0];
+    return SOLO_FAN_OFFSETS[(round - 1) % SOLO_FAN_OFFSETS.length];
+  };
   return (
     <div
       onClick={onClose}
@@ -773,21 +845,24 @@ export default function PinSheetModal({
             {/* Solo mode — round-labelled pins for the current
                 tournament only. Hidden while showing history. */}
             {!showHistory && roundsWithPin.map((round) => {
-              const pin = hole.pinByRound[round];
+              const pin = soloPinForRound(round);
               if (!pin) return null;
+              const [dx, dy] = soloPinOffset(round);
+              const displayX = pin.x + dx;
+              const displayY = pin.y + dy;
               const colour = ROUND_COLOURS[round] ?? "oklch(0.4 0.02 150)";
               const scoring = hole.scoringByRound?.[round];
               const active = hoverRound === round;
               // Position the tooltip below the pin unless the pin is
               // in the bottom third of the image, then flip above.
-              const flipUp = pin.y > 0.62;
+              const flipUp = displayY > 0.62;
               return (
                 <div
                   key={round}
                   style={{
                     position: "absolute",
-                    left: `${pin.x * 100}%`,
-                    top: `${pin.y * 100}%`,
+                    left: `${displayX * 100}%`,
+                    top: `${displayY * 100}%`,
                     transform: "translate(-50%, -50%)",
                     lineHeight: 1,
                   }}
@@ -888,6 +963,36 @@ export default function PinSheetModal({
                               }}
                             >
                               {formatVsPar(scoring.vsPar)}
+                            </span>
+                          )}
+                        </>
+                      ) : pin.rate != null ? (
+                        // Older-year fallback: no per-round scoring from
+                        // orchestrator courseStats for these seasons, but
+                        // the birdie-history aggregator DID compute a
+                        // per-round birdie rate. Show it as the primary
+                        // per-round stat so 2019-2022 tabs feel identical
+                        // to 2024+.
+                        <>
+                          <span
+                            style={{
+                              fontFamily: "var(--font-mono, monospace)",
+                              fontWeight: 800,
+                              color: "white",
+                              fontSize: 13,
+                            }}
+                          >
+                            {fmtRate(pin.rate)}
+                          </span>
+                          {pin.birdies != null && pin.total != null && (
+                            <span
+                              style={{
+                                fontFamily: "var(--font-mono, monospace)",
+                                fontSize: 10,
+                                color: "oklch(0.72 0.02 150)",
+                              }}
+                            >
+                              {pin.birdies}/{pin.total}
                             </span>
                           )}
                         </>
@@ -1430,7 +1535,7 @@ export default function PinSheetModal({
           </div>
         )}
 
-        {usingHistoryFallbackImage && !showHistory && (
+        {usingHistoryFallbackImage && !showHistory && !soloUsesHistoryPins && (
           <p
             style={{
               marginTop: 10,
@@ -1443,10 +1548,10 @@ export default function PinSheetModal({
               background: "oklch(0.99 0.005 95)",
             }}
           >
-            This year&apos;s pin sheet uses an older coordinate frame that
-            doesn&apos;t overlay on the green diagram — hit{" "}
-            <strong>Birdie rate mode</strong> above for the multi-season
-            history that does.
+            This year&apos;s pin sheet uses an older coordinate frame
+            that doesn&apos;t overlay perfectly on the green diagram — hit{" "}
+            <strong>History (all years)</strong> above for the calibrated
+            multi-season history view.
           </p>
         )}
         <p
