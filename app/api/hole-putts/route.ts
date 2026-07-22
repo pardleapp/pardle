@@ -29,7 +29,11 @@ const DEFAULT_PLAYER_LIMIT = 60;
 // Version tag on the cache key — bump when the shape of the response
 // or the derivation of any field changes so stale entries expire
 // immediately instead of poisoning the next 6h of reads.
-const CACHE_VERSION = "v2";
+// v3 — 2019-2022 tournamentIds had zero-putt sheets cached before
+// the pin backfill work; those events do have on-green stroke data
+// in shotDetailsV3, they just never got recomputed. Bump so a
+// fresh compute runs against the modern query pipeline.
+const CACHE_VERSION = "v3";
 function cacheKey(tournamentId: string, limit: number): string {
   return `feed:putts:${CACHE_VERSION}:${tournamentId}:${limit}`;
 }
