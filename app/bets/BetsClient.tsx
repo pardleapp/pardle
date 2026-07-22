@@ -295,13 +295,20 @@ export default function BetsClient() {
   }, [settledBets, marketFilter, tournamentFilter, timeframeFilter]);
 
   // Slice metrics — count, staked, realised PnL by currency, W/L,
-  // hit rate, ROI. Renders in the filtered summary card so users see
+  // hit rate, ROI. Renders in the filtered stats strip so users see
   // "how does 'outright at the Masters last 90d' actually score?".
   const sliceMetrics = useMemo(() => {
     const netByCur: Record<string, number> = {};
     const stakedByCur: Record<string, number> = {};
+    // Primary-currency subset for ROI + biggest-win — mixing currencies
+    // in a % or "£X" tile would be nonsense.
+    let primaryStakeSum = 0;
+    let primaryNetSum = 0;
+    let primaryBiggestWin = 0;
+    let primaryBiggestWinLabel = "";
     let sliceWins = 0;
     let sliceLosses = 0;
+    let oddsSum = 0;
     for (const b of filteredSettled) {
       if (b.result === "WON") sliceWins++;
       else sliceLosses++;
@@ -309,6 +316,17 @@ export default function BetsClient() {
       const num = parseFloat(b.pl.replace(/[^0-9.]/g, "")) || 0;
       netByCur[b.cur] = (netByCur[b.cur] ?? 0) + sign * num;
       stakedByCur[b.cur] = (stakedByCur[b.cur] ?? 0) + b.stake;
+      const dec = parseFloat(b.odds) || 0;
+      if (dec > 1) oddsSum += dec;
+      if (b.cur === primaryCur) {
+        primaryStakeSum += b.stake;
+        primaryNetSum += sign * num;
+        const pl = sign * num;
+        if (b.result === "WON" && pl > primaryBiggestWin) {
+          primaryBiggestWin = pl;
+          primaryBiggestWinLabel = `${b.who} · ${b.mkt}`;
+        }
+      }
     }
     const total = sliceWins + sliceLosses;
     return {
@@ -318,8 +336,15 @@ export default function BetsClient() {
       netByCur,
       stakedByCur,
       hitPct: total > 0 ? Math.round((sliceWins / total) * 100) : 0,
+      primaryStakeSum,
+      primaryNetSum,
+      primaryRoiPct:
+        primaryStakeSum > 0 ? (primaryNetSum / primaryStakeSum) * 100 : 0,
+      primaryBiggestWin,
+      primaryBiggestWinLabel,
+      avgOdds: filteredSettled.length > 0 ? oddsSum / filteredSettled.length : 0,
     };
-  }, [filteredSettled]);
+  }, [filteredSettled, primaryCur]);
 
   const filtersActive =
     marketFilter !== "all" ||
@@ -599,31 +624,100 @@ export default function BetsClient() {
                 )}
               </div>
             )}
-            <div className="bets-summary bets-summary-mobile">
-              <div>
-                <div className="bets-summary-lab">
-                  Net {filtersActive ? "· filtered" : "· all settled"}
+            {/* Filtered stats strip — 6-up grid, wraps to 2 cols on
+                mobile. Everything except Net PnL / Staked is currency-
+                agnostic (%, count), so those tiles show a single
+                figure; the currency-priced tiles use the primary
+                currency and add a "· etc" note for multi-currency
+                users. Visible on all viewports so mobile users get
+                the same headline picture. */}
+            <div className="bets-slice-strip">
+              <div className="bets-slice-tile">
+                <div className="bets-slice-lab">
+                  Net P&amp;L{filtersActive ? " · filtered" : ""}
                 </div>
-                <div className="bets-summary-big mono">
-                  {formatByCurWithSign(sliceMetrics.netByCur, { showSign: true })}
+                <div
+                  className={`bets-slice-val mono ${signClass(
+                    sliceMetrics.primaryNetSum,
+                  )}`}
+                >
+                  {sliceMetrics.count > 0
+                    ? formatByCurWithSign(sliceMetrics.netByCur, {
+                        showSign: true,
+                      })
+                    : "—"}
                 </div>
-                <div className="bets-summary-legs">
+                <div className="bets-slice-sub">
                   {sliceMetrics.count}{" "}
                   {sliceMetrics.count === 1 ? "settled bet" : "settled bets"}
                   {filtersActive && settledCount !== sliceMetrics.count
-                    ? ` · ${settledCount} total`
+                    ? ` of ${settledCount}`
                     : ""}
                 </div>
               </div>
-              <div className="bets-summary-r">
-                <div className="bets-summary-lab">Hit rate</div>
-                <div className="bets-summary-big mono">
+              <div className="bets-slice-tile">
+                <div className="bets-slice-lab">Win rate</div>
+                <div className="bets-slice-val mono">
                   {sliceMetrics.wins + sliceMetrics.losses > 0
                     ? `${sliceMetrics.hitPct}%`
                     : "—"}
                 </div>
-                <div className="bets-summary-legs">
+                <div className="bets-slice-sub">
                   {sliceMetrics.wins} W · {sliceMetrics.losses} L
+                </div>
+              </div>
+              <div className="bets-slice-tile">
+                <div className="bets-slice-lab">ROI</div>
+                <div
+                  className={`bets-slice-val mono ${signClass(
+                    sliceMetrics.primaryRoiPct,
+                  )}`}
+                >
+                  {sliceMetrics.primaryStakeSum > 0
+                    ? fmtPct(sliceMetrics.primaryRoiPct)
+                    : "—"}
+                </div>
+                <div className="bets-slice-sub">on settled stake</div>
+              </div>
+              <div className="bets-slice-tile">
+                <div className="bets-slice-lab">Staked</div>
+                <div className="bets-slice-val mono">
+                  {sliceMetrics.count > 0
+                    ? formatByCurWithSign(sliceMetrics.stakedByCur, {
+                        showSign: false,
+                      })
+                    : "—"}
+                </div>
+                <div className="bets-slice-sub">
+                  {sliceMetrics.count > 0 && sliceMetrics.primaryStakeSum > 0
+                    ? `${fmtMoney(
+                        sliceMetrics.primaryStakeSum / sliceMetrics.count,
+                      )} avg`
+                    : ""}
+                </div>
+              </div>
+              <div className="bets-slice-tile">
+                <div className="bets-slice-lab">Avg odds</div>
+                <div className="bets-slice-val mono">
+                  {sliceMetrics.avgOdds > 1
+                    ? sliceMetrics.avgOdds.toFixed(2)
+                    : "—"}
+                </div>
+                <div className="bets-slice-sub">decimal</div>
+              </div>
+              <div className="bets-slice-tile">
+                <div className="bets-slice-lab">Biggest win</div>
+                <div
+                  className={`bets-slice-val mono ${
+                    sliceMetrics.primaryBiggestWin > 0 ? "stat-up" : ""
+                  }`}
+                >
+                  {sliceMetrics.primaryBiggestWin > 0
+                    ? fmtMoney(sliceMetrics.primaryBiggestWin, true)
+                    : "—"}
+                </div>
+                <div className="bets-slice-sub">
+                  {sliceMetrics.primaryBiggestWinLabel || "no wins yet"}
                 </div>
               </div>
             </div>

@@ -21413,6 +21413,67 @@ html.pv-theme-body .auth-chip-btn {
   text-underline-offset: 3px;
 }
 
+/* Filtered stats strip inside the Settled tab. Six tiles auto-flow
+   in a grid: 2 cols on mobile, 3 on tablet, 6 on wide. Each tile
+   carries a small label, a big monospace figure, and a sub-line
+   for context. Mirrors the top desktop dash but recomputes for the
+   filtered slice AND stays visible at every viewport. */
+.bets-slice-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (min-width: 640px) {
+  .bets-slice-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  .bets-slice-strip {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+.bets-slice-tile {
+  padding: 12px;
+  background: var(--card, oklch(0.995 0.004 95));
+  border: 1px solid var(--line, oklch(0.90 0.013 95));
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bets-slice-lab {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted, oklch(0.50 0.02 150));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bets-slice-val {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink, oklch(0.26 0.04 155));
+  font-feature-settings: "tnum";
+  line-height: 1.15;
+}
+.bets-slice-val.stat-up {
+  color: var(--up, oklch(0.52 0.14 150));
+}
+.bets-slice-val.stat-down {
+  color: var(--down, oklch(0.57 0.19 28));
+}
+.bets-slice-sub {
+  font-size: 10.5px;
+  color: var(--dim, oklch(0.62 0.018 150));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Desktop /bets dashboard — hidden on mobile so the existing
    single-column tracker stays byte-for-byte unchanged. On desktop
    the middle column also widens (see body:has(.bets-pv) shell
