@@ -215,9 +215,9 @@ interface PinRow {
 const HARDER: PinRow[] = [
   { hole: 2,  position: "back-right", observed: 12.7, expected: 18.2, delta: -5.5, sample: 669 },
   { hole: 12, position: "front-right", observed: 49.4, expected: 54.9, delta: -5.4, sample: 908 },
-  { hole: 17, position: "back-right", observed: 10.6, expected: 14.3, delta: -3.7, sample: 669 },
+  { hole: 17, position: "middle-left", observed: 10.6, expected: 14.3, delta: -3.7, sample: 669 },
   { hole: 10, position: "middle-right", observed: 21.0, expected: 24.6, delta: -3.6, sample: 309 },
-  { hole: 13, position: "back-center", observed: 8.0, expected: 11.2, delta: -3.2, sample: 514 },
+  { hole: 13, position: "middle-right", observed: 8.0, expected: 11.2, delta: -3.2, sample: 514 },
   { hole: 18, position: "middle-right", observed: 36.4, expected: 39.6, delta: -3.1, sample: 516 },
 ];
 
