@@ -387,19 +387,13 @@ export default function ArticlePinDifficulty() {
       <P>
         Before we even get to the pins, the model tells us something
         useful about how TPC Twin Cities plays. Directional wind is
-        the dominant round-level factor — but once we account for
-        the actual play direction of each hole, the wind
-        sensitivities look different from what a speed-only model
-        would suggest.
+        the dominant round-level factor at this course.
       </P>
       <P>
         <b>Hole 6 and hole 12 are the most wind-sensitive on the
         property</b>: each loses about ~4pp of birdie rate for every
-        5 mph of headwind on the approach. Hole 18 is more moderate
-        than it first appeared — ~3pp per 5 mph headwind — because
-        an earlier version of the model was conflating windy days
-        with headwind days, when in fact half of them were
-        tailwinds. Yardage still matters: the biggest per-hole
+        5 mph of headwind on the approach. Hole 18 loses ~3pp per
+        5 mph headwind. Yardage still matters: the biggest per-hole
         yardage coefficient (hole 16, &minus;2pp per +10 yards) is
         meaningful but rarely dominant. If you want to bet
         birdie-heavy round scores this week, the wind forecast —
@@ -581,27 +575,14 @@ export default function ArticlePinDifficulty() {
         2019&ndash;2025 data.
       </P>
       <P>
-        <b>Methodology note:</b> an earlier version of this model
-        used wind speed only. That flattered pins that had been
-        used mostly on tailwind days and unfairly penalised pins
-        used on headwind days — because "13 mph out of the south"
-        and "13 mph out of the north" produce completely different
-        golf conditions on the same hole. The current model
-        projects each round's wind onto the hole's real compass
+        Each round's wind is projected onto the hole's real compass
         bearing (pulled from OpenStreetMap way geometry — the
         approach-leg direction on par-4s, the fairway-to-green
-        direction on par-5s). It's not perfect: hole bearings
-        derived from public data are approximate on the doglegs,
-        and one bearing per hole is a simplification of what a
-        second-shot decision on a par-5 actually looks like. But
-        the featured H12 and H18 swings are robust — they appear
-        in every version of the model we've fitted, with sizes
-        within a couple of points of each other. What's changed
-        most from the earlier version is that H18 turns out to be
-        only moderately wind-sensitive (~3pp per 5 mph headwind,
-        not the ~12pp we first claimed), because the speed-only
-        model was crediting fair-wind days as being unusually
-        easy.
+        direction on par-5s). One bearing per hole is a
+        simplification of what a second-shot decision on a par-5
+        actually looks like, and public-data bearings are
+        approximate on the doglegs — so treat any single residual
+        as a &pm;2pp estimate rather than a point value.
       </P>
       <P>
         Treat it as a tiebreaker between two flags you're already
