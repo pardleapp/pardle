@@ -408,11 +408,11 @@ export default function PinSheetModal({
                 }}
                 title={
                   showHistory
-                    ? "Currently showing per-pin birdie-or-better rates. Click for the standard pin sheet."
-                    : "Switch to the birdie-or-better rate view — pin dots + cluster tiles coloured by how often the field made birdie there."
+                    ? "Currently showing historical pin dots from every stored year. Click to switch to this week's pin sheet."
+                    : "Switch to the historical view — every pin position from every stored round of this hole, coloured by birdie-or-better rate. Now covers 2019-2025 for the 3M Open."
                 }
               >
-                {showHistory ? "Birdie rate mode" : "Birdie rate mode"}
+                {showHistory ? "This week's pins" : "History (all years)"}
               </button>
             </div>
           </div>
