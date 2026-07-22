@@ -23,6 +23,7 @@ import {
   type TopFinishBet,
   type TrackedBet,
   type WinningScoreBet,
+  type WithoutBet,
 } from "@/app/live/bet-shared";
 import {
   type BetCurrency,
@@ -91,6 +92,13 @@ const MARKETS: MarketDef[] = [
     defaultOdds: "+125",
     needsPlayer: false,
   },
+  {
+    key: "without",
+    label: "Without X",
+    kind: "without",
+    defaultOdds: "+400",
+    needsPlayer: true,
+  },
 ];
 
 const DEFAULT_ROUND_LINE = "69.5";
@@ -132,6 +140,11 @@ export default function AddBetSheet({
   const [picked, setPicked] = useState<PlayerOption | null>(
     prefillPlayer ?? null,
   );
+  // Second player picker — used only by the "without X" market for the
+  // excluded player. Reuses the same player list; separate search input
+  // so refining one picker doesn't disturb the other.
+  const [withoutPicked, setWithoutPicked] = useState<PlayerOption | null>(null);
+  const [withoutSearch, setWithoutSearch] = useState("");
   const [marketIdx, setMarketIdx] = useState(0);
   const [oddsText, setOddsText] = useState(MARKETS[0].defaultOdds);
   const [stake, setStake] = useState("");
@@ -315,6 +328,24 @@ export default function AddBetSheet({
       .slice(0, 12);
   }, [players, search, picked]);
 
+  // Same shape as `filtered` but for the "without X" picker. Excludes
+  // the backed player from the list so users can't accidentally pick
+  // the same player for both roles.
+  const withoutFiltered = useMemo(() => {
+    const q = withoutSearch.trim().toLowerCase();
+    const pool = players.filter((p) => p.id !== picked?.id);
+    if (!q) {
+      const head = withoutPicked ? [withoutPicked] : [];
+      const rest = pool
+        .filter((p) => p.id !== withoutPicked?.id)
+        .slice(0, 8);
+      return [...head, ...rest];
+    }
+    return pool
+      .filter((p) => p.name.toLowerCase().includes(q))
+      .slice(0, 12);
+  }, [players, withoutSearch, picked, withoutPicked]);
+
   const market = MARKETS[marketIdx];
   const previewName =
     market.needsPlayer && picked ? picked.name : "the field";
@@ -325,6 +356,9 @@ export default function AddBetSheet({
     }
     if (market.kind === "winning-score") {
       return `${side.toUpperCase()} ${lineText || "—"} · TOT`;
+    }
+    if (market.kind === "without") {
+      return `WIN WITHOUT ${withoutPicked?.name ?? "…"}`;
     }
     return market.label;
   })();
@@ -436,6 +470,29 @@ export default function AddBetSheet({
           currency: cur.code,
           ...tournamentStamp,
         } satisfies RoundScoreBet;
+      } else if (market.kind === "without") {
+        if (!withoutPicked) {
+          setErr("Pick the player to exclude.");
+          return;
+        }
+        if (picked!.id === withoutPicked.id) {
+          setErr("The excluded player must be different from the backed player.");
+          return;
+        }
+        bet = {
+          id,
+          kind: "without",
+          placedAt,
+          playerId: picked!.id,
+          playerName: picked!.name,
+          withoutPlayerId: withoutPicked.id,
+          withoutPlayerName: withoutPicked.name,
+          oddsTaken: parsed.decimal,
+          oddsTakenLabel,
+          stake: stakeNum,
+          currency: cur.code,
+          ...tournamentStamp,
+        } satisfies WithoutBet;
       } else {
         bet = {
           id,
@@ -472,10 +529,14 @@ export default function AddBetSheet({
       onClose,
       onTracked,
       picked,
+      pickable,
+      pickedTournamentId,
       round,
       saving,
       side,
       stake,
+      tournament,
+      withoutPicked,
     ],
   );
 
@@ -604,6 +665,39 @@ export default function AddBetSheet({
           </div>
         )}
 
+        {market.kind === "without" && (
+          <div className="addbet-field">
+            <div className="addbet-fl">Without (excluded player)</div>
+            <input
+              type="text"
+              className="addbet-search"
+              placeholder="Search the field for the excluded player…"
+              value={withoutSearch}
+              onChange={(e) => setWithoutSearch(e.target.value)}
+              autoComplete="off"
+            />
+            <div className="addbet-chiprow">
+              {withoutFiltered.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`addbet-chip${
+                    withoutPicked?.id === p.id ? " addbet-chip-on" : ""
+                  }`}
+                  onClick={() => setWithoutPicked(p)}
+                >
+                  {p.name}
+                </button>
+              ))}
+              {withoutFiltered.length === 0 && (
+                <span className="addbet-hint">
+                  No match — refine the search or close.
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {(market.kind === "round-score" ||
           market.kind === "winning-score") && (
           <div className="addbet-field">
@@ -707,14 +801,16 @@ export default function AddBetSheet({
         <div className="addbet-preview">
           {market.needsPlayer && !picked
             ? "Pick a player and a stake to track."
-            : !stake
-              ? "Enter a stake to continue."
-              : (
-                  <>
-                    Posts as <b>{previewName} · {marketPreview}</b> — your crew
-                    sees it live.
-                  </>
-                )}
+            : market.kind === "without" && !withoutPicked
+              ? "Pick the player to exclude."
+              : !stake
+                ? "Enter a stake to continue."
+                : (
+                    <>
+                      Posts as <b>{previewName} · {marketPreview}</b> — your
+                      crew sees it live.
+                    </>
+                  )}
         </div>
 
         <button
