@@ -19,6 +19,7 @@
  */
 
 import Link from "next/link";
+import { removeBetEverywhere } from "@/app/live/bet-shared";
 import type { MockBetLive, OddsFormatKey } from "./mock-bets";
 
 interface Props {
@@ -70,43 +71,64 @@ export default function BetRow({ bet, oddsFmt }: Props) {
   const odds = bet.odds[oddsFmt];
   const probColor =
     bet.dir === "down" ? "var(--pv-down)" : "var(--pv-up)";
+  const handleDelete = (
+    e: React.MouseEvent<HTMLButtonElement> | React.KeyboardEvent<HTMLButtonElement>,
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const label = `${bet.who} — ${bet.mkt}`;
+    if (window.confirm(`Delete this tracked bet?\n\n${label}`)) {
+      void removeBetEverywhere(bet.id);
+    }
+  };
   return (
-    <Link
-      href={`/live/bet/${bet.id}`}
-      className="bets-row-card"
-      prefetch={false}
-    >
-      <div className="bp-head">
-        <div className="bp-who">
-          <div className="bets-row-name">{bet.who}</div>
-          <div className="bets-row-chip">
-            <span className="bp-bet-mkt">{bet.mkt}</span>
-            <span className="bp-bet-stake">
-              {bet.cur === "u"
-                ? `${bet.stake}${bet.cur}`
-                : `${bet.cur}${bet.stake}`}{" "}
-              @ {odds}
-            </span>
+    <div className="bets-row-shell" style={{ position: "relative" }}>
+      <Link
+        href={`/live/bet/${bet.id}`}
+        className="bets-row-card"
+        prefetch={false}
+      >
+        <div className="bp-head">
+          <div className="bp-who">
+            <div className="bets-row-name">{bet.who}</div>
+            <div className="bets-row-chip">
+              <span className="bp-bet-mkt">{bet.mkt}</span>
+              <span className="bp-bet-stake">
+                {bet.cur === "u"
+                  ? `${bet.stake}${bet.cur}`
+                  : `${bet.cur}${bet.stake}`}{" "}
+                @ {odds}
+              </span>
+            </div>
+          </div>
+          <div className="bp-prob">
+            <div className="bp-prob-v" style={{ color: probColor }}>
+              {bet.prob}%
+            </div>
+            <div className={`bp-prob-d ${bet.dir}`}>
+              {bet.dir === "up" ? "▲" : "▼"} live
+            </div>
           </div>
         </div>
-        <div className="bp-prob">
-          <div className="bp-prob-v" style={{ color: probColor }}>
-            {bet.prob}%
-          </div>
-          <div className={`bp-prob-d ${bet.dir}`}>
-            {bet.dir === "up" ? "▲" : "▼"} live
-          </div>
+        <Spark hist={bet.hist} dir={bet.dir} />
+        <div className="bets-row-footer">
+          <span className="bets-row-shots">
+            {bet.tl.length} shots tracked · tap for detail
+          </span>
+          <span className="bets-row-chev" aria-hidden="true">
+            ›
+          </span>
         </div>
-      </div>
-      <Spark hist={bet.hist} dir={bet.dir} />
-      <div className="bets-row-footer">
-        <span className="bets-row-shots">
-          {bet.tl.length} shots tracked · tap for detail
-        </span>
-        <span className="bets-row-chev" aria-hidden="true">
-          ›
-        </span>
-      </div>
-    </Link>
+      </Link>
+      <button
+        type="button"
+        className="bets-row-delete"
+        aria-label={`Delete tracked bet: ${bet.who} ${bet.mkt}`}
+        title="Delete bet"
+        onClick={handleDelete}
+      >
+        ×
+      </button>
+    </div>
   );
 }

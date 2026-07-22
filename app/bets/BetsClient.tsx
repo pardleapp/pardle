@@ -25,6 +25,7 @@ import {
   type MockBetSettled,
 } from "./mock-bets";
 import BetRow from "./BetRow";
+import { removeBetEverywhere } from "@/app/live/bet-shared";
 import SettlementModal, { type SettlementData } from "./SettlementModal";
 import ShareCard from "./ShareCard";
 import { useRealBets } from "./useRealBets";
@@ -864,39 +865,62 @@ export default function BetsClient() {
             ) : (
               <div className="bets-grid">
                 {filteredSettled.map((b) => (
-                  <button
-                    type="button"
-                    className="bets-settled"
+                  <div
                     key={b.id}
-                    onClick={() => setSettle(buildSettlementData(b))}
+                    className="bets-row-shell"
+                    style={{ position: "relative" }}
                   >
-                    <div>
-                      <div className="bets-settled-nm">{b.who}</div>
-                      <div className="bets-settled-sub">
-                        <span className="bets-settled-mkt">{b.mkt}</span> @{" "}
-                        {b.odds} ·{" "}
-                        {b.cur === "u"
-                          ? `${b.stake}${b.cur}`
-                          : `${b.cur}${b.stake}`}
+                    <button
+                      type="button"
+                      className="bets-settled"
+                      onClick={() => setSettle(buildSettlementData(b))}
+                    >
+                      <div>
+                        <div className="bets-settled-nm">{b.who}</div>
+                        <div className="bets-settled-sub">
+                          <span className="bets-settled-mkt">{b.mkt}</span> @{" "}
+                          {b.odds} ·{" "}
+                          {b.cur === "u"
+                            ? `${b.stake}${b.cur}`
+                            : `${b.cur}${b.stake}`}
+                        </div>
                       </div>
-                    </div>
-                    <div className="bets-settled-pl-col">
-                      <div
-                        className={`bets-settled-pl ${
-                          b.result === "WON" ? "win" : "loss"
-                        }`}
-                      >
-                        {b.pl}
+                      <div className="bets-settled-pl-col">
+                        <div
+                          className={`bets-settled-pl ${
+                            b.result === "WON" ? "win" : "loss"
+                          }`}
+                        >
+                          {b.pl}
+                        </div>
+                        <div
+                          className={`bets-settled-stat ${
+                            b.result === "WON" ? "win" : "loss"
+                          }`}
+                        >
+                          {b.result}
+                        </div>
                       </div>
-                      <div
-                        className={`bets-settled-stat ${
-                          b.result === "WON" ? "win" : "loss"
-                        }`}
-                      >
-                        {b.result}
-                      </div>
-                    </div>
-                  </button>
+                    </button>
+                    <button
+                      type="button"
+                      className="bets-row-delete"
+                      aria-label={`Delete settled bet: ${b.who} ${b.mkt}`}
+                      title="Delete bet"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (
+                          window.confirm(
+                            `Delete this settled bet?\n\n${b.who} — ${b.mkt}`,
+                          )
+                        ) {
+                          void removeBetEverywhere(b.id);
+                        }
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
             )}

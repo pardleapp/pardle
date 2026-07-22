@@ -21748,6 +21748,51 @@ html.pv-theme-body .auth-chip-btn {
   color: inherit;
   transition: box-shadow 0.16s ease, transform 0.16s ease;
 }
+/* Delete "×" affordance on each bet card. Sits at the top-right of
+   the card, high z-index so it clears the sparkline + prob column,
+   `stopPropagation` in the handler so tapping it doesn't navigate
+   into the bet detail. Reveals on hover on desktop; always visible
+   on touch (no hover to gate). */
+.bets-row-shell {
+  position: relative;
+}
+.bets-row-delete {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--pv-muted, oklch(0.5 0.02 150));
+  font: 700 20px/1 system-ui, -apple-system, sans-serif;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  opacity: 0.55;
+}
+.bets-row-delete:hover,
+.bets-row-delete:focus-visible {
+  background: oklch(0.94 0.07 28);
+  border-color: oklch(0.85 0.09 28);
+  color: oklch(0.42 0.19 28);
+  opacity: 1;
+  outline: none;
+}
+@media (hover: hover) {
+  .bets-row-delete {
+    opacity: 0;
+  }
+  .bets-row-shell:hover .bets-row-delete,
+  .bets-row-delete:focus-visible {
+    opacity: 1;
+  }
+}
 @media (hover: hover) {
   .bets-row-card:hover {
     box-shadow: 0 10px 26px oklch(0.4 0.06 145 / 0.14);
