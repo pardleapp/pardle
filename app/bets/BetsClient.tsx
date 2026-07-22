@@ -26,6 +26,7 @@ import {
 } from "./mock-bets";
 import BetRow from "./BetRow";
 import { removeBetEverywhere } from "@/app/live/bet-shared";
+import ConfirmDialog from "@/app/_components/ConfirmDialog";
 import SettlementModal, { type SettlementData } from "./SettlementModal";
 import ShareCard from "./ShareCard";
 import { useRealBets } from "./useRealBets";
@@ -148,6 +149,10 @@ export default function BetsClient() {
   const [oddsFmt, setOddsFmt] = useState<OddsFormatKey>("am");
   const [tab, setTab] = useState<"live" | "settled">("live");
   const [settle, setSettle] = useState<SettlementData | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{
+    id: string;
+    detail: string;
+  } | null>(null);
   const [shareData, setShareData] = useState<SettlementData | null>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -909,13 +914,10 @@ export default function BetsClient() {
                       title="Delete bet"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (
-                          window.confirm(
-                            `Delete this settled bet?\n\n${b.who} — ${b.mkt}`,
-                          )
-                        ) {
-                          void removeBetEverywhere(b.id);
-                        }
+                        setConfirmDelete({
+                          id: b.id,
+                          detail: `${b.who} — ${b.mkt}`,
+                        });
                       }}
                     >
                       ×
@@ -940,6 +942,19 @@ export default function BetsClient() {
         />
       )}
       {shareData && <ShareCard data={shareData} onClose={closeShare} />}
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete this settled bet?"
+          detail={confirmDelete.detail}
+          confirmLabel="Delete"
+          destructive
+          onConfirm={() => {
+            void removeBetEverywhere(confirmDelete.id);
+            setConfirmDelete(null);
+          }}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
       <AddBetTrigger />
     </section>
   );

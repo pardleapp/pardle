@@ -19,7 +19,9 @@
  */
 
 import Link from "next/link";
+import { useState } from "react";
 import { removeBetEverywhere } from "@/app/live/bet-shared";
+import ConfirmDialog from "@/app/_components/ConfirmDialog";
 import type { MockBetLive, OddsFormatKey } from "./mock-bets";
 
 interface Props {
@@ -71,15 +73,13 @@ export default function BetRow({ bet, oddsFmt }: Props) {
   const odds = bet.odds[oddsFmt];
   const probColor =
     bet.dir === "down" ? "var(--pv-down)" : "var(--pv-up)";
-  const handleDelete = (
+  const [confirming, setConfirming] = useState(false);
+  const openConfirm = (
     e: React.MouseEvent<HTMLButtonElement> | React.KeyboardEvent<HTMLButtonElement>,
   ) => {
     e.preventDefault();
     e.stopPropagation();
-    const label = `${bet.who} — ${bet.mkt}`;
-    if (window.confirm(`Delete this tracked bet?\n\n${label}`)) {
-      void removeBetEverywhere(bet.id);
-    }
+    setConfirming(true);
   };
   return (
     <div className="bets-row-shell" style={{ position: "relative" }}>
@@ -125,10 +125,23 @@ export default function BetRow({ bet, oddsFmt }: Props) {
         className="bets-row-delete"
         aria-label={`Delete tracked bet: ${bet.who} ${bet.mkt}`}
         title="Delete bet"
-        onClick={handleDelete}
+        onClick={openConfirm}
       >
         ×
       </button>
+      {confirming && (
+        <ConfirmDialog
+          title="Delete this tracked bet?"
+          detail={`${bet.who} — ${bet.mkt}`}
+          confirmLabel="Delete"
+          destructive
+          onConfirm={() => {
+            void removeBetEverywhere(bet.id);
+            setConfirming(false);
+          }}
+          onCancel={() => setConfirming(false)}
+        />
+      )}
     </div>
   );
 }

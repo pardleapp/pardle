@@ -21793,6 +21793,107 @@ html.pv-theme-body .auth-chip-btn {
     opacity: 1;
   }
 }
+
+/* ── Themed confirm dialog (shared across bets delete, group leave,
+   etc.) — matches the paper/broadcast palette. Fixed overlay,
+   centred card, mono detail line, tang-red destructive button. */
+.pv-confirm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  font-family:
+    var(--font-archivo), "Archivo", system-ui, -apple-system, sans-serif;
+  animation: pv-confirm-fade 120ms ease-out;
+}
+@keyframes pv-confirm-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.pv-confirm-card {
+  background: var(--pv-card, #ffffff);
+  color: var(--pv-ink, oklch(0.26 0.04 155));
+  border: 1px solid var(--pv-line, oklch(0.9 0.008 95));
+  border-radius: 14px;
+  padding: 22px 22px 18px;
+  width: min(420px, 96vw);
+  box-shadow: 0 20px 44px oklch(0 0 0 / 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: pv-confirm-pop 140ms cubic-bezier(0.2, 0.9, 0.3, 1.1);
+}
+@keyframes pv-confirm-pop {
+  from { transform: translateY(6px) scale(0.98); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+.pv-confirm-title {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0;
+  color: var(--pv-ink, oklch(0.26 0.04 155));
+  line-height: 1.3;
+}
+.pv-confirm-detail {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--pv-muted, oklch(0.5 0.02 150));
+  background: var(--pv-soft, oklch(0.965 0.006 95));
+  border: 1px solid var(--pv-line, oklch(0.92 0.008 95));
+  border-radius: 8px;
+  padding: 8px 10px;
+  word-break: break-word;
+}
+.pv-confirm-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.pv-confirm-cancel,
+.pv-confirm-confirm {
+  font: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  min-width: 90px;
+  transition: background 0.14s ease, border-color 0.14s ease, transform 0.1s ease;
+}
+.pv-confirm-cancel {
+  background: transparent;
+  color: var(--pv-muted, oklch(0.5 0.02 150));
+  border-color: var(--pv-line, oklch(0.9 0.008 95));
+}
+.pv-confirm-cancel:hover {
+  background: var(--pv-soft, oklch(0.965 0.006 95));
+  color: var(--pv-ink, oklch(0.26 0.04 155));
+}
+.pv-confirm-confirm {
+  background: var(--pv-emerald, oklch(0.50 0.13 155));
+  color: white;
+  border-color: transparent;
+}
+.pv-confirm-confirm:hover {
+  filter: brightness(1.05);
+}
+.pv-confirm-confirm.destructive {
+  background: oklch(0.55 0.19 28);
+}
+.pv-confirm-confirm.destructive:hover {
+  background: oklch(0.48 0.20 28);
+}
+.pv-confirm-confirm:focus-visible,
+.pv-confirm-cancel:focus-visible {
+  outline: 2px solid var(--pv-ink, oklch(0.26 0.04 155));
+  outline-offset: 2px;
+}
 @media (hover: hover) {
   .bets-row-card:hover {
     box-shadow: 0 10px 26px oklch(0.4 0.06 145 / 0.14);
