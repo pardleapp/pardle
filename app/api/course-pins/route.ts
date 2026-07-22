@@ -27,11 +27,13 @@ const redis = Redis.fromEnv();
 const TTL_SECONDS = 6 * 60 * 60;
 
 function cacheKey(tournamentId: string): string {
-  // v5 — PinCoord now carries rawX/rawY + frameEnh so the birdie
-  // aggregator can fit a per-hole affine that pulls raw-only
-  // (2019-2023) pins into the enhanced image frame. v4 payloads
-  // don't carry those fields.
-  return `feed:pins:v5:${tournamentId}`;
+  // v6 — pre-v6 caches for 2019-2022 tournamentIds carry an empty
+  // yardsByRound because the augmentYardsFromHistorical readFile
+  // silently failed on Vercel (data/historical JSONs weren't in
+  // the serverless bundle). next.config.mjs now traces those
+  // files into the /api/course-pins bundle; bump the cache so
+  // the augmentation actually runs and TEE Δ starts firing.
+  return `feed:pins:v6:${tournamentId}`;
 }
 
 /** Map a tournamentId like "R2020525" back to the historical JSON
