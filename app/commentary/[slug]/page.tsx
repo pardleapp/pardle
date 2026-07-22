@@ -70,7 +70,7 @@ export default async function CommentaryArticle({ params }: Props) {
         </div>
       </header>
       <article
-        style={{ maxWidth: 720, margin: "20px auto", padding: "0 16px 60px" }}
+        style={{ maxWidth: 880, margin: "20px auto", padding: "0 16px 60px" }}
       >
         <nav style={{ marginBottom: 14 }}>
           <Link

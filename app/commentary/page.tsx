@@ -58,7 +58,7 @@ export default function CommentaryIndex() {
         </div>
       </header>
       <section
-        style={{ maxWidth: 780, margin: "20px auto", padding: "0 16px 60px" }}
+        style={{ maxWidth: 1120, margin: "20px auto", padding: "0 16px 60px" }}
       >
         <h2
           style={{
@@ -82,7 +82,17 @@ export default function CommentaryIndex() {
           Short, data-backed takes on the tournament ahead. Updated
           weekly. No hot air, no hedging.
         </p>
-        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 12 }}>
+        <ul
+          style={{
+            listStyle: "none",
+            padding: 0,
+            margin: 0,
+            display: "grid",
+            gap: 12,
+            gridTemplateColumns:
+              "repeat(auto-fill, minmax(340px, 1fr))",
+          }}
+        >
           {ARTICLES.map((a) => (
             <li key={a.slug}>
               <Link
