@@ -23,6 +23,13 @@ interface Article {
 // each one gets its own page under app/commentary/[slug]/page.tsx.
 const ARTICLES: Article[] = [
   {
+    slug: "3m-open-pin-difficulty",
+    title: "Where the birdies live: reading the 3M Open's pin patterns",
+    dek: "Adjusting eight years of pin-by-pin birdie rates for hole length and wind reveals which flag positions at TPC Twin Cities play harder or easier than they look.",
+    date: "2026-07-22",
+    tag: "Pin analysis",
+  },
+  {
     slug: "3m-open-course-fit",
     title: "The 3M Open: what course-fit says about TPC Twin Cities",
     dek: "A ball-flight model that ranks courses by whether they reward bombers or plotters — and where this week lands.",
