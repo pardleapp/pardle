@@ -21534,38 +21534,6 @@ html.pv-theme-body .auth-chip-btn {
 }
 
 @media (min-width: 1024px) {
-  /* Widen the /bets middle column at the expense of the right rail
-     — the bets surface is a dashboard, the rail-as-is-elsewhere
-     stays mounted but tighter. */
-  body:has(.bets-pv) .desktop-shell {
-    grid-template-columns:
-      clamp(180px, 16vw, 240px)
-      minmax(560px, 1fr)
-      clamp(320px, 24vw, 400px);
-  }
-  /* /analysis/tee-shots is a full-width analytics dashboard —
-     picker + stats + ball-flight + shot cloud + similar-drivers
-     ranking. Middle track uses 1fr so it absorbs every pixel of
-     slack; rails are slimmed so the useful data area gets the
-     lion's share. This mirrors the fluid-shell approach the /bets
-     dashboard uses. */
-  /* Analysis dashboards use a wider 2-column shell — the right
-     context rail (Now playing / leaderboard / live bets) doesn't
-     add value on a numbers-heavy analytics surface and steals
-     horizontal width from the charts. Shared across:
-     /analysis/tee-shots, /analysis/course-heatmap,
-     /analysis/tee-time-scoring — anything that opts in via the
-     `analysis-full-shell` class on its <main>. */
-  body:has(main.analysis-full-shell) .desktop-shell {
-    grid-template-columns:
-      clamp(180px, 13vw, 210px)
-      minmax(680px, 1fr);
-    column-gap: clamp(16px, 1.6vw, 24px);
-  }
-  body:has(main.analysis-full-shell) .desktop-ctx {
-    display: none;
-  }
-
   /* Desktop-only picker + dashboard split inside the middle track.
      Mobile ignores these rules and the surface stacks in natural
      block order (aside → content) with the picker at full width. */
@@ -27989,22 +27957,14 @@ summary,
      small even margins (proportional, not a 300px void). */
   .desktop-shell {
     display: grid;
-    /* Three tracks — nav fixed-ish (~240), feed capped at ~520 so
-       cards stay readable, right rail is 1fr so it ABSORBS the
-       leftover viewport width instead of letting it dump as a
-       trailing void. The previous (all-fixed) layout left ~340px
-       trailing void on a 1537px viewport because grid put all
-       slack after the last fixed track. With 1fr on the rail the
-       container has no internal slack at all; the rail expands to
-       hold the wider leaderboard / chat. A max-width cap stops
-       the rail growing past readability on 4K — beyond the cap,
-       `margin: 0 auto` splits the remainder into balanced
-       left+right gutters (never a one-sided void). */
+    /* Two tracks — left nav (fixed-ish ~200) + wide content column
+       (1fr) that absorbs every pixel of extra viewport width. Outer
+       margins absorb leftover width via `margin: 0 auto` + centered
+       justify so the cluster never strands in a sea of white. */
     grid-template-columns:
-      clamp(180px, 16vw, 240px)
-      clamp(440px, 36vw, 580px)
-      clamp(320px, 30vw, 460px);
-    column-gap: clamp(20px, 2vw, 32px);
+      clamp(180px, 13vw, 210px)
+      minmax(680px, 1fr);
+    column-gap: clamp(16px, 1.6vw, 24px);
     width: 100%;
     margin: 0 auto;
     padding: 0 clamp(8px, 1vw, 20px);
@@ -28099,16 +28059,6 @@ summary,
      foot of every page. Override down to 24px. */
   body:has(.desktop-shell) {
     padding-bottom: 24px !important;
-  }
-  /* Sweats feed — widen the middle column so the 2-up card wall
-     has room (≥760px is needed for two ~380px cards + gap). Right
-     rail tightens to compensate. Scoped to body:has(.feed-wrap)
-     so /bets / /leaders etc. keep their own column shape. */
-  body:has(.feed-wrap) .desktop-shell {
-    grid-template-columns:
-      clamp(180px, 16vw, 240px)
-      minmax(640px, 1fr)
-      clamp(320px, 24vw, 400px);
   }
   /* Feed list goes 2-up (3-up on ultrawide) using auto-fill grid
      so the desktop column reads as a live wall of action instead

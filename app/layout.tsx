@@ -7,7 +7,6 @@ import SiteFooter from "./SiteFooter";
 import { ToastProvider } from "./live/Toast";
 import BottomNav from "./BottomNav";
 import DesktopRail from "./_components/DesktopRail";
-import DesktopContextRail from "./_components/DesktopContextRail";
 
 // Inter variable: covers all weights we use (400/600/700/800/900) in
 // one woff2 file. Display-swap so the page paints with the system
@@ -90,14 +89,13 @@ export default function RootLayout({
           {/* Desktop-only chrome wrapped with the page content in a
               centered grid shell. On mobile the .desktop-shell div is
               a transparent passthrough (no grid styles apply); on
-              desktop it becomes a 2- or 3-column grid with the rails
-              sitting inside a max-width container so the outer
-              margins absorb leftover viewport width — no big voids
-              between columns. */}
+              desktop it becomes a 2-column grid — left nav rail + a
+              wide content column — sitting inside a max-width
+              container so the outer margins absorb leftover viewport
+              width. */}
           <div className="desktop-shell">
             <DesktopRail />
             {children}
-            <DesktopContextRail />
           </div>
           <SiteFooter />
           <BottomNav />
