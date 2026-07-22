@@ -365,27 +365,15 @@ export async function GET(req: Request) {
   const calibrationSourceEvents = inputs
     .filter((i) => i.year >= 2024)
     .slice(-2);
-  const calibrationDiag: {
-    source: string;
-    error?: string;
-    perHoleCount?: Record<number, number>;
-  }[] = [];
   for (const src of calibrationSourceEvents) {
-    const rec: { source: string; error?: string; perHoleCount?: Record<number, number> } = {
-      source: src.tournamentId,
-    };
     try {
       const pairs = await gatherGreenCalibrationPairs(src.tournamentId);
-      rec.perHoleCount = Object.fromEntries(
-        Object.entries(pairs).map(([h, arr]) => [Number(h), arr.length]),
-      );
       if (Object.keys(pairs).length > 0) {
         src.extraCalibrationPairs = pairs;
       }
-    } catch (err) {
-      rec.error = err instanceof Error ? err.message : String(err);
+    } catch {
+      /* calibration enrichment is best-effort */
     }
-    calibrationDiag.push(rec);
   }
 
   if (inputs.length === 0) {
@@ -403,7 +391,6 @@ export async function GET(req: Request) {
       (a, b) => a - b,
     ),
     holes,
-    calibrationDiag,
   };
   try {
     await redis.set(cacheKey(tournamentId), payload, { ex: CACHE_TTL });
