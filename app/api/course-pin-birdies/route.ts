@@ -241,14 +241,10 @@ async function familyFor(tournamentId: string): Promise<FamilyDef | null> {
 // ── Endpoint ────────────────────────────────────────────────────────
 
 function cacheKey(tournamentId: string): string {
-  // v11 — the per-hole affine calibration now pulls green stroke
-  // (raw, enh) coord pairs from a modern-year putt sheet as
-  // additional calibration data. Old 8-pin-pair fits extrapolated
-  // poorly at hole edges (H18 2019 R2/R3/R4 landed off the green);
-  // the enriched fit puts every 2019-2022 pin in the correct
-  // enhanced-frame position. Bump so a fresh compute picks up the
-  // richer calibration input.
-  return `feed:pin-birdies:v11:${tournamentId}`;
+  // v12 — v11 shipped the enrichment logic but the calibration diag
+  // showed 0 pairs made it in. Diag response now emits per-source
+  // error / perHoleCount so we can see what's going wrong on live.
+  return `feed:pin-birdies:v12:${tournamentId}`;
 }
 
 export async function GET(req: Request) {
@@ -369,15 +365,27 @@ export async function GET(req: Request) {
   const calibrationSourceEvents = inputs
     .filter((i) => i.year >= 2024)
     .slice(-2);
+  const calibrationDiag: {
+    source: string;
+    error?: string;
+    perHoleCount?: Record<number, number>;
+  }[] = [];
   for (const src of calibrationSourceEvents) {
+    const rec: { source: string; error?: string; perHoleCount?: Record<number, number> } = {
+      source: src.tournamentId,
+    };
     try {
       const pairs = await gatherGreenCalibrationPairs(src.tournamentId);
+      rec.perHoleCount = Object.fromEntries(
+        Object.entries(pairs).map(([h, arr]) => [Number(h), arr.length]),
+      );
       if (Object.keys(pairs).length > 0) {
         src.extraCalibrationPairs = pairs;
       }
-    } catch {
-      /* calibration enrichment is best-effort */
+    } catch (err) {
+      rec.error = err instanceof Error ? err.message : String(err);
     }
+    calibrationDiag.push(rec);
   }
 
   if (inputs.length === 0) {
@@ -395,6 +403,7 @@ export async function GET(req: Request) {
       (a, b) => a - b,
     ),
     holes,
+    calibrationDiag,
   };
   try {
     await redis.set(cacheKey(tournamentId), payload, { ex: CACHE_TTL });
