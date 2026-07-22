@@ -389,6 +389,13 @@ export interface PGAShotHole {
 }
 
 interface CoordNode {
+  /** Raw shot-tracker coord — populated on every season we've
+   *  seen, in a per-hole reference frame. Used as fallback for
+   *  older seasons that leave enhancedX/enhancedY as -1. */
+  x?: number;
+  y?: number;
+  /** Enhanced-frame coord that matches the greenImage / holeImage
+   *  reference frames. -1 sentinel on 2019-2022 events. */
   enhancedX?: number;
   enhancedY?: number;
 }
@@ -451,14 +458,14 @@ export async function getShotDetailsBatch(
                  distance playByPlay
                  overview {
                    leftToRightCoords {
-                     fromCoords { enhancedX enhancedY }
-                     toCoords { enhancedX enhancedY }
+                     fromCoords { x y enhancedX enhancedY }
+                     toCoords { x y enhancedX enhancedY }
                    }
                  }
                  green {
                    leftToRightCoords {
-                     fromCoords { enhancedX enhancedY }
-                     toCoords { enhancedX enhancedY }
+                     fromCoords { x y enhancedX enhancedY }
+                     toCoords { x y enhancedX enhancedY }
                    }
                  }
                }
@@ -481,6 +488,32 @@ export async function getShotDetailsBatch(
         strokes: (h.strokes ?? []).map((s) => {
           const ltr = s.overview?.leftToRightCoords;
           const grn = s.green?.leftToRightCoords;
+          // Prefer enhanced, fall back to raw when enhanced is
+          // -1 sentinel or missing. 2019-2022 populate raw x/y
+          // for green strokes but leave enhancedX/Y as -1, so
+          // reading only enhanced dropped every putt on those
+          // years. Same pattern as pins — the raw coords are
+          // in a slightly different reference frame per hole,
+          // but they're close enough that putt paths still read
+          // correctly on the diagram.
+          const pick = (
+            c: { x?: number; y?: number; enhancedX?: number; enhancedY?: number } | null | undefined,
+          ): [number, number] => {
+            if (!c) return [-1, -1];
+            const isReal = (n: unknown): n is number =>
+              typeof n === "number" && Number.isFinite(n) && n !== -1;
+            if (isReal(c.enhancedX) && isReal(c.enhancedY)) {
+              return [c.enhancedX, c.enhancedY];
+            }
+            if (isReal(c.x) && isReal(c.y)) {
+              return [c.x, c.y];
+            }
+            return [-1, -1];
+          };
+          const [fx, fy] = pick(ltr?.fromCoords);
+          const [tx, ty] = pick(ltr?.toCoords);
+          const [gfx, gfy] = pick(grn?.fromCoords);
+          const [gtx, gty] = pick(grn?.toCoords);
           return {
             strokeNumber: s.strokeNumber,
             strokeType: s.strokeType,
@@ -488,14 +521,14 @@ export async function getShotDetailsBatch(
             toLocationCode: s.toLocationCode,
             distance: s.distance,
             playByPlay: s.playByPlay,
-            fromX: ltr?.fromCoords?.enhancedX ?? -1,
-            fromY: ltr?.fromCoords?.enhancedY ?? -1,
-            toX: ltr?.toCoords?.enhancedX ?? -1,
-            toY: ltr?.toCoords?.enhancedY ?? -1,
-            greenFromX: grn?.fromCoords?.enhancedX ?? -1,
-            greenFromY: grn?.fromCoords?.enhancedY ?? -1,
-            greenToX: grn?.toCoords?.enhancedX ?? -1,
-            greenToY: grn?.toCoords?.enhancedY ?? -1,
+            fromX: fx,
+            fromY: fy,
+            toX: tx,
+            toY: ty,
+            greenFromX: gfx,
+            greenFromY: gfy,
+            greenToX: gtx,
+            greenToY: gty,
           };
         }),
       }));
