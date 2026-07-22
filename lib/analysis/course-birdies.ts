@@ -267,6 +267,69 @@ function clusterPins(pins: PinBirdie[]): PinCluster[] {
   });
 }
 
+/** Fit a 2D affine transform `(rawX, rawY) → (x, y)` via least
+ *  squares. Uses the normal-equations closed form on the 3×3 Gram
+ *  matrix — plenty stable for our N=8+ pairs per hole. Returns null
+ *  when we don't have at least 3 non-degenerate pairs or the fit
+ *  is singular. */
+function fitAffine(
+  pairs: Array<{ rawX: number; rawY: number; x: number; y: number }>,
+): { a: number; b: number; c: number; d: number; tx: number; ty: number } | null {
+  if (pairs.length < 3) return null;
+  // Design matrix rows: [rawX, rawY, 1]. Right-hand sides: x and y.
+  // Solve normal equations for each axis separately.
+  let s11 = 0, s12 = 0, s13 = 0, s22 = 0, s23 = 0, s33 = 0;
+  let bx1 = 0, bx2 = 0, bx3 = 0, by1 = 0, by2 = 0, by3 = 0;
+  for (const p of pairs) {
+    s11 += p.rawX * p.rawX;
+    s12 += p.rawX * p.rawY;
+    s13 += p.rawX;
+    s22 += p.rawY * p.rawY;
+    s23 += p.rawY;
+    s33 += 1;
+    bx1 += p.rawX * p.x;
+    bx2 += p.rawY * p.x;
+    bx3 += p.x;
+    by1 += p.rawX * p.y;
+    by2 += p.rawY * p.y;
+    by3 += p.y;
+  }
+  // Invert the 3×3 symmetric Gram matrix
+  //   [s11 s12 s13]
+  //   [s12 s22 s23]
+  //   [s13 s23 s33]
+  const det =
+    s11 * (s22 * s33 - s23 * s23) -
+    s12 * (s12 * s33 - s23 * s13) +
+    s13 * (s12 * s23 - s22 * s13);
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-12) return null;
+  const inv11 = (s22 * s33 - s23 * s23) / det;
+  const inv12 = -(s12 * s33 - s23 * s13) / det;
+  const inv13 = (s12 * s23 - s22 * s13) / det;
+  const inv22 = (s11 * s33 - s13 * s13) / det;
+  const inv23 = -(s11 * s23 - s13 * s12) / det;
+  const inv33 = (s11 * s22 - s12 * s12) / det;
+  const a = inv11 * bx1 + inv12 * bx2 + inv13 * bx3;
+  const b = inv12 * bx1 + inv22 * bx2 + inv23 * bx3;
+  const tx = inv13 * bx1 + inv23 * bx2 + inv33 * bx3;
+  const c = inv11 * by1 + inv12 * by2 + inv13 * by3;
+  const d = inv12 * by1 + inv22 * by2 + inv23 * by3;
+  const ty = inv13 * by1 + inv23 * by2 + inv33 * by3;
+  if ([a, b, c, d, tx, ty].some((v) => !Number.isFinite(v))) return null;
+  return { a, b, c, d, tx, ty };
+}
+
+function applyAffine(
+  fit: { a: number; b: number; c: number; d: number; tx: number; ty: number },
+  rawX: number,
+  rawY: number,
+): { x: number; y: number } {
+  return {
+    x: fit.a * rawX + fit.b * rawY + fit.tx,
+    y: fit.c * rawX + fit.d * rawY + fit.ty,
+  };
+}
+
 export function buildHoleBirdieData(
   holeNumber: number,
   events: EventInput[],
@@ -277,11 +340,39 @@ export function buildHoleBirdieData(
   let greenImageUrl = "";
   const yearsCovered = new Set<number>();
 
+  // Two-pass build so we can fit a per-hole raw→enhanced calibration
+  // from the events that have BOTH frames (2024+ for 3M Open) and
+  // apply it to events that only have raw (2019-2023). Without this,
+  // 2019-2023 dots plot in a different coord system than the green
+  // image and land off the green.
+  interface Draft {
+    year: number;
+    tournamentId: string;
+    round: number;
+    coord: { x: number; y: number };
+    /** true when coord.x/y are already in the enhanced frame (no
+     *  transform needed). false when they're raw and want an affine
+     *  fit applied before rendering. */
+    frameEnh: boolean;
+    /** Raw coord — always populated. Used both for calibration
+     *  pairing (when frameEnh) and for the transform target (when
+     *  !frameEnh). */
+    rawX: number;
+    rawY: number;
+    birdies: number;
+    total: number;
+  }
+  const drafts: Draft[] = [];
+  const calibPairs: Array<{
+    rawX: number;
+    rawY: number;
+    x: number;
+    y: number;
+  }> = [];
+
   for (const ev of events) {
     const holePin = ev.pins.find((h) => h.holeNumber === holeNumber);
     if (!holePin) continue;
-    // Only use par/yards/image from the first event that has them so
-    // the display metadata stays stable across selections.
     if (par == null && holePin.par != null) par = holePin.par;
     if (yards == null && holePin.yards != null) yards = holePin.yards;
     if (!greenImageUrl && holePin.greenImageUrl) {
@@ -293,23 +384,64 @@ export function buildHoleBirdieData(
       const count = ev.counts.get(holeRoundKey(holeNumber, round));
       const birdies = count?.birdies ?? 0;
       const total = count?.total ?? 0;
-      // Skip pin/round combinations that have no scoring — they're
-      // either upcoming rounds or missing data; contributing 0/0
-      // would just dilute the rates.
       if (total === 0) continue;
-      pins.push({
+      const frameEnh = coord.frameEnh === true;
+      // Raw fallback for calibration reference: use the pin's rawX/Y
+      // when carried alongside enhanced, otherwise x/y ARE the raw
+      // (older seasons).
+      const rawX = coord.rawX ?? coord.x;
+      const rawY = coord.rawY ?? coord.y;
+      if (
+        frameEnh &&
+        coord.rawX != null &&
+        coord.rawY != null &&
+        Number.isFinite(coord.rawX) &&
+        Number.isFinite(coord.rawY)
+      ) {
+        calibPairs.push({
+          rawX: coord.rawX,
+          rawY: coord.rawY,
+          x: coord.x,
+          y: coord.y,
+        });
+      }
+      drafts.push({
         year: ev.year,
         tournamentId: ev.tournamentId,
         round,
-        x: coord.x,
-        y: coord.y,
-        quadrant: quadrantOf(coord.x, coord.y),
+        coord: { x: coord.x, y: coord.y },
+        frameEnh,
+        rawX,
+        rawY,
         birdies,
         total,
-        rate: birdies / total,
       });
       yearsCovered.add(ev.year);
     }
+  }
+
+  const fit = fitAffine(calibPairs);
+  for (const d of drafts) {
+    let x = d.coord.x;
+    let y = d.coord.y;
+    if (!d.frameEnh && fit) {
+      // Transform raw-frame pin coord into the enhanced frame so it
+      // renders on the same green-image reference frame as 2024+.
+      const t = applyAffine(fit, d.rawX, d.rawY);
+      x = t.x;
+      y = t.y;
+    }
+    pins.push({
+      year: d.year,
+      tournamentId: d.tournamentId,
+      round: d.round,
+      x,
+      y,
+      quadrant: quadrantOf(x, y),
+      birdies: d.birdies,
+      total: d.total,
+      rate: d.birdies / d.total,
+    });
   }
 
   if (pins.length === 0) return null;

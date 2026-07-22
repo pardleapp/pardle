@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { parseCoursePinsPayload, pickPinCoord } from "./pgatour";
 
 describe("pickPinCoord — enhanced/raw fallback", () => {
-  it("prefers enhanced when both are valid", () => {
+  it("prefers enhanced when both are valid, preserves raw for calibration", () => {
     expect(
       pickPinCoord({
         x: 0.5,
@@ -15,7 +15,13 @@ describe("pickPinCoord — enhanced/raw fallback", () => {
         enhancedX: 0.48,
         enhancedY: 0.61,
       }),
-    ).toEqual({ x: 0.48, y: 0.61 });
+    ).toEqual({
+      x: 0.48,
+      y: 0.61,
+      rawX: 0.5,
+      rawY: 0.7,
+      frameEnh: true,
+    });
   });
 
   it("falls back to raw when enhanced is the -1 sentinel (2023 case)", () => {
@@ -111,8 +117,8 @@ describe("parseCoursePinsPayload — full season shapes", () => {
     expect(h.holeNumber).toBe(3);
     expect(h.par).toBe(4);
     expect(h.pinByRound).toEqual({
-      1: { x: 0.49, y: 0.61 },
-      4: { x: 0.61, y: 0.66 },
+      1: { x: 0.49, y: 0.61, rawX: 0.51, rawY: 0.72, frameEnh: true },
+      4: { x: 0.61, y: 0.66, rawX: 0.64, rawY: 0.68, frameEnh: true },
     });
   });
 
@@ -255,8 +261,14 @@ describe("parseCoursePinsPayload — full season shapes", () => {
     };
     const sheet = parseCoursePinsPayload("R2023525", raw);
     const h = sheet!.holes[0];
-    expect(h.pinByRound[2]).toEqual({ x: 0.48, y: 0.48 });
-    // R1, R3, R4 fall back to the roundless pin
+    expect(h.pinByRound[2]).toEqual({
+      x: 0.48,
+      y: 0.48,
+      rawX: 0.5,
+      rawY: 0.5,
+      frameEnh: true,
+    });
+    // R1, R3, R4 fall back to the roundless pin (raw only)
     expect(h.pinByRound[1]).toEqual({ x: 0.99, y: 0.99 });
     expect(h.pinByRound[3]).toEqual({ x: 0.99, y: 0.99 });
     expect(h.pinByRound[4]).toEqual({ x: 0.99, y: 0.99 });

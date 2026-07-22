@@ -546,6 +546,20 @@ function normalizeScorecard(
 export interface PinCoord {
   x: number;
   y: number;
+  /** Original raw x/y from the orchestrator, preserved when both
+   *  raw and enhanced were populated (2024+ seasons). Used as
+   *  calibration reference by the birdie-history aggregator to fit
+   *  a per-hole affine that transforms raw-only coords from older
+   *  seasons (2019-2023) into the enhanced-image frame. Undefined
+   *  when only one of raw/enhanced was present — nothing to
+   *  calibrate from. */
+  rawX?: number;
+  rawY?: number;
+  /** True when x/y come from the enhanced tracer coords (the frame
+   *  the green image is rendered in). Undefined or false means the
+   *  raw fallback was taken and the coord needs affine-calibration
+   *  before it can be plotted accurately. */
+  frameEnh?: boolean;
 }
 
 /** Field scoring for one hole in one round. */
@@ -718,15 +732,32 @@ export function pickPinCoord(
       }
     | undefined
     | null,
-): { x: number; y: number } | null {
+): PinCoord | null {
   if (!coords) return null;
   const isReal = (n: unknown): n is number =>
     typeof n === "number" && Number.isFinite(n) && n !== -1 && n >= 0;
-  if (isReal(coords.enhancedX) && isReal(coords.enhancedY)) {
-    return { x: coords.enhancedX, y: coords.enhancedY };
+  const hasRaw = isReal(coords.x) && isReal(coords.y);
+  const hasEnh = isReal(coords.enhancedX) && isReal(coords.enhancedY);
+  if (hasEnh) {
+    // Enhanced frame: display these directly. Preserve raw when
+    // available so the birdie-history aggregator can use this pin
+    // as a calibration reference for older raw-only seasons.
+    return {
+      x: coords.enhancedX as number,
+      y: coords.enhancedY as number,
+      rawX: hasRaw ? (coords.x as number) : undefined,
+      rawY: hasRaw ? (coords.y as number) : undefined,
+      frameEnh: true,
+    };
   }
-  if (isReal(coords.x) && isReal(coords.y)) {
-    return { x: coords.x, y: coords.y };
+  if (hasRaw) {
+    // Raw fallback (2019-2023). Rendering these directly plants the
+    // dot in the wrong frame; the aggregator transforms them via
+    // per-hole affine calibration before they land on the diagram.
+    return {
+      x: coords.x as number,
+      y: coords.y as number,
+    };
   }
   return null;
 }

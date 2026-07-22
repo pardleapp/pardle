@@ -27,11 +27,11 @@ const redis = Redis.fromEnv();
 const TTL_SECONDS = 6 * 60 * 60;
 
 function cacheKey(tournamentId: string): string {
-  // v4 — earlier v3 deploys briefly cached empty sheets for the
-  // 2019-2022 tournamentIds because getCoursePins was still using
-  // a duplicated old parser that skipped roundless entries. Bump
-  // so those empty-cached rows get thrown away.
-  return `feed:pins:v4:${tournamentId}`;
+  // v5 — PinCoord now carries rawX/rawY + frameEnh so the birdie
+  // aggregator can fit a per-hole affine that pulls raw-only
+  // (2019-2023) pins into the enhanced image frame. v4 payloads
+  // don't carry those fields.
+  return `feed:pins:v5:${tournamentId}`;
 }
 
 /** Map a tournamentId like "R2020525" back to the historical JSON
