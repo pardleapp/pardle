@@ -58,7 +58,7 @@ export default function CommentaryIndex() {
         </div>
       </header>
       <section
-        style={{ maxWidth: 1120, margin: "20px auto", padding: "0 16px 60px" }}
+        style={{ maxWidth: 1280, margin: "20px 0", padding: "0 16px 60px" }}
       >
         <h2
           style={{

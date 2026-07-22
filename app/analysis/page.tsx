@@ -54,8 +54,8 @@ export default function AnalysisIndex() {
       </header>
       <section
         style={{
-          maxWidth: 900,
-          margin: "20px auto",
+          maxWidth: 1280,
+          margin: "20px 0",
           padding: "0 16px 60px",
         }}
       >
@@ -89,7 +89,9 @@ export default function AnalysisIndex() {
             padding: 0,
             margin: 0,
             display: "grid",
-            gap: 12,
+            gap: 14,
+            gridTemplateColumns:
+              "repeat(auto-fill, minmax(340px, 1fr))",
           }}
         >
           {CARDS.map((card) => {
