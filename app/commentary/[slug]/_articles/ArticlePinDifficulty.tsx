@@ -213,12 +213,12 @@ interface PinRow {
 }
 
 const HARDER: PinRow[] = [
-  { hole: 18, position: "upper-right", observed: 41.4, expected: 47.7, delta: -6.2, sample: 152 },
   { hole: 2,  position: "lower-right", observed: 12.7, expected: 18.2, delta: -5.5, sample: 669 },
   { hole: 12, position: "lower-center", observed: 49.4, expected: 54.9, delta: -5.4, sample: 908 },
   { hole: 17, position: "upper-center", observed: 10.6, expected: 14.3, delta: -3.7, sample: 669 },
   { hole: 10, position: "lower-center", observed: 21.0, expected: 24.6, delta: -3.6, sample: 309 },
   { hole: 13, position: "lower-center", observed: 8.0, expected: 11.2, delta: -3.2, sample: 514 },
+  { hole: 18, position: "middle-left", observed: 36.4, expected: 39.6, delta: -3.1, sample: 516 },
 ];
 
 const EASIER: PinRow[] = [
@@ -478,17 +478,18 @@ export default function ArticlePinDifficulty() {
         upper one is a green light, the lower one a trap.
       </div>
       <P>
-        <b>Hole 18 upper-center</b> is the flag you want to see
+        <b>Hole 18 back-center</b> is the flag you want to see
         for a birdie sweat on 18 — 4.7pp easier than expected,
         which is meaningful in a hole this wind-sensitive. The
-        back-right flag on the same green is the one to fade: it
-        pulls the approach closest to the water short-right and
-        the field over-corrects long-left, into the fringe.
+        middle-left flag on the same green is the one to fade:
+        3.1pp harder than expected across six rounds, and it's
+        the pin that sits closest to the water short-left, where
+        the approach can't safely bail out on the low side.
       </P>
       <GreenCompare
         hole={18}
-        easy={{ x: 0.497, y: 0.156, label: "upper-center flag", delta: 4.7 }}
-        hard={{ x: 0.557, y: 0.250, label: "back-right flag", delta: -6.2 }}
+        easy={{ x: 0.497, y: 0.156, label: "back-center flag", delta: 4.7 }}
+        hard={{ x: 0.406, y: 0.583, label: "middle-left flag", delta: -3.1 }}
       />
       <div
         style={{
@@ -499,9 +500,10 @@ export default function ArticlePinDifficulty() {
           textAlign: "center",
         }}
       >
-        On the closing hole, the flag position matters more than
-        almost anywhere else on the course — an 11pp swing
-        between these two.
+        On the closing hole, the two most-used pin positions
+        create a ~8pp swing in birdie probability after
+        conditions — the back flag is a green light, the
+        middle-left flag isn't.
       </div>
 
       <H3>How to actually use this</H3>
@@ -526,10 +528,10 @@ export default function ArticlePinDifficulty() {
           Hole 12 lower-center flag → fade eagle/birdie parlays
         </li>
         <li style={{ marginBottom: 6 }}>
-          Hole 18 upper-center flag, calm forecast → real birdie chance
+          Hole 18 back-center flag, calm forecast → real birdie chance
         </li>
         <li style={{ marginBottom: 6 }}>
-          Hole 18 upper-right flag, any wind → treat as bogey-neutral
+          Hole 18 middle-left flag, any wind → treat as bogey-neutral
         </li>
         <li style={{ marginBottom: 6 }}>
           Hole 2 middle-right → soft; lower-right → hard
