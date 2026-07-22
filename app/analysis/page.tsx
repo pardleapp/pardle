@@ -91,7 +91,7 @@ export default function AnalysisIndex() {
             display: "grid",
             gap: 14,
             gridTemplateColumns:
-              "repeat(auto-fill, minmax(340px, 1fr))",
+              "repeat(auto-fit, minmax(340px, 1fr))",
           }}
         >
           {CARDS.map((card) => {

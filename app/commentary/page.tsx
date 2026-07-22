@@ -90,7 +90,7 @@ export default function CommentaryIndex() {
             display: "grid",
             gap: 12,
             gridTemplateColumns:
-              "repeat(auto-fill, minmax(340px, 1fr))",
+              "repeat(auto-fit, minmax(340px, 1fr))",
           }}
         >
           {ARTICLES.map((a) => (
