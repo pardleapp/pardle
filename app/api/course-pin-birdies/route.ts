@@ -179,11 +179,13 @@ async function familyFor(tournamentId: string): Promise<FamilyDef | null> {
 // ── Endpoint ────────────────────────────────────────────────────────
 
 function cacheKey(tournamentId: string): string {
-  // v6 — parser now falls back to raw coords when enhanced are the
-  // -1 sentinel (unlocks 2023) and replicates roundless pins across
-  // R1-R4 (unlocks 2019-2022). Old v5 responses were computed with
-  // 2023-2025 only; bump so we recompute with 7 seasons of data.
-  return `feed:pin-birdies:v6:${tournamentId}`;
+  // v7 — v6 rows for the 2023/2024/2025 tournamentIds were computed
+  // during the window when getCoursePins was still using its old
+  // duplicated parser (empty pinByRound for 2019-2022 events), so
+  // those years' pins never joined the birdie aggregation. Bump
+  // so a fresh compute runs through the consolidated parser and
+  // pulls all seven seasons.
+  return `feed:pin-birdies:v7:${tournamentId}`;
 }
 
 export async function GET(req: Request) {
