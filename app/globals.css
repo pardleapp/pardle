@@ -21334,6 +21334,85 @@ html.pv-theme-body .auth-chip-btn {
   gap: 12px;
 }
 
+/* Settled-tab filter block. Sits above the summary card; each row is
+   a label + a chip strip (or a select for tournaments — one dropdown
+   is cleaner than 20 chips when a user's played a full schedule). */
+.bets-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--card, oklch(0.995 0.004 95));
+  border: 1px solid var(--line, oklch(0.90 0.013 95));
+  border-radius: 12px;
+}
+.bets-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.bets-filter-lab {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted, oklch(0.50 0.02 150));
+  min-width: 84px;
+}
+.bets-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+.bets-filter-chip {
+  border: 1px solid var(--line, oklch(0.90 0.013 95));
+  background: var(--bg, oklch(0.972 0.009 95));
+  color: var(--ink, oklch(0.26 0.04 155));
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.08s, background 0.12s, border-color 0.12s;
+}
+.bets-filter-chip:hover {
+  background: var(--soft, oklch(0.945 0.012 95));
+}
+.bets-filter-chip.on {
+  background: var(--emerald-d, oklch(0.40 0.12 156));
+  color: #fff;
+  border-color: var(--emerald-d, oklch(0.40 0.12 156));
+}
+.bets-filter-select {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--line, oklch(0.90 0.013 95));
+  border-radius: 8px;
+  background: var(--bg, oklch(0.972 0.009 95));
+  color: var(--ink, oklch(0.26 0.04 155));
+  font-family: inherit;
+  cursor: pointer;
+}
+.bets-filter-clear {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  color: var(--emerald-d, oklch(0.40 0.12 156));
+  font-weight: 800;
+  font-size: 12px;
+  padding: 4px 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* Desktop /bets dashboard — hidden on mobile so the existing
    single-column tracker stays byte-for-byte unchanged. On desktop
    the middle column also widens (see body:has(.bets-pv) shell

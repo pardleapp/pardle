@@ -310,6 +310,14 @@ function adaptToSettled(bet: TrackedBet): MockBetSettled {
     stake: bet.stake,
     result: won ? "WON" : "LOST",
     pl,
+    // Filter metadata — populated so the /bets Settled tab can slice
+    // by market kind, tournament, and timeframe. Fields are optional
+    // on MockBetSettled itself so older callers keep working.
+    kind: bet.kind,
+    placedAt: bet.placedAt,
+    settledAt: bet.settledAt ?? undefined,
+    tournamentId: bet.tournamentId,
+    tournamentName: bet.tournamentName,
   };
 }
 

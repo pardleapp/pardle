@@ -55,6 +55,20 @@ export interface MockBetSettled {
   stake: number;
   result: "WON" | "LOST";
   pl: string;
+  /** Enum used by the /bets filter chips to group settled bets by
+   *  market. Matches TrackedBet["kind"] exactly. Optional to keep
+   *  the type back-compat with the older mock rows which don't
+   *  populate it — those still render but drop out of "by market"
+   *  slicing. */
+  kind?: "outright" | "round-score" | "winning-score" | "top-finish" | "without";
+  /** Epoch ms — used by timeframe filters. Optional for the same
+   *  back-compat reason. */
+  placedAt?: number;
+  settledAt?: number;
+  /** Orchestrator tournamentId + display name — used by the
+   *  tournament filter. */
+  tournamentId?: string;
+  tournamentName?: string;
 }
 
 export const MOCK_BETS_LIVE: MockBetLive[] = [

@@ -17,7 +17,7 @@
  * Settled tab: summary card (net + hit rate) + settled rows.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   ODDS_FORMAT_OPTIONS,
@@ -30,6 +30,48 @@ import ShareCard from "./ShareCard";
 import { useRealBets } from "./useRealBets";
 import AddBetTrigger from "@/app/_components/AddBetTrigger";
 import CumulativePnlChart from "./CumulativePnlChart";
+
+/** Settled-tab filter axes. Every axis defaults to "all" (no
+ *  restriction); the filter chips clear back to "all" when the user
+ *  taps the currently-selected one. */
+type MarketFilter =
+  | "all"
+  | "outright"
+  | "top-finish"
+  | "round-score"
+  | "winning-score"
+  | "without";
+type TimeframeFilter = "all" | "7d" | "30d" | "90d" | "ytd";
+
+const MARKET_FILTERS: Array<{ key: MarketFilter; label: string }> = [
+  { key: "all", label: "All markets" },
+  { key: "outright", label: "Outright" },
+  { key: "top-finish", label: "Top-N" },
+  { key: "without", label: "Without X" },
+  { key: "round-score", label: "Round score" },
+  { key: "winning-score", label: "Winning score" },
+];
+const TIMEFRAME_FILTERS: Array<{ key: TimeframeFilter; label: string }> = [
+  { key: "all", label: "All time" },
+  { key: "7d", label: "7d" },
+  { key: "30d", label: "30d" },
+  { key: "90d", label: "90d" },
+  { key: "ytd", label: "YTD" },
+];
+
+/** Turn a timeframe key into an epoch-ms lower bound. "all" → 0. */
+function timeframeStartMs(tf: TimeframeFilter, now: number): number {
+  if (tf === "all") return 0;
+  const DAY = 24 * 60 * 60 * 1000;
+  if (tf === "7d") return now - 7 * DAY;
+  if (tf === "30d") return now - 30 * DAY;
+  if (tf === "90d") return now - 90 * DAY;
+  // YTD — anchor to Jan 1 in the user's local timezone.
+  const jan1 = new Date();
+  jan1.setMonth(0, 1);
+  jan1.setHours(0, 0, 0, 0);
+  return jan1.getTime();
+}
 
 /** Build the settlement-modal data from a MockBetSettled — derives
  *  returnedLabel for wins (stake × odds), books a mock daily P&L
@@ -83,6 +125,13 @@ export default function BetsClient() {
   // MOCK_BETS_LIVE / MOCK_BETS_SETTLED constants this page rendered
   // until tonight.
   const { live: bets, settled: settledBets, ready } = useRealBets();
+
+  // Settled-tab filters — market kind, tournament, timeframe. Each
+  // axis is independent; the visible list AND the aggregate summary
+  // above it recompute against the intersection.
+  const [marketFilter, setMarketFilter] = useState<MarketFilter>("all");
+  const [tournamentFilter, setTournamentFilter] = useState<string>("all");
+  const [timeframeFilter, setTimeframeFilter] = useState<TimeframeFilter>("all");
 
   // Deep-link support: /bets?settle=s1 opens the settlement moment
   // for a given settled bet id. Used by the feed's compact settled-
@@ -208,6 +257,101 @@ export default function BetsClient() {
       biggestWinLabel = `${b.who} · ${b.mkt}`;
     }
   }
+  // ── Settled-tab: unique tournaments seen in the settled feed ────
+  // Populates the tournament dropdown. Order is most-recent-first
+  // (by max settledAt within the group) so the current event stays
+  // near the top.
+  const tournamentOptions = useMemo(() => {
+    const map = new Map<string, { name: string; latestTs: number }>();
+    for (const b of settledBets) {
+      if (!b.tournamentId) continue;
+      const name = b.tournamentName || b.tournamentId;
+      const ts = b.settledAt ?? b.placedAt ?? 0;
+      const prev = map.get(b.tournamentId);
+      if (!prev || ts > prev.latestTs) {
+        map.set(b.tournamentId, { name, latestTs: ts });
+      }
+    }
+    return [...map.entries()]
+      .map(([id, v]) => ({ id, name: v.name, latestTs: v.latestTs }))
+      .sort((a, b) => b.latestTs - a.latestTs);
+  }, [settledBets]);
+
+  // ── Settled-tab: filtered slice + per-slice metrics ─────────────
+  const filteredSettled = useMemo(() => {
+    const now = Date.now();
+    const start = timeframeStartMs(timeframeFilter, now);
+    return settledBets.filter((b) => {
+      if (marketFilter !== "all" && b.kind !== marketFilter) return false;
+      if (tournamentFilter !== "all" && b.tournamentId !== tournamentFilter) {
+        return false;
+      }
+      if (timeframeFilter !== "all") {
+        const ts = b.settledAt ?? b.placedAt ?? 0;
+        if (ts < start) return false;
+      }
+      return true;
+    });
+  }, [settledBets, marketFilter, tournamentFilter, timeframeFilter]);
+
+  // Slice metrics — count, staked, realised PnL by currency, W/L,
+  // hit rate, ROI. Renders in the filtered summary card so users see
+  // "how does 'outright at the Masters last 90d' actually score?".
+  const sliceMetrics = useMemo(() => {
+    const netByCur: Record<string, number> = {};
+    const stakedByCur: Record<string, number> = {};
+    let sliceWins = 0;
+    let sliceLosses = 0;
+    for (const b of filteredSettled) {
+      if (b.result === "WON") sliceWins++;
+      else sliceLosses++;
+      const sign = b.pl.startsWith("−") || b.pl.startsWith("-") ? -1 : 1;
+      const num = parseFloat(b.pl.replace(/[^0-9.]/g, "")) || 0;
+      netByCur[b.cur] = (netByCur[b.cur] ?? 0) + sign * num;
+      stakedByCur[b.cur] = (stakedByCur[b.cur] ?? 0) + b.stake;
+    }
+    const total = sliceWins + sliceLosses;
+    return {
+      count: filteredSettled.length,
+      wins: sliceWins,
+      losses: sliceLosses,
+      netByCur,
+      stakedByCur,
+      hitPct: total > 0 ? Math.round((sliceWins / total) * 100) : 0,
+    };
+  }, [filteredSettled]);
+
+  const filtersActive =
+    marketFilter !== "all" ||
+    tournamentFilter !== "all" ||
+    timeframeFilter !== "all";
+
+  const clearFilters = () => {
+    setMarketFilter("all");
+    setTournamentFilter("all");
+    setTimeframeFilter("all");
+  };
+
+  /** Format a per-currency dict into "+£120 · −$40" style. Handles
+   *  units ("u" as suffix) and the empty case ("—"). */
+  const formatByCurWithSign = (
+    dict: Record<string, number>,
+    { showSign }: { showSign: boolean },
+  ): string => {
+    const entries = Object.entries(dict);
+    if (entries.length === 0) return "—";
+    return entries
+      .map(([cur, n]) => {
+        const abs = Math.abs(n);
+        const s = n >= 0 ? (showSign ? "+" : "") : "−";
+        const body = abs.toLocaleString("en-US", {
+          maximumFractionDigits: cur === "u" ? 1 : 0,
+        });
+        return cur === "u" ? `${s}${body}${cur}` : `${s}${cur}${body}`;
+      })
+      .join(" · ");
+  };
+
   const fmtMoney = (v: number, withSign = false) => {
     const sign = v > 0 && withSign ? "+" : v < 0 ? "−" : "";
     const isUnit = primaryCur === "u";
@@ -386,19 +530,100 @@ export default function BetsClient() {
           </>
         ) : (
           <>
+            {/* Filter row — market, tournament, timeframe. Present
+                above the summary card so the summary numbers reflect
+                whatever the user's currently slicing. Sticks around
+                even if the filtered slice is empty so they can un-
+                filter without hunting for the Clear button. */}
+            {settledBets.length > 0 && (
+              <div className="bets-filters">
+                <div className="bets-filter-row">
+                  <div className="bets-filter-lab">Market</div>
+                  <div className="bets-filter-chips">
+                    {MARKET_FILTERS.map((f) => (
+                      <button
+                        key={f.key}
+                        type="button"
+                        className={`bets-filter-chip${
+                          marketFilter === f.key ? " on" : ""
+                        }`}
+                        onClick={() => setMarketFilter(f.key)}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {tournamentOptions.length > 0 && (
+                  <div className="bets-filter-row">
+                    <div className="bets-filter-lab">Tournament</div>
+                    <select
+                      className="bets-filter-select"
+                      value={tournamentFilter}
+                      onChange={(e) => setTournamentFilter(e.target.value)}
+                    >
+                      <option value="all">All tournaments</option>
+                      {tournamentOptions.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="bets-filter-row">
+                  <div className="bets-filter-lab">Timeframe</div>
+                  <div className="bets-filter-chips">
+                    {TIMEFRAME_FILTERS.map((f) => (
+                      <button
+                        key={f.key}
+                        type="button"
+                        className={`bets-filter-chip${
+                          timeframeFilter === f.key ? " on" : ""
+                        }`}
+                        onClick={() => setTimeframeFilter(f.key)}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {filtersActive && (
+                  <button
+                    type="button"
+                    className="bets-filter-clear"
+                    onClick={clearFilters}
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            )}
             <div className="bets-summary bets-summary-mobile">
               <div>
-                <div className="bets-summary-lab">Net · event</div>
-                <div className="bets-summary-big mono">{netLabel || "—"}</div>
+                <div className="bets-summary-lab">
+                  Net {filtersActive ? "· filtered" : "· all settled"}
+                </div>
+                <div className="bets-summary-big mono">
+                  {formatByCurWithSign(sliceMetrics.netByCur, { showSign: true })}
+                </div>
                 <div className="bets-summary-legs">
-                  {settledCount} settled
+                  {sliceMetrics.count}{" "}
+                  {sliceMetrics.count === 1 ? "settled bet" : "settled bets"}
+                  {filtersActive && settledCount !== sliceMetrics.count
+                    ? ` · ${settledCount} total`
+                    : ""}
                 </div>
               </div>
               <div className="bets-summary-r">
                 <div className="bets-summary-lab">Hit rate</div>
-                <div className="bets-summary-big mono">{hitPct}%</div>
+                <div className="bets-summary-big mono">
+                  {sliceMetrics.wins + sliceMetrics.losses > 0
+                    ? `${sliceMetrics.hitPct}%`
+                    : "—"}
+                </div>
                 <div className="bets-summary-legs">
-                  {wins} W · {losses} L
+                  {sliceMetrics.wins} W · {sliceMetrics.losses} L
                 </div>
               </div>
             </div>
@@ -408,9 +633,18 @@ export default function BetsClient() {
                   {ready ? "No settled bets yet" : "Loading…"}
                 </div>
               </div>
+            ) : filteredSettled.length === 0 ? (
+              <div className="bets-empty">
+                <div className="bets-empty-title">
+                  No settled bets match these filters
+                </div>
+                <div className="bets-empty-sub">
+                  Try clearing one — you have {settledCount} in total.
+                </div>
+              </div>
             ) : (
               <div className="bets-grid">
-                {settledBets.map((b) => (
+                {filteredSettled.map((b) => (
                   <button
                     type="button"
                     className="bets-settled"
