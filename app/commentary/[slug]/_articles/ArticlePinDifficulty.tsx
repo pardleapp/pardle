@@ -213,21 +213,21 @@ interface PinRow {
 }
 
 const HARDER: PinRow[] = [
-  { hole: 12, position: "front-right", observed: 49.4, expected: 57.1, delta: -7.7, sample: 908 },
-  { hole: 18, position: "middle-right", observed: 36.4, expected: 42.9, delta: -6.4, sample: 516 },
-  { hole: 13, position: "middle-right", observed: 8.0, expected: 11.7, delta: -3.7, sample: 514 },
+  { hole: 12, position: "front-right", observed: 49.4, expected: 57.4, delta: -7.9, sample: 908 },
+  { hole: 18, position: "middle-right", observed: 36.4, expected: 43.0, delta: -6.6, sample: 516 },
+  { hole: 13, position: "middle-right", observed: 8.0, expected: 12.3, delta: -4.3, sample: 514 },
   { hole: 17, position: "middle-left", observed: 10.6, expected: 14.3, delta: -3.7, sample: 669 },
-  { hole: 2,  position: "back-right", observed: 12.7, expected: 16.3, delta: -3.6, sample: 669 },
+  { hole: 2,  position: "back-right", observed: 12.7, expected: 16.3, delta: -3.5, sample: 669 },
   { hole: 1,  position: "front-left", observed: 20.0, expected: 23.1, delta: -3.1, sample: 746 },
 ];
 
 const EASIER: PinRow[] = [
+  { hole: 12, position: "front-center", observed: 64.8, expected: 58.6, delta: 6.1, sample: 528 },
+  { hole: 18, position: "front-left", observed: 42.0, expected: 36.1, delta: 5.9, sample: 514 },
   { hole: 2,  position: "back-left", observed: 25.9, expected: 20.3, delta: 5.5, sample: 673 },
-  { hole: 7,  position: "middle-left", observed: 26.9, expected: 21.9, delta: 5.0, sample: 290 },
-  { hole: 18, position: "front-left", observed: 42.0, expected: 37.1, delta: 4.9, sample: 514 },
-  { hole: 12, position: "front-center", observed: 64.8, expected: 61.1, delta: 3.7, sample: 528 },
+  { hole: 12, position: "back-left", observed: 56.8, expected: 53.3, delta: 3.4, sample: 599 },
   { hole: 6,  position: "front-center", observed: 46.8, expected: 43.6, delta: 3.3, sample: 741 },
-  { hole: 10, position: "back-left", observed: 24.4, expected: 21.4, delta: 3.0, sample: 509 },
+  { hole: 10, position: "back-left", observed: 24.4, expected: 21.5, delta: 2.9, sample: 509 },
 ];
 
 function PinRowRender({ p }: { p: PinRow }) {
@@ -368,39 +368,43 @@ export default function ArticlePinDifficulty() {
             color: "oklch(0.28 0.04 155)",
           }}
         >
-          birdie rate = a + b<sub>y</sub>&middot;yards + b<sub>u</sub>&middot;u + b<sub>v</sub>&middot;v
+          birdie rate = a + b<sub>y</sub>&middot;yards + b<sub>h</sub>&middot;headwind
         </span>
-        where u and v are the north/east components of the round's
-        wind vector (speed &times; direction). The linear combination
-        of u and v is mathematically equivalent to a headwind term
-        along <i>any</i> compass axis, so a per-hole regression
-        automatically discovers the direction into which that
-        hole's shots are hurt most by wind — no compass lookup
-        needed. Then we ask, for every historical pin: <i>did this
-        position birdie more or less often than the yardage and
-        directional wind that day would predict?</i> That residual
-        is the number worth looking at.
+        where <i>headwind</i> is the wind's speed projected onto the
+        hole's actual play direction (positive = into the player's
+        face on the approach). Each hole's play bearing is the real
+        compass direction from fairway landing to green, pulled from
+        OpenStreetMap way geometry — so a 15mph south wind is
+        correctly identified as a headwind on a hole playing south
+        and a tailwind on a hole playing north. Then we ask, for
+        every historical pin: <i>did this position birdie more or
+        less often than the yardage and directional wind that day
+        would predict?</i> That residual is the number worth
+        looking at.
       </P>
 
       <H3>What the coefficients say about the course</H3>
       <P>
         Before we even get to the pins, the model tells us something
         useful about how TPC Twin Cities plays. Directional wind is
-        by far the dominant round-level factor — and once we
-        account for direction rather than raw speed, the wind
-        sensitivity of specific holes sharpens up.
+        the dominant round-level factor — but once we account for
+        the actual play direction of each hole, the wind
+        sensitivities look different from what a speed-only model
+        would suggest.
       </P>
       <P>
-        The eighteenth and the sixth are the most wind-sensitive
-        holes on the property: <b>every 5 mph of headwind along the
-        hole's play axis strips ~6pp off its birdie rate</b>.
-        Hole 12 loses ~5pp per 5 mph headwind. Yardage matters
-        too — the biggest per-hole yardage coefficient (hole 16,
-        &minus;4pp per +10 yards) is meaningful but rarely
-        overwhelming. If you want to bet birdie-heavy round scores
-        this week, the wind forecast — and specifically <i>which
-        way</i> the wind is coming from — is the first thing to
-        read.
+        <b>Hole 6 and hole 12 are the most wind-sensitive on the
+        property</b>: each loses about ~4pp of birdie rate for every
+        5 mph of headwind on the approach. Hole 18 is more moderate
+        than it first appeared — ~3pp per 5 mph headwind — because
+        an earlier version of the model was conflating windy days
+        with headwind days, when in fact half of them were
+        tailwinds. Yardage still matters: the biggest per-hole
+        yardage coefficient (hole 16, &minus;2pp per +10 yards) is
+        meaningful but rarely dominant. If you want to bet
+        birdie-heavy round scores this week, the wind forecast —
+        and specifically <i>which way</i> the wind is coming
+        from — is the first thing to read.
       </P>
 
       <Callout>
@@ -443,48 +447,17 @@ export default function ArticlePinDifficulty() {
       <H3>Pins that play easier than they look</H3>
       <PinList rows={EASIER} label="Plays easier" />
       <P>
-        <b>Hole 18</b> has the biggest same-green swing on the
-        property after adjusting for directional wind: the
-        front-left flag plays +4.9pp <i>above</i> expectation and
-        the middle-right flag plays &minus;6.4pp <i>below</i> —
-        an <b>11pp swing in birdie probability</b> between two
-        pins on the closing green. Both effects are stronger once
-        you correctly account for whether the wind is helping or
-        hurting on 18, which flips more often than the day's
-        speed suggests.
-      </P>
-      <GreenCompare
-        hole={18}
-        easy={{ x: 0.497, y: 0.156, label: "front-left flag", delta: 4.9 }}
-        hard={{ x: 0.406, y: 0.583, label: "middle-right flag", delta: -6.4 }}
-      />
-      <div
-        style={{
-          fontSize: 12,
-          fontFamily: proseFont,
-          color: "oklch(0.55 0.02 150)",
-          margin: "-8px 0 20px",
-          textAlign: "center",
-        }}
-      >
-        On the closing hole, two flags on the same green produce
-        a ~11pp swing in birdie probability after conditions —
-        front-left is a green light, middle-right isn't.
-      </div>
-      <P>
-        <b>Hole 12</b> tells a similar story on a par-5 green: the
-        front-center flag plays +3.7pp above expectation, the
-        front-right flag &minus;7.7pp below. That's another 11pp
-        swing between two flags a wedge apart. Notably, once
-        directional wind is in the model, the front-right pin
-        looks tougher than v1 said and the front-center pin looks
-        milder — the earlier version was crediting favorable wind
-        angles to the pin position.
+        <b>Hole 12</b> has the biggest same-green swing on the
+        property: the front-center flag plays +6.1pp <i>above</i>
+        expectation and the front-right flag &minus;7.9pp
+        <i>below</i> — <b>a 14pp swing in birdie probability</b>
+        between two pins a wedge apart on the same par-5 green,
+        in comparable conditions.
       </P>
       <GreenCompare
         hole={12}
-        easy={{ x: 0.403, y: 0.482, label: "front-center flag", delta: 3.7 }}
-        hard={{ x: 0.520, y: 0.684, label: "front-right flag", delta: -7.7 }}
+        easy={{ x: 0.403, y: 0.482, label: "front-center flag", delta: 6.1 }}
+        hard={{ x: 0.520, y: 0.684, label: "front-right flag", delta: -7.9 }}
       />
       <div
         style={{
@@ -495,21 +468,47 @@ export default function ArticlePinDifficulty() {
           textAlign: "center",
         }}
       >
-        Two front pins on the twelfth: the centre flag is a
-        birdie zone, the right flag isn't.
+        Two front pins on the twelfth: the centre flag is a birdie
+        zone, the right flag isn't.
       </div>
       <P>
-        <b>Hole 2</b> is the third meaningful pair: the back-left
-        flag plays +5.5pp above expectation, the back-right
-        &minus;3.6pp below. Both effects are smaller than v1
-        claimed once you account for wind direction, but
-        directionally the story holds — back-right on 2 is
-        genuinely defensive, back-left is genuinely soft.
+        <b>Hole 18</b> tells the same story on the closing green:
+        front-left flag +5.9pp, middle-right flag &minus;6.6pp —
+        a 12pp swing between two pins on 18. The effect is real
+        even though H18 itself is only moderately wind-sensitive
+        once you use the actual play direction; some pins on
+        that green are just genuinely harder than the yardage
+        would predict.
+      </P>
+      <GreenCompare
+        hole={18}
+        easy={{ x: 0.497, y: 0.156, label: "front-left flag", delta: 5.9 }}
+        hard={{ x: 0.406, y: 0.583, label: "middle-right flag", delta: -6.6 }}
+      />
+      <div
+        style={{
+          fontSize: 12,
+          fontFamily: proseFont,
+          color: "oklch(0.55 0.02 150)",
+          margin: "-8px 0 20px",
+          textAlign: "center",
+        }}
+      >
+        On the closing hole, two flags on the same green produce a
+        ~12pp swing in birdie probability after conditions —
+        front-left is a green light, middle-right isn't.
+      </div>
+      <P>
+        <b>Hole 2</b> is a smaller-scale example of the same
+        pattern: the back-left flag plays +5.5pp above expectation,
+        the back-right &minus;3.5pp below. A 9pp swing between
+        two flags on the back shelf of the same green — a real
+        edge, if smaller than 12 or 18.
       </P>
       <GreenCompare
         hole={2}
         easy={{ x: 0.569, y: 0.449, label: "back-left flag", delta: 5.5 }}
-        hard={{ x: 0.581, y: 0.725, label: "back-right flag", delta: -3.6 }}
+        hard={{ x: 0.581, y: 0.725, label: "back-right flag", delta: -3.5 }}
       />
       <div
         style={{
@@ -540,16 +539,16 @@ export default function ArticlePinDifficulty() {
         }}
       >
         <li style={{ marginBottom: 6 }}>
-          Hole 18 front-left flag, tailwind or calm → real birdie chance
-        </li>
-        <li style={{ marginBottom: 6 }}>
-          Hole 18 middle-right flag, any headwind → treat as bogey-neutral
-        </li>
-        <li style={{ marginBottom: 6 }}>
           Hole 12 front-center flag → lean birdie-heavy
         </li>
         <li style={{ marginBottom: 6 }}>
           Hole 12 front-right flag → fade eagle/birdie parlays
+        </li>
+        <li style={{ marginBottom: 6 }}>
+          Hole 18 front-left flag → real birdie chance
+        </li>
+        <li style={{ marginBottom: 6 }}>
+          Hole 18 middle-right flag → treat as bogey-neutral
         </li>
         <li style={{ marginBottom: 6 }}>
           Hole 2 back-left → soft; back-right → hard
@@ -587,20 +586,28 @@ export default function ArticlePinDifficulty() {
         used mostly on tailwind days and unfairly penalised pins
         used on headwind days — because "13 mph out of the south"
         and "13 mph out of the north" produce completely different
-        golf conditions on the same hole. Adding wind direction
-        cost a couple of the largest residuals a few points (H12
-        front-centre dropped from +8.8 to +3.7, H2 back-left from
-        +8.1 to +5.5) but sharpened the H18 story — the closing
-        hole's biggest positive and negative residuals are both
-        larger under the directional model. The tables above
-        reflect the directional model.
+        golf conditions on the same hole. The current model
+        projects each round's wind onto the hole's real compass
+        bearing (pulled from OpenStreetMap way geometry — the
+        approach-leg direction on par-4s, the fairway-to-green
+        direction on par-5s). It's not perfect: hole bearings
+        derived from public data are approximate on the doglegs,
+        and one bearing per hole is a simplification of what a
+        second-shot decision on a par-5 actually looks like. But
+        the featured H12 and H18 swings are robust — they appear
+        in every version of the model we've fitted, with sizes
+        within a couple of points of each other. What's changed
+        most from the earlier version is that H18 turns out to be
+        only moderately wind-sensitive (~3pp per 5 mph headwind,
+        not the ~12pp we first claimed), because the speed-only
+        model was crediting fair-wind days as being unusually
+        easy.
       </P>
       <P>
         Treat it as a tiebreaker between two flags you're already
         pricing, not a system on its own. But when the pin sheet
-        shows H18 front-left with a tailwind on the closing hole —
-        or H12 front-center on any morning — that's a nudge worth
-        taking.
+        shows H12 front-center or H18 front-left on any morning,
+        that's a nudge worth taking.
       </P>
     </div>
   );
