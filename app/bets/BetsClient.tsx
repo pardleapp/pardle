@@ -120,6 +120,7 @@ function buildSettlementData(b: MockBetSettled): SettlementData {
     : undefined;
   return {
     win: b.result === "WON",
+    betId: b.id,
     profitLabel: b.pl,
     returnedLabel,
     player: b.who,
@@ -127,6 +128,9 @@ function buildSettlementData(b: MockBetSettled): SettlementData {
     currency: b.cur,
     stake: b.stake,
     oddsLabel: b.odds,
+    placedAt: b.placedAt,
+    settledAt: b.settledAt,
+    tournamentName: b.tournamentName,
     // No demo "+£226 daily" or "2nd in The Lads" group rank — the
     // settlement modal shows real-bet-only data. Real daily-pnl /
     // group-rank wiring is a follow-up; until then the modal omits

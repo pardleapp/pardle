@@ -23644,7 +23644,8 @@ html.pv-theme-body .auth-chip-btn {
   display: flex;
   gap: 9px;
 }
-.settle-btns button {
+.settle-btns button,
+.settle-btns .settle-replay {
   flex: 1;
   padding: 13px;
   border-radius: 11px;
@@ -23653,15 +23654,74 @@ html.pv-theme-body .auth-chip-btn {
   font-weight: 800;
   cursor: pointer;
   border: none;
+  text-align: center;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
-.settle-share {
+.settle-share,
+.settle-replay {
   background: var(--pv-emerald);
   color: #fff;
+}
+.settle-replay:hover {
+  filter: brightness(1.05);
 }
 .settle-done {
   background: var(--pv-soft);
   color: var(--pv-ink);
   border: 1px solid var(--pv-line);
+}
+
+/* Tournament name — sits just under the .settle-sub bet line. Quiet,
+   italic, so it clearly reads as context ("which event was this"). */
+.settle-tournament {
+  position: relative;
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--pv-muted);
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+}
+/* Timing strip — Placed / Settled / Live-for, three tight rows.
+   Mono values so the timestamps line up under each other. */
+.settle-timing {
+  position: relative;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--pv-soft);
+  border: 1px solid var(--pv-line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.settle-timing-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 12px;
+}
+.settle-timing-lbl {
+  color: var(--pv-muted);
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 10.5px;
+}
+.settle-timing-val {
+  color: var(--pv-ink);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+.settle-timing-row-quiet .settle-timing-lbl,
+.settle-timing-row-quiet .settle-timing-val {
+  color: var(--pv-muted);
+  font-weight: 500;
 }
 
 /* Confetti — 22 little geometric squares falling top → bottom. */
