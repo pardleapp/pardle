@@ -861,91 +861,12 @@ export async function getCoursePins(
       }
     }
   }`);
-  const courses = data?.courseStats?.courses ?? [];
-  if (courses.length === 0) return null;
-  // Multi-course events (rare — 3M, WMPO — one venue) still return
-  // an array. Take the first course; if a tournament ever splits
-  // rounds across venues we'll handle that when it comes up.
-  const primary = courses[0];
-  if (!primary) return null;
-
-  const holeMap = new Map<number, CoursePinHole>();
-  for (const rh of primary.roundHoleStats ?? []) {
-    const round = rh?.roundNum;
-    if (typeof round !== "number") continue;
-    for (const hs of rh?.holeStats ?? []) {
-      if (!hs) continue;
-      const holeNum = hs.courseHoleNum;
-      if (typeof holeNum !== "number") continue;
-      const coords = hs.pinGreen?.leftToRightCoords;
-      // Only use the enhanced tracer coords — the raw x/y is in a
-      // DIFFERENT reference frame per hole (comparing raw vs
-      // enhanced for a modern season shows offsets of 0.05-0.25 in
-      // both axes, so a raw pin plotted on the enhanced-frame green
-      // image lands in the wrong place). Older seasons that only
-      // populate raw (e.g. 2023) get their pins dropped here — the
-      // scoring still flows through the birdies endpoint but there's
-      // no safe way to overlay the pin dots on the same image.
-      const enhX = coords?.enhancedX;
-      const enhY = coords?.enhancedY;
-      const x = typeof enhX === "number" ? enhX : undefined;
-      const y = typeof enhY === "number" ? enhY : undefined;
-      const img = hs.holePickle?.greenLeftToRight ?? "";
-      // parValue is a String on this type — parse it to number.
-      const parNum =
-        typeof hs.parValue === "string" && hs.parValue
-          ? Number.parseInt(hs.parValue, 10)
-          : null;
-      const existing = holeMap.get(holeNum);
-      const target: CoursePinHole =
-        existing ?? {
-          holeNumber: holeNum,
-          par: Number.isFinite(parNum) ? (parNum as number) : null,
-          yards: typeof hs.yards === "number" ? hs.yards : null,
-          greenImageUrl: upscalePickle(img),
-          pinByRound: {},
-          yardsByRound: {},
-          scoringByRound: {},
-        };
-      if (!target.greenImageUrl && img) target.greenImageUrl = upscalePickle(img);
-      if (target.par == null && Number.isFinite(parNum)) target.par = parNum;
-      if (target.yards == null && typeof hs.yards === "number") target.yards = hs.yards;
-      if (typeof hs.yards === "number" && hs.yards > 0) {
-        target.yardsByRound[round] = hs.yards;
-      }
-      if (
-        typeof x === "number" &&
-        typeof y === "number" &&
-        x >= 0 &&
-        y >= 0
-      ) {
-        target.pinByRound[round] = { x, y };
-      }
-      const avgStr = hs.scoringAverage;
-      const diffStr = hs.scoringAverageDiff;
-      const avgNum =
-        typeof avgStr === "string" && avgStr.trim()
-          ? Number.parseFloat(avgStr)
-          : NaN;
-      const diffNum =
-        typeof diffStr === "string" && diffStr.trim()
-          ? Number.parseFloat(diffStr)
-          : NaN;
-      if (Number.isFinite(avgNum) || Number.isFinite(diffNum)) {
-        target.scoringByRound[round] = {
-          avg: Number.isFinite(avgNum) ? avgNum : null,
-          vsPar: Number.isFinite(diffNum) ? diffNum : null,
-        };
-      }
-      holeMap.set(holeNum, target);
-    }
-  }
-  const holes = [...holeMap.values()].sort((a, b) => a.holeNumber - b.holeNumber);
-  return {
-    tournamentId,
-    courseName: primary.courseName ?? "",
-    holes,
-  };
+  // Single source of truth for parsing lives in parseCoursePinsPayload
+  // above — this function used to inline a copy, which meant the
+  // enhanced/raw fallback and roundless-pin replication fixes only
+  // reached the debug path (getCoursePinsWithDiag) and not the
+  // production path. Delegate so all callers stay in sync.
+  return parseCoursePinsPayload(tournamentId, data);
 }
 
 // ──────────────────────────────────────────────────────────────────
