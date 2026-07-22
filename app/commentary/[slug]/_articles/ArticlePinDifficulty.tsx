@@ -47,6 +47,142 @@ function H3({ children }: { children: React.ReactNode }) {
   );
 }
 
+const GREEN_IMAGE: Record<number, string> = {
+  2: "https://pga-tour-res.cloudinary.com/c_fill,b_rgb:ffffff,w_1600,f_auto,q_auto/tourcastPickle/holes_2026_r_525_883_overhead_green_2_land.png",
+  12: "https://pga-tour-res.cloudinary.com/c_fill,b_rgb:ffffff,w_1600,f_auto,q_auto/tourcastPickle/holes_2026_r_525_883_overhead_green_12_land.png",
+  18: "https://pga-tour-res.cloudinary.com/c_fill,b_rgb:ffffff,w_1600,f_auto,q_auto/tourcastPickle/holes_2026_r_525_883_overhead_green_18_land.png",
+};
+
+interface GreenPin {
+  x: number; // 0-1
+  y: number; // 0-1
+  label: string;
+  delta: number; // pp — positive = easier, negative = harder
+}
+
+function GreenCard({
+  hole,
+  pin,
+}: {
+  hole: number;
+  pin: GreenPin;
+}) {
+  const positive = pin.delta >= 0;
+  const dotColor = positive
+    ? "oklch(0.55 0.16 155)"
+    : "oklch(0.60 0.19 28)";
+  const chipBg = positive
+    ? "oklch(0.94 0.06 155)"
+    : "oklch(0.94 0.07 28)";
+  const chipInk = positive
+    ? "oklch(0.32 0.13 155)"
+    : "oklch(0.38 0.15 28)";
+  const img = GREEN_IMAGE[hole];
+  if (!img) return null;
+  return (
+    <figure
+      style={{
+        margin: 0,
+        borderRadius: 10,
+        overflow: "hidden",
+        border: "1px solid oklch(0.9 0.008 95)",
+        background: "white",
+      }}
+    >
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          background: "oklch(0.94 0.008 95)",
+          lineHeight: 0,
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={img}
+          alt={`Green at hole ${hole}`}
+          style={{ display: "block", width: "100%", height: "auto" }}
+          loading="lazy"
+        />
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: `${pin.x * 100}%`,
+            top: `${pin.y * 100}%`,
+            width: 18,
+            height: 18,
+            marginLeft: -9,
+            marginTop: -9,
+            borderRadius: "50%",
+            background: dotColor,
+            border: "2px solid white",
+            boxShadow: "0 1px 4px oklch(0 0 0 / 0.3)",
+          }}
+        />
+      </div>
+      <figcaption
+        style={{
+          padding: "10px 12px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          borderTop: "1px solid oklch(0.95 0.008 95)",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 13,
+            fontFamily: proseFont,
+            color: "oklch(0.26 0.04 155)",
+          }}
+        >
+          <b>H{hole}</b> — {pin.label}
+        </div>
+        <span
+          style={{
+            fontFamily: numFont,
+            fontSize: 12,
+            fontWeight: 800,
+            padding: "3px 8px",
+            borderRadius: 999,
+            background: chipBg,
+            color: chipInk,
+          }}
+        >
+          {positive ? "+" : ""}
+          {pin.delta.toFixed(1)}pp
+        </span>
+      </figcaption>
+    </figure>
+  );
+}
+
+function GreenCompare({
+  hole,
+  easy,
+  hard,
+}: {
+  hole: number;
+  easy: GreenPin;
+  hard: GreenPin;
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+        gap: 12,
+        margin: "16px 0 20px",
+      }}
+    >
+      <GreenCard hole={hole} pin={easy} />
+      <GreenCard hole={hole} pin={hard} />
+    </div>
+  );
+}
+
 function Callout({ children }: { children: React.ReactNode }) {
   return (
     <aside
@@ -299,6 +435,23 @@ export default function ArticlePinDifficulty() {
         conditions. When the pin sheet lands, that's the first
         thing worth checking on 12.
       </P>
+      <GreenCompare
+        hole={12}
+        easy={{ x: 0.403, y: 0.482, label: "middle-left flag", delta: 8.8 }}
+        hard={{ x: 0.520, y: 0.684, label: "lower-center flag", delta: -5.4 }}
+      />
+      <div
+        style={{
+          fontSize: 12,
+          fontFamily: proseFont,
+          color: "oklch(0.55 0.02 150)",
+          margin: "-8px 0 20px",
+          textAlign: "center",
+        }}
+      >
+        Same green, same conditions: the middle-left flag plays 15pp
+        easier than the lower-center flag for birdie probability.
+      </div>
       <P>
         <b>Hole 2 middle-right</b> and <b>hole 2 lower-right</b>
         tell the same story in miniature: pins that look
@@ -307,13 +460,49 @@ export default function ArticlePinDifficulty() {
         away from the middle-right shelf; the lower-right flag
         pulls the ball into the false-front runoff.
       </P>
+      <GreenCompare
+        hole={2}
+        easy={{ x: 0.569, y: 0.449, label: "middle-right flag", delta: 8.1 }}
+        hard={{ x: 0.581, y: 0.725, label: "lower-right flag", delta: -5.5 }}
+      />
+      <div
+        style={{
+          fontSize: 12,
+          fontFamily: proseFont,
+          color: "oklch(0.55 0.02 150)",
+          margin: "-8px 0 20px",
+          textAlign: "center",
+        }}
+      >
+        Two pins on the same right side of the second green — the
+        upper one is a green light, the lower one a trap.
+      </div>
       <P>
         <b>Hole 18 upper-center</b> is the flag you want to see
         for a birdie sweat on 18 — 4.7pp easier than expected,
-        which is meaningful in a hole this wind-sensitive. On a
-        calm Sunday with the flag there, closers get a real
-        chance.
+        which is meaningful in a hole this wind-sensitive. The
+        back-right flag on the same green is the one to fade: it
+        pulls the approach closest to the water short-right and
+        the field over-corrects long-left, into the fringe.
       </P>
+      <GreenCompare
+        hole={18}
+        easy={{ x: 0.497, y: 0.156, label: "upper-center flag", delta: 4.7 }}
+        hard={{ x: 0.557, y: 0.250, label: "back-right flag", delta: -6.2 }}
+      />
+      <div
+        style={{
+          fontSize: 12,
+          fontFamily: proseFont,
+          color: "oklch(0.55 0.02 150)",
+          margin: "-8px 0 20px",
+          textAlign: "center",
+        }}
+      >
+        On the closing hole, the flag position matters more than
+        almost anywhere else on the course — an 11pp swing
+        between these two.
+      </div>
 
       <H3>How to actually use this</H3>
       <P>
