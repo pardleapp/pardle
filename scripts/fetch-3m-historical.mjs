@@ -227,6 +227,72 @@ async function fetchAllScorecards(tournamentId, playerIds) {
 }
 
 /**
+ * Per-round pin positions via shotDetailsV3.
+ *
+ * courseStats(tournamentId) only carries per-round pins for 2023+
+ * — earlier seasons ship a single roundless pin per hole, which
+ * the parser has to replicate to R1-R4 (all four rounds sit at the
+ * same coord). shotDetailsV3 is a different endpoint that DOES
+ * carry per-round pins going back to ~2017 (memory:
+ * reference_pga_hole_yardage). It's per-player, but the pin is
+ * the same for every player in a round, so any finisher's id works.
+ *
+ * Returns `pinsByRoundByHole[round][hole] = { x, y }` (raw frame —
+ * consumers apply their own calibration if the display frame
+ * differs). Missing rounds / holes fall through as undefined.
+ */
+async function fetchPerRoundPins(tournamentId, playerIds) {
+  if (!playerIds || playerIds.length === 0) return {};
+  // Try up to 3 different players per round in case the first
+  // finisher's shot-detail payload is missing / partial.
+  const CANDIDATES = playerIds.slice(0, 3);
+  const out = { 1: {}, 2: {}, 3: {}, 4: {} };
+  for (const round of [1, 2, 3, 4]) {
+    let landed = false;
+    for (const pid of CANDIDATES) {
+      const q = `{
+        shotDetailsV3(tournamentId: "${tournamentId}", playerId: "${pid}", round: ${round}) {
+          holes {
+            holeNumber
+            pinGreen { leftToRightCoords { x y } }
+          }
+        }
+      }`;
+      const data = await pga(q).catch(() => null);
+      const holes = data?.shotDetailsV3?.holes ?? [];
+      if (holes.length === 0) continue;
+      let anyRealCoord = false;
+      for (const h of holes) {
+        const hn = Number(h?.holeNumber);
+        const c = h?.pinGreen?.leftToRightCoords;
+        const x = Number(c?.x);
+        const y = Number(c?.y);
+        // shotDetailsV3 sometimes returns -1/-1 sentinels for events
+        // it doesn't have pin data on file for. Skip those cleanly.
+        if (
+          Number.isFinite(hn) &&
+          Number.isFinite(x) &&
+          Number.isFinite(y) &&
+          x !== -1 &&
+          y !== -1
+        ) {
+          out[round][hn] = { x, y };
+          anyRealCoord = true;
+        }
+      }
+      if (anyRealCoord) {
+        landed = true;
+        break;
+      }
+    }
+    if (!landed) {
+      console.warn(`[pga] no per-round pins for ${tournamentId} R${round}`);
+    }
+  }
+  return out;
+}
+
+/**
  * Skill baseline for historical charts.
  *
  * Preferred source: a DG pre-tournament predictions CSV saved at
@@ -516,6 +582,7 @@ async function main() {
     // PGA hole-level data (optional — heatmap degrades if missing)
     let holesByPgaId = {};
     let pgaPlayerMap = new Map();
+    let pinsByRoundByHole = null;
     const pgaMeta = pgaIds[year];
     if (pgaMeta) {
       console.log(`[pga] tournamentId ${pgaMeta.id} (${pgaMeta.name})`);
@@ -524,6 +591,19 @@ async function main() {
         pgaPlayerMap.set(normName(p.displayName), p);
       }
       console.log(`[pga] field: ${field.length} players`);
+      // Per-round pin positions via shotDetailsV3 — the only
+      // orchestrator source that carries per-round pins for
+      // pre-2023 events. Pull once per tournament (any finisher's
+      // id works, pin is shared across the field for a round).
+      pinsByRoundByHole = await fetchPerRoundPins(
+        pgaMeta.id,
+        field.map((p) => p.id),
+      );
+      const pinsFound = Object.values(pinsByRoundByHole).reduce(
+        (acc, byHole) => acc + Object.keys(byHole).length,
+        0,
+      );
+      console.log(`[pga] shotDetailsV3 pins: ${pinsFound}/72 (round, hole) cells`);
       const scorecards = await fetchAllScorecards(
         pgaMeta.id,
         field.map((p) => p.id),
@@ -626,6 +706,16 @@ async function main() {
       venue: VENUE,
       roundDates: roundDates ?? null,
       weatherByRound,
+      // Per-round per-hole pin coords from shotDetailsV3 — raw
+      // frame, ready for the pin-birdies aggregator's affine
+      // calibration to transform into the enhanced-frame green
+      // image. Pre-2023 seasons have no other source for per-round
+      // pins (courseStats gives one roundless entry per hole for
+      // 2019-2022, and per-round data but no enhanced coords for
+      // 2023). 2023+ can still use this as a raw calibration
+      // reference if the courseStats enhanced pair isn't
+      // populated — the aggregator picks the best available.
+      pinsByRoundByHole: pinsByRoundByHole ?? null,
       generatedAt: null, // deterministic — no timestamp so re-runs stay idempotent
       players,
     };

@@ -179,13 +179,13 @@ async function familyFor(tournamentId: string): Promise<FamilyDef | null> {
 // ── Endpoint ────────────────────────────────────────────────────────
 
 function cacheKey(tournamentId: string): string {
-  // v8 — buildHoleBirdieData now fits a per-hole affine transform
-  // from years with both raw+enh coords, then applies it to
-  // raw-only years (2019-2023). Prior v7 payloads still have the
-  // untransformed raw coords for those years so their pin dots
-  // plot off the green. Bump so a fresh compute puts them in the
-  // enhanced image frame.
-  return `feed:pin-birdies:v8:${tournamentId}`;
+  // v9 — /api/course-pins now merges per-round pin coords from
+  // shotDetailsV3 (via the historical JSONs' new pinsByRoundByHole
+  // field) so 2019-2022 tabs carry FOUR distinct pin positions,
+  // not one replicated coord. Older v8 responses aggregated over
+  // the replicated coords; bump so the fresh aggregation clusters
+  // 28 real per-round pins instead of 4 collapsed years.
+  return `feed:pin-birdies:v9:${tournamentId}`;
 }
 
 export async function GET(req: Request) {
@@ -243,7 +243,7 @@ export async function GET(req: Request) {
     let pins: CoursePinSheet | null = null;
     if (!refreshPins) {
       try {
-        pins = await redis.get<CoursePinSheet>(`feed:pins:v6:${ev.tournamentId}`);
+        pins = await redis.get<CoursePinSheet>(`feed:pins:v7:${ev.tournamentId}`);
       } catch {
         /* cache miss */
       }
@@ -253,7 +253,7 @@ export async function GET(req: Request) {
         pins = await getCoursePins(ev.tournamentId);
         if (pins) {
           try {
-            await redis.set(`feed:pins:v6:${ev.tournamentId}`, pins, {
+            await redis.set(`feed:pins:v7:${ev.tournamentId}`, pins, {
               ex: CACHE_TTL,
             });
           } catch {

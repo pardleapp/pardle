@@ -27,13 +27,13 @@ const redis = Redis.fromEnv();
 const TTL_SECONDS = 6 * 60 * 60;
 
 function cacheKey(tournamentId: string): string {
-  // v6 — pre-v6 caches for 2019-2022 tournamentIds carry an empty
-  // yardsByRound because the augmentYardsFromHistorical readFile
-  // silently failed on Vercel (data/historical JSONs weren't in
-  // the serverless bundle). next.config.mjs now traces those
-  // files into the /api/course-pins bundle; bump the cache so
-  // the augmentation actually runs and TEE Δ starts firing.
-  return `feed:pins:v6:${tournamentId}`;
+  // v7 — augmentYardsFromHistorical now ALSO merges per-round pin
+  // coords from data/historical/*.json's new pinsByRoundByHole
+  // field (unlocks real per-round pin positions for 2019-2022,
+  // where courseStats only had a single roundless pin the parser
+  // replicated to R1-R4). Old v6 payloads still have the
+  // replicated coords; bump so the fresh compute swaps them out.
+  return `feed:pins:v7:${tournamentId}`;
 }
 
 /** Map a tournamentId like "R2020525" back to the historical JSON
@@ -68,6 +68,11 @@ interface HistPlayer {
 }
 interface HistFile {
   players?: HistPlayer[];
+  /** Per-round per-hole pin coords from shotDetailsV3. Raw frame —
+   *  the pin-birdies aggregator's affine calibration transforms them
+   *  into the enhanced-frame green image at render time. Populated
+   *  for every season 2019+ once the fetch script is re-run. */
+  pinsByRoundByHole?: Record<string, Record<string, { x: number; y: number }>>;
 }
 
 /** Merge per-round per-hole yardage from the historical JSON into
@@ -110,13 +115,66 @@ async function augmentYardsFromHistorical(
       }
     }
   }
-  if (yardsByRoundHole.size === 0) return sheet;
+  // Per-round pin coords from shotDetailsV3, indexed as
+  // `${round}:${hole}` for parity with the yardage map above.
+  // Only useful for 2019-2022 where courseStats gave us just one
+  // roundless pin per hole — the parser replicated it to R1-R4,
+  // so pinByRound entries currently coincide across rounds. We
+  // overwrite those replicated coords with the real per-round
+  // pins so downstream rendering (both solo mode and the birdie
+  // aggregator) sees distinct positions.
+  const pinsByRoundHole = new Map<
+    string,
+    { x: number; y: number }
+  >();
+  const perRound = hist.pinsByRoundByHole ?? null;
+  if (perRound) {
+    for (const [rStr, byHole] of Object.entries(perRound)) {
+      const round = Number(rStr);
+      if (!Number.isFinite(round)) continue;
+      for (const [hStr, coord] of Object.entries(byHole ?? {})) {
+        const hole = Number(hStr);
+        if (!Number.isFinite(hole)) continue;
+        if (
+          typeof coord?.x === "number" &&
+          typeof coord?.y === "number" &&
+          Number.isFinite(coord.x) &&
+          Number.isFinite(coord.y)
+        ) {
+          pinsByRoundHole.set(`${round}:${hole}`, { x: coord.x, y: coord.y });
+        }
+      }
+    }
+  }
+
+  if (yardsByRoundHole.size === 0 && pinsByRoundHole.size === 0) return sheet;
+
+  // Detect the "roundless-replicated" case per hole — every round
+  // is present in pinByRound but they all coincide. That's the
+  // signal that our historical per-round pins are strictly better
+  // than what the orchestrator gave us for this hole. Holes with
+  // genuinely distinct per-round pinByRound coords (2023+) keep
+  // the orchestrator values.
+  function pinByRoundIsReplicated(
+    hole: CoursePinSheet["holes"][number],
+  ): boolean {
+    const entries = Object.entries(hole.pinByRound);
+    if (entries.length < 2) return false;
+    const first = entries[0][1];
+    for (let i = 1; i < entries.length; i++) {
+      const p = entries[i][1];
+      if (Math.abs(p.x - first.x) > 0.001 || Math.abs(p.y - first.y) > 0.001) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   const nextHoles = sheet.holes.map((holePin) => {
-    const yardsByRound = { ...(holePin.yardsByRound ?? {}) };
     let changed = false;
+    // Yardage merge — unchanged from before, fills only empty slots.
+    const yardsByRound = { ...(holePin.yardsByRound ?? {}) };
     for (const r of [1, 2, 3, 4]) {
-      // Skip when the orchestrator already has a per-round yardage
-      // for this (hole, round) — that value trumps our replay.
       if (yardsByRound[r]) continue;
       const y = yardsByRoundHole.get(`${r}:${holePin.holeNumber}`);
       if (y != null) {
@@ -124,7 +182,33 @@ async function augmentYardsFromHistorical(
         changed = true;
       }
     }
-    return changed ? { ...holePin, yardsByRound } : holePin;
+    // Pin merge — overwrite the replicated roundless pin with the
+    // real per-round pins when we have them AND the current
+    // pinByRound is all-coincident (parser had nothing better to
+    // work with). Real per-round data (2023+) stays authoritative.
+    let pinByRound = holePin.pinByRound;
+    if (pinsByRoundHole.size > 0 && pinByRoundIsReplicated(holePin)) {
+      const next: typeof pinByRound = {};
+      let anyReplaced = false;
+      for (const r of [1, 2, 3, 4]) {
+        const perRoundPin = pinsByRoundHole.get(
+          `${r}:${holePin.holeNumber}`,
+        );
+        if (perRoundPin) {
+          // Raw frame — no frameEnh flag; the birdie aggregator's
+          // affine fit will transform these to enhanced frame.
+          next[r] = { x: perRoundPin.x, y: perRoundPin.y };
+          anyReplaced = true;
+        } else if (holePin.pinByRound[r]) {
+          next[r] = holePin.pinByRound[r];
+        }
+      }
+      if (anyReplaced) {
+        pinByRound = next;
+        changed = true;
+      }
+    }
+    return changed ? { ...holePin, yardsByRound, pinByRound } : holePin;
   });
   return { ...sheet, holes: nextHoles };
 }
