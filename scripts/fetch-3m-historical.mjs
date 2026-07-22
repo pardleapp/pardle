@@ -190,11 +190,16 @@ async function fetchScorecardsChunk(tournamentId, playerIds) {
   const aliases = playerIds
     .map(
       (pid, i) =>
+        // `yardage` is what scorecardV3 exposes per hole per round —
+        // NOT available via courseStats for older seasons where the
+        // orchestrator only carries a single roundless yardage. This
+        // is the only orchestrator endpoint that surfaces per-round
+        // tee movement pre-2023.
         `p${i}: scorecardV3(tournamentId: "${tournamentId}", playerId: "${pid}") {
           roundScores {
             roundNumber
-            firstNine { holes { holeNumber score par } }
-            secondNine { holes { holeNumber score par } }
+            firstNine { holes { holeNumber score par yardage } }
+            secondNine { holes { holeNumber score par yardage } }
           }
         }`,
     )
@@ -536,8 +541,17 @@ async function main() {
               const num = Number(h.holeNumber);
               const strokes = Number(h.score);
               const par = Number(h.par);
+              const yards = Number(h.yardage);
               if (num && Number.isFinite(strokes) && strokes > 0) {
-                holes[num] = { strokes, par: Number.isFinite(par) ? par : 4 };
+                holes[num] = {
+                  strokes,
+                  par: Number.isFinite(par) ? par : 4,
+                  // Yardage is per-hole per-round — same for every
+                  // player in a round, but written on every row so
+                  // the merge step downstream can pick any player's
+                  // scorecard as authoritative.
+                  yards: Number.isFinite(yards) && yards > 0 ? yards : null,
+                };
               }
             }
           };

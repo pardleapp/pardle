@@ -11,6 +11,8 @@
  */
 
 import { NextResponse } from "next/server";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { Redis } from "@upstash/redis";
 import {
   getCoursePins,
@@ -25,12 +27,107 @@ const redis = Redis.fromEnv();
 const TTL_SECONDS = 6 * 60 * 60;
 
 function cacheKey(tournamentId: string): string {
-  // v2 — pgatour.parseCoursePinsPayload now falls back to raw coords
-  // when enhanced are absent (unlocks 2023) and replicates roundless
-  // pins across R1-R4 (unlocks 2019-2022). Old cached sheets for
-  // those years have empty pinByRound; bump the key so a fresh
-  // orchestrator pull runs through the new parser.
-  return `feed:pins:v2:${tournamentId}`;
+  // v3 — sheet now merges yardsByRound from data/historical/*.json
+  // for older seasons whose courseStats only carry a single
+  // roundless yardage. TEE Δ column stayed empty for 2019-2022
+  // without this merge because per-round yards weren't in the
+  // orchestrator's courseStats for those years — the scorecardV3
+  // endpoint has them and we now bake them into the historical
+  // JSONs and layer them in here.
+  return `feed:pins:v3:${tournamentId}`;
+}
+
+/** Map a tournamentId like "R2020525" back to the historical JSON
+ *  slug/year (e.g. { slug: "3m-open", year: 2020 }). Returns null
+ *  when the tournamentId doesn't fit our historical family scheme
+ *  — the augmentation quietly no-ops for those. */
+function historicalRefFor(
+  tournamentId: string,
+): { slug: string; year: number } | null {
+  // 3M Open family — R{year}525 for every edition since 2019.
+  const m3m = tournamentId.match(/^R(\d{4})525$/);
+  if (m3m) return { slug: "3m-open", year: Number(m3m[1]) };
+  return null;
+}
+
+/** Historical file shape (matches scripts/fetch-3m-historical.mjs +
+ *  the /api/course-pin-birdies HistPayload). Kept local rather than
+ *  shared because the shape is fetch-script-owned and evolves. */
+interface HistHole {
+  strokes: number;
+  par: number;
+  /** New in the v3 fetch — per-hole yardage from scorecardV3. Null
+   *  on older files that were fetched before the yardage query
+   *  landed. */
+  yards?: number | null;
+}
+interface HistRound {
+  holes?: Record<string, HistHole> | null;
+}
+interface HistPlayer {
+  rounds?: Record<string, HistRound>;
+}
+interface HistFile {
+  players?: HistPlayer[];
+}
+
+/** Merge per-round per-hole yardage from the historical JSON into
+ *  the pin sheet's yardsByRound maps. Only fills entries that are
+ *  actually missing — a year that already has per-round yardage in
+ *  the orchestrator (2023+) stays authoritative. */
+async function augmentYardsFromHistorical(
+  sheet: CoursePinSheet,
+  tournamentId: string,
+): Promise<CoursePinSheet> {
+  const ref = historicalRefFor(tournamentId);
+  if (!ref) return sheet;
+  const filePath = path.join(
+    process.cwd(),
+    "data",
+    "historical",
+    `${ref.slug}-${ref.year}.json`,
+  );
+  let hist: HistFile;
+  try {
+    const text = await readFile(filePath, "utf-8");
+    hist = JSON.parse(text) as HistFile;
+  } catch {
+    return sheet;
+  }
+  // Aggregate per (round, hole) → yardage. Every player in the
+  // field sees the same yardage in a round, so first-seen wins.
+  const yardsByRoundHole = new Map<string, number>();
+  for (const player of hist.players ?? []) {
+    for (const [rStr, r] of Object.entries(player.rounds ?? {})) {
+      const round = Number(rStr);
+      if (!Number.isFinite(round)) continue;
+      for (const [hStr, h] of Object.entries(r.holes ?? {})) {
+        const hole = Number(hStr);
+        if (!Number.isFinite(hole)) continue;
+        const y = h?.yards;
+        if (typeof y !== "number" || !Number.isFinite(y) || y <= 0) continue;
+        const key = `${round}:${hole}`;
+        if (!yardsByRoundHole.has(key)) yardsByRoundHole.set(key, y);
+      }
+    }
+  }
+  if (yardsByRoundHole.size === 0) return sheet;
+  const nextHoles = sheet.holes.map((holePin) => {
+    const yardsByRound = { ...(holePin.yardsByRound ?? {}) };
+    let changed = false;
+    for (const r of [1, 2, 3, 4]) {
+      // Skip when the orchestrator already has a per-round yardage
+      // for this (hole, round) — that value trumps our replay.
+      if (yardsByRound[r]) continue;
+      const y = yardsByRoundHole.get(`${r}:${holePin.holeNumber}`);
+      if (y != null) {
+        yardsByRound[r] = y;
+        changed = true;
+      }
+    }
+    return changed ? { ...holePin, yardsByRound } : holePin;
+  });
+  return { ...sheet, holes: nextHoles };
 }
 
 export async function GET(req: Request) {
@@ -83,6 +180,10 @@ export async function GET(req: Request) {
       { status: 404 },
     );
   }
+  // Fill per-round yardage from data/historical/*.json when the
+  // orchestrator returned a roundless-only courseStats (2019-2022).
+  // A no-op for years already carrying yardsByRound.
+  fresh = await augmentYardsFromHistorical(fresh, tournamentId);
   try {
     await redis.set(cacheKey(tournamentId), fresh, { ex: TTL_SECONDS });
   } catch {

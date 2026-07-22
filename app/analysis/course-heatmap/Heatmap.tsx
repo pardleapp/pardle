@@ -109,7 +109,14 @@ interface TeeFlag {
 
 /** Compute the pin-variance flag for a hole, if any of its clusters
  *  deviates from the cluster-rate mean by more than the threshold.
- *  Returns null when no cluster crosses the line. */
+ *  Returns null when no cluster crosses the line.
+ *
+ *  Deliberately cross-year: the clusters themselves aggregate every
+ *  historical pin location at the hole, so the "biggest outlier
+ *  cluster" is a pooled property of the venue, not of any one week.
+ *  A per-year anchoring would show a different number every tab but
+ *  hide the very signal (some pin neighbourhoods are permanent
+ *  outliers) the column exists to surface. */
 function pinFlagFor(birdie: HoleBirdieData | undefined): PinFlag | null {
   if (!birdie || birdie.clusters.length < 2) return null;
   const rates = birdie.clusters
@@ -615,7 +622,7 @@ export default function Heatmap({
                     </td>
                   );
                 })()}
-                {/* PIN Δ flag cell — cluster variance signal. */}
+                {/* PIN Δ flag cell — cluster variance signal (cross-year). */}
                 {(() => {
                   const flag = pinFlagFor(
                     birdieHistoryByHole?.[String(h)] ?? undefined,
