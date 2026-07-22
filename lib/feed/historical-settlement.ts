@@ -1,21 +1,27 @@
 /**
  * Historical bet settlement — given a bet whose tournament has
  * finished (i.e. it's no longer the active event), resolve its
- * outcome from the historical-rounds archive and return the
- * { settled, won } verdict.
+ * outcome and return the { settled, won } verdict.
  *
- * Mirrors the live-detector branches in bet-shared.ts but reads
- * from completed-tournament data rather than the live leaderboard:
+ * TWO paths, tried in order:
  *
+ *   1. **Orchestrator** (primary — see orchestrator-settlement.ts).
+ *      Uses the same PGA Tour orchestrator we already talk to for
+ *      the live feed. No paid-API dependency, identical shape to
+ *      the live detector, cached 30d in Redis per (tournamentId,
+ *      playerId) so we hit the network once per event.
+ *
+ *   2. **DataGolf archive** (fallback). Uses the historical-rounds
+ *      endpoint via the Redis-cached historical-events lookup.
+ *      Requires the DATAGOLF_API_KEY env var to be set; a missing
+ *      key silently disables this path — the orchestrator layer
+ *      above is the safety net.
+ *
+ * Each branch mirrors the live detector in bet-shared.ts:
  *   round-score    bet.round's score for the bet's player vs line
- *   outright       fin_text === "1" or "T1" (dead-heat = co-winners)
- *   top-finish     numeric fin_text ≤ bet.cutoff
+ *   outright       position "1"/"T1" (dead-heat = co-winners)
+ *   top-finish     numeric position ≤ bet.cutoff
  *   winning-score  winner's total strokes vs line
- *
- * Server-only — pulls from the historical-rounds Redis cache (30d
- * TTL) which in turn proxies the DataGolf paid archive endpoint.
- * Reads through resolveEventId (orchestrator tournament name → DG
- * event id by normalised-name match against the cached event list).
  */
 
 import "server-only";
@@ -23,6 +29,7 @@ import {
   getCachedHistoricalRounds,
   resolveEventId,
 } from "./historical-cache";
+import { settleBetFromOrchestrator } from "./orchestrator-settlement";
 import type {
   DGHistoricalRound,
   DGHistoricalScoreRow,
@@ -99,35 +106,53 @@ export interface HistoricalSettleResult {
 }
 
 /**
- * Auto-settle a bet from the historical archive. Returns
- * { settled: false } when the data isn't available (DG hasn't
- * archived the event yet, or the player isn't on file). Callers
- * leave such bets in their current state — the next cron tick
- * retries.
+ * Auto-settle a bet from the archives. Tries the PGA Tour
+ * orchestrator first (primary — no paid-API dependency, cached in
+ * Redis for 30 days), falls back to the DataGolf historical archive
+ * for cases the orchestrator can't reach.
+ *
+ * Returns { settled: false } when neither source has the data
+ * available yet. Callers leave such bets in their current state —
+ * the next cron tick retries.
  */
 export async function settleBetFromHistory(
   bet: TrackedBet,
 ): Promise<HistoricalSettleResult> {
-  // 1. Resolve the bet's tournament → DG event_id via the
-  //    tournamentName stamped at placement. Year is the year the
-  //    bet was placed (UTC) — covers the realistic case; long-
-  //    futures bets across year boundaries are rare for a 4-round
-  //    weekly market.
+  // 1. Orchestrator path — preferred. Cached, no vendor key needed,
+  //    identical semantics to the live detector.
+  try {
+    const orch = await settleBetFromOrchestrator(bet);
+    if (orch.settled) return orch;
+  } catch (err) {
+    // Non-fatal — fall through to DataGolf.
+    console.warn(
+      "[historical-settlement] orchestrator path failed",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+  // 2. DataGolf fallback. Only useful when DATAGOLF_API_KEY is set;
+  //    silently degraded otherwise.
+  return settleBetFromDataGolf(bet);
+}
+
+async function settleBetFromDataGolf(
+  bet: TrackedBet,
+): Promise<HistoricalSettleResult> {
   const tournamentName = bet.tournamentName;
   if (!tournamentName) {
-    return { settled: false, reason: "no-tournament-name" };
+    return { settled: false, reason: "dg:no-tournament-name" };
   }
   const year = new Date(bet.placedAt).getUTCFullYear();
-  const resolved = await resolveEventId(tournamentName, year);
+  const resolved = await resolveEventId(tournamentName, year).catch(() => null);
   if (!resolved) {
-    return { settled: false, reason: "event-not-in-dg-archive" };
+    return { settled: false, reason: "dg:event-not-in-archive" };
   }
   const payload = await getCachedHistoricalRounds(
     resolved.eventId,
     resolved.year,
-  );
+  ).catch(() => null);
   if (!payload || !Array.isArray(payload.scores)) {
-    return { settled: false, reason: "rounds-unavailable" };
+    return { settled: false, reason: "dg:rounds-unavailable" };
   }
   const rows = payload.scores;
 
@@ -156,7 +181,7 @@ export async function settleBetFromHistory(
     if (!player) {
       // Player not in the event = missed the field (WD'd / didn't
       // tee off / wrong tour). Bet effectively lost.
-      return { settled: true, won: false, reason: "player-not-in-event" };
+      return { settled: true, won: false, reason: "dg:player-not-in-event" };
     }
     const rd = (player as unknown as Record<string, DGHistoricalRound | undefined>)[
       `round_${round}`
@@ -166,7 +191,7 @@ export async function settleBetFromHistory(
       // Industry standard: bet voids / loses. Treat as "lost" here
       // — the tracker is informational; users can manually correct
       // a void if their book actually graded otherwise.
-      return { settled: true, won: false, reason: "round-not-played" };
+      return { settled: true, won: false, reason: "dg:round-not-played" };
     }
     const score = rd.score;
     const won = rs.side === "under" ? score < rs.line : score > rs.line;
@@ -179,7 +204,7 @@ export async function settleBetFromHistory(
     if (winners.length === 0) {
       // Tournament finished without a "1" / "T1" position recorded
       // — extremely rare (canceled tournament). Leave unsettled.
-      return { settled: false, reason: "no-winner-recorded" };
+      return { settled: false, reason: "dg:no-winner-recorded" };
     }
     const targetNorm = normaliseName(ob.playerName);
     const won = winners.some(
@@ -193,10 +218,10 @@ export async function settleBetFromHistory(
     const player = findPlayer(rows, tf.playerName);
     if (!player) {
       // Player not on file = missed cut at the very least → lost.
-      return { settled: true, won: false, reason: "player-not-in-event" };
+      return { settled: true, won: false, reason: "dg:player-not-in-event" };
     }
     const pos = parseFinish(player.fin_text);
-    if (pos == null) return { settled: true, won: false, reason: "cut-or-wd" };
+    if (pos == null) return { settled: true, won: false, reason: "dg:cut-or-wd" };
     return { settled: true, won: pos <= tf.cutoff };
   }
 
@@ -204,16 +229,16 @@ export async function settleBetFromHistory(
     const ws = bet as WinningScoreBet;
     const winners = findWinners(rows);
     if (winners.length === 0) {
-      return { settled: false, reason: "no-winner-recorded" };
+      return { settled: false, reason: "dg:no-winner-recorded" };
     }
     // Dead-heat: every winner has the same total. Pick the first.
     const total = totalStrokes(winners[0]);
     if (total === 0) {
-      return { settled: false, reason: "winner-rounds-incomplete" };
+      return { settled: false, reason: "dg:winner-rounds-incomplete" };
     }
     const won = ws.side === "under" ? total < ws.line : total >= ws.line;
     return { settled: true, won };
   }
 
-  return { settled: false, reason: "unknown-bet-kind" };
+  return { settled: false, reason: "dg:unknown-bet-kind" };
 }

@@ -8,6 +8,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "."),
+      // `import "server-only"` is a Next.js compile-time marker; in
+      // Vitest we stub it to a no-op so server-scoped modules load.
+      "server-only": path.resolve(__dirname, "test/server-only.stub.ts"),
     },
   },
 });

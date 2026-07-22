@@ -862,6 +862,9 @@ const INACTIVE_LEADERBOARD_STATES = new Set([
   "MC",
   "DQ",
   "DNS",
+  // Post-tournament state the orchestrator emits for withdrew players.
+  // (Live: "WD". Post-tournament: "WITHDRAWN".) Both must be skipped.
+  "WITHDRAWN",
 ]);
 
 /**
@@ -873,9 +876,20 @@ const INACTIVE_LEADERBOARD_STATES = new Set([
  * bets to settled the moment R1 ended (the original Memorial bug).
  *
  * So we require, for every active player on the leaderboard, that
- * their PlayerRoundState shows currentRound=4 AND holesRemaining=0.
- * Players marked CUT/WD/MC/DQ/DNS (or thru="—" for placeholder
- * inactive states) are skipped.
+ * their PlayerRoundState shows currentRound=4 AND holesRemaining=0
+ * (or, when the round-state map is patchy, that the leaderboard row
+ * itself shows thru="F"). Players marked CUT/WD/MC/DQ/DNS/WITHDRAWN
+ * (or with thru of the various "no round played" placeholders) are
+ * skipped.
+ *
+ * Handles post-tournament orchestrator state: once a tournament is
+ * archived (some minutes-to-hours after the winner's final putt),
+ * every player's playerState flips to "COMPLETE" (even the winner).
+ * Cut/WD players in the archived state additionally show thru="-"
+ * (plain hyphen) rather than "—" (em-dash). We treat BOTH thru
+ * markers as "did not play through" so post-tournament settlement
+ * works reliably: cut players get skipped, finishers pass the
+ * thru="F" check.
  *
  * Synchronous-safe mirror of pgatour.ts's isTournamentConcluded, but
  * without the 80h-since-start time gate — that gate is a server-side
@@ -891,9 +905,18 @@ function isLeaderboardFinal(
   let anyActive = false;
   for (const p of players) {
     if (p.playerState && INACTIVE_LEADERBOARD_STATES.has(p.playerState)) continue;
-    if (p.thru === "—") continue;
+    // Both markers mean "no round in play": em-dash is the pre-round
+    // placeholder; plain hyphen is what the archived-tournament
+    // leaderboard returns for cut/WD players once the event flips to
+    // playerState="COMPLETE".
+    if (p.thru === "—" || p.thru === "-") continue;
     if (p.thru !== "F") return false;
     const s = playerRoundStates[p.playerId];
+    // Missing round-state on a leaderboard-active player is a bundle
+    // race — the leaderboard row landed before the scorecard did. We
+    // return false and let the next cron tick retry rather than
+    // guess. Retries are cheap; a false positive here would settle
+    // an outright at the end of R1.
     if (!s) return false;
     if (s.currentRound !== 4 || s.holesRemaining !== 0) return false;
     anyActive = true;
