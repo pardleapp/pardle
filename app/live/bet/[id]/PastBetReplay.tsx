@@ -162,9 +162,13 @@ function PastSettledHeadlineInline({ bet }: { bet: TrackedBet }) {
   );
 }
 
+// Chart geometry — chart is the hero of the settled-bet page, so we
+// use a taller viewBox (900x560, ratio ~1.6:1) and generous padding
+// so axis labels + round markers + threshold annotations all sit in
+// clear whitespace rather than crashing into the plot area.
 const W = 900;
-const H = 320;
-const PAD = { top: 24, right: 20, bottom: 36, left: 56 };
+const H = 560;
+const PAD = { top: 40, right: 28, bottom: 48, left: 64 };
 
 function ReplayChart({
   points,
@@ -283,7 +287,7 @@ function ReplayChart({
               key={r}
               x={xToPx(mid)}
               y={PAD.top - 8}
-              fontSize={11}
+              fontSize={15}
               fontWeight={800}
               fill="var(--muted)"
               textAnchor="middle"
@@ -305,7 +309,7 @@ function ReplayChart({
       <text
         x={PAD.left - 8}
         y={zeroY + 4}
-        fontSize={11}
+        fontSize={14}
         fontWeight={700}
         fill="var(--muted)"
         textAnchor="end"
@@ -315,7 +319,7 @@ function ReplayChart({
       <text
         x={PAD.left - 8}
         y={yToPx(yMax) + 4}
-        fontSize={11}
+        fontSize={14}
         fontWeight={700}
         fill="var(--muted)"
         textAnchor="end"
@@ -351,7 +355,7 @@ function ReplayChart({
           <text
             x={W - PAD.right}
             y={yToPx(threshold.y) - 6}
-            fontSize={11}
+            fontSize={15}
             fontWeight={800}
             fill="var(--muted)"
             textAnchor="end"
@@ -364,7 +368,7 @@ function ReplayChart({
       <path
         d={linePath}
         stroke={lineColor}
-        strokeWidth={2.5}
+        strokeWidth={3.5}
         fill="none"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -373,14 +377,14 @@ function ReplayChart({
       <circle
         cx={lastX}
         cy={yToPx(lastP.toPar)}
-        r={5}
+        r={7}
         fill={lineColor}
       />
       {/* X-axis label */}
       <text
         x={W / 2}
-        y={H - 10}
-        fontSize={11}
+        y={H - 14}
+        fontSize={14}
         fontWeight={600}
         fill="var(--muted)"
         textAnchor="middle"
@@ -393,8 +397,8 @@ function ReplayChart({
       {kind === "top-finish" && cutoff && (
         <text
           x={W - PAD.right}
-          y={PAD.top + 14}
-          fontSize={11}
+          y={PAD.top + 18}
+          fontSize={14}
           fontWeight={800}
           fill="var(--muted)"
           textAnchor="end"

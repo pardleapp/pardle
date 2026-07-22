@@ -9092,18 +9092,22 @@ footer {
   color: var(--muted);
 }
 
-/* ── Past-tournament replay chart ─────────────────────────────── */
+/* ── Past-tournament replay chart — hero surface of the settled
+   bet detail page. Wraps in .bd-chart's outer card, then the SVG
+   itself fills the width edge-to-edge (no doubled border/radius),
+   so the plot area gets the largest possible visual footprint. */
 
 .bd-past-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
+  padding: 0 4px;
 }
 
 .bd-past-tournament {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 800;
   letter-spacing: -0.01em;
   color: var(--text);
@@ -9116,7 +9120,7 @@ footer {
 }
 
 .bd-past-result-pill {
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 900;
@@ -9125,7 +9129,7 @@ footer {
 }
 
 .bd-past-result-pnl {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
 }
@@ -9134,16 +9138,17 @@ footer {
   display: block;
   width: 100%;
   height: auto;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .bd-past-meta {
-  margin-top: 8px;
+  margin-top: 12px;
   text-align: center;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
+  padding: 0 4px;
 }
 
 .bd-table {
