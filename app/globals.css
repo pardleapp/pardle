@@ -30332,29 +30332,30 @@ body[data-chat-open] .addbet-fab {
 }
 
 /* ── Mobile (≤768px): purpose-built row layout that fits in 390px.
-   Line 1 = the always-visible facts (POS · avatar · NAME · TODAY · THRU · TOT).
-   Line 2 = LATEST event when present, spanning full width.
-   The 4 individual SG columns collapse into just TOT so the row breathes.
-   Everything sized down ~30% from desktop but kept LEGIBLE at arm's length. */
+   STREAMLINED — desktop has 11 grid tracks per row; mobile shows only
+   POS · avatar · NAME · TODAY · THRU. SG breakdown, SG total, and the
+   dividers all collapse. LATEST event moves to line 2 spanning full
+   width with STRONG visual weight so shot updates are the eye-catch,
+   not another data cell.
+   The rule set is small on purpose — desktop styling isn't touched. */
 @media (max-width: 768px) {
   .feed-v4 .v4-table { overflow-x: visible; }
   .feed-v4 .v4-headings,
   .feed-v4 .v4-row {
     grid-template-columns:
       40px                    /* pos */
-      44px                    /* avatar (holds 40px PlayerAvatar) */
+      44px                    /* avatar */
       minmax(0, 1fr)          /* name */
-      50px                    /* today */
-      36px                    /* thru */
-      48px;                   /* sg total */
-    column-gap: 4px;
+      60px                    /* today */
+      44px;                   /* thru */
+    column-gap: 6px;
     min-width: 0;
   }
   .feed-v4 .v4-row {
     grid-template-areas:
-      "pos avatar name today thru total"
-      "latest latest latest latest latest latest";
-    row-gap: 4px;
+      "pos avatar name today thru"
+      "latest latest latest latest latest";
+    row-gap: 6px;
     padding: 10px 12px;
     min-height: 0;
   }
@@ -30363,28 +30364,21 @@ body[data-chat-open] .addbet-fab {
   .feed-v4 .v4-row > .v4-name { grid-area: name; }
   .feed-v4 .v4-row > .v4-total { grid-area: today; }
   .feed-v4 .v4-row > .v4-thru { grid-area: thru; }
-  .feed-v4 .v4-row > .v4-sg.v4-sg-total { grid-area: total; display: inline-flex; }
   .feed-v4 .v4-row > .v4-latest { grid-area: latest; }
 
-  /* Hide the four individual SG stats — TOT tells the story on mobile */
-  .feed-v4 .v4-row > .v4-sg:not(.v4-sg-total) { display: none; }
-  .feed-v4 .v4-headings > .v4-h-sg:not(:last-of-type),
+  /* Hide ALL SG cells on mobile — this is a bettor's scan surface,
+     not a stats table. SG breakdown lives in the expanded row. */
+  .feed-v4 .v4-row > .v4-sg { display: none; }
+  .feed-v4 .v4-headings > .v4-h-sg,
   .feed-v4 .v4-headings > .v4-h-latest { display: none; }
 
-  /* Scale the pill sizes down from desktop */
+  /* Pill sizes — tighter than desktop, one clean rhythm */
   .feed-v4 .v4-row > .v4-total {
     font-size: 18px;
-    min-width: 48px;
+    min-width: 52px;
     padding: 5px 8px;
-    border-radius: 6px;
+    border-radius: 7px;
     letter-spacing: -0.4px;
-  }
-  .feed-v4 .v4-row > .v4-sg-total {
-    font-size: 14px;
-    min-width: 44px;
-    padding: 4px 8px;
-    border-radius: 5px;
-    letter-spacing: -0.2px;
   }
   .feed-v4 .v4-pos {
     font-size: 13px;
@@ -30392,30 +30386,43 @@ body[data-chat-open] .addbet-fab {
     padding: 3px 6px;
     border-radius: 5px;
   }
-  .feed-v4 .v4-name-primary { font-size: 14.5px; letter-spacing: -0.02em; }
-  .feed-v4 .v4-thru { font-size: 12.5px; }
-  .feed-v4 .v4-row > .v4-total {
-    font-size: 17px;
-    min-width: 44px;
-    padding: 5px 6px;
-  }
-  .feed-v4 .v4-row > .v4-sg-total {
-    font-size: 13.5px;
-    min-width: 42px;
-    padding: 4px 6px;
-  }
+  .feed-v4 .v4-name-primary { font-size: 15px; letter-spacing: -0.02em; }
+  .feed-v4 .v4-thru { font-size: 13px; font-weight: 700; }
 
-  /* LATEST cluster — compact on line 2 */
+  /* LATEST cluster — the SHOT UPDATE. Line 2 becomes a proper event
+     banner: full-width, tinted background when fresh, deeper ink,
+     larger text. This is the "wait, they just made a birdie" moment
+     that has to catch the eye during a scan. */
   .feed-v4 .v4-latest {
-    font-size: 13px;
-    gap: 6px;
-    padding-top: 2px;
-    padding-left: 46px;   /* aligns line 2 under the name column */
+    font-size: 13.5px;
+    gap: 7px;
+    padding: 6px 8px;
+    padding-left: 0;
+    background: oklch(0.985 0.005 95);
+    border-radius: 8px;
+    border: 1px solid oklch(0.94 0.008 95);
   }
-  .feed-v4 .v4-latest-tag { font-size: 10px; padding: 3px 7px; letter-spacing: 0.5px; }
-  .feed-v4 .v4-latest-text { font-size: 13px; }
-  .feed-v4 .v4-latest-anchor { font-size: 11px; }
-  .feed-v4 .v4-latest-time { font-size: 11px; }
+  .feed-v4 .v4-latest-pulse { margin-left: 4px; }
+  .feed-v4 .v4-latest-tag {
+    font-size: 10.5px;
+    padding: 3px 8px;
+    letter-spacing: 0.55px;
+  }
+  .feed-v4 .v4-latest-text {
+    font-size: 13.5px;
+    color: oklch(0.18 0.03 155);
+    font-weight: 600;
+  }
+  .feed-v4 .v4-latest-anchor { font-size: 11.5px; }
+  .feed-v4 .v4-latest-time { font-size: 11.5px; padding-right: 4px; }
+
+  /* Fresh event on mobile: tinted emerald banner, so shot updates
+     don't just sit as another gray row — they read as "this just
+     happened, look here". */
+  .feed-v4 .v4-row-fresh .v4-latest {
+    background: oklch(0.96 0.06 155);
+    border-color: oklch(0.82 0.10 155);
+  }
 
   /* Remove the desktop SG-column divider — no SG bank on mobile */
   .feed-v4 .v4-row > :nth-child(7),
@@ -30425,16 +30432,15 @@ body[data-chat-open] .addbet-fab {
     padding-left: 6px;
   }
 
-  /* Kill the empty-latest ("—") on line 2 so the row stays single-line
-     when there's no event, instead of showing an empty caption. */
+  /* Kill the empty-latest ("—") on line 2 so a player with no recent
+     event has a clean single-line row instead of an empty caption. */
   .feed-v4 .v4-row > .v4-latest:has(.v4-latest-empty) { display: none; }
 
-  /* Bet-impact chip: no room for prob "X% → Y%" or the "your outright"
-     label at 390px. Keep arrow + delta only. */
+  /* Bet-impact chip: no room for prob "X% → Y%" on 390px */
   .feed-v4 .v4-impact-prob,
   .feed-v4 .v4-impact-lbl { display: none; }
 
-  /* Headings: compact + no bottom emerald bar (visual noise on mobile) */
+  /* Headings: compact broadcast strip */
   .feed-v4 .v4-headings {
     padding: 8px 12px;
     font-size: 9.5px;
@@ -30442,7 +30448,6 @@ body[data-chat-open] .addbet-fab {
     border-bottom-width: 1px;
     border-radius: 10px 10px 0 0;
   }
-
 }
 
 /* ── v4 social layer — reactions, picker, comments, expanded row,
