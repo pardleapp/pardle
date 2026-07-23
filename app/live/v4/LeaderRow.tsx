@@ -18,6 +18,11 @@ import type {
   LeaderboardRow,
   EventSocial,
 } from "@/app/api/live-leaderboard/route";
+import type { EventBetImpact } from "../bet-impact";
+import {
+  betKindShortLabel,
+  formatImpactCurrency,
+} from "../bet-impact";
 
 interface Props {
   row: LeaderboardRow;
@@ -30,6 +35,11 @@ interface Props {
   onToggleExpanded: () => void;
   onReact: (eventId: string, emoji: string) => void;
   authorKey: string;
+  /** Impact this row's latest event had on one of the user's active
+   *  bets — null when nothing material moved. Renders a compact chip
+   *  in the LATEST column and boosts the row's mine-accent so the
+   *  bettor's eye lands on it during a scan. */
+  betImpact: EventBetImpact | null;
 }
 
 const REACTION_EMOJI = ["🔥", "😬", "🎯"];
@@ -255,6 +265,14 @@ function reactionChips(
     .slice(0, 3);
 }
 
+/** 10 → "10%", 0.85 → "1%" (min 1% floor so tiny non-zero moves still
+ *  read). Kept local to avoid an import from ShotPost. */
+function formatProbPct(prob: number): string {
+  const pct = Math.max(0, Math.min(100, prob * 100));
+  const rounded = pct < 1 ? Math.max(1, Math.round(pct)) : Math.round(pct);
+  return `${rounded}%`;
+}
+
 interface EventInlineProps {
   event: FeedEvent;
   now: number;
@@ -265,6 +283,7 @@ interface EventInlineProps {
   authorKey: string;
   commentsOpen: boolean;
   onToggleComments: () => void;
+  betImpact?: EventBetImpact | null;
 }
 
 function EventInline({
@@ -277,6 +296,7 @@ function EventInline({
   authorKey,
   commentsOpen,
   onToggleComments,
+  betImpact,
 }: EventInlineProps) {
   const verb = eventVerb(event);
   const stale = isStale(event.ts, now);
@@ -294,6 +314,32 @@ function EventInline({
         <span className={`v4-latest-tag v4-latest-tag-${verb.kind}`}>{verb.tag}</span>
         <span className="v4-latest-text">{verb.text}</span>
         {verb.anchor && <span className="v4-latest-anchor">{verb.anchor}</span>}
+        {betImpact && (
+          <span
+            className={`v4-impact ${
+              betImpact.deltaValue >= 0 ? "v4-impact-up" : "v4-impact-down"
+            }${betImpact.isBigMove ? " v4-impact-big" : ""}`}
+            title={`${betImpact.source === "direct" ? "Your player's shot" : "A competitor's shot"} moved your ${betKindShortLabel(betImpact.bet)} by ${formatImpactCurrency(betImpact.deltaValue, betImpact.bet.currency)}`}
+          >
+            <span className="v4-impact-arrow" aria-hidden="true">
+              {betImpact.deltaValue >= 0 ? "▲" : "▼"}
+            </span>
+            {typeof betImpact.probBefore === "number" &&
+            typeof betImpact.probAfter === "number" ? (
+              <span className="v4-impact-prob">
+                {formatProbPct(betImpact.probBefore)}
+                <span className="v4-impact-sep" aria-hidden="true">→</span>
+                {formatProbPct(betImpact.probAfter)}
+              </span>
+            ) : null}
+            <span className="v4-impact-lbl">
+              your {betKindShortLabel(betImpact.bet)}
+            </span>
+            <span className="v4-impact-val">
+              {formatImpactCurrency(betImpact.deltaValue, betImpact.bet.currency)}
+            </span>
+          </span>
+        )}
         <span
           className={`v4-latest-time${stale ? " v4-latest-time-final" : ""}`}
         >
@@ -370,6 +416,7 @@ export default function LeaderRow({
   onToggleExpanded,
   onReact,
   authorKey,
+  betImpact,
 }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const [openComments, setOpenComments] = useState<Set<string>>(new Set());
@@ -407,7 +454,7 @@ export default function LeaderRow({
   return (
     <div className={`v4-row-wrap${expanded ? " v4-row-wrap-open" : ""}`}>
       <div
-        className={`v4-row${isMine ? " v4-row-mine" : ""}${isCut ? " v4-row-cut" : ""}${eventFresh ? " v4-row-fresh" : ""}${eventCelebrate ? " v4-row-celebrate" : ""}`}
+        className={`v4-row${isMine ? " v4-row-mine" : ""}${isCut ? " v4-row-cut" : ""}${eventFresh ? " v4-row-fresh" : ""}${eventCelebrate ? " v4-row-celebrate" : ""}${betImpact ? " v4-row-impact" : ""}${betImpact && betImpact.deltaValue < 0 ? " v4-row-impact-down" : ""}`}
         onClick={onToggleExpanded}
         role="button"
         tabIndex={0}
@@ -442,6 +489,7 @@ export default function LeaderRow({
             authorKey={authorKey}
             commentsOpen={openComments.has(latest.id)}
             onToggleComments={() => toggleComments(latest.id)}
+            betImpact={betImpact}
           />
         ) : (
           <span className="v4-latest">

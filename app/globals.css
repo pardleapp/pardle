@@ -30106,6 +30106,117 @@ body[data-chat-open] .addbet-fab {
   font-family: "IBM Plex Mono", var(--font-mono, monospace), monospace;
 }
 
+/* ── Bet-impact chip — inline pill inside the LATEST cell that fires
+   when the row's latest event moved one of the user's active bets.
+   Colour tracks direction: emerald when up (your bet just gained),
+   tang when down. Big-move state adds a subtle glow + bolder ring so
+   the eye lands on it during a scan. */
+.feed-v4 .v4-impact {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.1px;
+  line-height: 1;
+  flex-shrink: 0;
+  white-space: nowrap;
+  margin-left: 4px;
+}
+.feed-v4 .v4-impact-arrow {
+  font-size: 11px;
+  line-height: 1;
+}
+.feed-v4 .v4-impact-prob {
+  font-family: "IBM Plex Mono", var(--font-mono, monospace), monospace;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+.feed-v4 .v4-impact-sep {
+  opacity: 0.75;
+  font-size: 10px;
+  padding: 0 1px;
+}
+.feed-v4 .v4-impact-lbl {
+  opacity: 0.85;
+  font-weight: 600;
+  font-size: 11.5px;
+}
+.feed-v4 .v4-impact-val {
+  font-family: "IBM Plex Mono", var(--font-mono, monospace), monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  font-size: 12px;
+}
+.feed-v4 .v4-impact-up {
+  background: linear-gradient(180deg, oklch(0.94 0.09 155), oklch(0.90 0.08 155));
+  color: oklch(0.26 0.16 155);
+  box-shadow: 0 0 0 1px oklch(0.78 0.12 155), 0 1px 3px oklch(0.55 0.14 155 / 0.25);
+}
+.feed-v4 .v4-impact-down {
+  background: linear-gradient(180deg, oklch(0.94 0.07 25), oklch(0.90 0.07 25));
+  color: oklch(0.36 0.18 25);
+  box-shadow: 0 0 0 1px oklch(0.80 0.10 25), 0 1px 3px oklch(0.55 0.17 25 / 0.25);
+}
+.feed-v4 .v4-impact-big.v4-impact-up {
+  box-shadow:
+    0 0 0 1.5px oklch(0.60 0.16 155),
+    0 0 12px oklch(0.55 0.16 155 / 0.5),
+    0 1px 3px oklch(0.40 0.15 155 / 0.4);
+  animation: v4-impact-pulse 1.4s ease-in-out;
+}
+.feed-v4 .v4-impact-big.v4-impact-down {
+  box-shadow:
+    0 0 0 1.5px oklch(0.60 0.19 25),
+    0 0 12px oklch(0.55 0.18 25 / 0.5),
+    0 1px 3px oklch(0.40 0.18 25 / 0.4);
+  animation: v4-impact-pulse 1.4s ease-in-out;
+}
+@keyframes v4-impact-pulse {
+  0%, 100% { transform: scale(1); }
+  40%      { transform: scale(1.05); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feed-v4 .v4-impact-big.v4-impact-up,
+  .feed-v4 .v4-impact-big.v4-impact-down { animation: none; }
+}
+
+/* Row-level accent: the mine-tang bar shifts to emerald when a good
+   impact just landed, and stays tang for a bad one. Slight scale on
+   the whole row lets bettors' eyes track their affected rows even
+   while scanning other data. */
+.feed-v4 .v4-row-impact::before {
+  background: oklch(0.55 0.16 155);
+  box-shadow: 0 0 10px oklch(0.55 0.16 155 / 0.6);
+  width: 4px;
+}
+.feed-v4 .v4-row-impact-down::before {
+  background: oklch(0.55 0.18 25);
+  box-shadow: 0 0 10px oklch(0.55 0.18 25 / 0.6);
+}
+.feed-v4 .v4-row-impact.v4-row-mine {
+  background: linear-gradient(90deg, oklch(0.97 0.06 155) 0%, white 340px);
+}
+.feed-v4 .v4-row-impact-down.v4-row-mine {
+  background: linear-gradient(90deg, oklch(0.97 0.05 25) 0%, white 340px);
+}
+
+/* Small viewports: drop the prob-shift micro-copy to save width — the
+   arrow + label + £ delta still tell the bettor what moved. */
+@media (max-width: 1180px) {
+  .feed-v4 .v4-impact-prob { display: none; }
+}
+@media (max-width: 900px) {
+  .feed-v4 .v4-impact-lbl { display: none; }
+}
+
 /* SG columns — mono, right-aligned, colour-coded with real contrast */
 .feed-v4 .v4-sg {
   font-family: "IBM Plex Mono", var(--font-mono, monospace), monospace;

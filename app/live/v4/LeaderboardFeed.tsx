@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import LeaderRow from "./LeaderRow";
 import { useFollowedPlayers } from "../useFollowedPlayers";
 import { readBets, type TrackedBet } from "../bet-shared";
+import { headlineImpactForEvent, type EventBetImpact } from "../bet-impact";
 import type { LeaderboardResponse } from "@/app/api/live-leaderboard/route";
 
 const POLL_MS = 3_000;
@@ -213,6 +214,23 @@ export default function LeaderboardFeed() {
       ? rows.filter((r) => mineIds.has(r.playerId))
       : rows;
 
+  // Per-row bet impact — surfaces "your outright ↑ 4pp · +£1.20" inline
+  // in the LATEST column whenever the row's latest event materially
+  // moved one of the user's active bets. Direct outright + top-finish
+  // only for v0 (indirect + round-score need currentOdds / contextRows
+  // which the leaderboard endpoint doesn't ship yet).
+  const impactByPlayer = new Map<string, EventBetImpact>();
+  if (bets.length > 0) {
+    for (const r of rows) {
+      if (!r.latestEvent) continue;
+      const imp = headlineImpactForEvent(r.latestEvent, bets, {
+        currentOdds: {},
+        leaderboard: [],
+      });
+      if (imp) impactByPlayer.set(r.playerId, imp);
+    }
+  }
+
   return (
     <section className="feed-wrap v4-theme pv-theme tchat-content-pad feed-v4">
       <div className="v4-header">
@@ -285,6 +303,7 @@ export default function LeaderboardFeed() {
               onToggleExpanded={() => toggleExpanded(r.playerId)}
               onReact={react}
               authorKey={authorKey.current}
+              betImpact={impactByPlayer.get(r.playerId) ?? null}
             />
           ))}
         </div>
