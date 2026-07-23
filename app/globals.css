@@ -30311,6 +30311,22 @@ body[data-chat-open] .addbet-fab {
     0 2px 8px oklch(0.20 0.03 155 / 0.2);
   animation: subscribe-slide-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
+/* Desktop — bigger surface so it feels like a proper landing hero,
+   not a mobile modal ported up. Only fires above the mobile breakpoint;
+   mobile stays at the tuned 400px width. */
+@media (min-width: 769px) {
+  .subscribe-modal {
+    max-width: 560px;
+    padding: 52px 44px 36px;
+    border-radius: 22px;
+  }
+  .subscribe-modal-title { font-size: 30px; margin: 8px 0 14px; }
+  .subscribe-modal-body { font-size: 16px; max-width: 400px; margin-bottom: 26px; }
+  .subscribe-modal-later { font-size: 14px; margin-top: 16px; }
+  .subscribe-modal-foot { font-size: 12.5px; margin-top: 10px; }
+  .subscribe-cta-btn { font-size: 16.5px; padding: 14px 32px; }
+  .subscribe-modal-close { top: 14px; right: 14px; width: 36px; height: 36px; font-size: 18px; }
+}
 @keyframes subscribe-slide-in {
   from { opacity: 0; transform: translateY(20px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }

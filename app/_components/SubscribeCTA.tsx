@@ -82,7 +82,6 @@ export default function SubscribeCTA() {
             >
               ✕
             </button>
-            <div className="subscribe-cta-eyebrow">Free · No payment</div>
             <h2 className="subscribe-modal-title">
               Get the weekly insight straight to your inbox
             </h2>
