@@ -560,6 +560,105 @@ export default function ArticlePinDifficulty() {
         year and by round.
       </P>
 
+      <H3>Round 1 read — the Thursday setup</H3>
+      <P>
+        The R1 pin sheet dropped Wednesday afternoon, and the
+        Thursday forecast is a <b>steady southerly, 5-7 mph all
+        day</b>. Plugged into the same regression above, here's
+        what today's set-up says vs. a typical R1 at TPC Twin
+        Cities.
+      </P>
+
+      <H3>Playing easier today</H3>
+      <ul
+        style={{
+          fontSize: 15,
+          lineHeight: 1.65,
+          color: "oklch(0.26 0.04 155)",
+          fontFamily: proseFont,
+          margin: "0 0 16px 20px",
+          padding: 0,
+        }}
+      >
+        <li style={{ marginBottom: 6 }}>
+          <b>H12 (par-5) — the day's biggest edge, ~+8pp above
+          normal.</b> The R1 flag sits on the back-left cluster
+          (+5.5pp on its historical record), and the south wind is a
+          strong tailwind on 12 — every 5 mph of tailwind lifts
+          birdie rate ~+4pp on this hole. Both effects stack.
+        </li>
+        <li style={{ marginBottom: 6 }}>
+          <b>H5 (par-4) — ~+5pp above normal.</b> Today's flag lands
+          on a smaller-sample cluster the regression rates as
+          consistently over-performing (~+6pp intrinsic). Wind is
+          essentially crosswind on the approach, so this is a
+          pin-driven edge.
+        </li>
+        <li style={{ marginBottom: 6 }}>
+          <b>H15 (par-4) — ~+4pp above normal.</b> The tee shot runs
+          nearly due-north, which turns today's south wind into a
+          straight tailwind off the tee — the hole plays shorter.
+          Neutral pin, but the wind boost is real.
+        </li>
+        <li style={{ marginBottom: 6 }}>
+          <b>H2 and H18 — mild + (each ~+2pp).</b> Strong tailwinds
+          on long holes, roughly neutral pins.
+        </li>
+      </ul>
+
+      <H3>Playing harder today</H3>
+      <ul
+        style={{
+          fontSize: 15,
+          lineHeight: 1.65,
+          color: "oklch(0.26 0.04 155)",
+          fontFamily: proseFont,
+          margin: "0 0 16px 20px",
+          padding: 0,
+        }}
+      >
+        <li style={{ marginBottom: 6 }}>
+          <b>H16 — the day's biggest defensive setup.</b> Back tee
+          at 411 yards + south wind is a direct headwind on the
+          approach. Neutral pin, but the yardage-and-wind stack
+          alone puts the hole ~6&ndash;8pp harder than a typical
+          R1. (The regression's raw estimate is bigger than that
+          but is inflated by anomalous drivable-hole setups in the
+          historical record.)
+        </li>
+        <li style={{ marginBottom: 6 }}>
+          <b>H7 — ~−4pp below normal.</b> South wind hits the
+          approach directly, and H7 is one of the property's most
+          yardage-sensitive holes.
+        </li>
+        <li style={{ marginBottom: 6 }}>
+          <b>H6 — ~−3pp below normal.</b> The R1 pin sits on a
+          smaller-sample cluster with a mildly negative residual,
+          and the tailwind bonus isn't enough to flip it. Not the
+          par-5 birdie opportunity it looks like on the leaderboard.
+        </li>
+      </ul>
+
+      <P>
+        <b>Net-net across the round:</b> the four flagged easier
+        holes add more strokes to the field's scoring than the
+        three defensive ones take away. Expect R1 scoring to run
+        roughly <b>1-1.5 strokes below the historical R1 average</b>
+        at TPC Twin Cities — a lean toward <b>round-score UNDERs</b>
+        on individual player lines and on the tournament's first-round
+        scoring total.
+      </P>
+      <P>
+        Two caveats: the R1 coord for H13 wasn't in the archive
+        when this ran, so the mid-round par-3 is a slight unknown
+        (its wind is a moderate headwind, so it's more likely to be
+        a small drag than a small lift). And the H16 penalty above
+        is the model's raw output — a more honest estimate,
+        stripping the anomalous drivable-hole setups from the
+        yardage baseline, is closer to −6 to −8pp harder than
+        normal.
+      </P>
+
       <H3>The limits</H3>
       <P>
         Six years is a shortish sample. Each pin cluster has
