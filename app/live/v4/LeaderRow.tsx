@@ -128,6 +128,24 @@ function shotDistanceLabel(ev: FeedEvent): string {
   return "";
 }
 
+/** Normalise the IMG landing surface into a lowercase display word.
+ *  IMG uses "Fairway" / "Rough" / "Bunker" / "Green" / "Native Area" /
+ *  "Tee" etc. Returns "" for unknown or absent values so callers can
+ *  omit the "to X" suffix cleanly. */
+function landingSurfaceLabel(ev: FeedEvent): string {
+  const raw = (ev.imgSurface ?? "").trim().toLowerCase();
+  if (!raw) return "";
+  if (raw.includes("fairway")) return "fairway";
+  if (raw.includes("rough")) return "rough";
+  if (raw.includes("bunker") || raw.includes("sand")) return "bunker";
+  if (raw === "green" || raw.includes("putting green")) return "green";
+  if (raw.includes("fringe") || raw.includes("collar")) return "fringe";
+  if (raw.includes("native") || raw.includes("waste")) return "native area";
+  if (raw.includes("water") || raw.includes("hazard")) return "water";
+  if (raw === "tee" || raw.includes("tee box")) return "tee";
+  return "";
+}
+
 function eventVerb(ev: FeedEvent): { tag: string; kind: string; text: string; anchor: string } {
   const h = (ev.headline ?? "").toLowerCase();
   const hole = holeLabel(ev.hole);
@@ -182,14 +200,15 @@ function eventVerb(ev: FeedEvent): { tag: string; kind: string; text: string; an
       return { tag: "APPR", kind: "shot", text, anchor: "" };
     }
     if (typeof ev.imgShotDistance === "number" && ev.imgShotDistanceUnit === "yds") {
-      // Drives — the distance IS the story. No hole label, no
-      // proximity (drives aim at a fairway, not the pin).
-      return {
-        tag: "DRIVE",
-        kind: "shot",
-        text: `Drives ${Math.round(ev.imgShotDistance)}y`,
-        anchor: "",
-      };
+      // Drives — the distance IS the story, plus where the ball ended
+      // up (fairway / rough / bunker) tells the "was it a good drive?"
+      // half of the story. No hole label — the row's thru column has
+      // that. No proximity — drives aim at a fairway, not the pin.
+      const surface = landingSurfaceLabel(ev);
+      const text = surface
+        ? `Drives ${Math.round(ev.imgShotDistance)}y to ${surface}`
+        : `Drives ${Math.round(ev.imgShotDistance)}y`;
+      return { tag: "DRIVE", kind: "shot", text, anchor: "" };
     }
     // Fallback for an untyped shot with no clear headline verb —
     // trust the collector's own sentence if we have one.
