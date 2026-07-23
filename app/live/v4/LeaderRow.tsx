@@ -405,7 +405,7 @@ export default function LeaderRow({
       >
         <span className="v4-pos">{row.position}</span>
         <span className="v4-avatar">
-          <PlayerAvatar playerId={row.playerId} playerName={row.playerName} size="sm" />
+          <PlayerAvatar playerId={row.playerId} playerName={row.playerName} size="md" />
         </span>
         <span className="v4-name">
           <span className="v4-name-primary">{shortName(row.playerName)}</span>
