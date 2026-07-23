@@ -637,28 +637,39 @@ export default function ArticlePinDifficulty() {
           and the tailwind bonus isn't enough to flip it. Not the
           par-5 birdie opportunity it looks like on the leaderboard.
         </li>
+        <li style={{ marginBottom: 6 }}>
+          <b>H13 — ~−5pp below normal.</b> This is the article's
+          flagged middle-right harder pin (&minus;4.3pp intrinsic),
+          plus today's south wind hits the tee shot as a moderate
+          headwind. Both effects stack. Solid <b>fade the birdie
+          sweat here</b>.
+        </li>
       </ul>
 
       <P>
-        <b>Net-net across the round:</b> the flagged easier holes
-        just about offset the defensive ones, with a small residual
-        lean toward the easier side once H16's inflated raw penalty
-        is corrected down. Sum of the per-hole birdie-rate deltas
-        works out at roughly +5pp of net birdie rate across 18
-        holes — which converts to about <b>0.1-0.3 strokes below
-        the historical R1 average</b> at TPC Twin Cities. That's a
-        <b>mild lean toward round-score UNDERs</b> — a nudge, not a
-        hammer.
+        <b>Net-net across the round:</b> once H13's flagged harder
+        pin is factored in, the easier and defensive holes roughly
+        cancel. Sum of the per-hole birdie-rate deltas comes in
+        near zero — the four eased holes lift ~+21pp and the four
+        defensive ones drag ~−21pp, so today's setup is basically
+        <b>a neutral R1 relative to the historical average</b>
+        rather than a round-wide easy day.
       </P>
       <P>
-        Two caveats: the R1 coord for H13 wasn't in the archive
-        when this ran, so the mid-round par-3 is a slight unknown
-        (its wind is a moderate headwind, so it's more likely to be
-        a small drag than a small lift). And the H16 penalty above
-        is the model's raw output — a more honest estimate,
-        stripping the anomalous drivable-hole setups from the
-        yardage baseline, is closer to −6 to −8pp harder than
-        normal.
+        That <i>doesn't</i> mean the flagged holes don't matter.
+        The <b>H12 birdie edge</b> (+~8pp) and the <b>H13 + H16
+        defensiveness</b> (~−5 and ~−8pp respectively, after
+        correcting H16 down for the drivable-hole distortion in the
+        historical baseline) are the strongest single-hole signals
+        of the day — worth playing on their own even when the
+        round-total is roughly a coin flip. Player-specific
+        matchups on those four holes are where the real edge sits.
+      </P>
+      <P>
+        One caveat: the H16 penalty above is the model's raw
+        output — a more honest estimate, stripping the anomalous
+        drivable-hole setups from the yardage baseline, is closer
+        to −6 to −8pp harder than normal.
       </P>
 
       <H3>The limits</H3>
