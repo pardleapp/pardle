@@ -101,7 +101,7 @@ const PRIMARY: Item[] = [
   },
   {
     href: "/analysis",
-    label: "Analysis",
+    label: "Tools",
     matches: ["/analysis"],
     iconPath: (
       <>

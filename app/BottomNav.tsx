@@ -86,7 +86,7 @@ const TABS: Tab[] = [
   },
   {
     href: "/analysis",
-    label: "Analysis",
+    label: "Tools",
     matches: ["/analysis"],
     iconPath: (
       <>

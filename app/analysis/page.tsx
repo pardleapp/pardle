@@ -7,7 +7,7 @@ import TeeTimePreview from "./_previews/TeeTimePreview";
 import TeeShotPreview from "./_previews/TeeShotPreview";
 
 export const metadata = {
-  title: `Analysis — ${BRAND.name}`,
+  title: `Tools — ${BRAND.name}`,
   description:
     "Deep-dive analytical views — course conditions, tee-time effects, skill-adjusted performance.",
 };
@@ -68,21 +68,22 @@ export default function AnalysisIndex() {
       >
         <h2
           style={{
-            fontSize: 22,
+            fontSize: 24,
             fontFamily:
               "var(--font-archivo), 'Archivo', system-ui, -apple-system, sans-serif",
-            marginBottom: 4,
+            marginBottom: 6,
           }}
         >
-          Analysis
+          Tools
         </h2>
         <p
           style={{
-            fontSize: 13,
+            fontSize: 14,
             color: "oklch(0.5 0.02 150)",
-            margin: "0 0 20px",
+            margin: "0 0 22px",
             fontFamily:
               "var(--font-archivo), 'Archivo', system-ui, -apple-system, sans-serif",
+            lineHeight: 1.5,
           }}
         >
           Deep-dive views on how a tournament&apos;s playing — who&apos;s
@@ -96,9 +97,9 @@ export default function AnalysisIndex() {
             padding: 0,
             margin: 0,
             display: "grid",
-            gap: 14,
+            gap: 18,
             gridTemplateColumns:
-              "repeat(auto-fit, minmax(340px, 1fr))",
+              "repeat(auto-fit, minmax(400px, 1fr))",
           }}
         >
           {CARDS.map((card) => {
@@ -120,21 +121,23 @@ export default function AnalysisIndex() {
                 }}
               >
                 <Preview />
-                <div style={{ padding: 16 }}>
+                <div style={{ padding: "20px 20px 22px" }}>
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
                       gap: 10,
-                      marginBottom: 6,
+                      marginBottom: 8,
                     }}
                   >
                     <h3
                       style={{
-                        fontSize: 15,
+                        fontSize: 18,
                         margin: 0,
                         fontFamily:
                           "var(--font-archivo), 'Archivo', system-ui, sans-serif",
+                        letterSpacing: -0.005,
+                        color: "oklch(0.22 0.03 155)",
                       }}
                     >
                       {card.title}
@@ -157,10 +160,12 @@ export default function AnalysisIndex() {
                   </div>
                   <p
                     style={{
-                      fontSize: 13,
-                      color: "oklch(0.4 0.02 150)",
+                      fontSize: 14.5,
+                      color: "oklch(0.32 0.03 155)",
                       margin: 0,
-                      lineHeight: 1.4,
+                      lineHeight: 1.5,
+                      fontFamily:
+                        "var(--font-archivo), 'Archivo', system-ui, sans-serif",
                     }}
                   >
                     {card.blurb}

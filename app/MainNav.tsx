@@ -31,7 +31,7 @@ const TABS: Array<{ key: MainNavTab; href: string; label: string }> = [
   { key: "bets", href: "/bets", label: "Bets" },
   { key: "sharp", href: "/sharp", label: "Sharp" },
   { key: "games", href: "/games", label: "Games" },
-  { key: "analysis", href: "/analysis", label: "Analysis" },
+  { key: "analysis", href: "/analysis", label: "Tools" },
   { key: "commentary", href: "/commentary", label: "Commentary" },
 ];
 
