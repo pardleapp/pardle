@@ -98,9 +98,41 @@ function isStale(ts: number, now: number): boolean {
   return now - ts >= STALE_THRESHOLD_MS;
 }
 
+/** Format proximity-to-hole from either proximityInches (canonical)
+ *  or the IMG-formatted imgToPin string (e.g. "3 ft" / "8yd"). Rounds
+ *  to whole feet under 30 ft and whole yards over. */
+function proximityLabel(ev: FeedEvent): string {
+  if (typeof ev.proximityInches === "number") {
+    const feet = ev.proximityInches / 12;
+    if (feet < 1) {
+      const inches = Math.round(ev.proximityInches);
+      return `${inches}in`;
+    }
+    if (feet < 30) return `${Math.round(feet)}ft`;
+    return `${Math.round(feet / 3)}yd`;
+  }
+  if (typeof ev.imgToPin === "string" && ev.imgToPin.trim().length > 0) {
+    return ev.imgToPin.replace(/\s+/g, "").replace(/yds?/i, "yd");
+  }
+  return "";
+}
+
+/** Format shot distance (how far the ball travelled). Yards for
+ *  drives/approaches, feet for putts/chips. */
+function shotDistanceLabel(ev: FeedEvent): string {
+  if (typeof ev.imgShotDistance !== "number") return "";
+  const unit = (ev.imgShotDistanceUnit ?? "").toLowerCase();
+  if (unit === "ft") return `${Math.round(ev.imgShotDistance)}ft`;
+  if (unit === "yds" || unit === "yd") return `${Math.round(ev.imgShotDistance)}y`;
+  // Unknown unit — trust the collector's headline instead
+  return "";
+}
+
 function eventVerb(ev: FeedEvent): { tag: string; kind: string; text: string; anchor: string } {
   const h = (ev.headline ?? "").toLowerCase();
   const hole = holeLabel(ev.hole);
+  // Score events keep the hole label — knowing WHICH hole they
+  // birdied is signal even when "thru" tells you what they're on.
   if (ev.ace) return { tag: "ACE", kind: "ace", text: `Ace ${hole}`, anchor: "" };
   if (ev.result === "albatross") return { tag: "ALB", kind: "eagle", text: `Alb ${hole}`, anchor: "" };
   if (ev.result === "eagle") return { tag: "EAGLE", kind: "eagle", text: `Eagle ${hole}`, anchor: "" };
@@ -108,30 +140,61 @@ function eventVerb(ev: FeedEvent): { tag: string; kind: string; text: string; an
   if (ev.result === "bogey") return { tag: "BOGEY", kind: "bogey", text: `Bogey ${hole}`, anchor: "" };
   if (ev.result === "double") return { tag: "DBL", kind: "double", text: `Double ${hole}`, anchor: "" };
   if (ev.result === "triple-plus") return { tag: "TRIP+", kind: "double", text: `Blow-up ${hole}`, anchor: "" };
+  // Shot events drop the hole label — the row's "thru" column already
+  // shows what hole the player is on. Instead, surface the distance
+  // that actually characterises the shot (drive length, putt length +
+  // proximity, approach proximity, etc).
   if (ev.type === "shot") {
     if (/\bputts?\b/.test(h)) {
-      const anchor =
-        typeof ev.imgShotDistance === "number" && ev.imgShotDistanceUnit === "ft"
-          ? `${Math.round(ev.imgShotDistance)}ft`
-          : typeof ev.proximityInches === "number"
-            ? `${Math.round(ev.proximityInches / 12)}ft`
-            : "";
-      return { tag: "PUTT", kind: "shot", text: `Putts ${hole}`, anchor };
+      const dist = shotDistanceLabel(ev);
+      const prox = proximityLabel(ev);
+      const text =
+        dist && prox
+          ? `${dist} putt → ${prox}`
+          : dist
+            ? `${dist} putt`
+            : prox
+              ? `Putts → ${prox}`
+              : "Putts";
+      return { tag: "PUTT", kind: "shot", text, anchor: "" };
     }
     if (/\b(bunker|sand)\b/.test(h)) {
-      return { tag: "SAND", kind: "shot", text: `Sand ${hole}`, anchor: "" };
+      const prox = proximityLabel(ev);
+      const text = prox ? `From bunker → ${prox}` : "From bunker";
+      return { tag: "SAND", kind: "shot", text, anchor: "" };
+    }
+    if (/\b(chips?|chip[- ]in|pitch(?:es|ing)?)\b/.test(h)) {
+      const prox = proximityLabel(ev);
+      const text = prox ? `Chips → ${prox}` : "Chips";
+      return { tag: "CHIP", kind: "shot", text, anchor: "" };
     }
     if (/\bapproach(es|ing)?\b/.test(h)) {
-      const anchor =
-        typeof ev.proximityInches === "number"
-          ? `${Math.round(ev.proximityInches / 12)}ft`
-          : "";
-      return { tag: "APPR", kind: "shot", text: `Approach ${hole}`, anchor };
+      const dist = shotDistanceLabel(ev);
+      const prox = proximityLabel(ev);
+      const text =
+        dist && prox
+          ? `Approach from ${dist} → ${prox}`
+          : dist
+            ? `Approach from ${dist}`
+            : prox
+              ? `Approach → ${prox}`
+              : "Approach";
+      return { tag: "APPR", kind: "shot", text, anchor: "" };
     }
     if (typeof ev.imgShotDistance === "number" && ev.imgShotDistanceUnit === "yds") {
-      return { tag: "DRIVE", kind: "shot", text: `Drive ${hole}`, anchor: `${Math.round(ev.imgShotDistance)}y` };
+      // Drives — the distance IS the story. No hole label, no
+      // proximity (drives aim at a fairway, not the pin).
+      return {
+        tag: "DRIVE",
+        kind: "shot",
+        text: `Drives ${Math.round(ev.imgShotDistance)}y`,
+        anchor: "",
+      };
     }
-    return { tag: "SHOT", kind: "shot", text: `Shot ${hole}`, anchor: "" };
+    // Fallback for an untyped shot with no clear headline verb —
+    // trust the collector's own sentence if we have one.
+    if (ev.headline) return { tag: "SHOT", kind: "shot", text: ev.headline, anchor: "" };
+    return { tag: "SHOT", kind: "shot", text: "Plays a shot", anchor: "" };
   }
   if (ev.type === "position") {
     return { tag: "MOVE", kind: "misc", text: ev.headline ?? "", anchor: "" };
