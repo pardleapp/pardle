@@ -29745,12 +29745,12 @@ body[data-chat-open] .addbet-fab {
   display: grid;
   grid-template-columns:
     64px          /* pos */
-    52px          /* avatar */
+    56px          /* avatar */
     minmax(150px, 190px) /* name */
-    82px          /* today */
+    96px          /* today — chip needs room */
     64px          /* thru */
     minmax(0, 1fr)   /* latest */
-    58px 58px 58px 58px 68px; /* 5x SG */
+    58px 58px 58px 58px 78px; /* 5x SG (TOT chip needs room) */
   align-items: center;
   column-gap: 6px;
   padding: 0;
@@ -29970,27 +29970,47 @@ body[data-chat-open] .addbet-fab {
   border-radius: 4px;
   letter-spacing: 0.6px;
 }
-/* Score TOT — LED-style readout. Digital glow scales with polarity,
-   sits inside the cell as its own inline chip so it reads as data
-   even when the eye is scanning fast down the column. */
+/* Score TODAY — solid broadcast pill. Emerald fill for under-par,
+   tang fill for over-par, slate fill for even. White text sits inside
+   with tabular mono. This is the primary POP of the leaderboard — the
+   number a bettor needs to read at 10 feet. */
 .feed-v4 .v4-total {
   font-family: "IBM Plex Mono", var(--font-mono, monospace), monospace;
-  font-size: 27px;
+  font-size: 22px;
   font-weight: 800;
-  text-align: right;
-  letter-spacing: -0.7px;
+  letter-spacing: -0.5px;
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  justify-self: end;
+  transition: transform 0.18s ease;
 }
 .feed-v4 .v4-total-under {
-  color: oklch(0.38 0.17 150);
-  text-shadow: 0 0 12px oklch(0.55 0.20 150 / 0.32);
+  background: linear-gradient(180deg, oklch(0.52 0.17 155), oklch(0.40 0.17 155));
+  color: oklch(0.99 0.02 155);
+  box-shadow:
+    0 1px 3px oklch(0.32 0.17 155 / 0.5),
+    0 0 0 1px oklch(0.32 0.15 155);
+  text-shadow: 0 1px 2px oklch(0.20 0.10 155 / 0.35);
 }
 .feed-v4 .v4-total-over  {
-  color: oklch(0.48 0.19 25);
-  text-shadow: 0 0 12px oklch(0.58 0.20 25 / 0.28);
+  background: linear-gradient(180deg, oklch(0.60 0.20 25), oklch(0.48 0.19 25));
+  color: oklch(0.99 0.02 25);
+  box-shadow:
+    0 1px 3px oklch(0.38 0.19 25 / 0.5),
+    0 0 0 1px oklch(0.40 0.19 25);
+  text-shadow: 0 1px 2px oklch(0.25 0.10 25 / 0.35);
 }
-.feed-v4 .v4-total-even  { color: oklch(0.42 0.02 150); }
+.feed-v4 .v4-total-even  {
+  background: oklch(0.94 0.008 95);
+  color: oklch(0.32 0.03 155);
+  box-shadow: 0 0 0 1px oklch(0.88 0.008 95);
+}
 .feed-v4 .v4-thru {
   font-family: "IBM Plex Mono", var(--font-mono, monospace), monospace;
   font-size: 15px;
@@ -30098,13 +30118,30 @@ body[data-chat-open] .addbet-fab {
 .feed-v4 .v4-sg-plus  { color: oklch(0.34 0.19 150); font-weight: 800; }
 .feed-v4 .v4-sg-minus { color: oklch(0.44 0.21 25);  font-weight: 800; }
 .feed-v4 .v4-sg-total {
-  font-size: 17.5px;
+  font-size: 16px;
   font-weight: 800;
   color: oklch(0.16 0.03 155);
-  letter-spacing: -0.4px;
+  letter-spacing: -0.3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: oklch(0.94 0.008 95);
+  box-shadow: 0 0 0 1px oklch(0.88 0.008 95);
+  justify-self: end;
 }
-.feed-v4 .v4-sg-total.v4-sg-plus  { color: oklch(0.28 0.19 150); }
-.feed-v4 .v4-sg-total.v4-sg-minus { color: oklch(0.38 0.21 25);  }
+.feed-v4 .v4-sg-total.v4-sg-plus  {
+  background: oklch(0.96 0.06 155);
+  color: oklch(0.28 0.19 150);
+  box-shadow: 0 0 0 1px oklch(0.86 0.09 155);
+}
+.feed-v4 .v4-sg-total.v4-sg-minus {
+  background: oklch(0.96 0.045 25);
+  color: oklch(0.40 0.21 25);
+  box-shadow: 0 0 0 1px oklch(0.86 0.08 25);
+}
 
 .feed-v4 .v4-footnote {
   margin-top: 12px;
