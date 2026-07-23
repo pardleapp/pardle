@@ -1,45 +1,19 @@
-# Fly.io configuration for the IMG ShotLink collector.
+# fly.toml app configuration file generated for pardle-img-collector on 2026-07-12T14:24:20+01:00
 #
-# Deployment model: ONE Fly App named `pardle-img-collector`; one
-# Machine per active tournament, spun up on Thursday morning and
-# auto-stopped once the tournament wraps. Each Machine sets
-# TOURNAMENT_ID + IMG_EVENT_ID as its own env; Redis secrets are
-# shared across Machines via the App.
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
-# Deploy the image once:
-#   fly deploy
-#
-# Then run a Machine per tournament:
-#   fly machine run . --name scottish-2026 \
-#     --env TOURNAMENT_ID=R2026034 \
-#     --env IMG_EVENT_ID=1427 \
-#     --env TOURNAMENT_NAME="Genesis Scottish Open" \
-#     --env SHADOW_MODE=true
-#
-# Stop after the tournament:
-#   fly machine stop <id>
-#
-# Secrets (set once per App):
-#   fly secrets set UPSTASH_REDIS_REST_URL=... UPSTASH_REDIS_REST_TOKEN=...
 
-app = "pardle-img-collector"
-primary_region = "lhr"    # UK — matches Vercel edge, low Redis RTT
+app = 'pardle-img-collector'
+primary_region = 'lhr'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-  # Fresh Machines write to a shadow key by default; opt IN to
-  # primary-feed writing per-Machine via `--env SHADOW_MODE=false`.
-  SHADOW_MODE = "true"
-  HEARTBEAT_MS = "10000"
-  # Auto-stop 90 min after last shot — protects against a runaway
-  # Machine idling on a finished tournament.
-  SHUTDOWN_ON_IDLE_MS = "5400000"
+  HEARTBEAT_MS = '10000'
+  SHADOW_MODE = 'false'
+  SHUTDOWN_ON_IDLE_MS = '5400000'
 
-# 1 vCPU + 1 GB is plenty for headless Chromium doing DOM diffing on
-# one leaderboard. If we see OOMs we can bump. Cost ≈ $2–3/mo per
-# running Machine.
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "1024mb"
+  size = 'shared-cpu-1x'
+  memory = '2048mb'
