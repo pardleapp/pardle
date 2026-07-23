@@ -29973,8 +29973,9 @@ body[data-chat-open] .addbet-fab {
 /* Score TODAY — solid broadcast pill. Emerald fill for under-par,
    tang fill for over-par, slate fill for even. White text sits inside
    with tabular mono. This is the primary POP of the leaderboard — the
-   number a bettor needs to read at 10 feet. */
-.feed-v4 .v4-total {
+   number a bettor needs to read at 10 feet. Selector needs `.v4-row >`
+   to out-specific the shared `.v4-row > * { padding: 0 6px }` reset. */
+.feed-v4 .v4-row > .v4-total {
   font-family: "IBM Plex Mono", var(--font-mono, monospace), monospace;
   font-size: 22px;
   font-weight: 800;
@@ -30117,7 +30118,7 @@ body[data-chat-open] .addbet-fab {
 }
 .feed-v4 .v4-sg-plus  { color: oklch(0.34 0.19 150); font-weight: 800; }
 .feed-v4 .v4-sg-minus { color: oklch(0.44 0.21 25);  font-weight: 800; }
-.feed-v4 .v4-sg-total {
+.feed-v4 .v4-row > .v4-sg-total {
   font-size: 16px;
   font-weight: 800;
   color: oklch(0.16 0.03 155);
@@ -30132,12 +30133,12 @@ body[data-chat-open] .addbet-fab {
   box-shadow: 0 0 0 1px oklch(0.88 0.008 95);
   justify-self: end;
 }
-.feed-v4 .v4-sg-total.v4-sg-plus  {
+.feed-v4 .v4-row > .v4-sg-total.v4-sg-plus  {
   background: oklch(0.96 0.06 155);
   color: oklch(0.28 0.19 150);
   box-shadow: 0 0 0 1px oklch(0.86 0.09 155);
 }
-.feed-v4 .v4-sg-total.v4-sg-minus {
+.feed-v4 .v4-row > .v4-sg-total.v4-sg-minus {
   background: oklch(0.96 0.045 25);
   color: oklch(0.40 0.21 25);
   box-shadow: 0 0 0 1px oklch(0.86 0.08 25);
@@ -30548,7 +30549,7 @@ body[data-chat-open] .addbet-fab {
   text-align: center;
 }
 
-/* ── SG cells uniform mono, right-aligned, tabular-nums ─────── */
+/* ── tabular numerals across all numeric cells ─────── */
 .feed-v4 .v4-sg,
 .feed-v4 .v4-total,
 .feed-v4 .v4-thru,
@@ -30556,15 +30557,9 @@ body[data-chat-open] .addbet-fab {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
-.feed-v4 .v4-total {
-  font-size: 14px;
-}
-.feed-v4 .v4-sg {
-  font-size: 11px;
-}
-.feed-v4 .v4-sg-total {
-  font-size: 12px;
-}
+/* Font-size overrides for these cells are set at the primary rule
+   blocks earlier in the file — do NOT re-declare here (was clobbering
+   the redesigned pill sizes). */
 
 /* ── Grid-aligned expansion — nest under the LATEST column so the
    recent-shot pills sit in the same lane as the parent row's
