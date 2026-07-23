@@ -637,6 +637,12 @@ export interface PinCoord {
    *  raw fallback was taken and the coord needs affine-calibration
    *  before it can be plotted accurately. */
   frameEnh?: boolean;
+  /** True when this coord was estimated by the client (cluster
+   *  centroid of the SHOTLINK-identified R1 pin, when the
+   *  orchestrator hadn't yet published a real coord). Rendered with
+   *  a dashed marker in the greens grid so users know it's a
+   *  placeholder. Undefined for orchestrator-served coords. */
+  estimated?: boolean;
 }
 
 /** Field scoring for one hole in one round. */

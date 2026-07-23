@@ -8,6 +8,7 @@ import { BRAND } from "@/lib/brand";
 import type { Cell } from "./Heatmap";
 import GreensGrid from "./GreensGrid";
 import PinSheetModal from "./PinSheetModal";
+import { R1_CLUSTER_BY_TOURNAMENT } from "./r1-estimated-pins";
 import type { DailyWeatherView } from "../_components/WeatherStrip";
 import type {
   CoursePinSheet,
@@ -172,6 +173,46 @@ export default function Page() {
     })();
   }, [data?.tournamentId, pinsForTournament]);
 
+  /** Augment the pin sheet with an estimated R1 pin for holes the
+   *  orchestrator hasn't published yet — we plot the centroid of the
+   *  cluster the pin sits on per the pre-round SHOTLINK sheet. Only
+   *  fires for holes with a null R1 in the raw sheet AND a mapping
+   *  in R1_CLUSTER_BY_TOURNAMENT for the active tournament. When the
+   *  orchestrator's real coord lands, this fallback silently retires. */
+  const augmentedPins: CoursePinSheet | null = (() => {
+    if (!pins) return pins;
+    const tid = data?.tournamentId;
+    if (!tid) return pins;
+    const map = R1_CLUSTER_BY_TOURNAMENT[tid];
+    if (!map) return pins;
+    let anyChange = false;
+    const augmentedHoles = pins.holes.map((h) => {
+      const existingR1 = h.pinByRound?.[1];
+      if (existingR1) return h;
+      const letter = map[h.holeNumber];
+      if (!letter) return h;
+      const birdie = birdieHistoryByHole?.[String(h.holeNumber)];
+      if (!birdie) return h;
+      const idx = letter.charCodeAt(0) - 65;
+      const cluster = birdie.clusters[idx];
+      if (!cluster) return h;
+      anyChange = true;
+      return {
+        ...h,
+        pinByRound: {
+          ...h.pinByRound,
+          1: {
+            x: cluster.centroid.x,
+            y: cluster.centroid.y,
+            frameEnh: true,
+            estimated: true,
+          },
+        },
+      };
+    });
+    return anyChange ? { ...pins, holes: augmentedHoles } : pins;
+  })();
+
   /** Merge the raw pin sheet with per-hole/per-round scoring derived
    *  from the heatmap cells we already have. PGA Tour's own
    *  scoringAverage field on courseStats is empty for historical
@@ -316,8 +357,10 @@ export default function Page() {
             )}
             <GreensGrid
               pinsByHole={
-                pins
-                  ? new Map(pins.holes.map((h) => [h.holeNumber, h]))
+                augmentedPins
+                  ? new Map(
+                      augmentedPins.holes.map((h) => [h.holeNumber, h]),
+                    )
                   : undefined
               }
               birdieHistoryByHole={birdieHistoryByHole}
