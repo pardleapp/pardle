@@ -30,8 +30,19 @@ interface Item {
 const PRIMARY: Item[] = [
   {
     href: "/",
+    label: "Insights",
+    matches: ["/", "/commentary"],
+    iconPath: (
+      <>
+        <path d="M4 6h11l4 4v9a1 1 0 0 1-1 1H4z" />
+        <path d="M7 11h9M7 15h6" />
+      </>
+    ),
+  },
+  {
+    href: "/live",
     label: "Feed",
-    matches: ["/", "/live"],
+    matches: ["/live"],
     iconPath: (
       <>
         <path d="M4 6h16" />
@@ -48,17 +59,6 @@ const PRIMARY: Item[] = [
       <>
         <path d="M5 4h11l3 3v13H5z" />
         <path d="M9 9h6M9 13h6M9 17h3" />
-      </>
-    ),
-  },
-  {
-    href: "/commentary",
-    label: "Commentary",
-    matches: ["/commentary"],
-    iconPath: (
-      <>
-        <path d="M4 6h11l4 4v9a1 1 0 0 1-1 1H4z" />
-        <path d="M7 11h9M7 15h6" />
       </>
     ),
   },

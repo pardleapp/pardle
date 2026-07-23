@@ -41,7 +41,7 @@ interface Props {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const a = ARTICLES[slug];
-  if (!a) return { title: `Commentary — ${BRAND.name}` };
+  if (!a) return { title: `Insights — ${BRAND.name}` };
   return {
     title: `${a.title} — ${BRAND.name}`,
     description: a.dek,
@@ -74,7 +74,7 @@ export default async function CommentaryArticle({ params }: Props) {
       >
         <nav style={{ marginBottom: 14 }}>
           <Link
-            href="/commentary"
+            href="/"
             style={{
               fontSize: 12,
               color: "oklch(0.50 0.13 155)",
@@ -84,7 +84,7 @@ export default async function CommentaryArticle({ params }: Props) {
                 "var(--font-archivo), 'Archivo', system-ui, sans-serif",
             }}
           >
-            ← Commentary
+            ← Insights
           </Link>
         </nav>
         <div

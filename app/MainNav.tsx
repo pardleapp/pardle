@@ -27,12 +27,12 @@ export type MainNavTab =
 // primary tab. Direct links from in-feed shot rows go to the
 // player page, not the course map.
 const TABS: Array<{ key: MainNavTab; href: string; label: string }> = [
-  { key: "live", href: "/", label: "Feed" },
+  { key: "commentary", href: "/", label: "Insights" },
+  { key: "live", href: "/live", label: "Feed" },
   { key: "bets", href: "/bets", label: "Bets" },
   { key: "sharp", href: "/sharp", label: "Sharp" },
   { key: "games", href: "/games", label: "Games" },
   { key: "analysis", href: "/analysis", label: "Tools" },
-  { key: "commentary", href: "/commentary", label: "Commentary" },
 ];
 
 export default function MainNav({ active }: { active: MainNavTab }) {
