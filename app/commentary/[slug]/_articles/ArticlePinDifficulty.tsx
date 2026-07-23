@@ -640,13 +640,15 @@ export default function ArticlePinDifficulty() {
       </ul>
 
       <P>
-        <b>Net-net across the round:</b> the four flagged easier
-        holes add more strokes to the field's scoring than the
-        three defensive ones take away. Expect R1 scoring to run
-        roughly <b>1-1.5 strokes below the historical R1 average</b>
-        at TPC Twin Cities — a lean toward <b>round-score UNDERs</b>
-        on individual player lines and on the tournament's first-round
-        scoring total.
+        <b>Net-net across the round:</b> the flagged easier holes
+        just about offset the defensive ones, with a small residual
+        lean toward the easier side once H16's inflated raw penalty
+        is corrected down. Sum of the per-hole birdie-rate deltas
+        works out at roughly +5pp of net birdie rate across 18
+        holes — which converts to about <b>0.1-0.3 strokes below
+        the historical R1 average</b> at TPC Twin Cities. That's a
+        <b>mild lean toward round-score UNDERs</b> — a nudge, not a
+        hammer.
       </P>
       <P>
         Two caveats: the R1 coord for H13 wasn't in the archive
