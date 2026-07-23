@@ -87,7 +87,6 @@ export default function InsightsIndex() {
           Short, data-backed takes on the tournament ahead. Updated
           weekly. No hot air, no hedging.
         </p>
-        <SubscribeCTA />
         <ul
           style={{
             listStyle: "none",
@@ -171,6 +170,7 @@ export default function InsightsIndex() {
           ))}
         </ul>
       </section>
+      <SubscribeCTA />
     </main>
   );
 }
