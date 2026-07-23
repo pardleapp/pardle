@@ -30276,6 +30276,94 @@ body[data-chat-open] .addbet-fab {
   text-align: center;
 }
 
+/* ── Subscribe CTA on the Insights homepage. Emerald-tinted card
+   promoting free email subscription — opens the standard SignInModal.
+   Card lives only when the visitor is signed-out (the component
+   returns null otherwise). Prominent enough to be the eye anchor
+   between the intro copy and the article list. */
+.subscribe-cta {
+  background: linear-gradient(180deg, oklch(0.965 0.055 155), oklch(0.94 0.05 155));
+  border: 1px solid oklch(0.82 0.10 155);
+  border-radius: 14px;
+  padding: 22px 20px 20px;
+  margin: 6px 0 22px;
+  text-align: center;
+  box-shadow: 0 1px 4px oklch(0.55 0.14 155 / 0.12);
+}
+.subscribe-cta-eyebrow {
+  display: inline-block;
+  font-family: "IBM Plex Mono", var(--font-mono, monospace), monospace;
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  color: oklch(0.30 0.15 155);
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: white;
+  border: 1px solid oklch(0.82 0.10 155);
+  margin-bottom: 10px;
+}
+.subscribe-cta-title {
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  color: oklch(0.18 0.03 155);
+  margin: 0 0 8px;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.subscribe-cta-body {
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  font-size: 14px;
+  color: oklch(0.32 0.03 155);
+  line-height: 1.5;
+  margin: 0 auto 16px;
+  max-width: 340px;
+}
+.subscribe-cta-btn {
+  background: linear-gradient(180deg, oklch(0.55 0.15 155), oklch(0.42 0.15 155));
+  color: white;
+  border: none;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 12px 26px;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px oklch(0.42 0.14 155 / 0.4);
+  letter-spacing: 0.2px;
+  min-height: 44px;
+  transition: filter 0.14s ease, transform 0.1s ease;
+}
+.subscribe-cta-btn:hover { filter: brightness(1.06); }
+.subscribe-cta-btn:active { transform: scale(0.98); }
+.subscribe-cta-foot {
+  margin-top: 12px;
+  font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
+  font-size: 11.5px;
+  color: oklch(0.42 0.03 155);
+  letter-spacing: 0.1px;
+}
+
+/* Mobile: hide the top Insights ribbon (empty on mobile because h1 +
+   MainNav are already hidden and only the AuthChip remains). The CTA
+   card below is the new call-to-subscribe surface. */
+@media (max-width: 768px) {
+  .insights-page > .insights-brand {
+    display: none;
+  }
+  .subscribe-cta {
+    margin: 0 0 20px;
+    padding: 20px 18px 18px;
+  }
+  .subscribe-cta-title { font-size: 18px; }
+  .subscribe-cta-body { font-size: 13.5px; }
+}
+
 /* ── Tee-time-scoring wave-average grid — 4 round cards horizontally
    on desktop, 2×2 on mobile so nothing overflows the 390px viewport.
    Extracted from an inline style so we can override at breakpoints. */

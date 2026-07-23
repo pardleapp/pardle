@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import AuthChip from "./live/auth/AuthChip";
 import MainNav from "./MainNav";
+import SubscribeCTA from "./_components/SubscribeCTA";
 
 export const metadata = {
   title: `Insights — ${BRAND.name}`,
@@ -53,8 +54,8 @@ function formatDate(iso: string): string {
 
 export default function InsightsIndex() {
   return (
-    <main className="container container-wide v4-theme pv-theme">
-      <header className="brand brand-split">
+    <main className="container container-wide v4-theme pv-theme insights-page">
+      <header className="brand brand-split insights-brand">
         <h1>{BRAND.name}</h1>
         <div className="brand-nav">
           <MainNav active="commentary" />
@@ -86,6 +87,7 @@ export default function InsightsIndex() {
           Short, data-backed takes on the tournament ahead. Updated
           weekly. No hot air, no hedging.
         </p>
+        <SubscribeCTA />
         <ul
           style={{
             listStyle: "none",
