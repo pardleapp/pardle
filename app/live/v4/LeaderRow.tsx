@@ -76,6 +76,15 @@ function totalClass(total: string): string {
   return "";
 }
 
+function posClass(position: string | null | undefined): string {
+  if (!position) return "";
+  const n = position.replace(/^T/i, "").trim();
+  if (n === "1") return "v4-pos-1";
+  if (n === "2") return "v4-pos-2";
+  if (n === "3") return "v4-pos-3";
+  return "";
+}
+
 const STALE_THRESHOLD_MS = 6 * 60 * 60 * 1000; // 6h
 
 /** Live-appropriate timestamp. Events older than the stale threshold
@@ -403,7 +412,7 @@ export default function LeaderRow({
           }
         }}
       >
-        <span className="v4-pos">{row.position}</span>
+        <span className={`v4-pos ${posClass(row.position)}`}>{row.position}</span>
         <span className="v4-avatar">
           <PlayerAvatar playerId={row.playerId} playerName={row.playerName} size="md" />
         </span>

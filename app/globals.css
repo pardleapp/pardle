@@ -29744,13 +29744,13 @@ body[data-chat-open] .addbet-fab {
 .feed-v4 .v4-row {
   display: grid;
   grid-template-columns:
-    56px          /* pos */
+    62px          /* pos (chip needs room) */
     48px          /* avatar */
-    minmax(0, 1.3fr) /* name */
-    76px          /* today */
-    60px          /* thru */
-    minmax(0, 2fr)   /* latest */
-    58px 58px 58px 58px 66px; /* 5x SG */
+    minmax(140px, 180px) /* name — capped, no more dead space */
+    82px          /* today */
+    62px          /* thru */
+    minmax(0, 1fr)   /* latest */
+    58px 58px 58px 58px 68px; /* 5x SG */
   align-items: center;
   column-gap: 4px;
   padding: 0;
@@ -29758,16 +29758,17 @@ body[data-chat-open] .addbet-fab {
 }
 .feed-v4 .v4-headings {
   padding: 12px 20px;
-  background: oklch(0.98 0.006 95);
+  background: linear-gradient(180deg, oklch(0.22 0.02 155), oklch(0.19 0.02 155));
   font-size: 10.5px;
   font-weight: 800;
-  letter-spacing: 0.7px;
-  color: oklch(0.5 0.02 150);
+  letter-spacing: 0.9px;
+  color: oklch(0.86 0.03 155);
   text-transform: uppercase;
   font-family: var(--font-archivo), "Archivo", system-ui, sans-serif;
   border-radius: 12px 12px 0 0;
-  border: 1px solid oklch(0.92 0.008 95);
-  border-bottom: none;
+  border: 1px solid oklch(0.22 0.02 155);
+  border-bottom: 2px solid oklch(0.55 0.14 155);
+  box-shadow: 0 1px 0 oklch(0.55 0.14 155 / 0.4) inset;
 }
 .feed-v4 .v4-headings > span { padding: 0 4px; }
 .feed-v4 .v4-h-pos { text-align: left; }
@@ -29801,11 +29802,12 @@ body[data-chat-open] .addbet-fab {
   pointer-events: none;
 }
 .feed-v4 .v4-row:hover {
-  background: oklch(0.995 0.005 95);
+  background: linear-gradient(90deg, oklch(0.995 0.005 95) 0%, oklch(0.98 0.03 155 / 0.5) 100%);
   z-index: 2;
 }
 .feed-v4 .v4-row:hover::before {
-  background: oklch(0.85 0.05 155);
+  background: oklch(0.55 0.14 155);
+  box-shadow: 0 0 8px oklch(0.55 0.14 155 / 0.5);
 }
 .feed-v4 .v4-row-mine {
   background: linear-gradient(90deg, oklch(0.98 0.045 65) 0%, white 260px);
@@ -29821,9 +29823,16 @@ body[data-chat-open] .addbet-fab {
 }
 .feed-v4 .v4-row-fresh::before {
   background: oklch(0.55 0.14 155);
+  box-shadow: 0 0 10px oklch(0.55 0.14 155 / 0.65);
+  width: 4px;
 }
 .feed-v4 .v4-row-fresh {
   animation: v4-row-fresh 1.6s ease;
+}
+.feed-v4 .v4-row-fresh .v4-latest-tag {
+  box-shadow:
+    0 0 0 2px oklch(0.55 0.18 150 / 0.25),
+    0 0 14px oklch(0.55 0.18 150 / 0.35);
 }
 @keyframes v4-row-fresh {
   0%   { background-color: oklch(0.94 0.09 155); }
@@ -29834,6 +29843,17 @@ body[data-chat-open] .addbet-fab {
 }
 
 .feed-v4 .v4-row > * { padding: 0 6px; }
+/* Thin divider before the SG bank — visually separates "what just
+   happened" (LATEST) from "how they've played" (SG). Broadcast feel. */
+.feed-v4 .v4-row > :nth-child(7),
+.feed-v4 .v4-headings > .v4-h-sg:first-of-type {
+  border-left: 1px solid oklch(0.90 0.008 95);
+  margin-left: 4px;
+  padding-left: 10px;
+}
+.feed-v4 .v4-headings > .v4-h-sg:first-of-type {
+  border-left-color: oklch(0.45 0.05 155);
+}
 
 .feed-v4 .v4-pos {
   font-family: "IBM Plex Mono", var(--font-mono, monospace), monospace;
@@ -29842,6 +29862,33 @@ body[data-chat-open] .addbet-fab {
   color: oklch(0.24 0.03 155);
   letter-spacing: 0.2px;
   font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  line-height: 1.1;
+}
+/* Leaderboard medals — T1 solid emerald, T2/T3 outlined variants.
+   Gives the top of the board an immediate broadcast-graphic anchor. */
+.feed-v4 .v4-pos-1 {
+  background: linear-gradient(180deg, oklch(0.58 0.15 155), oklch(0.42 0.15 155));
+  color: white;
+  box-shadow:
+    0 1px 3px oklch(0.42 0.15 155 / 0.5),
+    0 0 0 1px oklch(0.35 0.14 155);
+  letter-spacing: 0.4px;
+}
+.feed-v4 .v4-pos-2 {
+  background: oklch(0.95 0.05 155);
+  color: oklch(0.30 0.14 155);
+  box-shadow: 0 0 0 1px oklch(0.82 0.08 155);
+}
+.feed-v4 .v4-pos-3 {
+  background: oklch(0.97 0.02 65);
+  color: oklch(0.42 0.13 65);
+  box-shadow: 0 0 0 1px oklch(0.85 0.07 65);
 }
 .feed-v4 .v4-avatar {
   display: flex;
@@ -29875,18 +29922,27 @@ body[data-chat-open] .addbet-fab {
   border-radius: 4px;
   letter-spacing: 0.6px;
 }
+/* Score TOT — LED-style readout. Digital glow scales with polarity,
+   sits inside the cell as its own inline chip so it reads as data
+   even when the eye is scanning fast down the column. */
 .feed-v4 .v4-total {
   font-family: "IBM Plex Mono", var(--font-mono, monospace), monospace;
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 800;
   text-align: right;
-  letter-spacing: -0.4px;
+  letter-spacing: -0.5px;
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
-.feed-v4 .v4-total-under { color: oklch(0.42 0.17 150); }
-.feed-v4 .v4-total-over  { color: oklch(0.52 0.19 25);  }
-.feed-v4 .v4-total-even  { color: oklch(0.48 0.02 150); }
+.feed-v4 .v4-total-under {
+  color: oklch(0.38 0.17 150);
+  text-shadow: 0 0 12px oklch(0.55 0.20 150 / 0.32);
+}
+.feed-v4 .v4-total-over  {
+  color: oklch(0.48 0.19 25);
+  text-shadow: 0 0 12px oklch(0.58 0.20 25 / 0.28);
+}
+.feed-v4 .v4-total-even  { color: oklch(0.42 0.02 150); }
 .feed-v4 .v4-thru {
   font-family: "IBM Plex Mono", var(--font-mono, monospace), monospace;
   font-size: 13px;
