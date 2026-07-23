@@ -18026,10 +18026,11 @@ body:has(.v4-theme) {
   }
   /* With h1 hidden, the brand-nav (AuthChip when nav tabs are hidden)
      was left-aligned on its own — reads as a floating pill in an empty
-     strip. Right-align so the chip anchors to the header edge like
-     every native mobile app's account chip. */
+     strip. Right-align the chip inside brand-nav (which is width: 100%
+     on mobile) so it anchors to the header edge like a native mobile
+     account chip. */
   .v4-theme .brand.brand-split .brand-nav {
-    align-self: flex-end;
+    justify-content: flex-end;
   }
 
   /* Primary nav rail — 32px pills */
@@ -30340,13 +30341,13 @@ body[data-chat-open] .addbet-fab {
   .feed-v4 .v4-headings,
   .feed-v4 .v4-row {
     grid-template-columns:
-      42px                    /* pos */
+      40px                    /* pos */
       44px                    /* avatar (holds 40px PlayerAvatar) */
       minmax(0, 1fr)          /* name */
-      54px                    /* today */
-      42px                    /* thru */
-      50px;                   /* sg total */
-    column-gap: 5px;
+      50px                    /* today */
+      36px                    /* thru */
+      48px;                   /* sg total */
+    column-gap: 4px;
     min-width: 0;
   }
   .feed-v4 .v4-row {
@@ -30391,8 +30392,18 @@ body[data-chat-open] .addbet-fab {
     padding: 3px 6px;
     border-radius: 5px;
   }
-  .feed-v4 .v4-name-primary { font-size: 15.5px; }
-  .feed-v4 .v4-thru { font-size: 13px; }
+  .feed-v4 .v4-name-primary { font-size: 14.5px; letter-spacing: -0.02em; }
+  .feed-v4 .v4-thru { font-size: 12.5px; }
+  .feed-v4 .v4-row > .v4-total {
+    font-size: 17px;
+    min-width: 44px;
+    padding: 5px 6px;
+  }
+  .feed-v4 .v4-row > .v4-sg-total {
+    font-size: 13.5px;
+    min-width: 42px;
+    padding: 4px 6px;
+  }
 
   /* LATEST cluster — compact on line 2 */
   .feed-v4 .v4-latest {
