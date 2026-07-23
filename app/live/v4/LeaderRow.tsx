@@ -382,6 +382,13 @@ export default function LeaderRow({
   const isCut = state === "CUT" || state === "MC" || state === "WD" || state === "DQ";
   const latest = row.latestEvent;
   const eventFresh = latest != null && now - latest.ts < 60_000;
+  const eventCelebrate =
+    eventFresh &&
+    latest != null &&
+    (latest.ace === true ||
+      latest.result === "birdie" ||
+      latest.result === "eagle" ||
+      latest.result === "albatross");
 
   const toggleComments = (eventId: string) => {
     setOpenComments((cur) => {
@@ -400,7 +407,7 @@ export default function LeaderRow({
   return (
     <div className={`v4-row-wrap${expanded ? " v4-row-wrap-open" : ""}`}>
       <div
-        className={`v4-row${isMine ? " v4-row-mine" : ""}${isCut ? " v4-row-cut" : ""}${eventFresh ? " v4-row-fresh" : ""}`}
+        className={`v4-row${isMine ? " v4-row-mine" : ""}${isCut ? " v4-row-cut" : ""}${eventFresh ? " v4-row-fresh" : ""}${eventCelebrate ? " v4-row-celebrate" : ""}`}
         onClick={onToggleExpanded}
         role="button"
         tabIndex={0}
