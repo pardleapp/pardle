@@ -23,14 +23,14 @@ const CARDS: Card[] = [
     href: "/analysis/tee-time-scoring",
     title: "Tee time vs skill-adjusted score",
     blurb:
-      "Scatter of every finisher's round score minus their pre-tournament skill projection, plotted against tee time. Trend line reveals whether one wave had it easier.",
+      "Scatter of every finisher's round score minus their pre-tournament skill projection, plotted against tee time. Toggle to a field-scoring heatmap by hole and hour to see which waves had it easier and which holes bit hardest.",
     status: "live",
   },
   {
     href: "/analysis/course-heatmap",
     title: "Course & pin guide",
     blurb:
-      "Field scoring vs par per hole per hour, per-round summary, weather, and click into any hole for that week's pin positions on the green with the field's putt paths layered on top.",
+      "Every green on the property at a glance — this week's four pin positions overlaid on each aerial. Click any card for putt paths, multi-season birdie history, and per-round scoring.",
     status: "live",
   },
   {
