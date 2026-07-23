@@ -22,6 +22,8 @@ import { getActiveTournament } from "@/lib/golf-api/pgatour";
 import { getSnapshot, getCachedTournamentPars } from "@/lib/feed/store";
 import { getDailyWeather, type DailyWeather } from "@/lib/weather/open-meteo";
 import { coordsForTournamentId } from "@/lib/weather/course-coords";
+import { loadHoleAveragesForRound } from "@/lib/hole-averages-loader";
+import { remainingHoles, sumRemainingToPar } from "@/lib/hole-averages";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -434,6 +436,29 @@ export async function GET(req: Request) {
     const liveR3Rows = liveR3.live_stats ?? [];
     const liveR4Rows = liveR4.live_stats ?? [];
 
+    // Per-round per-hole scoring averages. Live-first: current round
+    // (≥15 players finished the hole) → previous round of this tournament
+    // → previous year's data for the same hole → hole par. Powers the
+    // remaining-holes projection so mid-round players inherit the
+    // course's actual scoring shape, not "assume par" for the tail.
+    const holeAvgsByRound: Record<
+      number,
+      Awaited<ReturnType<typeof loadHoleAveragesForRound>>
+    > = {};
+    if (activeTournamentId) {
+      const rounds: RoundNum[] = [1, 2, 3, 4];
+      await Promise.all(
+        rounds.map(async (r) => {
+          holeAvgsByRound[r] = await loadHoleAveragesForRound({
+            tournamentId: activeTournamentId,
+            round: r,
+            snapshot,
+            holePars: snapshotPars[r] ?? {},
+          });
+        }),
+      );
+    }
+
     const fieldMap = new Map<number, FieldEntry>();
     for (const f of fieldRows) fieldMap.set(f.dg_id, f);
     const skillMap = new Map<number, SkillEntry>();
@@ -572,21 +597,32 @@ export async function GET(req: Request) {
           drops.noSkill++;
         }
 
-        // Projected final for players still on course.
-        //   projected_per_hole_remaining = -sgTotal / 18
+        // Projected final for players still on course. New method
+        // (field-anchored + skill delta):
+        //   field_expected = Σ hole_avg_toPar[h] for h in remaining
+        //     (per-hole scoring averages with the fallback chain —
+        //      current round ≥15 players → prev round → prev year → par)
+        //   skill_delta = holes_remaining × (−sgTotal / 18)
         //     (positive SG player expected to shoot below field per
-        //      hole; we treat field average as par as a simplification.)
-        //   projected_final_toPar =
-        //     current_score + (18 - thru) * projected_per_hole
+        //      hole. −sgTotal makes it a *deduction* from expected score.)
+        //   projected_final_toPar = current_score + field_expected + skill_delta
         //
-        // Regresses their current pace toward their skill baseline.
-        // Naive but honest: a good player who's off to a bad start
-        // gets projected to recover toward par; a bad player off to
-        // a hot start gets projected to fall back a bit.
+        // This replaces the previous "assume every remaining hole plays
+        // like par" simplification. Now the tail knows the course's
+        // real scoring shape and handles back-nine starters correctly
+        // (their remaining holes may wrap 18→1).
         const projected = !thruDone;
-        const finalToPar = projected
-          ? rndScore + (18 - thruHoles) * (-sgTotal / 18)
-          : rndScore;
+        let finalToPar: number;
+        if (projected) {
+          const startHole = tt?.start_hole ?? 1;
+          const remaining = remainingHoles(startHole, thruHoles);
+          const roundAvgs = holeAvgsByRound[round]?.averages ?? {};
+          const fieldExpected = sumRemainingToPar(roundAvgs, remaining);
+          const skillDelta = remaining.length * (-sgTotal / 18);
+          finalToPar = rndScore + fieldExpected + skillDelta;
+        } else {
+          finalToPar = rndScore;
+        }
 
         out.push({
           dgId: String(l.dg_id),
