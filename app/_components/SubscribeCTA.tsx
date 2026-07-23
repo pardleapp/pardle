@@ -1,19 +1,22 @@
 "use client";
 
 /**
- * SubscribeCTA — first-visit popup pitching free email subscription.
+ * SubscribeCTA — first-visit popup pitching free account creation.
  * Shows once, on initial page load, for signed-out visitors who
- * haven't dismissed or subscribed. Dismissal is remembered in
- * localStorage (30-day cooldown) so repeat visitors aren't nagged.
+ * haven't dismissed. Dismissal is remembered in localStorage (30-day
+ * cooldown) so repeat visitors aren't nagged.
  *
- * Opens the standard SignInModal for the actual email capture —
- * there's one auth flow everywhere in the app.
+ * Deliberately DOES NOT use useDismissibleOverlay — the popup hands
+ * off to SignInModal (which does), and both fighting for the same
+ * history entry left the Subscribe button doing nothing (popup closed
+ * via history.back(), the popstate then closed the SignInModal that
+ * had just opened). Dismissal here is X / "Maybe later" / backdrop /
+ * Escape only.
  */
 
 import { useEffect, useState } from "react";
 import { useAuth } from "../live/auth/useAuth";
 import SignInModal from "../live/auth/SignInModal";
-import { useDismissibleOverlay } from "../_hooks/useDismissibleOverlay";
 
 const DISMISS_KEY = "pardle_subscribe_prompt_dismissed_at";
 const COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -45,10 +48,6 @@ export default function SubscribeCTA() {
   const { user, loading } = useAuth();
   const [popupOpen, setPopupOpen] = useState(false);
   const [signInOpen, setSignInOpen] = useState(false);
-  useDismissibleOverlay(popupOpen, () => {
-    markDismissed();
-    setPopupOpen(false);
-  });
 
   useEffect(() => {
     if (loading || user) return;
@@ -56,6 +55,19 @@ export default function SubscribeCTA() {
     const t = setTimeout(() => setPopupOpen(true), OPEN_DELAY_MS);
     return () => clearTimeout(t);
   }, [loading, user]);
+
+  // Escape closes the popup.
+  useEffect(() => {
+    if (!popupOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        markDismissed();
+        setPopupOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [popupOpen]);
 
   if (loading || user) return null;
 
@@ -66,14 +78,24 @@ export default function SubscribeCTA() {
   function openSignIn() {
     markDismissed();
     setPopupOpen(false);
-    setSignInOpen(true);
+    // Give the popup a frame to unmount before mounting SignInModal
+    // so their overlay/history/focus flows don't race.
+    setTimeout(() => setSignInOpen(true), 60);
   }
 
   return (
     <>
       {popupOpen && (
-        <div className="subscribe-overlay" role="dialog" aria-modal="true">
-          <div className="subscribe-modal">
+        <div
+          className="subscribe-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={close}
+        >
+          <div
+            className="subscribe-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               type="button"
               className="subscribe-modal-close"
@@ -83,19 +105,31 @@ export default function SubscribeCTA() {
               ✕
             </button>
             <h2 className="subscribe-modal-title">
-              Get the weekly insight straight to your inbox
+              Create your free account
             </h2>
             <p className="subscribe-modal-body">
-              Data-backed analysis every week — pin patterns, course
-              fit, skill-adjusted picks. Delivered before every
-              tournament.
+              Join Pardle to get:
             </p>
+            <ul className="subscribe-modal-benefits">
+              <li>
+                <strong>Weekly insight email</strong> — data-backed
+                analysis before every tournament
+              </li>
+              <li>
+                <strong>Shot-by-shot updates on your bets</strong> —
+                push alerts when your picks move
+              </li>
+              <li>
+                <strong>Your bets, everywhere</strong> — phone, laptop,
+                same view
+              </li>
+            </ul>
             <button
               type="button"
               className="subscribe-cta-btn"
               onClick={openSignIn}
             >
-              Subscribe with email
+              Create account
             </button>
             <button
               type="button"
@@ -105,7 +139,7 @@ export default function SubscribeCTA() {
               Maybe later
             </button>
             <div className="subscribe-modal-foot">
-              Magic-link sign-in · No password · Unsubscribe anytime
+              Magic-link sign-in · No password · No payment
             </div>
           </div>
         </div>
