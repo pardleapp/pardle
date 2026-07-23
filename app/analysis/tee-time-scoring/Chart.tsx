@@ -1068,13 +1068,7 @@ function ChartCore({
             smoothing pulls extremes toward the middle.
           </span>
         </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 10,
-          }}
-        >
+        <div className="tt-wave-grid">
           {([1, 2, 3, 4] as const).map((r) => {
             const wave = waveByRound[r];
             const style = ROUND_STYLE[r];

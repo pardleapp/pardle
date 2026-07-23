@@ -637,20 +637,23 @@ export default function BetsClient() {
       <div className="bets-pv-body">
         {tab === "live" ? (
           <>
-            {/* Mobile-only summary tile — desktop gets the strip above. */}
-            <div className="bets-summary bets-summary-mobile">
-              <div>
-                <div className="bets-summary-lab">Open stake</div>
-                <div className="bets-summary-big mono">
-                  {openStakeLabel || "—"}
-                </div>
-                <div className="bets-summary-legs">
-                  {bets.length > 0
-                    ? `${bets.length} live ${bets.length === 1 ? "bet" : "bets"}`
-                    : "no live bets yet"}
+            {/* Mobile-only summary tile — desktop gets the strip above.
+                Hidden when there are no live bets: a big emerald slab
+                just to say "—" reads as broken UI on mobile empty state.
+                The .bets-empty block below now carries the whole zero-state. */}
+            {bets.length > 0 && (
+              <div className="bets-summary bets-summary-mobile">
+                <div>
+                  <div className="bets-summary-lab">Open stake</div>
+                  <div className="bets-summary-big mono">
+                    {openStakeLabel || "—"}
+                  </div>
+                  <div className="bets-summary-legs">
+                    {`${bets.length} live ${bets.length === 1 ? "bet" : "bets"}`}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
             {bets.length === 0 ? (
               <div className="bets-empty">
                 <div className="bets-empty-title">
