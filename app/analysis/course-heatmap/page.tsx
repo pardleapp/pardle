@@ -5,7 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 import MainNav from "@/app/MainNav";
 import AuthChip from "@/app/live/auth/AuthChip";
 import { BRAND } from "@/lib/brand";
-import Heatmap, { type Cell } from "./Heatmap";
+import type { Cell } from "./Heatmap";
+import GreensGrid from "./GreensGrid";
 import PinSheetModal from "./PinSheetModal";
 import type { DailyWeatherView } from "../_components/WeatherStrip";
 import type {
@@ -238,21 +239,13 @@ export default function Page() {
           Course &amp; pin guide
         </h2>
         <p style={{ fontSize: 13, color: "oklch(0.5 0.02 150)", margin: 0 }}>
-          Field-average strokes vs par for every hole across the day
-          (heatmap), plus a per-round scoring summary, per-hour weather,
-          and click any hole label for that week&apos;s pin positions on
-          the green — with the field&apos;s putt paths layered on top.
-        </p>
-        <p
-          style={{
-            fontSize: 11,
-            color: "oklch(0.55 0.02 150)",
-            marginTop: 6,
-            fontStyle: "italic",
-          }}
-        >
-          Hole completion times estimated from tee time + ~15 min per hole.
-          Actual timing may vary by ±10 min for slow / fast groups.
+          Every green on the property — this week&apos;s R1-R4 pin
+          positions overlaid on the aerial. Click a card for putt
+          paths, multi-season birdie history, and per-round scoring.
+          The <b>PIN Δ</b> chip flags any hole where one cluster
+          stands ≥10pp above or below the other clusters&apos;
+          birdie rate; the <b>TEE Δ</b> chip flags holes whose tee
+          markers moved &gt;30 yd across the tournament.
         </p>
         <div
           role="tablist"
@@ -304,42 +297,31 @@ export default function Page() {
             data; won&apos;t refresh.
           </p>
         )}
-        {error || (data && !data.ok) ? (
+        {error ? (
           <p style={{ marginTop: 20, color: "oklch(0.5 0.16 25)" }}>
-            Couldn&apos;t load data: {error ?? data?.error}
-          </p>
-        ) : !data ? (
-          <p style={{ marginTop: 20 }}>Loading…</p>
-        ) : !data.cells || data.cells.length === 0 ? (
-          <p style={{ marginTop: 20 }}>
-            No completed rounds yet.
+            Couldn&apos;t load pin data: {error}
           </p>
         ) : (
           <>
-            <p
-              style={{
-                fontSize: 11,
-                color: "oklch(0.55 0.02 150)",
-                marginTop: 8,
-              }}
-            >
-              {data.cells.length} cells ·{" "}
-              {data.generatedAt
-                ? `updated ${new Date(data.generatedAt).toLocaleTimeString()}`
-                : ""}
-            </p>
-            <Heatmap
-              cells={data.cells}
-              bucketMinutes={data.bucketMinutes ?? 15}
-              weatherByRound={data.weatherByRound}
-              onHoleClick={pins ? (h) => setOpenHole(h) : undefined}
-              pinsAvailable={pins != null}
+            {tab === "live" && !pins && (
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "oklch(0.55 0.02 150)",
+                  marginTop: 8,
+                }}
+              >
+                Loading this week&apos;s pin sheet…
+              </p>
+            )}
+            <GreensGrid
               pinsByHole={
                 pins
                   ? new Map(pins.holes.map((h) => [h.holeNumber, h]))
                   : undefined
               }
               birdieHistoryByHole={birdieHistoryByHole}
+              onHoleClick={pins ? (h) => setOpenHole(h) : undefined}
             />
           </>
         )}
