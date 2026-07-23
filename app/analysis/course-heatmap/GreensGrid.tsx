@@ -256,16 +256,11 @@ export default function GreensGrid({
                   if (!p || p.x == null || p.y == null) return null;
                   const round = Number(r);
                   const colour = ROUND_COLOURS[round] ?? "oklch(0.4 0.02 150)";
-                  const isEstimated = (p as { estimated?: boolean }).estimated === true;
                   return (
                     <span
                       key={r}
                       aria-hidden
-                      title={
-                        isEstimated
-                          ? `R${r} — estimated from the SHOTLINK sheet (cluster centroid; API coord pending)`
-                          : `R${r} pin`
-                      }
+                      title={`R${r} pin`}
                       style={{
                         position: "absolute",
                         left: `${p.x * 100}%`,
@@ -275,13 +270,9 @@ export default function GreensGrid({
                         marginLeft: -5,
                         marginTop: -5,
                         borderRadius: "50%",
-                        background: isEstimated ? "transparent" : colour,
-                        border: isEstimated
-                          ? `2px dashed ${colour}`
-                          : "1.5px solid white",
-                        boxShadow: isEstimated
-                          ? "none"
-                          : "0 1px 3px oklch(0 0 0 / 0.4)",
+                        background: colour,
+                        border: "1.5px solid white",
+                        boxShadow: "0 1px 3px oklch(0 0 0 / 0.4)",
                       }}
                     />
                   );
