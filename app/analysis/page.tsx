@@ -2,6 +2,9 @@ import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import AuthChip from "../live/auth/AuthChip";
 import MainNav from "../MainNav";
+import CoursePinPreview from "./_previews/CoursePinPreview";
+import TeeTimePreview from "./_previews/TeeTimePreview";
+import TeeShotPreview from "./_previews/TeeShotPreview";
 
 export const metadata = {
   title: `Analysis — ${BRAND.name}`,
@@ -16,22 +19,25 @@ interface Card {
   title: string;
   blurb: string;
   status: "live" | "coming-soon";
+  Preview: React.ComponentType;
 }
 
 const CARDS: Card[] = [
-  {
-    href: "/analysis/tee-time-scoring",
-    title: "Tee time vs skill-adjusted score",
-    blurb:
-      "Scatter of every finisher's round score minus their pre-tournament skill projection, plotted against tee time. Toggle to a field-scoring heatmap by hole and hour to see which waves had it easier and which holes bit hardest.",
-    status: "live",
-  },
   {
     href: "/analysis/course-heatmap",
     title: "Course & pin guide",
     blurb:
       "Every green on the property at a glance — this week's four pin positions overlaid on each aerial. Click any card for putt paths, multi-season birdie history, and per-round scoring.",
     status: "live",
+    Preview: CoursePinPreview,
+  },
+  {
+    href: "/analysis/tee-time-scoring",
+    title: "Tee time vs skill-adjusted score",
+    blurb:
+      "Scatter of every finisher's round score minus their pre-tournament skill projection, plotted against tee time. Toggle to a field-scoring heatmap by hole and hour to see which waves had it easier and which holes bit hardest.",
+    status: "live",
+    Preview: TeeTimePreview,
   },
   {
     href: "/analysis/tee-shots",
@@ -39,6 +45,7 @@ const CARDS: Card[] = [
     blurb:
       "Every driver-off-the-tee ball flight from the last two seasons. Pick a player to see their average shape, dispersion cloud, and the closest matches in the field ranked by radar profile.",
     status: "live",
+    Preview: TeeShotPreview,
   },
 ];
 
@@ -96,63 +103,70 @@ export default function AnalysisIndex() {
         >
           {CARDS.map((card) => {
             const isLive = card.status === "live";
+            const Preview = card.Preview;
             const CardEl = (
-              <div
+              <article
                 style={{
-                  padding: 16,
                   border: "1px solid oklch(0.9 0.008 95)",
                   borderRadius: 10,
                   background: "white",
-                  transition: "border-color 0.15s ease",
+                  transition:
+                    "border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease",
                   cursor: isLive ? "pointer" : "not-allowed",
                   opacity: isLive ? 1 : 0.55,
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    marginBottom: 6,
-                  }}
-                >
-                  <h3
+                <Preview />
+                <div style={{ padding: 16 }}>
+                  <div
                     style={{
-                      fontSize: 15,
-                      margin: 0,
-                      fontFamily:
-                        "var(--font-archivo), 'Archivo', system-ui, sans-serif",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      marginBottom: 6,
                     }}
                   >
-                    {card.title}
-                  </h3>
-                  {!isLive && (
-                    <span
+                    <h3
                       style={{
-                        fontSize: 10,
-                        letterSpacing: 0.6,
-                        color: "oklch(0.55 0.02 150)",
-                        padding: "2px 6px",
-                        border: "1px solid oklch(0.85 0.013 95)",
-                        borderRadius: 4,
-                        fontWeight: 700,
+                        fontSize: 15,
+                        margin: 0,
+                        fontFamily:
+                          "var(--font-archivo), 'Archivo', system-ui, sans-serif",
                       }}
                     >
-                      COMING SOON
-                    </span>
-                  )}
+                      {card.title}
+                    </h3>
+                    {!isLive && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          letterSpacing: 0.6,
+                          color: "oklch(0.55 0.02 150)",
+                          padding: "2px 6px",
+                          border: "1px solid oklch(0.85 0.013 95)",
+                          borderRadius: 4,
+                          fontWeight: 700,
+                        }}
+                      >
+                        COMING SOON
+                      </span>
+                    )}
+                  </div>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "oklch(0.4 0.02 150)",
+                      margin: 0,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {card.blurb}
+                  </p>
                 </div>
-                <p
-                  style={{
-                    fontSize: 13,
-                    color: "oklch(0.4 0.02 150)",
-                    margin: 0,
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {card.blurb}
-                </p>
-              </div>
+              </article>
             );
             return (
               <li key={card.href}>
