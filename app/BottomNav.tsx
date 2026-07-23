@@ -28,7 +28,7 @@ interface Tab {
 const TABS: Tab[] = [
   {
     href: "/",
-    label: "Sweats",
+    label: "Feed",
     matches: ["/", "/live"],
     iconPath: (
       <>

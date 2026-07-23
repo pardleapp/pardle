@@ -1159,15 +1159,9 @@ export default function FeedClient({
         </span>
       </div>
 
-      {data.predictionPolls && data.predictionPolls.length > 0 && (
-        <div className="pv-poll-deck-host">
-          <PredictionPollDeck
-            polls={data.predictionPolls}
-            myVotes={myPredictionVotes}
-            onVote={sendPredictionVote}
-          />
-        </div>
-      )}
+      {/* Prediction poll deck disabled — Tom asked to drop putt polls
+          from the feed. Kept the vote plumbing (state + handlers)
+          untouched so re-enabling later is a one-block change. */}
 
       <main className="feed-main">
 

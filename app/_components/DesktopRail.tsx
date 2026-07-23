@@ -30,7 +30,7 @@ interface Item {
 const PRIMARY: Item[] = [
   {
     href: "/",
-    label: "Sweats",
+    label: "Feed",
     matches: ["/", "/live"],
     iconPath: (
       <>
