@@ -509,9 +509,10 @@ export default function ArticleR2Preview() {
       <P>
         For each angle: our estimated true probability (built from the
         matched-wind history and the cluster residual), the fair
-        decimal odds that implies, and the price at which we'd take it
-        (roughly 10% edge over fair — that's the working threshold for
-        a bet worth firing rather than one worth watching).
+        American odds that implies, and the price at which we'd take
+        it (roughly 10% edge over fair — that's the working threshold
+        for a bet worth firing rather than one worth watching). All
+        backs; no lays.
       </P>
       <Table
         headers={["Market", "Our number", "Fair", "Bet at"]}
@@ -531,9 +532,9 @@ export default function ArticleR2Preview() {
               </div>
             </>,
             "roughly 27%",
-            "3.7",
+            "+270",
             <b key="15odds" style={{ color: emerald }}>
-              4.0 or bigger
+              +300 or bigger
             </b>,
           ],
           [
@@ -547,15 +548,15 @@ export default function ArticleR2Preview() {
                 }}
               >
                 Cluster B is the harder of the big-sample clusters on
-                this par-5 (49% base), but the tailwind wins the argument.
-                Nine matched-wind rounds averaged 59% — anchor sits
-                mid-50s.
+                this par-5 (49% base), but the tailwind wins the
+                argument. Nine matched-wind rounds averaged 59% —
+                anchor sits mid-50s.
               </div>
             </>,
             "roughly 55%",
-            "1.8",
+            "−125",
             <b key="12odds" style={{ color: emerald }}>
-              2.0 or bigger
+              +100 (even money) or bigger
             </b>,
           ],
           [
@@ -574,9 +575,9 @@ export default function ArticleR2Preview() {
               </div>
             </>,
             "roughly 25%",
-            "4.0",
+            "+300",
             <b key="2odds" style={{ color: emerald }}>
-              4.5 or bigger
+              +350 or bigger
             </b>,
           ],
           [
@@ -595,14 +596,14 @@ export default function ArticleR2Preview() {
               </div>
             </>,
             "roughly 45%",
-            "2.2",
+            "+120",
             <b key="18odds" style={{ color: emerald }}>
-              2.4 or bigger
+              +140 or bigger
             </b>,
           ],
           [
             <>
-              <b>H16 birdie prop</b> — as a FADE
+              <b>H16 bogey-or-worse prop</b>
               <div
                 style={{
                   fontSize: 13,
@@ -610,17 +611,18 @@ export default function ArticleR2Preview() {
                   marginTop: 4,
                 }}
               >
-                Base 26%. Today's setup — 20 mph headwind on the
-                property's toughest short par-4 with a deep-back pin —
-                pushes this into the low teens. The biggest single-hole
-                edge on the card.
+                Base bogey-or-worse rate around 20% typical. Today —
+                20 mph headwind on the property's toughest short par-4
+                with a deep-back pin on a 23-yard-deep green — pushes
+                that into the low-mid 30s. This is the cleanest
+                back-side H16 angle if the market's available. Biggest
+                single-hole edge on the card.
               </div>
             </>,
-            "roughly 13% (fade to no-birdie at 87%)",
-            "1.15 (no-birdie)",
-            <b key="16odds" style={{ color: tang }}>
-              LAY birdie at 5 or shorter · BACK no-birdie at 1.25 or
-              bigger
+            "roughly 33%",
+            "+200",
+            <b key="16odds" style={{ color: emerald }}>
+              +230 or bigger
             </b>,
           ],
           [
