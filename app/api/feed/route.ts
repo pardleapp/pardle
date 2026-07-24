@@ -36,6 +36,7 @@ import {
 } from "@/lib/feed/top-finish-cache";
 import { ensurePlayerSkill } from "@/lib/feed/skill-cache";
 import { fallbackHoleMean } from "@/lib/feed/round-defaults";
+import { loadHoleAveragesForRound } from "@/lib/hole-averages-loader";
 import { findOddsShift } from "@/lib/feed/odds-store";
 import { getInPlayTopFinish } from "@/lib/golf-api/datagolf";
 import { getLiveStatsCached } from "@/lib/feed/live-stats-cache";
@@ -680,6 +681,30 @@ async function handle(req: Request) {
   // because the snapshot is already loaded from the bundle.
   const fieldStats = computeFieldStats(bundle.snapshot, bundle.pars);
 
+  // Per-hole score-to-par with the live-first fallback chain (this
+  // round ≥15 samples → prev round → prev year → par). Fresh signal
+  // for round-score bet projections — replaces the older "one scalar
+  // spread evenly across the tail" approach. Loader is I/O-heavy
+  // (reads /data/historical for the prev-year fallback), so compute
+  // once per response outside the player loop.
+  const holeAvgByRound: Record<number, Record<number, number>> = {};
+  try {
+    const results = await Promise.all(
+      [1, 2, 3, 4].map(async (r) => {
+        const { averages } = await loadHoleAveragesForRound({
+          tournamentId: tournament.id,
+          round: r,
+          snapshot: bundle.snapshot,
+          holePars: bundle.pars[r] ?? {},
+        });
+        return [r, averages] as const;
+      }),
+    );
+    for (const [r, avgs] of results) holeAvgByRound[r] = avgs;
+  } catch (err) {
+    console.error("[feed] holeAvgByRound bake failed", err);
+  }
+
   // Per-hole scoring aggregates for the "hole-by-hole scoring avg"
   // chart. Computed from the full snapshot (all players' scores on
   // every played hole) so the mean isn't biased by the feed's par-
@@ -724,6 +749,7 @@ async function handle(req: Request) {
       fallbackHoleMean(tournament.name),
       leaderboard,
       null,
+      holeAvgByRound,
     );
 
   // Drop any open prediction poll whose subject player(s) have
@@ -1145,6 +1171,7 @@ function computePlayerRoundStates(
   fallbackMean: number,
   leaderboard: import("@/lib/feed/store").CachedLeaderboardRow[],
   fieldDrift: FieldDrift | null,
+  holeAvgByRound: Record<number, Record<number, number>> = {},
 ): {
   roundStates: Record<string, PlayerRoundState>;
   tournamentProjections: Record<string, TournamentProjection>;
@@ -1305,6 +1332,7 @@ function computePlayerRoundStates(
             : "not-started",
         expectedRemaining,
         variance,
+        holeAvgToPar: holeAvgByRound[r],
       };
       tournamentMean += strokes + expectedRemaining;
       tournamentVariance += variance;
@@ -1374,6 +1402,11 @@ interface RoundSnapshot {
   expectedRemaining: number;
   /** Variance of the projection (sum of per-hole variance for remaining). */
   variance: number;
+  /** Per-hole expected score-to-par with the live-first fallback chain
+   *  (current round ≥15 samples → prev round → prev year → par).
+   *  Enables round-score bet projections to use per-specific-hole
+   *  averages rather than a scalar spread evenly across the tail. */
+  holeAvgToPar?: Record<number, number>;
 }
 
 interface PlayerRoundState {

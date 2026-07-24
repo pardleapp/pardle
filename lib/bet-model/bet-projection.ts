@@ -72,6 +72,7 @@ export function projectRoundTotal({
   holePars,
   snapExpectedRemaining,
   snapHolesRemaining,
+  holeAvgToPar,
 }: {
   rows: FeedRow[];
   playerId: string;
@@ -81,6 +82,16 @@ export function projectRoundTotal({
   holePars?: Record<number, number>;
   snapExpectedRemaining?: number;
   snapHolesRemaining?: number;
+  /** Per-hole expected score-to-par (live-first fallback: current
+   *  round ≥15 samples → prev round → prev year → par). Server-baked
+   *  by the snap pipeline. When present, un-touched remaining holes
+   *  use their specific hole average instead of the older
+   *  `snapExpectedRemaining` scalar (which spread one number evenly
+   *  across all remaining holes). More accurate for back-nine
+   *  starters who have specific holes 1..9 ahead of them, some easier,
+   *  some harder. Keeps precedence over snapExpectedRemaining when
+   *  both are passed. */
+  holeAvgToPar?: Record<number, number>;
 }): RoundProjection {
   // Filter to events for this player+round only.
   const events = rows
@@ -128,14 +139,22 @@ export function projectRoundTotal({
   if (currentHoleNumber != null) holesTouched.add(currentHoleNumber);
 
   // Per-hole baseline for un-touched remaining holes. Priority order:
-  //   1. Snap's field-anchored + skill-adjusted projection, spread
-  //      evenly across its holesRemaining. This matches what the
-  //      server-side round-score model uses (see pgatour projection
-  //      pipeline — DataGolf SG_total ÷ 18 × player skill applied
-  //      against field-anchored per-hole means).
-  //   2. Raw hole par, if we know it.
-  //   3. Par 4 as a last-resort fallback.
+  //   1. holeAvgToPar[h] — per-specific-hole average with the
+  //      live-first fallback chain (current round ≥15 samples → prev
+  //      round → prev year → par). This is the most accurate signal
+  //      because it knows the ACTUAL hole shape, not a scalar spread
+  //      evenly across the tail. Handles back-nine starters correctly
+  //      (a player thru 4 from hole 10 has 14..18 + 1..9 remaining,
+  //      each with its own average).
+  //   2. Snap's field-anchored + skill-adjusted projection, spread
+  //      evenly across its holesRemaining. Kept as fallback for old
+  //      snap payloads that don't ship holeAvgToPar yet.
+  //   3. Raw hole par, if we know it.
+  //   4. Par 4 as a last-resort fallback.
+  const hasHoleAvg =
+    holeAvgToPar != null && Object.keys(holeAvgToPar).length > 0;
   const snapPerHole =
+    !hasHoleAvg &&
     typeof snapExpectedRemaining === "number" &&
     typeof snapHolesRemaining === "number" &&
     snapHolesRemaining > 0
@@ -146,7 +165,11 @@ export function projectRoundTotal({
   let remainingVariance = 0;
   for (let h = 1; h <= 18; h++) {
     if (holesTouched.has(h)) continue;
-    if (snapPerHole != null) {
+    if (hasHoleAvg) {
+      const par = holePars?.[h] ?? 4;
+      const toPar = holeAvgToPar[h] ?? 0;
+      remainingExpected += par + toPar;
+    } else if (snapPerHole != null) {
       remainingExpected += snapPerHole;
     } else {
       remainingExpected += holePars?.[h] ?? 4;

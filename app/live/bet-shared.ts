@@ -200,6 +200,12 @@ export interface RoundSnapshot {
   expectedRemaining?: number;
   /** Variance of the projection (sum of per-hole variance for remaining). */
   variance?: number;
+  /** Per-hole expected score-to-par with the live-first fallback chain
+   *  (current round ≥15 samples → prev round → prev year → par).
+   *  Enables round-score bet win% to use per-specific-hole averages
+   *  for un-touched holes instead of the scalar expectedRemaining.
+   *  Server-baked; older payloads / clients ignore it. */
+  holeAvgToPar?: Record<number, number>;
 }
 
 export interface PlayerRoundState {
@@ -830,6 +836,7 @@ export function evaluateRoundScore(
       holePars,
       snapExpectedRemaining: snap.expectedRemaining,
       snapHolesRemaining: r.holesRemaining,
+      holeAvgToPar: r.holeAvgToPar,
     });
     if (projection.currentHole) {
       const prob = roundScoreProb({
@@ -1243,6 +1250,7 @@ function adjustProjectionsForShots(
       holePars,
       snapExpectedRemaining: snap.expectedRemaining,
       snapHolesRemaining: rs.holesRemaining,
+      holeAvgToPar: rs.holeAvgToPar,
     });
     if (!shotProjection.currentHole) continue;
 
