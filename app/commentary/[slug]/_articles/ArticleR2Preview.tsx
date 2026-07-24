@@ -77,15 +77,29 @@ function Table({
   headers: string[];
   rows: Array<Array<string | React.ReactNode>>;
 }) {
+  // The wrapper needs three defensive props for mobile: maxWidth 100%
+  // (obey viewport), minWidth 0 (override flex-item intrinsic min-width
+  // that would otherwise let child minWidth push the parent wider than
+  // the viewport), and overflow-x: auto so the table scrolls inside
+  // the constrained wrapper rather than dragging the page along.
   return (
-    <div style={{ overflowX: "auto", margin: "0 0 20px" }}>
+    <div
+      className="article-table-wrap"
+      style={{
+        overflowX: "auto",
+        margin: "0 0 20px",
+        maxWidth: "100%",
+        minWidth: 0,
+        WebkitOverflowScrolling: "touch",
+      }}
+    >
       <table
         style={{
           width: "100%",
           borderCollapse: "collapse",
           fontSize: 14,
           fontFamily: proseFont,
-          minWidth: 520,
+          minWidth: 460,
         }}
       >
         <thead>
@@ -180,8 +194,13 @@ function HarderChip({ children }: { children: React.ReactNode }) {
 }
 
 export default function ArticleR2Preview() {
+  // Outer wrapper carries a min-width: 0 so nested tables (each with a
+  // minWidth to keep the columns readable) can't push the whole
+  // article past the viewport width on mobile. Without this, tables'
+  // intrinsic min-content width propagates all the way up through the
+  // flex-column .container, shoving the page into horizontal scroll.
   return (
-    <div>
+    <div style={{ minWidth: 0, maxWidth: "100%" }}>
       <P>
         Round 1 played to a near-neutral setup at TPC Twin Cities under
         a soft 5-7 mph southerly. Round 2 is a different animal: the
