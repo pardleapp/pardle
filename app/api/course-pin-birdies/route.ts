@@ -242,12 +242,12 @@ async function familyFor(tournamentId: string): Promise<FamilyDef | null> {
 // ── Endpoint ────────────────────────────────────────────────────────
 
 function cacheKey(tournamentId: string): string {
-  // v13 — v12 payloads were computed against unaugmented pin sheets
-  // for the historical (pre-2023) events feeding the family aggregation,
-  // so the modal's per-round dots for those years landed at the
-  // replicated coord instead of the real per-round positions.
-  // Bump to invalidate poisoned payloads.
-  return `feed:pin-birdies:v13:${tournamentId}`;
+  // v14 — v13 payloads pre-date the extension of BirdieCount with
+  // bogeys, sumVsPar, bogeyRate, avgVsPar. Cached rows lack those
+  // fields so the new metric toggle would render zeros for bogey
+  // rate + avg vs par until the cache turned over naturally. Bump
+  // to force a fresh compute that fills the new counters.
+  return `feed:pin-birdies:v14:${tournamentId}`;
 }
 
 export async function GET(req: Request) {
