@@ -291,12 +291,30 @@ export default function PinSheetModal({
   })();
   // Per-round pin resolved from whichever source solo mode is using.
   const soloPinForRound = (round: number):
-    | { x: number; y: number; rate?: number; birdies?: number; total?: number }
+    | {
+        x: number;
+        y: number;
+        rate?: number;
+        bogeyRate?: number;
+        avgVsPar?: number;
+        birdies?: number;
+        bogeys?: number;
+        total?: number;
+      }
     | null => {
     if (soloUsesHistoryPins) {
       const p = yearPinsFromHistory.find((hp) => hp.round === round);
       if (!p) return null;
-      return { x: p.x, y: p.y, rate: p.rate, birdies: p.birdies, total: p.total };
+      return {
+        x: p.x,
+        y: p.y,
+        rate: p.rate,
+        bogeyRate: p.bogeyRate,
+        avgVsPar: p.avgVsPar,
+        birdies: p.birdies,
+        bogeys: p.bogeys,
+        total: p.total,
+      };
     }
     const p = hole.pinByRound[round];
     if (!p) return null;
@@ -828,7 +846,7 @@ export default function PinSheetModal({
               <>
                 {filteredHistoryPins.map((pin, i) => {
                   const active = hoverHistIdx === i;
-                  const dotColour = rateColor(pin.rate, 1);
+                  const dotColour = displayColor(pin, metric, 1);
                   // Position tooltip flipped when the pin sits in the
                   // bottom third so it doesn't fall off the diagram.
                   const flipUp = pin.y > 0.62;
@@ -854,7 +872,13 @@ export default function PinSheetModal({
                         onBlur={() =>
                           setHoverHistIdx((cur) => (cur === i ? null : cur))
                         }
-                        aria-label={`${pin.year} R${pin.round} pin — ${fmtRate(pin.rate)} birdie rate`}
+                        aria-label={`${pin.year} R${pin.round} pin — ${displayLabel(pin, metric)} ${
+                          metric === "birdie"
+                            ? "birdie rate"
+                            : metric === "bogey"
+                              ? "bogey-or-worse rate"
+                              : "avg vs par"
+                        }`}
                         style={{
                           width: active ? 20 : 14,
                           height: active ? 20 : 14,
@@ -914,7 +938,7 @@ export default function PinSheetModal({
                               fontSize: 13,
                             }}
                           >
-                            {fmtRate(pin.rate)}
+                            {displayLabel(pin, metric)}
                           </span>
                           <span
                             style={{
@@ -1057,12 +1081,14 @@ export default function PinSheetModal({
                             </span>
                           )}
                         </>
-                      ) : pin.rate != null ? (
+                      ) : pin.rate != null &&
+                        pin.bogeyRate != null &&
+                        pin.avgVsPar != null ? (
                         // Older-year fallback: no per-round scoring from
                         // orchestrator courseStats for these seasons, but
-                        // the birdie-history aggregator DID compute a
-                        // per-round birdie rate. Show it as the primary
-                        // per-round stat so 2019-2022 tabs feel identical
+                        // the birdie-history aggregator DID compute per-
+                        // round metrics for every hole. Show the active
+                        // metric here so 2019-2022 tabs feel identical
                         // to 2024+.
                         <>
                           <span
@@ -1073,9 +1099,16 @@ export default function PinSheetModal({
                               fontSize: 13,
                             }}
                           >
-                            {fmtRate(pin.rate)}
+                            {displayLabel(
+                              {
+                                rate: pin.rate,
+                                bogeyRate: pin.bogeyRate,
+                                avgVsPar: pin.avgVsPar,
+                              },
+                              metric,
+                            )}
                           </span>
-                          {pin.birdies != null && pin.total != null && (
+                          {pin.total != null && (
                             <span
                               style={{
                                 fontFamily: "var(--font-mono, monospace)",
@@ -1083,7 +1116,11 @@ export default function PinSheetModal({
                                 color: "oklch(0.72 0.02 150)",
                               }}
                             >
-                              {pin.birdies}/{pin.total}
+                              {metric === "bogey" && pin.bogeys != null
+                                ? `${pin.bogeys}/${pin.total}`
+                                : metric === "birdie" && pin.birdies != null
+                                  ? `${pin.birdies}/${pin.total}`
+                                  : `n=${pin.total}`}
                             </span>
                           )}
                         </>
@@ -1524,7 +1561,9 @@ export default function PinSheetModal({
                     padding: "10px 12px",
                     border: "1px solid oklch(0.94 0.008 95)",
                     borderRadius: 8,
-                    background: has ? rateColor(pin.rate, 0.14) : "white",
+                    background: has
+                      ? displayColor(pin, metric, 0.14)
+                      : "white",
                     display: "flex",
                     flexDirection: "column",
                     gap: 3,
@@ -1550,7 +1589,7 @@ export default function PinSheetModal({
                       letterSpacing: "-0.01em",
                     }}
                   >
-                    {fmtRate(pin.rate)}
+                    {displayLabel(pin, metric)}
                   </span>
                   <span
                     style={{
@@ -1559,7 +1598,11 @@ export default function PinSheetModal({
                       color: "oklch(0.55 0.02 150)",
                     }}
                   >
-                    {pin.birdies}/{pin.total}
+                    {metric === "bogey"
+                      ? `${pin.bogeys}/${pin.total}`
+                      : metric === "birdie"
+                        ? `${pin.birdies}/${pin.total}`
+                        : `n=${pin.total}`}
                   </span>
                 </div>
               );
@@ -1582,51 +1625,56 @@ export default function PinSheetModal({
               flexWrap: "wrap",
             }}
           >
-            <span>Rate scale</span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-              <span
-                style={{
-                  width: 14,
-                  height: 8,
-                  background: rateColor(0.05),
-                  borderRadius: 2,
-                }}
-              />
-              5%
+            <span>
+              {metric === "birdie"
+                ? "Birdie rate"
+                : metric === "bogey"
+                  ? "Bogey rate"
+                  : "Score vs par"}
             </span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-              <span
-                style={{
-                  width: 14,
-                  height: 8,
-                  background: rateColor(0.15),
-                  borderRadius: 2,
-                }}
-              />
-              15%
-            </span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-              <span
-                style={{
-                  width: 14,
-                  height: 8,
-                  background: rateColor(0.25),
-                  borderRadius: 2,
-                }}
-              />
-              25%
-            </span>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-              <span
-                style={{
-                  width: 14,
-                  height: 8,
-                  background: rateColor(0.35),
-                  borderRadius: 2,
-                }}
-              />
-              35%+
-            </span>
+            {metric === "avg"
+              ? (
+                  [
+                    { v: -0.3, l: "−0.30" },
+                    { v: -0.1, l: "−0.10" },
+                    { v: 0.1, l: "+0.10" },
+                    { v: 0.3, l: "+0.30" },
+                  ] as const
+                ).map(({ v, l }) => (
+                  <span
+                    key={l}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                  >
+                    <span
+                      style={{
+                        width: 14,
+                        height: 8,
+                        background: avgVsParColor(v),
+                        borderRadius: 2,
+                      }}
+                    />
+                    {l}
+                  </span>
+                ))
+              : (
+                  [0.05, 0.15, 0.25, 0.35] as const
+                ).map((r, i) => (
+                  <span
+                    key={r}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                  >
+                    <span
+                      style={{
+                        width: 14,
+                        height: 8,
+                        background:
+                          metric === "bogey" ? bogeyRateColor(r) : rateColor(r),
+                        borderRadius: 2,
+                      }}
+                    />
+                    {i === 3 ? "35%+" : `${Math.round(r * 100)}%`}
+                  </span>
+                ))}
           </div>
         )}
 
@@ -1657,11 +1705,21 @@ export default function PinSheetModal({
             textAlign: "center",
           }}
         >
-          {showHistory
-            ? seasonFilter != null
-              ? `Only ${seasonFilter} pin positions shown. Each dot is one round of that year, coloured by the field's birdie-or-better rate for that round. Switch to All seasons for the multi-year cluster view.`
-              : "Every pin position from every stored round of this hole, coloured by that round's birdie-or-better rate. Dashed circles mark proximity clusters — pins the course-setup crew puts in the same spot year to year get merged into one tile in the panel below. Bigger pin counts = more trustworthy."
-            : "Hover any pin to see the field's scoring average for that round. Pin coordinates + green diagram from PGA Tour's own broadcast feed. Rounds without a coloured dot haven't been posted yet (or the round hasn't been played)."}
+          {(() => {
+            const metricPhrase =
+              metric === "birdie"
+                ? "birdie-or-better rate"
+                : metric === "bogey"
+                  ? "bogey-or-worse rate"
+                  : "scoring avg vs par";
+            if (!showHistory) {
+              return "Hover any pin to see the field's scoring average for that round. Pin coordinates + green diagram from PGA Tour's own broadcast feed. Rounds without a coloured dot haven't been posted yet (or the round hasn't been played).";
+            }
+            if (seasonFilter != null) {
+              return `Only ${seasonFilter} pin positions shown. Each dot is one round of that year, coloured by the field's ${metricPhrase} for that round. Switch to All seasons for the multi-year cluster view.`;
+            }
+            return `Every pin position from every stored round of this hole, coloured by that round's ${metricPhrase}. Dashed circles mark proximity clusters — pins the course-setup crew puts in the same spot year to year get merged into one tile in the panel below. Bigger pin counts = more trustworthy.`;
+          })()}
         </p>
       </div>
     </div>
