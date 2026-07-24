@@ -142,6 +142,7 @@ interface FeedResponse {
           status: "not-started" | "in-progress" | "complete";
           expectedRemaining?: number;
           variance?: number;
+          holeAvgToPar?: Record<number, number>;
         }
       >;
     }
@@ -1393,6 +1394,41 @@ export default function FeedClient({
                     currentOdds: data.currentOdds,
                     leaderboard: data.leaderboard,
                     contextRows: data.rows,
+                    // Per-round per-hole averages are field-level (same
+                    // for every player in the round), so grab them from
+                    // any player's snap. Same live-first fallback as
+                    // the bet detail page + tee-time chart.
+                    holeAvgToParByRound: (() => {
+                      const out: Record<number, Record<number, number>> = {};
+                      for (const rs of Object.values(
+                        data.playerRoundStates ?? {},
+                      )) {
+                        for (const [rStr, snap] of Object.entries(
+                          rs.rounds ?? {},
+                        )) {
+                          const r = Number(rStr);
+                          if (out[r]) continue;
+                          if (snap.holeAvgToPar) out[r] = snap.holeAvgToPar;
+                        }
+                      }
+                      return out;
+                    })(),
+                    roundParByRound: (() => {
+                      const out: Record<number, number> = {};
+                      for (const rs of Object.values(
+                        data.playerRoundStates ?? {},
+                      )) {
+                        for (const [rStr, snap] of Object.entries(
+                          rs.rounds ?? {},
+                        )) {
+                          const r = Number(rStr);
+                          if (out[r]) continue;
+                          if (typeof snap.roundPar === "number")
+                            out[r] = snap.roundPar;
+                        }
+                      }
+                      return out;
+                    })(),
                   })
                 : null;
             // v3 desktop: rank the event for the accent-stripe

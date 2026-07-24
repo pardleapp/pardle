@@ -210,6 +210,8 @@ function impactForRoundScore(
   bet: TrackedBet & { kind: "round-score" },
   playerSkill?: PlayerSkill,
   contextRows?: FeedRow[],
+  holeAvgToPar?: Record<number, number>,
+  roundPar?: number,
 ): EventBetImpact | null {
   // Round-score is direct-only by user instruction — a competitor's
   // shot doesn't affect your player's round total.
@@ -240,7 +242,14 @@ function impactForRoundScore(
       playerId: bet.playerId,
       round: targetRound,
       skill: playerSkill,
-      roundPar: 72, // default course par; refinable per event later
+      // Per-round par when we know it (baked into snap); default 72
+      // for majors/legacy events without the map. Same for holeAvgToPar
+      // — pass through when the caller supplied it so the impact chip
+      // uses the same live-first fallback (current round ≥15 samples
+      // → prev round → prev year → par) as the round-score bet detail
+      // page + tee-time chart.
+      roundPar: roundPar ?? 72,
+      holeAvgToPar,
     });
     // The "before" total = after - shot's contribution to the hole.
     // Rebuilding a whole projection twice is expensive; short-circuit
@@ -324,6 +333,15 @@ export function computeBetImpact(
      *  computations. Absent means the round-score chip falls back
      *  to par-anchored delta only. */
     contextRows?: FeedRow[];
+    /** Optional per-round per-hole expected score-to-par map. When
+     *  provided, the round-score impact uses the SAME live-first
+     *  fallback (current round ≥15 samples → prev round → prev year
+     *  → par) as the round-score bet detail page + tee-time chart.
+     *  Absent means the impact chip falls back to hardcoded par 4. */
+    holeAvgToParByRound?: Record<number, Record<number, number>>;
+    /** Optional per-round par lookup for the current tournament. When
+     *  provided, we use it instead of the hardcoded 72 default. */
+    roundParByRound?: Record<number, number>;
   },
 ): EventBetImpact | null {
   if (bet.kind === "outright") {
@@ -339,7 +357,21 @@ export function computeBetImpact(
   }
   if (bet.kind === "round-score") {
     const skill = data.playerSkill?.[bet.playerId];
-    return impactForRoundScore(event, bet, skill, data.contextRows);
+    const targetRound = bet.round ?? bet.placement?.round ?? null;
+    const holeAvgToPar =
+      targetRound != null
+        ? data.holeAvgToParByRound?.[targetRound]
+        : undefined;
+    const roundPar =
+      targetRound != null ? data.roundParByRound?.[targetRound] : undefined;
+    return impactForRoundScore(
+      event,
+      bet,
+      skill,
+      data.contextRows,
+      holeAvgToPar,
+      roundPar,
+    );
   }
   // winning-score: skip for v1. A single event rarely has a clean
   // attributable impact on the full-field distribution, and the
@@ -365,6 +397,14 @@ export function headlineImpactForEvent(
     leaderboard: CachedLeaderboardRow[];
     playerSkill?: Record<string, PlayerSkill>;
     contextRows?: FeedRow[];
+    /** Per-round per-hole expected score-to-par (from feed snap).
+     *  When provided, round-score impact chips use the same live-first
+     *  fallback (current round ≥15 samples → prev round → prev year →
+     *  par) as the bet detail page + tee-time chart. */
+    holeAvgToParByRound?: Record<number, Record<number, number>>;
+    /** Per-round par lookup for the current tournament (from feed
+     *  snap). When present, replaces the hardcoded 72 default. */
+    roundParByRound?: Record<number, number>;
   },
 ): EventBetImpact | null {
   let best: EventBetImpact | null = null;

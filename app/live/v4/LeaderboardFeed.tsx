@@ -217,15 +217,20 @@ export default function LeaderboardFeed() {
   // Per-row bet impact — surfaces "your outright ↑ 4pp · +£1.20" inline
   // in the LATEST column whenever the row's latest event materially
   // moved one of the user's active bets. Direct outright + top-finish
-  // only for v0 (indirect + round-score need currentOdds / contextRows
-  // which the leaderboard endpoint doesn't ship yet).
+  // work from FeedEvent fields alone. Round-score impact uses the same
+  // per-hole averages the bet detail page + tee-time chart use — the
+  // server now bakes them onto the response.
   const impactByPlayer = new Map<string, EventBetImpact>();
   if (bets.length > 0) {
+    const holeAvgToParByRound = data?.holeAvgToParByRound;
+    const roundParByRound = data?.roundParByRound;
     for (const r of rows) {
       if (!r.latestEvent) continue;
       const imp = headlineImpactForEvent(r.latestEvent, bets, {
         currentOdds: {},
         leaderboard: [],
+        holeAvgToParByRound,
+        roundParByRound,
       });
       if (imp) impactByPlayer.set(r.playerId, imp);
     }

@@ -31,9 +31,12 @@ import {
   getReactionsBulk,
   getCommentCountsBulk,
   getEmojiReactionsBulk,
+  getSnapshot,
+  getCachedTournamentPars,
   type CachedLeaderboardRow,
 } from "@/lib/feed/store";
 import type { FeedEvent, ReactionCounts } from "@/lib/feed/types";
+import { loadHoleAveragesForRound } from "@/lib/hole-averages-loader";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -155,6 +158,15 @@ export interface LeaderboardResponse {
   /** eventId → server-side reactions + comment count. Client bulk-
    *  hydrates the social chips for every event in the response. */
   social: Record<string, EventSocial>;
+  /** Per-round per-hole expected score-to-par with the live-first
+   *  fallback chain. Client uses this to power round-score bet impact
+   *  chips on this feed so they match the bet-detail page + tee-time
+   *  chart projection method. Empty when the tournament id is
+   *  unresolvable or the snapshot / historical fallback all miss. */
+  holeAvgToParByRound?: Record<number, Record<number, number>>;
+  /** Per-round par lookup for the current tournament, from the same
+   *  snapshot bake. Client falls back to 72 when absent. */
+  roundParByRound?: Record<number, number>;
   generatedAt: number;
   diag: {
     leaderboardCount: number;
@@ -186,10 +198,44 @@ export async function GET(req: Request) {
       } satisfies LeaderboardResponse);
     }
 
-    const [leaderboard, events] = await Promise.all([
+    const [leaderboard, events, snapshot, roundPars] = await Promise.all([
       getCachedLeaderboard(tournament.id).catch(() => [] as CachedLeaderboardRow[]),
       getEvents(tournament.id, 400).catch(() => [] as FeedEvent[]),
+      getSnapshot(tournament.id).catch(() => null),
+      getCachedTournamentPars(tournament.id).catch(
+        () => ({}) as Record<number, Record<number, number>>,
+      ),
     ]);
+
+    // Bake per-round per-hole averages so the round-score impact
+    // chips on this feed can use the SAME live-first fallback
+    // (current round ≥15 samples → prev round → prev year → par) as
+    // the bet detail page + tee-time chart. Loader is I/O-heavy on
+    // first call (reads /data/historical), so run all 4 rounds in
+    // parallel and only when we have a real snapshot to hand it.
+    const holeAvgToParByRound: Record<number, Record<number, number>> = {};
+    const roundParByRound: Record<number, number> = {};
+    if (snapshot) {
+      const rounds = [1, 2, 3, 4] as const;
+      await Promise.all(
+        rounds.map(async (r) => {
+          const pars = roundPars[r] ?? {};
+          const parTotal = Object.values(pars).reduce((a, b) => a + b, 0);
+          if (parTotal > 0) roundParByRound[r] = parTotal;
+          try {
+            const { averages } = await loadHoleAveragesForRound({
+              tournamentId: tournament.id,
+              round: r,
+              snapshot,
+              holePars: pars,
+            });
+            holeAvgToParByRound[r] = averages;
+          } catch {
+            /* leave the round out of the map; client falls back to par */
+          }
+        }),
+      );
+    }
 
     const { round: activeRound, payload: dgLive } =
       await findActiveRoundWithData();
@@ -266,6 +312,8 @@ export async function GET(req: Request) {
       activeRound,
       rows,
       social,
+      holeAvgToParByRound,
+      roundParByRound,
       generatedAt: Date.now(),
       diag: {
         leaderboardCount: leaderboard.length,
