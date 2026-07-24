@@ -7,6 +7,8 @@ import SiteFooter from "./SiteFooter";
 import { ToastProvider } from "./live/Toast";
 import BottomNav from "./BottomNav";
 import DesktopRail from "./_components/DesktopRail";
+import EngagementBeacon from "./_components/EngagementBeacon";
+import SubscribeCTA from "./_components/SubscribeCTA";
 
 // Inter variable: covers all weights we use (400/600/700/800/900) in
 // one woff2 file. Display-swap so the page paints with the system
@@ -99,6 +101,12 @@ export default function RootLayout({
           </div>
           <SiteFooter />
           <BottomNav />
+          <EngagementBeacon />
+          {/* Post-engagement subscribe pitch. Mounted at layout level
+              so it can fire on the very article/tool page that
+              triggered the engagement — not just when the user
+              navigates back to Insights. */}
+          <SubscribeCTA />
         </ToastProvider>
         <Analytics />
       </body>

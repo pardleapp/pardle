@@ -1,37 +1,52 @@
 "use client";
 
 /**
- * SubscribeCTA — first-visit popup pitching free account creation.
- * Shows once, on initial page load, for signed-out visitors who
- * haven't dismissed. Dismissal is remembered in localStorage (30-day
- * cooldown) so repeat visitors aren't nagged.
+ * SubscribeCTA — post-engagement popup pitching free account creation.
+ * Fires only AFTER the visitor has spent meaningful time on a value-
+ * proving surface (an article or an analysis tool). The
+ * EngagementBeacon in the root layout writes `pardle_engaged_at` to
+ * localStorage after ~10 seconds on any qualifying page. This popup
+ * component then only opens when that key exists — prove the value
+ * first, ask for the email second.
+ *
+ * Dismissal is stored under `pardle_subscribe_prompt_dismissed_at`
+ * with a 30-day cooldown so repeat visitors aren't nagged.
  *
  * Deliberately DOES NOT use useDismissibleOverlay — the popup hands
  * off to SignInModal (which does), and both fighting for the same
- * history entry left the Subscribe button doing nothing (popup closed
- * via history.back(), the popstate then closed the SignInModal that
- * had just opened). Dismissal here is X / "Maybe later" / backdrop /
- * Escape only.
+ * history entry left the Subscribe button doing nothing. Dismissal
+ * here is X / "Maybe later" / backdrop / Escape only.
  */
 
 import { useEffect, useState } from "react";
 import { useAuth } from "../live/auth/useAuth";
 import SignInModal from "../live/auth/SignInModal";
 
+const ENGAGED_KEY = "pardle_engaged_at";
 const DISMISS_KEY = "pardle_subscribe_prompt_dismissed_at";
 const COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-const OPEN_DELAY_MS = 700;
+const OPEN_DELAY_MS = 1500; // 1.5s so the popup lands after page settles
+const ENGAGEMENT_POLL_MS = 2000; // recheck engagement while mounted
 
-function shouldShowPopup(): boolean {
+function isEngaged(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(ENGAGED_KEY) != null;
+  } catch {
+    return false;
+  }
+}
+
+function isDismissed(): boolean {
   if (typeof window === "undefined") return false;
   try {
     const raw = window.localStorage.getItem(DISMISS_KEY);
-    if (!raw) return true;
+    if (!raw) return false;
     const ts = Number(raw);
-    if (!Number.isFinite(ts)) return true;
-    return Date.now() - ts > COOLDOWN_MS;
+    if (!Number.isFinite(ts)) return false;
+    return Date.now() - ts < COOLDOWN_MS;
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -51,9 +66,42 @@ export default function SubscribeCTA() {
 
   useEffect(() => {
     if (loading || user) return;
-    if (!shouldShowPopup()) return;
-    const t = setTimeout(() => setPopupOpen(true), OPEN_DELAY_MS);
-    return () => clearTimeout(t);
+    if (isDismissed()) return;
+
+    // Fast path: engagement already recorded (visitor read an article
+    // or used a tool in a previous session). Fire the popup right away
+    // with the standard settle delay.
+    if (isEngaged()) {
+      const t = window.setTimeout(() => setPopupOpen(true), OPEN_DELAY_MS);
+      return () => window.clearTimeout(t);
+    }
+
+    // Slow path: no engagement yet. Watch localStorage — the
+    // EngagementBeacon writes the key after ~10s on a qualifying
+    // page. Poll every 2s so we notice mid-session engagement, and
+    // also listen to the storage event so cross-tab engagement
+    // propagates.
+    let popupTimer: number | undefined;
+    const check = () => {
+      if (popupTimer != null) return;
+      if (isEngaged() && !isDismissed()) {
+        popupTimer = window.setTimeout(
+          () => setPopupOpen(true),
+          OPEN_DELAY_MS,
+        );
+      }
+    };
+    check();
+    const poll = window.setInterval(check, ENGAGEMENT_POLL_MS);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === ENGAGED_KEY) check();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.clearInterval(poll);
+      window.removeEventListener("storage", onStorage);
+      if (popupTimer != null) window.clearTimeout(popupTimer);
+    };
   }, [loading, user]);
 
   // Escape closes the popup.

@@ -2,7 +2,9 @@ import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 import AuthChip from "./live/auth/AuthChip";
 import MainNav from "./MainNav";
-import SubscribeCTA from "./_components/SubscribeCTA";
+// SubscribeCTA moved to the root layout so it can fire post-engagement
+// on the article / tool page the visitor is already on, not only when
+// they navigate back to Insights.
 
 export const metadata = {
   title: `Insights — ${BRAND.name}`,
@@ -177,7 +179,6 @@ export default function InsightsIndex() {
           ))}
         </ul>
       </section>
-      <SubscribeCTA />
     </main>
   );
 }
