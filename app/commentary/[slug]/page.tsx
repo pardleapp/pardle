@@ -6,6 +6,7 @@ import MainNav from "../../MainNav";
 import ArticleThreeMOpen from "./_articles/ArticleThreeMOpen";
 import ArticlePinDifficulty from "./_articles/ArticlePinDifficulty";
 import ArticleR2Preview from "./_articles/ArticleR2Preview";
+import ArticleR2ScoringForecast from "./_articles/ArticleR2ScoringForecast";
 
 interface Article {
   slug: string;
@@ -17,6 +18,14 @@ interface Article {
 }
 
 const ARTICLES: Record<string, Article> = {
+  "3m-open-r2-scoring-forecast": {
+    slug: "3m-open-r2-scoring-forecast",
+    title: "3M Open R2: what the field averages today",
+    dek: "Fitting eight years of pin-by-pin scoring to today's wind, then calibrating against yesterday's field average, points to a course playing softer than the wind suggests.",
+    date: "2026-07-24",
+    tag: "R2 forecast",
+    Body: ArticleR2ScoringForecast,
+  },
   "3m-open-r2-preview": {
     slug: "3m-open-r2-preview",
     title: "3M Open R2 preview: wind, hole bearings, and where the birdies live",

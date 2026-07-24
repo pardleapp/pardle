@@ -30,6 +30,13 @@ interface Article {
 // now lives at /).
 const ARTICLES: Article[] = [
   {
+    slug: "3m-open-r2-scoring-forecast",
+    title: "3M Open R2: what the field averages today",
+    dek: "Fitting eight years of pin-by-pin scoring to today's wind, then calibrating against yesterday's field average, points to a course playing softer than the wind suggests.",
+    date: "2026-07-24",
+    tag: "R2 forecast",
+  },
+  {
     slug: "3m-open-r2-preview",
     title: "3M Open R2 preview: wind, hole bearings, and where the birdies live",
     dek: "Same wind direction as R1, roughly triple the speed. This is where the R2 pin sheet meets a 20 mph SSW — hole by hole, cluster by cluster.",
