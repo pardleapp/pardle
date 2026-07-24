@@ -5,6 +5,7 @@ import AuthChip from "../../live/auth/AuthChip";
 import MainNav from "../../MainNav";
 import ArticleThreeMOpen from "./_articles/ArticleThreeMOpen";
 import ArticlePinDifficulty from "./_articles/ArticlePinDifficulty";
+import ArticleR2Preview from "./_articles/ArticleR2Preview";
 
 interface Article {
   slug: string;
@@ -16,6 +17,14 @@ interface Article {
 }
 
 const ARTICLES: Record<string, Article> = {
+  "3m-open-r2-preview": {
+    slug: "3m-open-r2-preview",
+    title: "3M Open R2 preview: wind, hole bearings, and where the birdies live",
+    dek: "Same wind direction as R1, roughly triple the speed. This is where the R2 pin sheet meets a 20 mph SSW — hole by hole, cluster by cluster.",
+    date: "2026-07-24",
+    tag: "R2 preview",
+    Body: ArticleR2Preview,
+  },
   "3m-open-pin-difficulty": {
     slug: "3m-open-pin-difficulty",
     title: "Where the birdies live: reading the 3M Open's pin patterns",

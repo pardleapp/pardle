@@ -28,6 +28,13 @@ interface Article {
 // now lives at /).
 const ARTICLES: Article[] = [
   {
+    slug: "3m-open-r2-preview",
+    title: "3M Open R2 preview: wind, hole bearings, and where the birdies live",
+    dek: "Same wind direction as R1, roughly triple the speed. This is where the R2 pin sheet meets a 20 mph SSW — hole by hole, cluster by cluster.",
+    date: "2026-07-24",
+    tag: "R2 preview",
+  },
+  {
     slug: "3m-open-pin-difficulty",
     title: "Where the birdies live: reading the 3M Open's pin patterns",
     dek: "Adjusting eight years of pin-by-pin birdie rates for hole length and wind reveals which flag positions at TPC Twin Cities play harder or easier than they look.",
