@@ -380,19 +380,23 @@ export default function ArticleR2Preview() {
       <H3>What history says — matched-wind parallels</H3>
       <P>
         The regression is a model. What actually happened on each hole
-        the last time the wind blew like this is empirical. Pulling every
-        prior 3M Open round (2019-2025, 28 rounds total) and matching
-        each on <b>headwind component within ±4 mph</b> gives a
-        historical anchor for the forecast.
+        the last time the wind blew from a similar direction is
+        empirical. Pulling every prior 3M Open round (2019-2025, 28
+        rounds total) and matching each on <b>headwind component
+        within ±4 mph</b> per hole gives a historical anchor for the
+        forecast — the wind that would land on each approach, not just
+        the raw mph on the flag.
       </P>
 
       <Callout>
-        <b>Three of today's biggest holes are off the historical
-        distribution.</b> H16 (~19.6 mph headwind), H7 (~19.1 mph
-        headwind), and H15 (~19.5 mph tailwind) have NO prior rounds
-        in the sample within 4 mph of today's wind component. Every
-        past 3M Open in our archive was played in ≤14 mph — today is
-        the windiest 3M Open Friday we have on file.
+        <b>Today is the strongest SSW wind we have on file for this
+        event.</b> Every prior 3M Open round in the archive was played
+        in ≤14 mph average; only 8 of those 28 rounds sat inside the
+        SSW/S wind cone at all. Today's forecast is 18-21 mph from the
+        same direction. That means H16 (~19.6 mph headwind), H7 (~19.1
+        mph headwind), and H15 (~19.5 mph tailwind) fall outside the
+        top of the historical distribution — no prior round matches
+        their exact wind component within 4 mph.
       </Callout>
 
       <P>
