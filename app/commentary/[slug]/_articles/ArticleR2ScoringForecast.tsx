@@ -256,29 +256,57 @@ export default function ArticleR2ScoringForecast() {
         even in benign wind.
       </P>
 
-      <H3>The wind-and-pin adjustment (before any calibration)</H3>
+      <H3>The wind-and-pin adjustment</H3>
       <Callout>
         Plug today's wind and today's pin cluster into the fitted
         model and it says R2 plays <b>+0.22 strokes harder than a
-        typical R2</b>. AM and PM come out effectively identical —
-        the tailwind boost on the N-facing par-5s in the afternoon
-        cancels the added headwind cost on the S-facing par-4s.
+        typical R2</b> — which is almost certainly an
+        underestimate. The wind coefficient was fit on historical
+        rounds that peaked at 13 mph. Extrapolating linearly to 20
+        mph misses the non-linear damage — club-up decisions, more
+        greens missed, chip-out lies. Anchoring off the three
+        windiest R2s (2020, 2022, 2024, averaging 72.04 in 13 mph),
+        a more honest wind term is <b>+0.5 to +1.0 strokes</b> over
+        the historical mean. Central: <b>+0.7</b>.
       </Callout>
       <P>
-        Most of the +0.22 lives in two holes on opposite sides of
-        zero. H16 (par 4, back-right shelf, 20 mph direct headwind)
-        comes in{" "}
+        Most of the wind effect lives in two holes on opposite sides
+        of zero. H16 (par 4, back-right shelf, 20 mph direct
+        headwind) comes in{" "}
         <HarderChip>+0.33 strokes</HarderChip>{" "}
-        harder than typical R2. H2 (par 4, back-right pin, full
-        tailwind on the 354° tee) comes in{" "}
+        harder than typical R2 in the linear model — probably closer
+        to +0.5 once non-linear effects kick in. H2 (par 4, back-right
+        pin, full tailwind on the 354° tee) comes in{" "}
         <EasierChip>−0.33 strokes</EasierChip>{" "}
-        easier. Everywhere else is scatter — the four par-4s dead into
-        the wind pick up about +0.14 each; three N-facing tailwind
-        holes give about −0.10 back. The residual is +0.22 and that's
-        what pushes the field number from a wind-quiet 70.3 to a
-        wind-heavy 71.5. Or would, if wind were the only thing in
-        play.
+        easier. AM and PM come out effectively identical — the
+        tailwind boost on the N-facing par-5s in the afternoon
+        cancels the added headwind cost on the S-facing par-4s.
       </P>
+      <P>
+        Everywhere else is scatter — the four par-4s dead into the
+        wind pick up about +0.14 each in the linear model; three
+        N-facing tailwind holes give about −0.10 back. Sum the
+        honest wind estimate across 18 holes and you get to +0.7
+        strokes harder than the mean.
+      </P>
+
+      <H3>Setup response — expect tees to move up</H3>
+      <P>
+        The tour rarely leaves a course fully teed back into a 20
+        mph forecast. Every year we've seen this magnitude of R2
+        wind, at least one or two tee blocks have shifted forward
+        from the yardage on the pin sheet — reducing effective
+        approach length on the hardest headwind holes so the leaders
+        can still make par. It's a competitive-integrity call, not a
+        scoring one, but it has real scoring effects downstream.
+      </P>
+      <Callout>
+        Rule of thumb from historical setup shifts: each tee moved
+        forward is worth about <b>−0.2 strokes</b> for the field on
+        that hole. If two tees move up today (a reasonable guess
+        given the wind forecast), that's <b>−0.4 strokes</b> off
+        the round total on top of everything else.
+      </Callout>
 
       <H3>What yesterday tells us</H3>
       <P>
@@ -307,8 +335,8 @@ export default function ArticleR2ScoringForecast() {
 
       <H3>The forecast</H3>
       <P>
-        Combining the wind-and-pin adjustment (+0.22 vs typical R2)
-        with the R1-derived softness residual (−0.74):
+        Stack the four components: historical mean, wind + pins,
+        setup response, and course softness.
       </P>
       <Table
         headers={["Component", "Strokes"]}
@@ -323,39 +351,62 @@ export default function ArticleR2ScoringForecast() {
             </span>,
           ],
           [
-            "Wind + pin adjustment for today",
-            <span key="wp" style={{ fontFamily: numFont }}>+0.22</span>,
+            "Wind + pin adjustment (extrapolation-aware)",
+            <span key="wp" style={{ fontFamily: numFont }}>+0.70</span>,
           ],
           [
-            "R1-derived softness level shift",
+            "Setup response — 2 tees moved up",
+            <span key="tee" style={{ fontFamily: numFont }}>−0.40</span>,
+          ],
+          [
+            "R1-derived course softness",
             <span key="soft" style={{ fontFamily: numFont }}>−0.74</span>,
           ],
           [
             <b key="fcast">R2 forecast</b>,
             <b key="fcastv" style={{ fontFamily: numFont }}>
-              70.70 (−0.30 vs par)
+              70.78 (−0.22 vs par)
             </b>,
           ],
         ]}
       />
       <Callout>
-        <b>Central estimate: the field averages around 70.7 today.</b>
-        {" "}That's about a quarter-stroke softer than the historical
-        R2 mean, despite the wind being harder than anything the model
-        has seen — because the greens are giving strokes back that a
-        firm setup wouldn't.
+        <b>Central estimate: the field averages around 70.8 today.</b>
+        {" "}Wind is doing real damage — the raw wind term is around
+        a stroke over the mean — but two forward tee blocks and a
+        soft, receptive course claw most of it back. Net: today plays
+        a shade softer than the average historical R2.
       </Callout>
       <P>
-        There's a range around that number worth naming. The wind
-        coefficient in our regression was fit on historical rounds
-        that peaked at 13 mph. Extrapolating it to 20 mph almost
-        certainly under-estimates the true damage on the biggest
-        headwind holes — non-linear effects (club-up decisions, more
-        greens missed, chip-out lies) kick in. If we push the wind
-        term to +0.4 strokes instead of +0.22, the forecast shifts to
-        70.9. And if some of the R1 softness partly dries out through
-        the day, add another tenth. Reasonable window:{" "}
-        <b>70.5 to 71.0</b> (−0.5 to par).
+        Range on the central estimate:
+      </P>
+      <ul
+        style={{
+          fontSize: 14.5,
+          lineHeight: 1.6,
+          color: "oklch(0.32 0.03 155)",
+          fontFamily: proseFont,
+          margin: "0 0 16px 20px",
+          padding: 0,
+        }}
+      >
+        <li style={{ marginBottom: 6 }}>
+          <b>If tees stay back</b> and setup doesn't respond to the
+          wind: forecast pushes to <b>~71.2</b> (the wind + softness
+          net without the tee-up help).
+        </li>
+        <li style={{ marginBottom: 6 }}>
+          <b>If the wind term is closer to +0.5</b> instead of +0.7
+          (softer extrapolation): <b>~70.6</b>.
+        </li>
+        <li style={{ marginBottom: 6 }}>
+          <b>If softness partly dries out through the PM</b> as gusts
+          move moisture: PM plays maybe 0.15 stroke harder than AM,
+          full-day central closer to <b>70.9</b>.
+        </li>
+      </ul>
+      <P>
+        Reasonable window: <b>70.5 to 71.2</b>.
       </P>
 
       <H3>Where the number lives — the two hero holes</H3>
@@ -385,8 +436,9 @@ export default function ArticleR2ScoringForecast() {
       </P>
       <P>
         These two cancel each other in the round total. Most of what
-        moves the +0.22 wind-and-pin term is spread across secondary
-        movers:
+        moves the wind-and-pin term is spread across secondary
+        movers (linear-model values shown — the true H16 impact is
+        larger once extrapolation kicks in):
       </P>
       <Table
         headers={["Hole", "Par", "Cluster", "Model Δ", "Note"]}
@@ -436,10 +488,10 @@ export default function ArticleR2ScoringForecast() {
         ]}
       />
 
-      <H3>What ~70.7 means</H3>
+      <H3>What ~70.8 means</H3>
       <P>
         <b>For the leaders.</b> Leaders through R1 sit in the −7 to −9
-        range. A projected R2 of 70.7 means anyone shooting 69 or
+        range. A projected R2 of 70.8 means anyone shooting 69 or
         better today gains ground on the field; 71 or worse loses
         ground. Names shooting 71 today drop toward the pack; names
         shooting 68 get close to the top of the board. Expect the
@@ -447,11 +499,11 @@ export default function ArticleR2ScoringForecast() {
       </P>
       <P>
         <b>For the cut line.</b> R2 cut lines at 3M Open sit between
-        −4 and −5 in a typical year. Today isn't a typical year — a
-        soft course cuts deeper. Cut line likely lands at <b>−4 to
-        −6</b>. If you're on a made-cut prop for a player currently at
-        even par, a 71-72 today is a coin-flip; a 69 makes it
-        comfortably.
+        −4 and −5 in a typical year. Soft course + moved tees cuts
+        slightly deeper than raw wind would suggest. Cut line likely
+        lands at <b>−4 to −6</b>. If you're on a made-cut prop for a
+        player currently at even par, a 71-72 today is a coin-flip;
+        a 69 makes it comfortably.
       </P>
       <P>
         <b>For the birdie hunters.</b> Two clean spots (H2, H15) plus
@@ -499,11 +551,19 @@ export default function ArticleR2ScoringForecast() {
         </li>
         <li style={{ marginBottom: 10 }}>
           <b>Wind coefficients were fit inside 5 to 13 mph.</b>{" "}
-          Extrapolating to 20 mph likely under-states the damage on
-          the biggest headwind holes and over-states the boost on the
-          biggest tailwind holes. Rank order of holes stays right;
-          the specific magnitudes on H16 and H2 are conservative in
-          both directions.
+          The article uses +0.7 for the wind term based on the
+          historical windy-year average, but this is an educated
+          extrapolation rather than a fitted value. If the true
+          non-linearity is milder than assumed, wind term drops to
+          +0.5 and forecast pushes toward 70.6; if steeper, +1.0
+          and forecast pushes toward 71.1.
+        </li>
+        <li style={{ marginBottom: 10 }}>
+          <b>The tee-move-up count is a guess.</b> We don't know how
+          many tees the tour will move forward before it happens. Two
+          is a reasonable central assumption given the wind, but one
+          or three would swing the total ±0.2 strokes. Watch the
+          official yardage sheet at the first tee time as the truth.
         </li>
         <li style={{ marginBottom: 10 }}>
           <b>Softness can partly dry out.</b> A gusty 20 mph
