@@ -39,6 +39,7 @@ import {
   type EventInput,
   type PerHoleRoundCounts,
 } from "@/lib/analysis/course-birdies";
+import { augmentYardsFromHistorical } from "@/lib/pin-sheet-augment";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -241,10 +242,12 @@ async function familyFor(tournamentId: string): Promise<FamilyDef | null> {
 // ── Endpoint ────────────────────────────────────────────────────────
 
 function cacheKey(tournamentId: string): string {
-  // v12 — v11 shipped the enrichment logic but the calibration diag
-  // showed 0 pairs made it in. Diag response now emits per-source
-  // error / perHoleCount so we can see what's going wrong on live.
-  return `feed:pin-birdies:v12:${tournamentId}`;
+  // v13 — v12 payloads were computed against unaugmented pin sheets
+  // for the historical (pre-2023) events feeding the family aggregation,
+  // so the modal's per-round dots for those years landed at the
+  // replicated coord instead of the real per-round positions.
+  // Bump to invalidate poisoned payloads.
+  return `feed:pin-birdies:v13:${tournamentId}`;
 }
 
 export async function GET(req: Request) {
@@ -299,10 +302,18 @@ export async function GET(req: Request) {
     // refreshPins=1 bypasses the read to force a fresh orchestrator
     // fetch (used when the cached payload was populated by a buggy
     // parser and needs to be replaced).
+    // Cache key must match /api/course-pins so both routes share
+    // ONE pin-sheet cache — otherwise this route can populate a raw
+    // (unaugmented) sheet that /api/course-pins then reads back and
+    // returns without augmenting.  v9: cache-invalidation bump — v8
+    // rows were populated by this route WITHOUT augmentYardsFromHistorical,
+    // so pre-2023 events had replicated per-round pins and the
+    // birdie-history modal showed all four dots stacked in one spot.
+    const cacheKey = `feed:pins:v9:${ev.tournamentId}`;
     let pins: CoursePinSheet | null = null;
     if (!refreshPins) {
       try {
-        pins = await redis.get<CoursePinSheet>(`feed:pins:v8:${ev.tournamentId}`);
+        pins = await redis.get<CoursePinSheet>(cacheKey);
       } catch {
         /* cache miss */
       }
@@ -311,10 +322,15 @@ export async function GET(req: Request) {
       try {
         pins = await getCoursePins(ev.tournamentId);
         if (pins) {
+          // Apply the shared augment — for pre-2023 events, this
+          // swaps in the real per-round pins from
+          // pinsByRoundByHole (fetched via shotDetailsV3 and
+          // written to data/historical/*.json). Without this step,
+          // pinByRound stays replicated and the birdie-history
+          // modal's four round dots stack on top of each other.
+          pins = await augmentYardsFromHistorical(pins, ev.tournamentId);
           try {
-            await redis.set(`feed:pins:v8:${ev.tournamentId}`, pins, {
-              ex: CACHE_TTL,
-            });
+            await redis.set(cacheKey, pins, { ex: CACHE_TTL });
           } catch {
             /* cache write failure not fatal */
           }
