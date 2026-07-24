@@ -377,6 +377,98 @@ export default function ArticleR2Preview() {
         ]}
       />
 
+      <H3>What history says — matched-wind parallels</H3>
+      <P>
+        The regression is a model. What actually happened on each hole
+        the last time the wind blew like this is empirical. Pulling every
+        prior 3M Open round (2019-2025, 28 rounds total) and matching
+        each on <b>headwind component within ±4 mph</b> gives a
+        historical anchor for the forecast.
+      </P>
+
+      <Callout>
+        <b>Three of today's biggest holes are off the historical
+        distribution.</b> H16 (~19.6 mph headwind), H7 (~19.1 mph
+        headwind), and H15 (~19.5 mph tailwind) have NO prior rounds
+        in the sample within 4 mph of today's wind component. Every
+        past 3M Open in our archive was played in ≤14 mph — today is
+        the windiest 3M Open Friday we have on file.
+      </Callout>
+
+      <P>
+        For the holes with prior parallels, the empirical read is
+        strong and lands mostly on the model's side:
+      </P>
+      <Table
+        headers={["Hole", "Prior rounds", "Matched avg", "All-time avg", "Delta"]}
+        rows={[
+          [
+            <b key="12">H12 (par-5, tailwind)</b>,
+            "9 rounds (10-14 mph tail)",
+            "59.2% birdies",
+            "54.8%",
+            <EasierChip>+4.4pp</EasierChip>,
+          ],
+          [
+            <b key="18">H18 (par-5, tailwind)</b>,
+            "14 rounds (5-11 mph tail)",
+            "45.2% birdies",
+            "42.0%",
+            <EasierChip>+3.2pp</EasierChip>,
+          ],
+          [
+            <b key="2">H2 (par-4, tailwind)</b>,
+            "1 round (13.6 mph tail, 2024 R3)",
+            "29.3% birdies",
+            "15.8%",
+            <EasierChip>+13.5pp</EasierChip>,
+          ],
+          [
+            <b key="11">H11 (par-4, headwind)</b>,
+            "1 round (13.7 mph head, 2024 R3)",
+            "9.3% birdies",
+            "14.1%",
+            <HarderChip>−4.7pp</HarderChip>,
+          ],
+          [
+            <b key="9">H9 (par-4, quartering headwind)</b>,
+            "9 rounds (9-14 mph head)",
+            "7.5% birdies",
+            "9.9%",
+            <HarderChip>−2.4pp</HarderChip>,
+          ],
+        ]}
+      />
+      <P>
+        Two of today's model calls need adjusting after this reality
+        check:
+      </P>
+      <ul
+        style={{
+          fontSize: 15,
+          lineHeight: 1.65,
+          color: "oklch(0.26 0.04 155)",
+          fontFamily: proseFont,
+          margin: "0 0 16px 20px",
+          padding: 0,
+        }}
+      >
+        <li style={{ marginBottom: 8 }}>
+          <b>H13 empirical anchor is weaker than the model suggests.</b>{" "}
+          Fourteen prior rounds with 5-11 mph headwind on H13 averaged
+          10.4% birdies vs. the 11.4% all-time — very close to average,
+          not the mild-easier the cluster-G residual was suggesting.
+          Treat H13 as neutral rather than +EV.
+        </li>
+        <li style={{ marginBottom: 8 }}>
+          <b>H6 doesn't get harder in this wind.</b> Nine prior
+          low-wind rounds on H6 (this hole runs 289° — SSW is nearly
+          pure crosswind) actually posted 48.7% birdies vs. 44.3%
+          all-time. Cluster D's residual pulled the model too far.
+          H6 is closer to neutral.
+        </li>
+      </ul>
+
       <H3>Round-total picture</H3>
       <P>
         Summing the per-hole birdie-rate deltas across all 18 holes:
