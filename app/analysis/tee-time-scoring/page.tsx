@@ -8,6 +8,8 @@ import MainNav from "@/app/MainNav";
 import AuthChip from "@/app/live/auth/AuthChip";
 import { BRAND } from "@/lib/brand";
 import type { DailyWeatherView } from "../_components/WeatherStrip";
+import type { CoursePinSheet, CoursePinHole } from "@/lib/golf-api/pgatour";
+import type { HoleBirdieData } from "@/lib/analysis/course-birdies";
 
 export type RoundNum = 1 | 2 | 3 | 4;
 
@@ -45,8 +47,8 @@ interface FetchResp {
  *  at roughly 15 min intervals so refreshing more often is waste. */
 const POLL_MS = 60_000;
 
-type YearTab = "live" | "2025" | "2024" | "2023";
-const YEAR_TABS: YearTab[] = ["live", "2025", "2024", "2023"];
+type YearTab = "live" | "2025" | "2024" | "2023" | "2022" | "2021" | "2020" | "2019";
+const YEAR_TABS: YearTab[] = ["live", "2025", "2024", "2023", "2022", "2021", "2020", "2019"];
 
 interface HeatmapResp {
   ok: boolean;
@@ -56,6 +58,19 @@ interface HeatmapResp {
   cells?: Cell[];
   generatedAt?: number | null;
   weatherByRound?: Record<string, DailyWeatherView | null> | null;
+  /** Present when heatmap resolved a live tournament. Used here to
+   *  fetch the pin sheet + birdie history that power the PIN Δ /
+   *  TEE Δ chip columns — same signals as the course-heatmap page. */
+  tournamentId?: string | null;
+}
+
+interface PinsResp {
+  ok: boolean;
+  pins?: CoursePinSheet;
+}
+interface BirdieHistResp {
+  ok: boolean;
+  holes?: Record<string, HoleBirdieData>;
 }
 
 type View = "chart" | "heatmap";
@@ -66,6 +81,14 @@ export default function Page() {
   const [data, setData] = useState<FetchResp | null>(null);
   const [heat, setHeat] = useState<HeatmapResp | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Feeds the PIN Δ + TEE Δ chip columns on the heatmap — same source
+  // of truth the course-heatmap page uses. Keyed by tournamentId so a
+  // year switch triggers a re-fetch (cached 6h server-side).
+  const [pins, setPins] = useState<CoursePinSheet | null>(null);
+  const [pinsForTournament, setPinsForTournament] = useState<string | null>(null);
+  const [birdieHistoryByHole, setBirdieHistoryByHole] = useState<
+    Record<string, HoleBirdieData> | null
+  >(null);
 
   const load = useCallback(async () => {
     try {
@@ -97,6 +120,41 @@ export default function Page() {
     const id = setInterval(load, POLL_MS);
     return () => clearInterval(id);
   }, [load, tab, view]);
+
+  // Fetch pin sheet + multi-season birdie history whenever the heatmap
+  // response resolves a tournamentId. Same pipeline the course-heatmap
+  // page uses; server-cached so this is cheap on subsequent tab
+  // switches. Silent-fail — the heatmap still renders without chips.
+  useEffect(() => {
+    if (view !== "heatmap") return;
+    const tid = heat?.tournamentId;
+    if (!tid || tid === pinsForTournament) return;
+    setPinsForTournament(tid);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/course-pins?tournamentId=${encodeURIComponent(tid)}`,
+          { cache: "no-store" },
+        );
+        const json = (await res.json()) as PinsResp;
+        if (json.ok && json.pins) setPins(json.pins);
+      } catch {
+        /* pin sheet failure is non-fatal */
+      }
+    })();
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/course-pin-birdies?tournamentId=${encodeURIComponent(tid)}`,
+          { cache: "no-store" },
+        );
+        const json = (await res.json()) as BirdieHistResp;
+        if (json.ok && json.holes) setBirdieHistoryByHole(json.holes);
+      } catch {
+        /* history overlay is opt-in; failing silently is fine */
+      }
+    })();
+  }, [view, heat?.tournamentId, pinsForTournament]);
 
   return (
     <main className="container container-wide v4-theme pv-theme analysis-full-shell">
@@ -301,6 +359,15 @@ export default function Page() {
               cells={heat.cells}
               bucketMinutes={heat.bucketMinutes ?? 15}
               weatherByRound={heat.weatherByRound}
+              pinsByHole={
+                pins
+                  ? new Map<number, CoursePinHole>(
+                      pins.holes.map((h) => [h.holeNumber, h]),
+                    )
+                  : undefined
+              }
+              birdieHistoryByHole={birdieHistoryByHole}
+              pinsAvailable={!!pins}
             />
           </>
         )
