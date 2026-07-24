@@ -15,7 +15,38 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CoursePinHole, HolePutt } from "@/lib/golf-api/pgatour";
 import type { HoleBirdieData } from "@/lib/analysis/course-birdies";
-import { fmtRate, rateColor } from "@/lib/analysis/course-birdies";
+import {
+  avgVsParColor,
+  bogeyRateColor,
+  fmtRate,
+  fmtVsPar,
+  rateColor,
+} from "@/lib/analysis/course-birdies";
+import type { ScoringMetric } from "./GreensGrid";
+import { metricValue } from "./GreensGrid";
+
+/** Read the display value for a cluster/pin under the selected
+ *  metric, and return the colour + label string to render. Keeps the
+ *  modal's cluster cards + on-image disc tints in sync with the page's
+ *  metric toggle. */
+function displayColor(
+  raw: { rate: number; bogeyRate: number; avgVsPar: number },
+  metric: ScoringMetric,
+  alpha = 1,
+): string {
+  if (metric === "birdie") return rateColor(raw.rate, alpha);
+  if (metric === "bogey") return bogeyRateColor(raw.bogeyRate, alpha);
+  return avgVsParColor(raw.avgVsPar, alpha);
+}
+
+function displayLabel(
+  raw: { rate: number; bogeyRate: number; avgVsPar: number },
+  metric: ScoringMetric,
+): string {
+  if (metric === "birdie") return fmtRate(raw.rate);
+  if (metric === "bogey") return fmtRate(raw.bogeyRate);
+  return fmtVsPar(raw.avgVsPar);
+}
 import SlopeOverlay from "./SlopeOverlay";
 
 interface Props {
@@ -41,6 +72,13 @@ interface Props {
    *  3M Open only). Toggling the "History" mode below renders these
    *  pins in place of the round-labelled ones. */
   birdieHistory?: HoleBirdieData | null;
+  /** Which of the three per-cluster metrics is surfaced on the cards
+   *  + the on-image cluster tints. Threaded from the page so the
+   *  modal stays in sync with the greens grid. */
+  metric?: import("./GreensGrid").ScoringMetric;
+  /** Setter — lets the modal render its own metric toggle inline.
+   *  Optional so old callers still work. */
+  onMetricChange?: (m: import("./GreensGrid").ScoringMetric) => void;
   onClose: () => void;
 }
 
@@ -83,6 +121,8 @@ export default function PinSheetModal({
   puttsGreenImageUrl,
   puttsLoading,
   birdieHistory,
+  metric = "avg",
+  onMetricChange,
   onClose,
 }: Props) {
   /** eventId of the pin currently being hovered — null when not
@@ -535,6 +575,57 @@ export default function PinSheetModal({
           </div>
         )}
 
+        {/* Metric selector — only meaningful in history mode where the
+            cluster cards + on-image tints react to it. Reuses the
+            page-level state via onMetricChange so switching here also
+            updates the greens grid behind the modal. */}
+        {showHistory && birdieHistory && onMetricChange && (
+          <div
+            role="tablist"
+            aria-label="Cluster metric"
+            style={{
+              display: "flex",
+              gap: 4,
+              flexWrap: "wrap",
+              margin: "10px 0 0",
+            }}
+          >
+            {(
+              [
+                { id: "avg", label: "Scoring avg" },
+                { id: "birdie", label: "Birdie or better" },
+                { id: "bogey", label: "Bogey or worse" },
+              ] as Array<{ id: ScoringMetric; label: string }>
+            ).map((m) => {
+              const active = metric === m.id;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => onMetricChange(m.id)}
+                  style={{
+                    padding: "4px 12px",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    borderRadius: 6,
+                    border: "1px solid oklch(0.85 0.013 95)",
+                    background: active
+                      ? "oklch(0.25 0.02 150)"
+                      : "white",
+                    color: active ? "white" : "oklch(0.3 0.02 150)",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {diagramImageUrl ? (
           // Container's height is driven by the <img> (width:100%, height
           // auto) so pin dot percentages resolve against the image's
@@ -681,11 +772,11 @@ export default function PinSheetModal({
                         borderRadius: "50%",
                         background:
                           cluster.total > 0
-                            ? rateColor(cluster.rate, 0.32)
+                            ? displayColor(cluster, metric, 0.32)
                             : "transparent",
                         border:
                           cluster.total > 0
-                            ? `1.5px dashed ${rateColor(cluster.rate, 0.7)}`
+                            ? `1.5px dashed ${displayColor(cluster, metric, 0.7)}`
                             : "none",
                         pointerEvents: "none",
                         zIndex: 1,
@@ -1341,7 +1432,9 @@ export default function PinSheetModal({
                     padding: "10px 12px",
                     border: "1px solid oklch(0.94 0.008 95)",
                     borderRadius: 8,
-                    background: has ? rateColor(cluster.rate, 0.14) : "white",
+                    background: has
+                      ? displayColor(cluster, metric, 0.14)
+                      : "white",
                     display: "flex",
                     flexDirection: "column",
                     gap: 4,
@@ -1389,7 +1482,7 @@ export default function PinSheetModal({
                       letterSpacing: "-0.01em",
                     }}
                   >
-                    {has ? fmtRate(cluster.rate) : "—"}
+                    {has ? displayLabel(cluster, metric) : "—"}
                   </span>
                   <span
                     style={{
@@ -1400,7 +1493,9 @@ export default function PinSheetModal({
                   >
                     {cluster.pinCount} pin
                     {cluster.pinCount === 1 ? "" : "s"} ·{" "}
-                    {cluster.birdies}/{cluster.total}
+                    {metric === "bogey"
+                      ? `${cluster.bogeys}/${cluster.total}`
+                      : `${cluster.birdies}/${cluster.total}`}
                   </span>
                 </div>
               );

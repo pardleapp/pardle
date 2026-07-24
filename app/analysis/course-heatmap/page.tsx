@@ -77,6 +77,18 @@ const YEAR_TABS: YearTab[] = [
   "2019",
 ];
 
+/** Metric surfaced on the green-cards + modal cluster cards.
+ *  "avg" = mean strokes vs par per cluster (default — the base view
+ *  matches "how hard did that pin play"). "birdie" = birdie-or-better
+ *  rate. "bogey" = bogey-or-worse rate. */
+export type ScoringMetric = "avg" | "birdie" | "bogey";
+
+const METRIC_OPTIONS: Array<{ id: ScoringMetric; label: string }> = [
+  { id: "avg", label: "Scoring avg" },
+  { id: "birdie", label: "Birdie or better" },
+  { id: "bogey", label: "Bogey or worse" },
+];
+
 export default function Page() {
   const [tab, setTab] = useState<YearTab>("live");
   const [data, setData] = useState<FetchResp | null>(null);
@@ -90,6 +102,7 @@ export default function Page() {
     string,
     HoleBirdieData
   > | null>(null);
+  const [metric, setMetric] = useState<ScoringMetric>("avg");
 
   const load = useCallback(async () => {
     try {
@@ -355,6 +368,48 @@ export default function Page() {
                 Loading this week&apos;s pin sheet…
               </p>
             )}
+            {/* Metric toggle — flips the number surfaced on every
+                green card + inside the pin-sheet modal. Default is
+                scoring average vs par; the two rate options are the
+                birdie-or-better and bogey-or-worse familiar surfaces. */}
+            <div
+              role="tablist"
+              aria-label="Scoring metric"
+              style={{
+                display: "flex",
+                gap: 4,
+                marginTop: 14,
+                flexWrap: "wrap",
+              }}
+            >
+              {METRIC_OPTIONS.map((m) => {
+                const active = metric === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setMetric(m.id)}
+                    style={{
+                      padding: "5px 14px",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      borderRadius: 6,
+                      border: "1px solid oklch(0.85 0.013 95)",
+                      background: active
+                        ? "oklch(0.25 0.02 150)"
+                        : "white",
+                      color: active ? "white" : "oklch(0.3 0.02 150)",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    {m.label}
+                  </button>
+                );
+              })}
+            </div>
             <GreensGrid
               pinsByHole={
                 augmentedPins
@@ -365,6 +420,7 @@ export default function Page() {
               }
               birdieHistoryByHole={birdieHistoryByHole}
               onHoleClick={pins ? (h) => setOpenHole(h) : undefined}
+              metric={metric}
             />
           </>
         )}
@@ -381,6 +437,8 @@ export default function Page() {
           birdieHistory={
             birdieHistoryByHole?.[String(openHoleData.holeNumber)] ?? null
           }
+          metric={metric}
+          onMetricChange={setMetric}
           onClose={() => setOpenHole(null)}
         />
       )}

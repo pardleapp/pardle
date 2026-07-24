@@ -19,13 +19,41 @@
 import type {
   CoursePinHole,
 } from "@/lib/golf-api/pgatour";
-import type { HoleBirdieData } from "@/lib/analysis/course-birdies";
+import type {
+  HoleBirdieData,
+  PinCluster,
+} from "@/lib/analysis/course-birdies";
+
+/** Metric selector — driven by the page-level segmented control.
+ *  Threaded through so every green card and the PIN Δ chip on it can
+ *  switch to the same view (birdie rate / bogey rate / avg vs par). */
+export type ScoringMetric = "avg" | "birdie" | "bogey";
+
+/** Read the right number off a cluster for the current metric. Same
+ *  helper the modal uses — keep the numbers consistent. */
+export function metricValue(
+  c: Pick<PinCluster, "rate" | "bogeyRate" | "avgVsPar">,
+  m: ScoringMetric,
+): number {
+  if (m === "birdie") return c.rate;
+  if (m === "bogey") return c.bogeyRate;
+  return c.avgVsPar;
+}
+
+/** How a positive delta reads for each metric:
+ *  - birdie: positive delta = easier (green)
+ *  - bogey: positive delta = harder (red)
+ *  - avg: positive delta = over par = harder (red)
+ *  Callers use this to pick the chip colour. */
+function positiveMeansEasier(m: ScoringMetric): boolean {
+  return m === "birdie";
+}
 
 interface PinFlag {
   delta: number;
   clusterLetter: string;
-  clusterRate: number;
-  meanRate: number;
+  clusterValue: number;
+  meanValue: number;
 }
 
 interface TeeFlag {
@@ -36,28 +64,38 @@ interface TeeFlag {
   maxRound: number;
 }
 
-const PIN_VARIANCE_THRESHOLD = 0.1;
+/** Chip threshold per metric — birdie/bogey rates are 0-1 fractions
+ *  where 10 percentage points is a "meaningful" gap; avg vs par is
+ *  strokes where 0.10 strokes is the sensitivity ceiling for a
+ *  chip-worthy standout. */
+function pinChipThreshold(m: ScoringMetric): number {
+  return m === "avg" ? 0.1 : 0.1;
+}
 const TEE_MOVE_THRESHOLD_YARDS = 30;
 
-function pinFlagFor(birdie: HoleBirdieData | undefined): PinFlag | null {
+function pinFlagFor(
+  birdie: HoleBirdieData | undefined,
+  metric: ScoringMetric,
+): PinFlag | null {
   if (!birdie || birdie.clusters.length < 2) return null;
-  const rates = birdie.clusters
+  const values = birdie.clusters
     .filter((c) => c.total > 0)
-    .map((c) => c.rate);
-  if (rates.length < 2) return null;
-  const mean = rates.reduce((a, b) => a + b, 0) / rates.length;
+    .map((c) => metricValue(c, metric));
+  if (values.length < 2) return null;
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
   let best: PinFlag | null = null;
-  let bestAbs = PIN_VARIANCE_THRESHOLD;
+  let bestAbs = pinChipThreshold(metric);
   birdie.clusters.forEach((c, i) => {
     if (c.total === 0) return;
-    const delta = c.rate - mean;
+    const v = metricValue(c, metric);
+    const delta = v - mean;
     if (Math.abs(delta) > bestAbs) {
       bestAbs = Math.abs(delta);
       best = {
         delta,
         clusterLetter: String.fromCharCode(65 + i),
-        clusterRate: c.rate,
-        meanRate: mean,
+        clusterValue: v,
+        meanValue: mean,
       };
     }
   });
@@ -95,12 +133,35 @@ interface Props {
   pinsByHole?: Map<number, CoursePinHole>;
   birdieHistoryByHole?: Record<string, HoleBirdieData> | null;
   onHoleClick?: (hole: number) => void;
+  metric?: ScoringMetric;
+}
+
+/** Format the PIN Δ chip's number for the current metric.
+ *  birdie/bogey rates: shown as percentage points (e.g. "+12%").
+ *  avg vs par: shown as absolute strokes with the sign carried through
+ *  ("+0.15" strokes over par means the hole plays 0.15 harder). */
+function formatChip(delta: number, metric: ScoringMetric): string {
+  if (metric === "avg") {
+    return (delta >= 0 ? "+" : "−") + Math.abs(delta).toFixed(2);
+  }
+  return (
+    (delta >= 0 ? "+" : "−") + Math.round(Math.abs(delta) * 100) + "%"
+  );
+}
+
+/** Chip tint — encodes "easier" (emerald) vs "harder" (tang). */
+function chipColour(delta: number, metric: ScoringMetric) {
+  const easier = positiveMeansEasier(metric) ? delta > 0 : delta < 0;
+  return easier
+    ? { bg: "oklch(0.94 0.06 155)", fg: "oklch(0.32 0.13 155)" }
+    : { bg: "oklch(0.94 0.07 28)", fg: "oklch(0.38 0.15 28)" };
 }
 
 export default function GreensGrid({
   pinsByHole,
   birdieHistoryByHole,
   onHoleClick,
+  metric = "avg",
 }: Props) {
   const holes = Array.from({ length: 18 }, (_, i) => i + 1);
   return (
@@ -115,7 +176,7 @@ export default function GreensGrid({
       {holes.map((h) => {
         const pin = pinsByHole?.get(h);
         const birdie = birdieHistoryByHole?.[String(h)];
-        const pinFlag = pinFlagFor(birdie);
+        const pinFlag = pinFlagFor(birdie, metric);
         const teeFlag = teeFlagFor(pin);
         const clickable = pin != null && onHoleClick != null;
         return (
@@ -187,29 +248,36 @@ export default function GreensGrid({
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                {pinFlag && (
-                  <span
-                    title={`Cluster ${pinFlag.clusterLetter} birdie rate ${(pinFlag.clusterRate * 100).toFixed(1)}% vs hole mean ${(pinFlag.meanRate * 100).toFixed(1)}%`}
-                    style={{
-                      fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
-                      fontSize: 11,
-                      fontWeight: 800,
-                      padding: "3px 7px",
-                      borderRadius: 999,
-                      background:
-                        pinFlag.delta > 0
-                          ? "oklch(0.94 0.06 155)"
-                          : "oklch(0.94 0.07 28)",
-                      color:
-                        pinFlag.delta > 0
-                          ? "oklch(0.32 0.13 155)"
-                          : "oklch(0.38 0.15 28)",
-                    }}
-                  >
-                    {pinFlag.delta > 0 ? "+" : "−"}
-                    {Math.round(Math.abs(pinFlag.delta) * 100)}% {pinFlag.clusterLetter}
-                  </span>
-                )}
+                {pinFlag && (() => {
+                  const c = chipColour(pinFlag.delta, metric);
+                  const metricLabel =
+                    metric === "birdie"
+                      ? "birdie rate"
+                      : metric === "bogey"
+                        ? "bogey-or-worse rate"
+                        : "avg vs par";
+                  const titleValueFor = (v: number) =>
+                    metric === "avg"
+                      ? (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2)
+                      : (v * 100).toFixed(1) + "%";
+                  return (
+                    <span
+                      title={`Cluster ${pinFlag.clusterLetter} ${metricLabel} ${titleValueFor(pinFlag.clusterValue)} vs hole mean ${titleValueFor(pinFlag.meanValue)}`}
+                      style={{
+                        fontFamily:
+                          "'IBM Plex Mono', ui-monospace, monospace",
+                        fontSize: 11,
+                        fontWeight: 800,
+                        padding: "3px 7px",
+                        borderRadius: 999,
+                        background: c.bg,
+                        color: c.fg,
+                      }}
+                    >
+                      {formatChip(pinFlag.delta, metric)} {pinFlag.clusterLetter}
+                    </span>
+                  );
+                })()}
                 {teeFlag && (
                   <span
                     title={`Yards moved from ${teeFlag.minYards} yd (R${teeFlag.minRound}) to ${teeFlag.maxYards} yd (R${teeFlag.maxRound})`}

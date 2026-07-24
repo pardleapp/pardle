@@ -22,12 +22,21 @@ import type { CoursePinHole } from "@/lib/golf-api/pgatour";
 export type Quadrant = "TL" | "TR" | "BL" | "BR";
 
 export interface BirdieCount {
-  /** Strokes < par count. */
+  /** Strokes < par count (birdie or better). */
   birdies: number;
+  /** Strokes > par count (bogey or worse). */
+  bogeys: number;
+  /** Sum of (strokes − par). Used to derive avgVsPar. Positive = the
+   *  hole plays over par on average; negative = under par. */
+  sumVsPar: number;
   /** Players who posted a valid score on this hole in this round. */
   total: number;
   /** birdies / total (0 when total = 0). */
   rate: number;
+  /** bogeys / total (0 when total = 0). */
+  bogeyRate: number;
+  /** sumVsPar / total (0 when total = 0). */
+  avgVsPar: number;
 }
 
 export interface PinBirdie extends BirdieCount {
@@ -119,28 +128,50 @@ export function tallyPlayerHole(
   }
   const key = holeRoundKey(hole, round);
   const existing = counts.get(key);
-  const bump = strokes < par ? 1 : 0;
+  const birdieBump = strokes < par ? 1 : 0;
+  const bogeyBump = strokes > par ? 1 : 0;
+  const vsPar = strokes - par;
   if (existing) {
-    existing.birdies += bump;
+    existing.birdies += birdieBump;
+    existing.bogeys += bogeyBump;
+    existing.sumVsPar += vsPar;
     existing.total += 1;
     existing.rate = existing.birdies / existing.total;
+    existing.bogeyRate = existing.bogeys / existing.total;
+    existing.avgVsPar = existing.sumVsPar / existing.total;
   } else {
-    counts.set(key, { birdies: bump, total: 1, rate: bump });
+    counts.set(key, {
+      birdies: birdieBump,
+      bogeys: bogeyBump,
+      sumVsPar: vsPar,
+      total: 1,
+      rate: birdieBump,
+      bogeyRate: bogeyBump,
+      avgVsPar: vsPar,
+    });
   }
 }
 
 /** Aggregate an array of PinBirdies into one QuadrantSummary. */
 function summarise(pins: PinBirdie[]): QuadrantSummary {
   let birdies = 0;
+  let bogeys = 0;
+  let sumVsPar = 0;
   let total = 0;
   for (const p of pins) {
     birdies += p.birdies;
+    bogeys += p.bogeys;
+    sumVsPar += p.sumVsPar;
     total += p.total;
   }
   return {
     birdies,
+    bogeys,
+    sumVsPar,
     total,
     rate: total > 0 ? birdies / total : 0,
+    bogeyRate: total > 0 ? bogeys / total : 0,
+    avgVsPar: total > 0 ? sumVsPar / total : 0,
     pinCount: pins.length,
   };
 }
@@ -174,8 +205,12 @@ export interface EventInput {
 
 const EMPTY_QUAD: QuadrantSummary = {
   birdies: 0,
+  bogeys: 0,
+  sumVsPar: 0,
   total: 0,
   rate: 0,
+  bogeyRate: 0,
+  avgVsPar: 0,
   pinCount: 0,
 };
 
@@ -256,10 +291,14 @@ function clusterPins(pins: PinBirdie[]): PinCluster[] {
   return buckets.map((bucket, i) => {
     const members = bucket.memberIndices.map((idx) => pins[idx]);
     let birdies = 0;
+    let bogeys = 0;
+    let sumVsPar = 0;
     let total = 0;
     let radius = 0;
     for (const m of members) {
       birdies += m.birdies;
+      bogeys += m.bogeys;
+      sumVsPar += m.sumVsPar;
       total += m.total;
       const d = dist(bucket.centroid, m);
       if (d > radius) radius = d;
@@ -271,8 +310,12 @@ function clusterPins(pins: PinBirdie[]): PinCluster[] {
       // render as a visible disc rather than a zero-radius glitch.
       radius: Math.max(radius, 0.02),
       birdies,
+      bogeys,
+      sumVsPar,
       total,
       rate: total > 0 ? birdies / total : 0,
+      bogeyRate: total > 0 ? bogeys / total : 0,
+      avgVsPar: total > 0 ? sumVsPar / total : 0,
       pinCount: members.length,
       memberIndices: bucket.memberIndices,
     };
@@ -372,6 +415,8 @@ export function buildHoleBirdieData(
     rawX: number;
     rawY: number;
     birdies: number;
+    bogeys: number;
+    sumVsPar: number;
     total: number;
   }
   const drafts: Draft[] = [];
@@ -395,6 +440,8 @@ export function buildHoleBirdieData(
       if (!Number.isFinite(round)) continue;
       const count = ev.counts.get(holeRoundKey(holeNumber, round));
       const birdies = count?.birdies ?? 0;
+      const bogeys = count?.bogeys ?? 0;
+      const sumVsPar = count?.sumVsPar ?? 0;
       const total = count?.total ?? 0;
       if (total === 0) continue;
       const frameEnh = coord.frameEnh === true;
@@ -426,6 +473,8 @@ export function buildHoleBirdieData(
         rawX,
         rawY,
         birdies,
+        bogeys,
+        sumVsPar,
         total,
       });
       yearsCovered.add(ev.year);
@@ -460,8 +509,12 @@ export function buildHoleBirdieData(
       y,
       quadrant: quadrantOf(x, y),
       birdies: d.birdies,
+      bogeys: d.bogeys,
+      sumVsPar: d.sumVsPar,
       total: d.total,
       rate: d.birdies / d.total,
+      bogeyRate: d.bogeys / d.total,
+      avgVsPar: d.sumVsPar / d.total,
     });
   }
 
@@ -537,4 +590,32 @@ export function rateColor(rate: number, alpha = 1): string {
 export function fmtRate(rate: number, digits = 1): string {
   if (!Number.isFinite(rate)) return "—";
   return `${(rate * 100).toFixed(digits)}%`;
+}
+
+/** Colour ramp for the "bogey or worse" metric — mirror of rateColor
+ *  since a HIGHER bogey rate is BAD (red) whereas a higher birdie
+ *  rate is GOOD (emerald). Same hue palette, inverted domain: 0% is
+ *  emerald, 30%+ is deep red. */
+export function bogeyRateColor(rate: number, alpha = 1): string {
+  const inverted = 1 - Math.max(0, Math.min(1, rate / 0.35));
+  return rateColor(inverted * 0.35, alpha);
+}
+
+/** Colour ramp for avg strokes vs par. Diverging around 0:
+ *  emerald when under par, red when over. Clamped at ±0.35 strokes so
+ *  the ramp saturates at a par-3 birdie or a bogey-heavy hole. */
+export function avgVsParColor(avg: number, alpha = 1): string {
+  // Convert vs-par → an inverted-birdie proxy so we can reuse the
+  // rateColor ramp. avg = 0 → mid palette; avg = −0.35 → emerald;
+  // avg = +0.35 → red. Same visual language as rateColor.
+  const proxy = 0.175 - Math.max(-0.35, Math.min(0.35, avg)) / 2;
+  return rateColor(proxy, alpha);
+}
+
+/** Compact vs-par formatter: "+0.15" or "−0.22" for strokes over/under
+ *  par, "0.00" at the midpoint. */
+export function fmtVsPar(v: number, digits = 2): string {
+  if (!Number.isFinite(v)) return "—";
+  if (Math.abs(v) < 0.005) return "0.00";
+  return v > 0 ? `+${v.toFixed(digits)}` : `−${Math.abs(v).toFixed(digits)}`;
 }

@@ -11,9 +11,28 @@ import { buildHoleBirdieData, type EventInput } from "./course-birdies";
 import type { CoursePinHole } from "@/lib/golf-api/pgatour";
 
 function counts(birdiesTotalByRound: Record<number, [number, number]>) {
-  const m = new Map<string, { birdies: number; total: number; rate: number }>();
+  const m = new Map<
+    string,
+    {
+      birdies: number;
+      bogeys: number;
+      sumVsPar: number;
+      total: number;
+      rate: number;
+      bogeyRate: number;
+      avgVsPar: number;
+    }
+  >();
   for (const [rStr, [b, t]] of Object.entries(birdiesTotalByRound)) {
-    m.set(`${1}:${rStr}`, { birdies: b, total: t, rate: t > 0 ? b / t : 0 });
+    m.set(`${1}:${rStr}`, {
+      birdies: b,
+      bogeys: 0,
+      sumVsPar: 0,
+      total: t,
+      rate: t > 0 ? b / t : 0,
+      bogeyRate: 0,
+      avgVsPar: 0,
+    });
   }
   return m;
 }
