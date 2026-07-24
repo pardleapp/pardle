@@ -625,29 +625,6 @@ export default function ArticleR2Preview() {
               +230 or bigger
             </b>,
           ],
-          [
-            <>
-              <b>Round-score UNDERS</b> — AM tee times
-              <div
-                style={{
-                  fontSize: 13,
-                  color: "oklch(0.44 0.03 155)",
-                  marginTop: 4,
-                }}
-              >
-                About a tenth of a stroke of expected-scoring advantage
-                for AM starters. Not enough to move a line meaningfully,
-                but books that priced R2 pre-wind won't adjust wave by
-                wave — worth systematically taking the AM side of
-                round-score unders if the number is close to fair.
-              </div>
-            </>,
-            "small tilt, wave-level",
-            "no fair-odds shift on its own",
-            <span key="rsu" style={{ color: emerald }}>
-              take AM side any time price ≥ fair, skip PM
-            </span>,
-          ],
         ]}
       />
 
