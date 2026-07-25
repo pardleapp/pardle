@@ -490,6 +490,12 @@ export async function GET(req: Request) {
         wind: { windMph: wr.windAvgMph, windDirDeg: wr.windDirDeg },
       };
     };
+    // Pre-build every round's setup so the level-shift calc can use
+    // prior finished rounds' setups against the actual scoring.
+    const setupsByRound: Partial<
+      Record<1 | 2 | 3 | 4, ReturnType<typeof buildSetup>>
+    > = {};
+    for (const r of [1, 2, 3, 4] as const) setupsByRound[r] = buildSetup(r);
     const holeAvgsByRound: Record<
       number,
       Awaited<ReturnType<typeof loadHoleAveragesForRound>>
@@ -498,12 +504,31 @@ export async function GET(req: Request) {
       const rounds: RoundNum[] = [1, 2, 3, 4];
       await Promise.all(
         rounds.map(async (r) => {
+          // Prior rounds' setups (rounds < r) so the level-shift term
+          // sees this week's R1/R2 conditions against actual scoring.
+          const priorRoundsSetup: Partial<
+            Record<1 | 2 | 3 | 4, ReturnType<typeof buildSetup>>
+          > = {};
+          const priorHolePars: Partial<
+            Record<1 | 2 | 3 | 4, Record<number, number>>
+          > = {};
+          for (const pr of [1, 2, 3, 4] as const) {
+            if (pr >= r) continue;
+            const s = setupsByRound[pr];
+            if (s) priorRoundsSetup[pr] = s;
+            const pp = snapshotPars[pr];
+            if (pp) priorHolePars[pr] = pp;
+          }
           holeAvgsByRound[r] = await loadHoleAveragesForRound({
             tournamentId: activeTournamentId,
             round: r,
             snapshot,
             holePars: snapshotPars[r] ?? {},
-            todaySetup: buildSetup(r),
+            todaySetup: setupsByRound[r],
+            priorRoundsSetup: Object.fromEntries(
+              Object.entries(priorRoundsSetup).filter(([, v]) => v),
+            ) as Partial<Record<1 | 2 | 3 | 4, ReturnType<typeof buildSetup>>>,
+            priorHolePars,
             originUrl,
           });
         }),

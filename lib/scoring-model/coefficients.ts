@@ -75,8 +75,12 @@ export function assembleHoleFit(
   const fit = fitPerHole(rows);
   if (!fit) return null;
 
-  // Weighted mean residual per cluster.
+  // Weighted mean residual per cluster + per-round baselines.
   const clusterAgg: Record<string, { w: number; s: number }> = {};
+  const perRoundAgg: Record<
+    number,
+    { w: number; sAvg: number; sHead: number; sYds: number; rows: number }
+  > = {};
   let totalW = 0;
   let totalSum = 0;
   let totalHead = 0;
@@ -88,6 +92,13 @@ export function assembleHoleFit(
     (clusterAgg[letter] ??= { w: 0, s: 0 });
     clusterAgg[letter].w += r.total;
     clusterAgg[letter].s += res * r.total;
+    (perRoundAgg[r.round] ??= { w: 0, sAvg: 0, sHead: 0, sYds: 0, rows: 0 });
+    const pra = perRoundAgg[r.round];
+    pra.w += r.total;
+    pra.sAvg += r.avgVsPar * r.total;
+    pra.sHead += r.headwind * r.total;
+    pra.sYds += r.yards * r.total;
+    pra.rows += 1;
     totalW += r.total;
     totalSum += r.avgVsPar * r.total;
     totalHead += r.headwind * r.total;
@@ -96,6 +107,17 @@ export function assembleHoleFit(
   const clusterResiduals: Record<string, number> = {};
   for (const [letter, a] of Object.entries(clusterAgg)) {
     clusterResiduals[letter] = a.s / a.w;
+  }
+  const histMeanAvgVsParByRound: Partial<Record<1 | 2 | 3 | 4, number>> = {};
+  const histMeanYardsByRound: Partial<Record<1 | 2 | 3 | 4, number>> = {};
+  const histMeanHeadByRound: Partial<Record<1 | 2 | 3 | 4, number>> = {};
+  for (const [rStr, a] of Object.entries(perRoundAgg)) {
+    // Skip rounds with too few rows — the mean would be too noisy.
+    if (a.rows < 3) continue;
+    const r = Number(rStr) as 1 | 2 | 3 | 4;
+    histMeanAvgVsParByRound[r] = a.sAvg / a.w;
+    histMeanYardsByRound[r] = a.sYds / a.w;
+    histMeanHeadByRound[r] = a.sHead / a.w;
   }
   return {
     bYards: fit.bYards,
@@ -106,6 +128,9 @@ export function assembleHoleFit(
     histMeanYards: totalYds / totalW,
     histMeanHead: totalHead / totalW,
     histMeanAvgVsPar: totalSum / totalW,
+    histMeanAvgVsParByRound,
+    histMeanYardsByRound,
+    histMeanHeadByRound,
     rowCount: rows.length,
   };
 }

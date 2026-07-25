@@ -63,6 +63,11 @@ export interface PerPlayerInputs {
   fallbackWind?: { windMph: number; windDirDeg: number };
   /** Per-hole live-round observations, blended in per hole. */
   liveByHole?: LiveSampleByHole;
+  /** Round number (1-4) for round-specific baseline selection. */
+  roundNum?: 1 | 2 | 3 | 4;
+  /** Optional per-hole additive stroke shift capturing "this week is
+   *  playing softer than the model expects" (from R1/R2 residuals). */
+  levelShift?: number;
 }
 
 /** Which holes does a player have left, given their starting hole and
@@ -154,6 +159,8 @@ export function projectRemainingForPlayer(
         bearing,
         conditions,
         liveSample: live,
+        roundNum: input.roundNum,
+        levelShift: input.levelShift ?? 0,
       });
       avgVsPar = proj.avgVsPar;
       matchedCluster = proj.matchedCluster;

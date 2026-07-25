@@ -8,6 +8,11 @@
 export interface FitRow {
   /** Cluster index (0-based) within the hole's cluster array. */
   clusterIdx: number;
+  /** Round number (1-4) this observation came from. Used to build
+   *  round-specific baselines — R3s at 3M Open play systematically
+   *  softer than R1s, so a projection for R3 should anchor on the
+   *  R3-only mean, not the all-rounds mean. */
+  round: number;
   /** Hole yardage played that round. */
   yards: number;
   /** Headwind component (mph, sign carries direction) for that round.
@@ -44,8 +49,20 @@ export interface HoleFit {
    *  the reference point for the wind-delta term. */
   histMeanHead: number;
   /** Historical mean avg-vs-par across all pins × rounds (weighted).
-   *  Used as the baseline for absolute-prediction callers. */
+   *  Used as the baseline for absolute-prediction callers when no
+   *  round-specific baseline is available. */
   histMeanAvgVsPar: number;
+  /** Per-round historical mean avg-vs-par (weighted). Populated when
+   *  the round has ≥3 fit rows; otherwise omitted so callers can
+   *  fall back to histMeanAvgVsPar. This captures the systematic
+   *  round-to-round difference — e.g. R3 at 3M Open plays about
+   *  a stroke below the all-rounds mean. */
+  histMeanAvgVsParByRound: Partial<Record<1 | 2 | 3 | 4, number>>;
+  /** Per-round historical mean yardage (weighted). Populated when
+   *  the per-round sample supports it. */
+  histMeanYardsByRound: Partial<Record<1 | 2 | 3 | 4, number>>;
+  /** Per-round historical mean headwind (weighted). */
+  histMeanHeadByRound: Partial<Record<1 | 2 | 3 | 4, number>>;
   /** Number of fit rows. Below ~6 the fit is unreliable. */
   rowCount: number;
 }

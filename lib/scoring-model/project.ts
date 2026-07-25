@@ -64,18 +64,31 @@ export function computeHeadwind(
 
 /** Project one hole's expected strokes-vs-par given the fit,
  *  today's conditions, this hole's bearing, and (optional) live
- *  round observations. */
+ *  round observations. When `roundNum` is supplied AND the fit has
+ *  per-round baselines for it, the projection anchors on the
+ *  round-specific mean instead of the all-rounds mean — R3 at
+ *  3M Open plays a stroke softer than the all-rounds mean, so
+ *  round-specific baselines materially improve projections.
+ *
+ *  `levelShift` (optional) is a per-hole additive stroke shift
+ *  applied to the model prediction — used to carry through the
+ *  "this week is playing softer than the model expects" signal
+ *  we compute from R1/R2 residuals on the current tournament. */
 export function projectHoleAvgToPar({
   fit,
   bearing,
   conditions,
   liveSample,
+  roundNum,
+  levelShift = 0,
   targetLiveSample = TARGET_LIVE_SAMPLE,
 }: {
   fit: HoleFit;
   bearing: number;
   conditions: TodayConditions;
   liveSample?: LiveSample | null;
+  roundNum?: 1 | 2 | 3 | 4;
+  levelShift?: number;
   targetLiveSample?: number;
 }): HoleProjection {
   const head = computeHeadwind(
@@ -100,13 +113,31 @@ export function projectHoleAvgToPar({
     }
   }
 
-  // Model prediction = historical baseline + adjustments for
-  // today's yards, wind, and pin cluster.
+  // Baseline: round-specific when available, else all-rounds. The
+  // reference means for the delta terms follow the same choice so
+  // the delta is measured against the same anchor.
+  const roundKey = roundNum as 1 | 2 | 3 | 4 | undefined;
+  const baseAvg =
+    (roundKey != null
+      ? fit.histMeanAvgVsParByRound[roundKey]
+      : undefined) ?? fit.histMeanAvgVsPar;
+  const baseHead =
+    (roundKey != null
+      ? fit.histMeanHeadByRound[roundKey]
+      : undefined) ?? fit.histMeanHead;
+  const baseYards =
+    (roundKey != null
+      ? fit.histMeanYardsByRound[roundKey]
+      : undefined) ?? fit.histMeanYards;
+
+  // Model prediction = round-specific baseline + adjustments for
+  // today's yards, wind, and pin cluster, plus the week-level shift.
   const modelAvgVsPar =
-    fit.histMeanAvgVsPar +
+    baseAvg +
     clusterRes +
-    fit.bHead * (head - fit.histMeanHead) +
-    fit.bYards * (conditions.yards - fit.histMeanYards);
+    fit.bHead * (head - baseHead) +
+    fit.bYards * (conditions.yards - baseYards) +
+    levelShift;
 
   // Blend with live sample (if any).
   let liveWeight = 0;

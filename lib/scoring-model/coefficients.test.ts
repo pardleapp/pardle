@@ -10,7 +10,7 @@ import type { FitRow } from "./types";
 describe("fitPerHole", () => {
   it("returns null when there are fewer than 6 rows", () => {
     const rows: FitRow[] = Array.from({ length: 5 }, () => ({
-      clusterIdx: 0,
+      clusterIdx: 0, round: 1,
       yards: 400,
       headwind: 0,
       avgVsPar: 0.1,
@@ -24,7 +24,7 @@ describe("fitPerHole", () => {
     const yardsList = [380, 400, 420, 440, 460, 380, 420, 460];
     const headList = [-10, -5, 0, 5, 10, 8, -3, 12];
     const rows: FitRow[] = yardsList.map((y, i) => ({
-      clusterIdx: 0,
+      clusterIdx: 0, round: 1,
       yards: y,
       headwind: headList[i],
       avgVsPar: 0.002 * y + 0.02 * headList[i] - 0.85,
@@ -41,13 +41,13 @@ describe("fitPerHole", () => {
     // Two clusters of rows around different avgVsPar values. The
     // heavy-weight row should pull the intercept toward its value.
     const rows: FitRow[] = [
-      { clusterIdx: 0, yards: 400, headwind: 0, avgVsPar: -1.0, total: 10 },
-      { clusterIdx: 0, yards: 400, headwind: 0, avgVsPar: -1.0, total: 10 },
-      { clusterIdx: 0, yards: 400, headwind: 0, avgVsPar: -1.0, total: 10 },
-      { clusterIdx: 0, yards: 401, headwind: 1, avgVsPar: -1.0, total: 10 },
-      { clusterIdx: 0, yards: 402, headwind: 2, avgVsPar: -1.0, total: 10 },
-      { clusterIdx: 0, yards: 403, headwind: 3, avgVsPar: -1.0, total: 10 },
-      { clusterIdx: 0, yards: 400, headwind: 0, avgVsPar: 0.5, total: 1000 },
+      { clusterIdx: 0, round: 1, yards: 400, headwind: 0, avgVsPar: -1.0, total: 10 },
+      { clusterIdx: 0, round: 1, yards: 400, headwind: 0, avgVsPar: -1.0, total: 10 },
+      { clusterIdx: 0, round: 1, yards: 400, headwind: 0, avgVsPar: -1.0, total: 10 },
+      { clusterIdx: 0, round: 1, yards: 401, headwind: 1, avgVsPar: -1.0, total: 10 },
+      { clusterIdx: 0, round: 1, yards: 402, headwind: 2, avgVsPar: -1.0, total: 10 },
+      { clusterIdx: 0, round: 1, yards: 403, headwind: 3, avgVsPar: -1.0, total: 10 },
+      { clusterIdx: 0, round: 1, yards: 400, headwind: 0, avgVsPar: 0.5, total: 1000 },
     ];
     const fit = fitPerHole(rows);
     expect(fit).not.toBeNull();
@@ -68,7 +68,7 @@ describe("assembleHoleFit", () => {
     // 8 A pins around avgVsPar = +0.2
     for (let i = 0; i < 8; i++) {
       rows.push({
-        clusterIdx: 0,
+        clusterIdx: 0, round: 1,
         yards: yardsList[i],
         headwind: headList[i],
         avgVsPar: 0.2,
@@ -78,7 +78,7 @@ describe("assembleHoleFit", () => {
     // 8 B pins around avgVsPar = -0.3
     for (let i = 0; i < 8; i++) {
       rows.push({
-        clusterIdx: 1,
+        clusterIdx: 1, round: 1,
         yards: yardsList[i],
         headwind: headList[i],
         avgVsPar: -0.3,
@@ -104,12 +104,44 @@ describe("assembleHoleFit", () => {
 
   it("returns null when fit is too degenerate", () => {
     const rows: FitRow[] = Array.from({ length: 3 }, () => ({
-      clusterIdx: 0,
+      clusterIdx: 0, round: 1,
       yards: 400,
       headwind: 0,
       avgVsPar: 0,
       total: 100,
     }));
     expect(assembleHoleFit(rows, {})).toBeNull();
+  });
+
+  it("computes per-round baselines when rounds have ≥3 rows", () => {
+    // Mix of R1 and R3 rows with distinct avg-vs-par means.
+    const yardsList = [380, 400, 420, 440, 380, 400, 420, 440];
+    const headList = [-10, -5, 0, 5, 8, 3, -2, -6];
+    const rows: FitRow[] = [];
+    // 4 R1 rows at avgVsPar = 0.0
+    for (let i = 0; i < 4; i++) {
+      rows.push({
+        clusterIdx: 0, round: 1,
+        yards: yardsList[i], headwind: headList[i],
+        avgVsPar: 0.0, total: 100,
+      });
+    }
+    // 4 R3 rows at avgVsPar = -0.5 (R3 plays softer)
+    for (let i = 4; i < 8; i++) {
+      rows.push({
+        clusterIdx: 0, round: 3,
+        yards: yardsList[i], headwind: headList[i],
+        avgVsPar: -0.5, total: 100,
+      });
+    }
+    const fit = assembleHoleFit(rows, { A: { x: 0.5, y: 0.5 } });
+    expect(fit).not.toBeNull();
+    // R1 baseline is near 0.0 (weighted mean of the 4 R1 rows).
+    expect(fit!.histMeanAvgVsParByRound[1]).toBeCloseTo(0.0, 2);
+    // R3 baseline is near -0.5 (weighted mean of the 4 R3 rows).
+    expect(fit!.histMeanAvgVsParByRound[3]).toBeCloseTo(-0.5, 2);
+    // R2/R4 have no rows so are undefined.
+    expect(fit!.histMeanAvgVsParByRound[2]).toBeUndefined();
+    expect(fit!.histMeanAvgVsParByRound[4]).toBeUndefined();
   });
 });

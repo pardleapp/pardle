@@ -262,6 +262,7 @@ export async function getScoringModel(
           Math.cos(((context.windDirDeg - bearing) * Math.PI) / 180);
         rows.push({
           clusterIdx: ci,
+          round: pin.round,
           yards,
           headwind: head,
           avgVsPar: pin.avgVsPar,

@@ -12,17 +12,7 @@ import type { ScoringModelCoefficients } from "./types";
 import type { HourlyWind } from "./hrrr-hourly";
 
 function fixtureCoeffs(): ScoringModelCoefficients {
-  const holes: Record<number, {
-    bYards: number;
-    bHead: number;
-    intercept: number;
-    clusterResiduals: Record<string, number>;
-    clusterCentroids: Record<string, { x: number; y: number }>;
-    histMeanYards: number;
-    histMeanHead: number;
-    histMeanAvgVsPar: number;
-    rowCount: number;
-  }> = {};
+  const holes: ScoringModelCoefficients["holes"] = {};
   for (let h = 1; h <= 18; h++) {
     holes[h] = {
       bYards: 0,
@@ -33,6 +23,9 @@ function fixtureCoeffs(): ScoringModelCoefficients {
       histMeanYards: 400,
       histMeanHead: 0,
       histMeanAvgVsPar: -0.4,
+      histMeanAvgVsParByRound: {},
+      histMeanYardsByRound: {},
+      histMeanHeadByRound: {},
       rowCount: 20,
     };
   }

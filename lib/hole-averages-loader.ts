@@ -155,6 +155,10 @@ export interface TodaySetupPerHole {
   wind: { windMph: number; windDirDeg: number };
 }
 
+/** Per-round setup for a prior round used by the level-shift calc.
+ *  Same shape as TodaySetupPerHole. */
+export type PriorRoundSetup = TodaySetupPerHole;
+
 /**
  * Load per-hole averages for `round` of `tournamentId`, applying the
  * live-first fallback chain (current round → previous round → previous
@@ -176,15 +180,35 @@ export async function loadHoleAveragesForRound(input: {
   /** Optional — enables the scoring-model path. When absent the loader
    *  falls back to the pre-model chain. */
   todaySetup?: TodaySetupPerHole;
+  /** Optional — prior-round setups for the current tournament, keyed
+   *  by round number. Used to compute the "this week is playing
+   *  softer/harder than the model expects" level shift from finished
+   *  R1/R2 data. Ignored when absent. */
+  priorRoundsSetup?: Partial<Record<1 | 2 | 3 | 4, PriorRoundSetup>>;
+  /** Per-round hole pars — needed to convert prior-round strokes into
+   *  vs-par residuals. Falls back to `holePars` for every round when
+   *  absent. */
+  priorHolePars?: Partial<Record<1 | 2 | 3 | 4, Record<number, number>>>;
   /** Absolute base URL for internal fetches (e.g. to the birdies API).
    *  Required when `todaySetup` is provided. */
   originUrl?: string;
 }): Promise<{
   averages: HoleAverages;
   diag: Record<number, HoleAverageDiag>;
+  /** Per-hole level shift applied to model predictions (0 when the
+   *  level-shift path wasn't taken). Exposed for diagnostics. */
+  levelShift?: number;
 }> {
-  const { tournamentId, round, snapshot, holePars, todaySetup, originUrl } =
-    input;
+  const {
+    tournamentId,
+    round,
+    snapshot,
+    holePars,
+    todaySetup,
+    priorRoundsSetup,
+    priorHolePars,
+    originUrl,
+  } = input;
   const currentRound = samplesFromSnapshot(snapshot, round);
   const prevRound =
     round > 1 ? samplesFromSnapshot(snapshot, round - 1) : null;
@@ -238,8 +262,80 @@ export async function loadHoleAveragesForRound(input: {
   }
   if (!coeffs) return legacy;
 
+  // Compute the "this week is playing softer/harder than the model
+  // expects" level shift from any finished prior rounds of this
+  // tournament. For each finished round r < currentRound, compare
+  // the field's actual per-hole avg-vs-par to what the model
+  // (round-specific baseline + today-style pin/yards/wind) would
+  // have predicted. Average per-hole residual across finished rounds
+  // becomes the level shift applied to each hole's projection.
+  let levelShift = 0;
+  if (priorRoundsSetup) {
+    const residualsPerRound: number[] = [];
+    for (let r = 1; r < round; r++) {
+      const rk = r as 1 | 2 | 3 | 4;
+      const setup = priorRoundsSetup[rk];
+      if (!setup) continue;
+      const pars = priorHolePars?.[rk] ?? holePars;
+      const samples = samplesFromSnapshot(snapshot, r);
+      // Confirm the round has meaningful data — skip an in-progress
+      // round so we don't level-shift off a half-played round.
+      let sampleTotal = 0;
+      for (const arr of Object.values(samples)) sampleTotal += arr.length;
+      if (sampleTotal < 500) continue;
+      let sumResidualsPerHole = 0;
+      let holesCounted = 0;
+      for (let h = 1; h <= 18; h++) {
+        const fit = coeffs.holes[h];
+        const bearing = bearings[h];
+        const yards = setup.yardsByHole[h];
+        const par = pars[h];
+        if (
+          !fit ||
+          typeof bearing !== "number" ||
+          typeof yards !== "number" ||
+          typeof par !== "number"
+        )
+          continue;
+        const holeSamples = samples[h] ?? [];
+        const validSamples = holeSamples.filter(
+          (s) => Number.isFinite(s) && s > 0,
+        );
+        if (validSamples.length < 10) continue;
+        const actualAvg =
+          validSamples.reduce((a, b) => a + b, 0) / validSamples.length - par;
+        const pin = setup.pinByHole?.[h];
+        const proj = projectHoleAvgToPar({
+          fit,
+          bearing,
+          conditions: {
+            yards,
+            windSpeed: setup.wind.windMph,
+            windDir: setup.wind.windDirDeg,
+            pinX: pin?.x,
+            pinY: pin?.y,
+          },
+          roundNum: rk,
+        });
+        sumResidualsPerHole += actualAvg - proj.modelAvgVsPar;
+        holesCounted += 1;
+      }
+      if (holesCounted >= 15) {
+        residualsPerRound.push(sumResidualsPerHole / holesCounted);
+      }
+    }
+    if (residualsPerRound.length > 0) {
+      levelShift =
+        residualsPerRound.reduce((a, b) => a + b, 0) / residualsPerRound.length;
+    }
+  }
+
   const averages: HoleAverages = { ...legacy.averages };
   const diag: Record<number, HoleAverageDiag> = { ...legacy.diag };
+  const roundNum =
+    round === 1 || round === 2 || round === 3 || round === 4
+      ? (round as 1 | 2 | 3 | 4)
+      : undefined;
   for (let h = 1; h <= 18; h++) {
     const fit = coeffs.holes[h];
     const bearing = bearings[h];
@@ -274,6 +370,8 @@ export async function loadHoleAveragesForRound(input: {
       bearing,
       conditions,
       liveSample,
+      roundNum,
+      levelShift,
     });
     averages[h] = proj.avgVsPar;
     diag[h] = {
@@ -282,5 +380,5 @@ export async function loadHoleAveragesForRound(input: {
       sampleCount: liveSample?.count ?? 0,
     };
   }
-  return { averages, diag };
+  return { averages, diag, levelShift };
 }

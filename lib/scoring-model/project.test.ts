@@ -29,6 +29,9 @@ function fixtureFit(overrides: Partial<HoleFit> = {}): HoleFit {
     histMeanYards: 420,
     histMeanHead: 5,
     histMeanAvgVsPar: -0.5,
+    histMeanAvgVsParByRound: {},
+    histMeanYardsByRound: {},
+    histMeanHeadByRound: {},
     rowCount: 30,
     ...overrides,
   };
@@ -133,6 +136,59 @@ describe("projectHoleAvgToPar", () => {
       conditions: { yards: 420, windSpeed: 5, windDir: 200 },
     });
     expect(proj.matchedCluster).toBeNull();
+    expect(proj.modelAvgVsPar).toBeCloseTo(-0.5, 4);
+  });
+
+  it("uses round-specific baseline when available", () => {
+    // R3 baseline is a stroke lower than the all-rounds baseline.
+    const fit = fixtureFit({
+      histMeanAvgVsPar: -0.5,
+      histMeanAvgVsParByRound: { 3: -1.5 },
+      histMeanHeadByRound: { 3: 5 },
+      histMeanYardsByRound: { 3: 420 },
+    });
+    // Without roundNum: uses all-rounds baseline (-0.5).
+    const allRounds = projectHoleAvgToPar({
+      fit,
+      bearing: 200,
+      conditions: { yards: 420, windSpeed: 5, windDir: 200 },
+    });
+    expect(allRounds.modelAvgVsPar).toBeCloseTo(-0.5, 4);
+    // With roundNum=3: uses R3 baseline (-1.5).
+    const r3 = projectHoleAvgToPar({
+      fit,
+      bearing: 200,
+      conditions: { yards: 420, windSpeed: 5, windDir: 200 },
+      roundNum: 3,
+    });
+    expect(r3.modelAvgVsPar).toBeCloseTo(-1.5, 4);
+  });
+
+  it("applies level shift on top of model prediction", () => {
+    const fit = fixtureFit();
+    const shift = -0.3; // course playing 0.3 softer than model
+    const proj = projectHoleAvgToPar({
+      fit,
+      bearing: 200,
+      conditions: { yards: 420, windSpeed: 5, windDir: 200 },
+      levelShift: shift,
+    });
+    // Base = histMean (-0.5) + 0 shifts + shift → -0.8
+    expect(proj.modelAvgVsPar).toBeCloseTo(-0.8, 4);
+  });
+
+  it("falls back to all-rounds baseline when round-specific missing", () => {
+    const fit = fixtureFit({
+      histMeanAvgVsPar: -0.5,
+      histMeanAvgVsParByRound: { 1: -0.2 }, // only R1 available
+    });
+    // Asking for R3 — no R3 baseline → falls back to -0.5.
+    const proj = projectHoleAvgToPar({
+      fit,
+      bearing: 200,
+      conditions: { yards: 420, windSpeed: 5, windDir: 200 },
+      roundNum: 3,
+    });
     expect(proj.modelAvgVsPar).toBeCloseTo(-0.5, 4);
   });
 });
