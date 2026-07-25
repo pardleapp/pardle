@@ -1206,8 +1206,16 @@ function ChartCore({
           overlay the chart without shifting the layout — the previous
           in-flow tooltip pushed content down, which shrank the SVG
           (max-height 80vh), moved the dot away from the cursor, and
-          triggered mouseleave → "chart disappears" feedback loop. */}
-      <div style={{ position: "relative" }}>
+          triggered mouseleave → "chart disappears" feedback loop.
+          maxWidth in non-expanded mode caps the desktop size at ~80%
+          of the intrinsic viewBox width (820 × 0.8 ≈ 656). Mobile is
+          unaffected — container widths there are already narrower. */}
+      <div
+        style={{
+          position: "relative",
+          maxWidth: expanded ? undefined : 656,
+        }}
+      >
       <svg
         ref={svgRef}
         // No fixed width/height attributes — viewBox handles the aspect
