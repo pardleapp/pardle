@@ -232,29 +232,23 @@ function minutesToClock(mins: number): string {
 /** Derive Thu-Sun round dates from whatever tee times are still in
  *  the field payload. DataGolf drops past rounds' tee times as they
  *  complete, so once R1 is done we can't anchor on R1 directly —
- *  fall through to R2, R3, or R4 in turn, subtracting the right
- *  offset to reconstruct R1. Returns date strings in the venue's
- *  local timezone (Open-Meteo will bucket by them). */
+ *  fall through to R2, R3, or R4 in turn. When DG returns hh:mm-only
+ *  (no date component), fall back to anchoring on today's UTC date
+ *  under the assumption that the "highest-round-with-tee-times" is
+ *  currently being played. Returns date strings in the venue's local
+ *  timezone (Open-Meteo will bucket by them). */
 function deriveRoundDates(
   fieldRows: { teetimes?: { round_num?: number; teetime?: string }[] }[],
+  now: Date = new Date(),
 ): Record<1 | 2 | 3 | 4, string> | null {
-  for (const anchorRound of [1, 2, 3, 4] as const) {
-    let earliest: string | null = null;
-    for (const f of fieldRows) {
-      for (const t of f.teetimes ?? []) {
-        if (t.round_num !== anchorRound || !t.teetime) continue;
-        const day = t.teetime.slice(0, 10);
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
-        if (!earliest || day < earliest) earliest = day;
-      }
-    }
-    if (!earliest) continue;
-    const [y, m, d] = earliest.split("-").map(Number);
-    const anchor = new Date(Date.UTC(y, m - 1, d));
-    const iso = (dt: Date) => dt.toISOString().slice(0, 10);
+  const iso = (dt: Date) => dt.toISOString().slice(0, 10);
+  const buildFromAnchor = (
+    anchorRound: 1 | 2 | 3 | 4,
+    anchorDate: Date,
+  ): Record<1 | 2 | 3 | 4, string> => {
     const bump = (offset: number) => {
-      const dt = new Date(anchor);
-      dt.setUTCDate(anchor.getUTCDate() + offset);
+      const dt = new Date(anchorDate);
+      dt.setUTCDate(anchorDate.getUTCDate() + offset);
       return iso(dt);
     };
     return {
@@ -263,6 +257,32 @@ function deriveRoundDates(
       3: bump(3 - anchorRound),
       4: bump(4 - anchorRound),
     };
+  };
+
+  for (const anchorRound of [1, 2, 3, 4] as const) {
+    let earliestDated: string | null = null;
+    let hasAnyForRound = false;
+    for (const f of fieldRows) {
+      for (const t of f.teetimes ?? []) {
+        if (t.round_num !== anchorRound || !t.teetime) continue;
+        hasAnyForRound = true;
+        const day = t.teetime.slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+        if (!earliestDated || day < earliestDated) earliestDated = day;
+      }
+    }
+    if (earliestDated) {
+      const [y, m, d] = earliestDated.split("-").map(Number);
+      return buildFromAnchor(anchorRound, new Date(Date.UTC(y, m - 1, d)));
+    }
+    if (hasAnyForRound) {
+      // We saw tee times for this round but no date component (DG
+      // sometimes ships hh:mm only mid-tournament). Anchor on today.
+      const today = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+      );
+      return buildFromAnchor(anchorRound, today);
+    }
   }
   return null;
 }
