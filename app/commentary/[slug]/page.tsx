@@ -7,6 +7,7 @@ import ArticleThreeMOpen from "./_articles/ArticleThreeMOpen";
 import ArticlePinDifficulty from "./_articles/ArticlePinDifficulty";
 import ArticleR2Preview from "./_articles/ArticleR2Preview";
 import ArticleR2ScoringForecast from "./_articles/ArticleR2ScoringForecast";
+import ArticleSchefflerR3Dynamics from "./_articles/ArticleSchefflerR3Dynamics";
 
 interface Article {
   slug: string;
@@ -18,6 +19,14 @@ interface Article {
 }
 
 const ARTICLES: Record<string, Article> = {
+  "3m-open-r3-scheffler-dynamics": {
+    slug: "3m-open-r3-scheffler-dynamics",
+    title: "Exploring Scheffler round score dynamics: 3M Open R3",
+    dek: "Walking the full pricing exercise on Scheffler's over/under 66.5 — field mean, personal edge, course compression, and the mean-vs-median gap that decides where the fair line actually sits.",
+    date: "2026-07-25",
+    tag: "R3 pricing",
+    Body: ArticleSchefflerR3Dynamics,
+  },
   "3m-open-r2-scoring-forecast": {
     slug: "3m-open-r2-scoring-forecast",
     title: "3M Open R2: what the field averages today",

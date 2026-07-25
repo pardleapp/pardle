@@ -30,6 +30,13 @@ interface Article {
 // now lives at /).
 const ARTICLES: Article[] = [
   {
+    slug: "3m-open-r3-scheffler-dynamics",
+    title: "Exploring Scheffler round score dynamics: 3M Open R3",
+    dek: "Walking the full pricing exercise on Scheffler's over/under 66.5 — field mean, personal edge, course compression, and the mean-vs-median gap that decides where the fair line actually sits.",
+    date: "2026-07-25",
+    tag: "R3 pricing",
+  },
+  {
     slug: "3m-open-r2-scoring-forecast",
     title: "3M Open R2: what the field averages today",
     dek: "Fitting eight years of pin-by-pin scoring to today's wind, then calibrating against yesterday's field average, points to a course playing softer than the wind suggests.",
