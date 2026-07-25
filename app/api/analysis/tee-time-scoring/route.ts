@@ -880,10 +880,30 @@ export async function GET(req: Request) {
           ? Object.fromEntries(
               Object.entries(holeAvgsByRound[3].diag).map(([h, d]) => [
                 h,
-                { source: d.source, toPar: Number(d.toPar.toFixed(3)) },
+                {
+                  source: d.source,
+                  toPar: Number(d.toPar.toFixed(3)),
+                  sampleCount: d.sampleCount,
+                },
               ]),
             )
           : null,
+        // Per-round snapshot sample counts per hole — reveals whether
+        // the snapshot has the live back-9 data.
+        r3SnapshotSampleCounts: (() => {
+          const out: Record<number, number> = {};
+          if (snapshot?.holes) {
+            for (let h = 1; h <= 18; h++) {
+              let n = 0;
+              for (const pid of Object.keys(snapshot.holes)) {
+                const s = Number(snapshot.holes[pid]?.[3]?.[h]);
+                if (Number.isFinite(s) && s > 0) n++;
+              }
+              out[h] = n;
+            }
+          }
+          return out;
+        })(),
         drops: dropCounts,
         splitByRound: {
           r1: splitByRound(rowsR1),
