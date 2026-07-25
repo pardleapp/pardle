@@ -141,7 +141,9 @@ function buildHistoricalContext(
 }
 
 /** Shape of the birdies API response we need. Only fields we read
- *  are typed — the response has many more. */
+ *  are typed — the response has many more. The route returns holes
+ *  as an OBJECT keyed by hole number string ("1", "2", ...), not
+ *  an array — that shape trip-hazarded the initial version. */
 interface BirdiesPin {
   year: number;
   round: number;
@@ -160,7 +162,7 @@ interface BirdiesHole {
 }
 interface BirdiesResponse {
   ok?: boolean;
-  holes?: BirdiesHole[];
+  holes?: Record<string, BirdiesHole>;
 }
 
 /** Fetch birdies aggregate from the internal API. `originUrl` should
@@ -221,12 +223,12 @@ export async function getScoringModel(
 
   // Fetch birdies aggregate — the per-pin, per-cluster data we fit against.
   const birdies = await fetchBirdies(tournamentId, originUrl);
-  const holes = birdies?.holes ?? [];
-  if (holes.length === 0) return null;
+  const holes = birdies?.holes ?? {};
+  if (Object.keys(holes).length === 0) return null;
 
   const perHoleFit: Record<number, HoleFit | null> = {};
   for (let h = 1; h <= 18; h++) {
-    const hData = holes.find((x) => x.holeNumber === h);
+    const hData = holes[String(h)];
     if (!hData) {
       perHoleFit[h] = null;
       continue;
