@@ -229,32 +229,42 @@ function minutesToClock(mins: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-/** Pick the earliest R1 tee date from the field payload → derive Thu
- *  → Sun round dates. Prefers R1; falls back to the min date across
- *  all teetimes. Returns date strings in the venue's local timezone
- *  (Open-Meteo will bucket by them). */
+/** Derive Thu-Sun round dates from whatever tee times are still in
+ *  the field payload. DataGolf drops past rounds' tee times as they
+ *  complete, so once R1 is done we can't anchor on R1 directly —
+ *  fall through to R2, R3, or R4 in turn, subtracting the right
+ *  offset to reconstruct R1. Returns date strings in the venue's
+ *  local timezone (Open-Meteo will bucket by them). */
 function deriveRoundDates(
   fieldRows: { teetimes?: { round_num?: number; teetime?: string }[] }[],
 ): Record<1 | 2 | 3 | 4, string> | null {
-  let earliest: string | null = null;
-  for (const f of fieldRows) {
-    for (const t of f.teetimes ?? []) {
-      if (t.round_num !== 1 || !t.teetime) continue;
-      const day = t.teetime.slice(0, 10);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
-      if (!earliest || day < earliest) earliest = day;
+  for (const anchorRound of [1, 2, 3, 4] as const) {
+    let earliest: string | null = null;
+    for (const f of fieldRows) {
+      for (const t of f.teetimes ?? []) {
+        if (t.round_num !== anchorRound || !t.teetime) continue;
+        const day = t.teetime.slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+        if (!earliest || day < earliest) earliest = day;
+      }
     }
+    if (!earliest) continue;
+    const [y, m, d] = earliest.split("-").map(Number);
+    const anchor = new Date(Date.UTC(y, m - 1, d));
+    const iso = (dt: Date) => dt.toISOString().slice(0, 10);
+    const bump = (offset: number) => {
+      const dt = new Date(anchor);
+      dt.setUTCDate(anchor.getUTCDate() + offset);
+      return iso(dt);
+    };
+    return {
+      1: bump(1 - anchorRound),
+      2: bump(2 - anchorRound),
+      3: bump(3 - anchorRound),
+      4: bump(4 - anchorRound),
+    };
   }
-  if (!earliest) return null;
-  const [y, m, d] = earliest.split("-").map(Number);
-  const r1 = new Date(Date.UTC(y, m - 1, d));
-  const iso = (dt: Date) => dt.toISOString().slice(0, 10);
-  const bump = (offset: number) => {
-    const dt = new Date(r1);
-    dt.setUTCDate(r1.getUTCDate() + offset);
-    return iso(dt);
-  };
-  return { 1: iso(r1), 2: bump(1), 3: bump(2), 4: bump(3) };
+  return null;
 }
 
 async function fetchLiveWeatherByRound(
