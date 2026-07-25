@@ -291,6 +291,19 @@ function ChartCore({
   const [cursorX, setCursorX] = useState<number | null>(null);
   const [roundFilter, setRoundFilter] = useState<RoundFilter>("all");
   const [showPoints, setShowPoints] = useState(true);
+  /** Case-insensitive substring search on player name. Empty string
+   *  = no highlight; any match makes the player's dot render bigger
+   *  with a coloured ring so the eye can find them on the scatter. */
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchMatches = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return new Set<string>();
+    const out = new Set<string>();
+    for (const r of rows) {
+      if (r.name.toLowerCase().includes(q)) out.add(r.dgId);
+    }
+    return out;
+  }, [rows, searchQuery]);
   /** When false, the y-axis shows raw round-score-to-par (each dot is
    *  where that player finished the round vs par). When true (default),
    *  the y-axis shows the skill-adjusted deviation (score + skill
@@ -878,6 +891,37 @@ function ChartCore({
         >
           Hide points
         </button>
+        {/* Player search — matches highlight on the scatter with a
+            gold ring. Case-insensitive substring. */}
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search player…"
+          aria-label="Search player"
+          style={{
+            padding: "8px 12px",
+            fontSize: 14,
+            fontWeight: 500,
+            border: "1px solid oklch(0.85 0.013 95)",
+            borderRadius: 6,
+            background: "white",
+            width: 180,
+            minWidth: 140,
+          }}
+        />
+        {searchQuery && (
+          <span
+            style={{
+              fontSize: 12,
+              color: "oklch(0.5 0.02 150)",
+              alignSelf: "center",
+            }}
+          >
+            {searchMatches.size} match
+            {searchMatches.size === 1 ? "" : "es"}
+          </span>
+        )}
         {/* Round filter — pill group covers all 4 rounds + "All". */}
         <div
           role="group"
@@ -1158,6 +1202,12 @@ function ChartCore({
         </div>
       </div>
 
+      {/* SVG wrapper is position: relative so the hover tooltip can
+          overlay the chart without shifting the layout — the previous
+          in-flow tooltip pushed content down, which shrank the SVG
+          (max-height 80vh), moved the dot away from the cursor, and
+          triggered mouseleave → "chart disappears" feedback loop. */}
+      <div style={{ position: "relative" }}>
       <svg
         ref={svgRef}
         // No fixed width/height attributes — viewBox handles the aspect
@@ -1372,31 +1422,61 @@ function ChartCore({
                 y < -0.3 ? "#059669" : y > 0.3 ? "#dc2626" : "#334155";
               const isHover =
                 hover?.dgId === p.row.dgId && hover?.round === p.row.round;
+              const isSearchMatch = searchMatches.has(p.row.dgId);
+              const searchActive = searchMatches.size > 0;
               const noSkill = p.row.noSkill === true;
               const isProjected = p.row.projected === true;
               const style = ROUND_STYLE[p.row.round];
               const cx = xFor(p.x);
               const cy = yFor(y);
-              const size = isHover ? 7 : 4;
+              const size = isHover || isSearchMatch ? 8 : 4;
               const fill = isProjected || noSkill ? "white" : polarityColor;
               const stroke = isProjected ? polarityColor : style.color;
-              const strokeWidth = isProjected ? 2 : isHover ? 3 : 1.8;
+              const strokeWidth = isProjected
+                ? 2
+                : isHover || isSearchMatch
+                  ? 3
+                  : 1.8;
               const dash = isProjected ? "3 2" : undefined;
-              const opacity = isHover ? 1 : isProjected ? 0.7 : 0.85;
+              // When a search is active, dim unmatched dots so the
+              // eye finds the highlighted ones instantly.
+              const opacity = isSearchMatch
+                ? 1
+                : searchActive
+                  ? 0.15
+                  : isHover
+                    ? 1
+                    : isProjected
+                      ? 0.7
+                      : 0.85;
               return (
-                <ShapeMark
-                  key={`${p.row.dgId}-${p.row.round}`}
-                  shape={style.shape}
-                  cx={cx}
-                  cy={cy}
-                  size={size}
-                  fill={fill}
-                  stroke={stroke}
-                  strokeWidth={strokeWidth}
-                  strokeDasharray={dash}
-                  opacity={opacity}
-                  onPointerEnter={() => setHover(p.row)}
-                />
+                <g key={`${p.row.dgId}-${p.row.round}`}>
+                  {/* Gold halo behind a search match — makes the dot
+                      pop against the desaturated background. */}
+                  {isSearchMatch && (
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r={13}
+                      fill="none"
+                      stroke="#f59e0b"
+                      strokeWidth={2.5}
+                      opacity={0.9}
+                    />
+                  )}
+                  <ShapeMark
+                    shape={style.shape}
+                    cx={cx}
+                    cy={cy}
+                    size={size}
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={strokeWidth}
+                    strokeDasharray={dash}
+                    opacity={opacity}
+                    onPointerEnter={() => setHover(p.row)}
+                  />
+                </g>
               );
             })}
 
@@ -1437,8 +1517,14 @@ function ChartCore({
 
       {hover && (
         <div
+          // Overlay in the top-right of the chart. `pointer-events:
+          // none` so hovering the tooltip itself doesn't trigger
+          // mouseleave on the SVG (which would clear hover and
+          // remove the tooltip, causing flicker).
           style={{
-            marginTop: 10,
+            position: "absolute",
+            top: 12,
+            right: 12,
             padding: 10,
             border: "1px solid oklch(0.9 0.008 95)",
             borderRadius: 8,
@@ -1447,7 +1533,11 @@ function ChartCore({
             gridTemplateColumns: "auto 1fr",
             columnGap: 12,
             rowGap: 4,
-            maxWidth: 480,
+            maxWidth: 320,
+            background: "rgba(255, 255, 255, 0.96)",
+            boxShadow: "0 4px 12px rgba(15, 23, 42, 0.08)",
+            pointerEvents: "none",
+            zIndex: 5,
           }}
         >
           <strong>
@@ -1525,6 +1615,7 @@ function ChartCore({
           </span>
         </div>
       )}
+      </div>
 
       <p
         style={{
