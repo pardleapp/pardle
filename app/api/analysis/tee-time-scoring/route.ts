@@ -515,6 +515,7 @@ export async function GET(req: Request) {
       if (!pins) return undefined;
       const yardsByHole: Record<number, number> = {};
       const pinByHole: Record<number, { x: number; y: number }> = {};
+      const liveVsParByHole: Record<number, number> = {};
       for (const h of pins.holes ?? []) {
         const ybr = h.yardsByRound?.[r];
         if (typeof ybr === "number") yardsByHole[h.holeNumber] = ybr;
@@ -529,6 +530,14 @@ export async function GET(req: Request) {
         ) {
           pinByHole[h.holeNumber] = { x: pin.x, y: pin.y };
         }
+        // Authoritative live scoring avg from courseStats — Pardle's
+        // snapshot only tracks currently-active players so finished
+        // R3 players' back-9 scores fall out, but courseStats always
+        // has the true field average.
+        const sc = h.scoringByRound?.[r];
+        if (sc && typeof sc.vsPar === "number") {
+          liveVsParByHole[h.holeNumber] = sc.vsPar;
+        }
       }
       const wr = weatherByRound?.[String(r)];
       if (!wr || wr.windAvgMph == null || wr.windDirDeg == null) return undefined;
@@ -536,6 +545,7 @@ export async function GET(req: Request) {
         yardsByHole,
         pinByHole,
         wind: { windMph: wr.windAvgMph, windDirDeg: wr.windDirDeg },
+        liveVsParByHole,
       };
     };
     // Pre-build every round's setup so the level-shift calc can use

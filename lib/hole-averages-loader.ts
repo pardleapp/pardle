@@ -153,6 +153,14 @@ export interface TodaySetupPerHole {
   /** Today's headline wind (single average — used for holes when the
    *  per-player HRRR path isn't in play). */
   wind: { windMph: number; windDirDeg: number };
+  /** Authoritative live per-hole scoring-vs-par from the orchestrator's
+   *  courseStats (or Pardle's pin-sheet scoringByRound). When present
+   *  this OVERRIDES the snapshot-derived live sample — the snapshot
+   *  only carries currently-active players' data, so once R3
+   *  finishers have completed the back-9 their scores drop out of the
+   *  snapshot but courseStats still knows the true field average.
+   *  Value is vs-par (negative = under par). */
+  liveVsParByHole?: Record<number, number>;
 }
 
 /** Per-round setup for a prior round used by the level-shift calc.
@@ -345,19 +353,30 @@ export async function loadHoleAveragesForRound(input: {
       continue;
     }
     const pin = todaySetup.pinByHole?.[h];
-    // Build per-hole live sample from the current-round samples.
+    // Live sample source priority:
+    //   1. todaySetup.liveVsParByHole (authoritative field avg from
+    //      the pin sheet's scoringByRound) — treated as a fully-
+    //      populated sample (weight → 1) since it aggregates over the
+    //      entire field including finished players.
+    //   2. currentRound samples from the snapshot — decays because
+    //      finished players get dropped from the active poll set.
     const par = holePars[h];
-    const samples = currentRound[h] ?? [];
-    const validSamples = samples.filter((s) => Number.isFinite(s) && s > 0);
-    const liveSample =
-      validSamples.length > 0 && typeof par === "number"
-        ? {
-            avgVsPar:
-              validSamples.reduce((a, b) => a + b, 0) / validSamples.length -
-              par,
-            count: validSamples.length,
-          }
-        : null;
+    let liveSample: { avgVsPar: number; count: number } | null = null;
+    const authoritativeLive = todaySetup.liveVsParByHole?.[h];
+    if (typeof authoritativeLive === "number") {
+      liveSample = { avgVsPar: authoritativeLive, count: 30 };
+    } else {
+      const samples = currentRound[h] ?? [];
+      const validSamples = samples.filter((s) => Number.isFinite(s) && s > 0);
+      if (validSamples.length > 0 && typeof par === "number") {
+        liveSample = {
+          avgVsPar:
+            validSamples.reduce((a, b) => a + b, 0) / validSamples.length -
+            par,
+          count: validSamples.length,
+        };
+      }
+    }
     const conditions: TodayConditions = {
       yards,
       windSpeed: todaySetup.wind.windMph,
