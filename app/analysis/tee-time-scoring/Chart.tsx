@@ -1213,7 +1213,7 @@ function ChartCore({
       <div
         style={{
           position: "relative",
-          maxWidth: expanded ? undefined : 656,
+          maxWidth: expanded ? undefined : 738,
         }}
       >
       <svg
