@@ -550,11 +550,23 @@ export async function GET(req: Request) {
     ): OutRow[] => {
       const drops = dropCounts[`r${round}` as "r1" | "r2" | "r3" | "r4"];
       const out: OutRow[] = [];
-      // If NO player in the field has snapshot data for this round,
-      // the round hasn't started. Don't process DG rows — DG echoes
-      // prior-round data with thru:18 and prior scores, which would
-      // create phantom "finished" rows for a round that hasn't begun.
-      if (!roundHasSnapshotData[round]) {
+      // Guard against DG's echo behaviour: when a round hasn't started
+      // yet, DG's live-tournament-stats?round=N returns 144 rows all
+      // showing thru:18 with the previous round's score. If the round
+      // is genuinely underway, some players will show thru<18 (still
+      // on course). So: process the round IF EITHER
+      //   (a) the snapshot has R3 data for at least one player (feed
+      //       engine has caught up), OR
+      //   (b) DG's response shows in-progress rows (some thru < 18,
+      //       > 0) — the "real live" signal that isn't an echo.
+      // If neither, DG is echoing and we should skip the round.
+      const inProgressCount = liveRows.filter((l) => {
+        const t = typeof l.thru === "number"
+          ? l.thru
+          : typeof l.thru === "string" ? Number(l.thru.trim()) : NaN;
+        return Number.isFinite(t) && t > 0 && t < 18;
+      }).length;
+      if (!roundHasSnapshotData[round] && inProgressCount === 0) {
         return out;
       }
       for (const l of liveRows) {
