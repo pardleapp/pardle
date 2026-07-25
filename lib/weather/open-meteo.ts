@@ -271,13 +271,17 @@ export async function getDailyWeather(
       `&daily=${DAILY_VARS}&hourly=${HOURLY_VARS}` +
       `&${COMMON_QS}&timezone=${encodedTz}`;
   } else {
+    // Open-Meteo rejects start_date/end_date combined with
+    // past_days/forecast_days ("mutually exclusive" error). We
+    // already have the explicit window from start_date/end_date;
+    // the extra past/forecast bracketing isn't needed and was
+    // silently 400'ing the request.
     url =
       `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${lat}&longitude=${lon}` +
       `&start_date=${startDate}&end_date=${endDate}` +
       `&daily=${DAILY_VARS}&hourly=${HOURLY_VARS}` +
-      `&${COMMON_QS}&timezone=${encodedTz}` +
-      `&past_days=7&forecast_days=10`;
+      `&${COMMON_QS}&timezone=${encodedTz}`;
   }
   const payload = await fetchOpenMeteo(url);
   const shaped = shapeDaily(payload);
