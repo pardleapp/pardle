@@ -229,18 +229,19 @@ function minutesToClock(mins: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-/** Derive Thu-Sun round dates from whatever tee times are still in
- *  the field payload. DataGolf drops past rounds' tee times as they
- *  complete, so once R1 is done we can't anchor on R1 directly —
- *  fall through to R2, R3, or R4 in turn. When DG returns hh:mm-only
- *  (no date component), fall back to anchoring on today's UTC date
- *  under the assumption that the "highest-round-with-tee-times" is
- *  currently being played. Returns date strings in the venue's local
- *  timezone (Open-Meteo will bucket by them). */
+/** Derive Thu-Sun round dates. Tries in order:
+ *   1. Full ISO date on any round's teetime string ("YYYY-MM-DD HH:MM")
+ *   2. If we have tee times but no date, anchor that round on today
+ *   3. Nothing at all in field data → default R3 = today's UTC date
+ *      (safe assumption for the tournament being ACTIVELY POLLED;
+ *      Sunday R4 shifts one day off from truth but weather is close
+ *      enough for the wind coefficient use case).
+ *
+ *  Returns date strings in the venue's local timezone bucket. */
 function deriveRoundDates(
   fieldRows: { teetimes?: { round_num?: number; teetime?: string }[] }[],
   now: Date = new Date(),
-): Record<1 | 2 | 3 | 4, string> | null {
+): Record<1 | 2 | 3 | 4, string> {
   const iso = (dt: Date) => dt.toISOString().slice(0, 10);
   const buildFromAnchor = (
     anchorRound: 1 | 2 | 3 | 4,
@@ -276,15 +277,19 @@ function deriveRoundDates(
       return buildFromAnchor(anchorRound, new Date(Date.UTC(y, m - 1, d)));
     }
     if (hasAnyForRound) {
-      // We saw tee times for this round but no date component (DG
-      // sometimes ships hh:mm only mid-tournament). Anchor on today.
       const today = new Date(
         Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
       );
       return buildFromAnchor(anchorRound, today);
     }
   }
-  return null;
+  // Nothing to anchor on — safe default: R3 = today. Wind lookups still
+  // resolve; the R1/R2 residual computation will just be one day off
+  // (Open-Meteo is fine with that at daily granularity).
+  const today = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+  return buildFromAnchor(3, today);
 }
 
 async function fetchLiveWeatherByRound(
@@ -294,7 +299,6 @@ async function fetchLiveWeatherByRound(
   const coords = coordsForTournamentId(activeTournamentId);
   if (!coords) return null;
   const dates = deriveRoundDates(fieldRows);
-  if (!dates) return null;
   const flat = [dates[1], dates[2], dates[3], dates[4]];
   const daily = await getDailyWeather(coords.lat, coords.lon, flat, coords.tz);
   const byDate = new Map(daily.map((d) => [d.date, d]));
