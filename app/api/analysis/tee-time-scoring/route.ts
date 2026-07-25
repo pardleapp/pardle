@@ -464,6 +464,31 @@ export async function GET(req: Request) {
     const skillMap = new Map<number, SkillEntry>();
     for (const s of skillRows) skillMap.set(s.dg_id, s);
 
+    // Determine which rounds have ANY snapshot data across the field.
+    // The snapshot is authoritative for whether a round has actually
+    // started — if no player has a single hole logged for a round, the
+    // round hasn't been played yet regardless of what DataGolf returns.
+    //
+    // Without this guard, DG's live-tournament-stats?round=3 echoes
+    // prior-round data (thru: 18, prior round's score) when R3 hasn't
+    // started — the DG fallback path in buildRows then treats those
+    // ghost rows as real finished R3 rounds. See fix commit for the
+    // "R3 hasn't started but 58 phantom R3 rows appear" bug.
+    const roundHasSnapshotData: Record<RoundNum, boolean> = {
+      1: false, 2: false, 3: false, 4: false,
+    };
+    if (snapshot?.holes) {
+      for (const pid of Object.keys(snapshot.holes)) {
+        for (const r of [1, 2, 3, 4] as RoundNum[]) {
+          if (roundHasSnapshotData[r]) continue;
+          const holes = snapshot.holes[pid]?.[r];
+          if (holes && Object.keys(holes).length > 0) {
+            roundHasSnapshotData[r] = true;
+          }
+        }
+      }
+    }
+
     // Diagnostic counters (per round).
     const emptyDrops = () => ({
       noField: 0,
@@ -525,6 +550,13 @@ export async function GET(req: Request) {
     ): OutRow[] => {
       const drops = dropCounts[`r${round}` as "r1" | "r2" | "r3" | "r4"];
       const out: OutRow[] = [];
+      // If NO player in the field has snapshot data for this round,
+      // the round hasn't started. Don't process DG rows — DG echoes
+      // prior-round data with thru:18 and prior scores, which would
+      // create phantom "finished" rows for a round that hasn't begun.
+      if (!roundHasSnapshotData[round]) {
+        return out;
+      }
       for (const l of liveRows) {
         const f = fieldMap.get(l.dg_id);
         const s = skillMap.get(l.dg_id);
