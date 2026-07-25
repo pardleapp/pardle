@@ -48,7 +48,9 @@ export type HoleAvgSource =
   | "current-round"
   | "prev-round"
   | "prev-year"
-  | "par";
+  | "par"
+  | "model"
+  | "model-blend";
 
 /** Per-hole diagnostic — which source the average came from and how
  *  many samples backed it. Exposed for the API response so callers can

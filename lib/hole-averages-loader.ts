@@ -18,6 +18,10 @@ import {
   type HoleAverageDiag,
   type HoleScoreSamples,
 } from "./hole-averages";
+import { getScoringModel } from "./scoring-model/loader";
+import { projectHoleAvgToPar } from "./scoring-model/project";
+import { getHoleBearings } from "./scoring-model/hole-bearings";
+import type { TodayConditions } from "./scoring-model/types";
 
 /** Extract per-hole raw strokes samples from a Pardle snapshot for a
  *  specific round. Returns an empty object when the snapshot has no
@@ -139,22 +143,48 @@ function samplesFromHistorical(dump: HistoricalDump): HoleScoreSamples {
   return out;
 }
 
+/** Today's per-hole setup used by the scoring-model layer. */
+export interface TodaySetupPerHole {
+  /** Yardage today per hole (from the pin sheet). */
+  yardsByHole: Record<number, number>;
+  /** Pin coord today per hole, if known. Missing pins → no cluster
+   *  adjustment for that hole. */
+  pinByHole?: Record<number, { x: number; y: number }>;
+  /** Today's headline wind (single average — used for holes when the
+   *  per-player HRRR path isn't in play). */
+  wind: { windMph: number; windDirDeg: number };
+}
+
 /**
  * Load per-hole averages for `round` of `tournamentId`, applying the
  * live-first fallback chain (current round → previous round → previous
  * year → par). All I/O + fallback logic lives here so callers just
  * take the resulting HoleAverages / diag map.
+ *
+ * When `todaySetup` + `originUrl` are provided AND we can fit the
+ * scoring model, the loader upgrades to:
+ *   - Pure MODEL prediction when the live current-round sample is thin
+ *   - Blend of MODEL + live sample as the sample grows
+ *   - Falls back to the old chain when the model can't fit (missing
+ *     coefficients, missing bearings, or fetch errors)
  */
 export async function loadHoleAveragesForRound(input: {
   tournamentId: string;
   round: number;
   snapshot: PollSnapshot | null;
   holePars: Record<number, number>;
+  /** Optional — enables the scoring-model path. When absent the loader
+   *  falls back to the pre-model chain. */
+  todaySetup?: TodaySetupPerHole;
+  /** Absolute base URL for internal fetches (e.g. to the birdies API).
+   *  Required when `todaySetup` is provided. */
+  originUrl?: string;
 }): Promise<{
   averages: HoleAverages;
   diag: Record<number, HoleAverageDiag>;
 }> {
-  const { tournamentId, round, snapshot, holePars } = input;
+  const { tournamentId, round, snapshot, holePars, todaySetup, originUrl } =
+    input;
   const currentRound = samplesFromSnapshot(snapshot, round);
   const prevRound =
     round > 1 ? samplesFromSnapshot(snapshot, round - 1) : null;
@@ -185,10 +215,72 @@ export async function loadHoleAveragesForRound(input: {
     }
   }
 
-  return computeHoleAverages({
+  const legacy = computeHoleAverages({
     currentRound,
     prevRound,
     prevYear,
     holePars,
   });
+
+  // If the model path is available, layer it on top. The model gets
+  // wind + pin + yardage right for today; the legacy chain is left in
+  // place as the fallback for any hole the model can't fit.
+  if (!todaySetup || !originUrl) return legacy;
+
+  const bearings = getHoleBearings(tournamentId);
+  if (!bearings) return legacy;
+
+  let coeffs;
+  try {
+    coeffs = await getScoringModel(tournamentId, originUrl);
+  } catch {
+    coeffs = null;
+  }
+  if (!coeffs) return legacy;
+
+  const averages: HoleAverages = { ...legacy.averages };
+  const diag: Record<number, HoleAverageDiag> = { ...legacy.diag };
+  for (let h = 1; h <= 18; h++) {
+    const fit = coeffs.holes[h];
+    const bearing = bearings[h];
+    const yards = todaySetup.yardsByHole[h];
+    if (!fit || typeof bearing !== "number" || typeof yards !== "number") {
+      // Keep the legacy result for this hole.
+      continue;
+    }
+    const pin = todaySetup.pinByHole?.[h];
+    // Build per-hole live sample from the current-round samples.
+    const par = holePars[h];
+    const samples = currentRound[h] ?? [];
+    const validSamples = samples.filter((s) => Number.isFinite(s) && s > 0);
+    const liveSample =
+      validSamples.length > 0 && typeof par === "number"
+        ? {
+            avgVsPar:
+              validSamples.reduce((a, b) => a + b, 0) / validSamples.length -
+              par,
+            count: validSamples.length,
+          }
+        : null;
+    const conditions: TodayConditions = {
+      yards,
+      windSpeed: todaySetup.wind.windMph,
+      windDir: todaySetup.wind.windDirDeg,
+      pinX: pin?.x,
+      pinY: pin?.y,
+    };
+    const proj = projectHoleAvgToPar({
+      fit,
+      bearing,
+      conditions,
+      liveSample,
+    });
+    averages[h] = proj.avgVsPar;
+    diag[h] = {
+      toPar: proj.avgVsPar,
+      source: proj.liveWeight > 0 ? "model-blend" : "model",
+      sampleCount: liveSample?.count ?? 0,
+    };
+  }
+  return { averages, diag };
 }

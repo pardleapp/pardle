@@ -18,7 +18,8 @@
 import { NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { getActiveTournament } from "@/lib/golf-api/pgatour";
+import { getActiveTournament, getCoursePins } from "@/lib/golf-api/pgatour";
+import { augmentYardsFromHistorical } from "@/lib/pin-sheet-augment";
 import { getSnapshot, getCachedTournamentPars } from "@/lib/feed/store";
 import { getDailyWeather, type DailyWeather } from "@/lib/weather/open-meteo";
 import { coordsForTournamentId } from "@/lib/weather/course-coords";
@@ -436,11 +437,59 @@ export async function GET(req: Request) {
     const liveR3Rows = liveR3.live_stats ?? [];
     const liveR4Rows = liveR4.live_stats ?? [];
 
-    // Per-round per-hole scoring averages. Live-first: current round
-    // (≥15 players finished the hole) → previous round of this tournament
-    // → previous year's data for the same hole → hole par. Powers the
-    // remaining-holes projection so mid-round players inherit the
-    // course's actual scoring shape, not "assume par" for the tail.
+    // Per-round per-hole scoring averages. Model-first when we have
+    // today's pins/yards/wind + scoring-model coefficients — the model
+    // combines historical fit (wind + yardage + pin cluster) with the
+    // live current-round sample as it grows. Falls back to the legacy
+    // live-first fallback chain (current round ≥15 → prev round → prev
+    // year → par) when any input is missing. Powers the remaining-holes
+    // projection so mid-round players inherit today's real setup, not
+    // "assume last round's shape".
+    const originUrl = new URL(req.url).origin;
+    const [pinsRaw, weatherByRound] = await Promise.all([
+      activeTournamentId
+        ? getCoursePins(activeTournamentId).catch(() => null)
+        : Promise.resolve(null),
+      fetchLiveWeatherByRound(activeTournamentId, fieldRows),
+    ]);
+    // Apply the historical-augment step so pre-2023 events' replicated
+    // per-round pins get scattered back to their actual positions
+    // before we read yards/pin coords out of the sheet. See
+    // lib/pin-sheet-augment-import.test.ts for the guard rationale.
+    const pins =
+      pinsRaw && activeTournamentId
+        ? await augmentYardsFromHistorical(pinsRaw, activeTournamentId).catch(
+            () => pinsRaw,
+          )
+        : pinsRaw;
+    /** Build today's setup for one round from the pin sheet + weather. */
+    const buildSetup = (r: RoundNum) => {
+      if (!pins) return undefined;
+      const yardsByHole: Record<number, number> = {};
+      const pinByHole: Record<number, { x: number; y: number }> = {};
+      for (const h of pins.holes ?? []) {
+        const ybr = h.yardsByRound?.[r];
+        if (typeof ybr === "number") yardsByHole[h.holeNumber] = ybr;
+        else if (typeof h.yards === "number") yardsByHole[h.holeNumber] = h.yards;
+        const pin = h.pinByRound?.[r];
+        if (
+          pin &&
+          typeof pin.x === "number" &&
+          typeof pin.y === "number" &&
+          pin.x !== -1 &&
+          pin.y !== -1
+        ) {
+          pinByHole[h.holeNumber] = { x: pin.x, y: pin.y };
+        }
+      }
+      const wr = weatherByRound?.[String(r)];
+      if (!wr || wr.windAvgMph == null || wr.windDirDeg == null) return undefined;
+      return {
+        yardsByHole,
+        pinByHole,
+        wind: { windMph: wr.windAvgMph, windDirDeg: wr.windDirDeg },
+      };
+    };
     const holeAvgsByRound: Record<
       number,
       Awaited<ReturnType<typeof loadHoleAveragesForRound>>
@@ -454,6 +503,8 @@ export async function GET(req: Request) {
             round: r,
             snapshot,
             holePars: snapshotPars[r] ?? {},
+            todaySetup: buildSetup(r),
+            originUrl,
           });
         }),
       );
@@ -711,15 +762,8 @@ export async function GET(req: Request) {
       return { total: rs.length, finished, projected };
     };
 
-    // Live weather — resolve venue coords from the active tournament
-    // and pull 4 days from Open-Meteo (past days + forecast in one
-    // call). If we don't have coords for this course, weather is
-    // simply omitted from the response.
-    const weatherByRound = await fetchLiveWeatherByRound(
-      activeTournamentId,
-      fieldRows,
-    );
-
+    // Weather was fetched earlier alongside the pin sheet (Promise.all
+    // above) so buildSetup and the response share the same lookup.
     return NextResponse.json({
       ok: true,
       count: rows.length,
