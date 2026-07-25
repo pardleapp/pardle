@@ -76,19 +76,6 @@ const PRIMARY: Item[] = [
     ),
   },
   {
-    href: "/games",
-    label: "Games",
-    matches: ["/games", "/pros", "/holes", "/connections", "/trivia", "/faces"],
-    iconPath: (
-      <>
-        <rect x="2.5" y="7" width="19" height="10" rx="3.5" />
-        <path d="M7 11v2.4M5.8 12.2h2.4" />
-        <circle cx="15.5" cy="11.5" r="0.6" fill="currentColor" />
-        <circle cx="17.6" cy="13.6" r="0.6" fill="currentColor" />
-      </>
-    ),
-  },
-  {
     href: "/analysis",
     label: "Tools",
     matches: ["/analysis"],

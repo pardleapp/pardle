@@ -13,7 +13,6 @@ export type MainNavTab =
   | "live"
   | "bets"
   | "course"
-  | "games"
   | "analysis"
   | "commentary"
   /** Page is not itself one of the nav tabs (e.g. tipster channel,
@@ -29,7 +28,6 @@ const TABS: Array<{ key: MainNavTab; href: string; label: string }> = [
   { key: "commentary", href: "/", label: "Insights" },
   { key: "live", href: "/live", label: "Shot Tracker" },
   { key: "bets", href: "/bets", label: "Bets" },
-  { key: "games", href: "/games", label: "Games" },
   { key: "analysis", href: "/analysis", label: "Tools" },
 ];
 
