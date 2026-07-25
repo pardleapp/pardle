@@ -330,32 +330,49 @@ export default function ArticleSchefflerR3Dynamics() {
       />
 
       <H3>Step 6 — Betting decision rules</H3>
+      <P>
+        Fair is UNDER −133 / OVER +133. A bet only has edge when
+        the book offers BETTER than fair — for UNDER, "better" means
+        less negative (or positive); for OVER, "better" means MORE
+        positive.
+      </P>
       <Table
-        headers={["Book line offered", "Verdict"]}
+        headers={["Book line offered", "Implied prob", "Verdict"]}
         rows={[
           [
-            <UnderChip key="a">UNDER −125 or better</UnderChip>,
-            <b key="av">Strong bet UNDER (5%+ edge)</b>,
+            <UnderChip key="a1">UNDER −115 or better</UnderChip>,
+            <span key="a2" style={{ fontFamily: numFont }}>≤53.5%</span>,
+            <b key="a3">Strong bet UNDER (3-5%+ edge)</b>,
           ],
           [
-            <UnderChip key="b">UNDER −125 to −135</UnderChip>,
-            "Lean UNDER (1-3% edge, size accordingly)",
+            <UnderChip key="b1">UNDER −116 to −130</UnderChip>,
+            <span key="b2" style={{ fontFamily: numFont }}>53.7-56.5%</span>,
+            "Lean UNDER (0.5-3% edge)",
           ],
           [
-            <UnderChip key="c">UNDER −136 to −145</UnderChip>,
-            "No bet — book has priced the skew correctly",
+            <UnderChip key="c1">UNDER −131 to −145</UnderChip>,
+            <span key="c2" style={{ fontFamily: numFont }}>56.7-59.2%</span>,
+            "No bet — priced near or above fair",
           ],
           [
-            <OverChip key="d">OVER +115 to +125</OverChip>,
+            <OverChip key="d1">OVER +100 to +130</OverChip>,
+            <span key="d2" style={{ fontFamily: numFont }}>43.5-50%</span>,
+            "No bet — book pricing this side worse than fair",
+          ],
+          [
+            <OverChip key="e1">OVER +131 to +145</OverChip>,
+            <span key="e2" style={{ fontFamily: numFont }}>40.8-43.3%</span>,
+            "Marginal — small or no edge",
+          ],
+          [
+            <OverChip key="f1">OVER +146 to +160</OverChip>,
+            <span key="f2" style={{ fontFamily: numFont }}>38.5-40.7%</span>,
             "Lean OVER (small edge)",
           ],
           [
-            <OverChip key="e">OVER +126 or better</OverChip>,
-            <b key="ev">Strong bet OVER (5%+ edge)</b>,
-          ],
-          [
-            <OverChip key="f">OVER +145 or better</OverChip>,
-            <b key="fv">Hammer OVER — rare but happens on soft lines</b>,
+            <OverChip key="g1">OVER +161 or better</OverChip>,
+            <span key="g2" style={{ fontFamily: numFont }}>≤38.3%</span>,
+            <b key="g3">Strong bet OVER (3-5%+ edge)</b>,
           ],
         ]}
       />
@@ -396,10 +413,14 @@ export default function ArticleSchefflerR3Dynamics() {
 
       <H3>Bottom line</H3>
       <Callout>
-        <b>Fair line: 66.1. Fair odds on UNDER 66.5: −133.</b>
-        {" "}Bet UNDER at any price better than −125. Bet OVER at any
-        price better than +130. Anything between −126 and +129 is
-        priced correctly and doesn't offer edge.
+        <b>Fair line: 66.1. Fair odds are UNDER −133 / OVER +133.</b>
+        {" "}For UNDER to have edge, need odds LESS negative than
+        −133 — bet UNDER at any price better than <b>−130</b> (small
+        edge) or <b>−115</b> (strong edge). For OVER to have edge,
+        need odds MORE positive than +133 — bet OVER at any price
+        better than <b>+145</b> (small edge) or <b>+160</b> (strong
+        edge). Anything between −131 and +145 is priced fairly and
+        doesn't offer edge.
       </Callout>
       <P>
         The three load-bearing assumptions are the 3.0 SG edge, the
