@@ -813,6 +813,29 @@ export async function GET(req: Request) {
         snapshotPlayerCount: snapshot?.holes
           ? Object.keys(snapshot.holes).length
           : 0,
+        pinSheetLoaded: pins != null,
+        setupByRoundAvailable: {
+          r1: setupsByRound[1] != null,
+          r2: setupsByRound[2] != null,
+          r3: setupsByRound[3] != null,
+          r4: setupsByRound[4] != null,
+        },
+        modelLevelShiftByRound: {
+          r1: holeAvgsByRound[1]?.levelShift ?? null,
+          r2: holeAvgsByRound[2]?.levelShift ?? null,
+          r3: holeAvgsByRound[3]?.levelShift ?? null,
+          r4: holeAvgsByRound[4]?.levelShift ?? null,
+        },
+        // Per-hole source & score for R3 — quickest way to tell whether
+        // the model path is taken or the loader fell back to legacy.
+        r3PerHoleSource: holeAvgsByRound[3]
+          ? Object.fromEntries(
+              Object.entries(holeAvgsByRound[3].diag).map(([h, d]) => [
+                h,
+                { source: d.source, toPar: Number(d.toPar.toFixed(3)) },
+              ]),
+            )
+          : null,
         drops: dropCounts,
         splitByRound: {
           r1: splitByRound(rowsR1),
