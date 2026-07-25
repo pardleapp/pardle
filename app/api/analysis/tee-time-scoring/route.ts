@@ -292,13 +292,27 @@ function deriveRoundDates(
   return buildFromAnchor(3, today);
 }
 
+/** Hard-coded round dates per tournament. First-choice source when
+ *  present — bypasses the DG-teetime-derivation quirks entirely. Add
+ *  new tournaments here as they're onboarded. */
+const HARDCODED_ROUND_DATES: Record<string, Record<1 | 2 | 3 | 4, string>> = {
+  R2026525: {
+    1: "2026-07-23",
+    2: "2026-07-24",
+    3: "2026-07-25",
+    4: "2026-07-26",
+  },
+};
+
 async function fetchLiveWeatherByRound(
   activeTournamentId: string | null,
   fieldRows: { teetimes?: { round_num?: number; teetime?: string }[] }[],
 ): Promise<Record<string, DailyWeather | null> | null> {
   const coords = coordsForTournamentId(activeTournamentId);
   if (!coords) return null;
-  const dates = deriveRoundDates(fieldRows);
+  const dates =
+    (activeTournamentId && HARDCODED_ROUND_DATES[activeTournamentId]) ||
+    deriveRoundDates(fieldRows);
   const flat = [dates[1], dates[2], dates[3], dates[4]];
   const daily = await getDailyWeather(coords.lat, coords.lon, flat, coords.tz);
   const byDate = new Map(daily.map((d) => [d.date, d]));
