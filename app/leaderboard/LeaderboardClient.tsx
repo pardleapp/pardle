@@ -165,9 +165,6 @@ export default function LeaderboardClient() {
             <Link href="/players" className="lb-offweek-cta-quiet">
               Player statistics
             </Link>
-            <Link href="/sharp" className="lb-offweek-cta-quiet">
-              Sharp Score
-            </Link>
           </div>
         </div>
       </section>

@@ -41,7 +41,7 @@ const PRIMARY: Item[] = [
   },
   {
     href: "/live",
-    label: "Feed",
+    label: "Shot Tracker",
     matches: ["/live"],
     iconPath: (
       <>
@@ -72,17 +72,6 @@ const PRIMARY: Item[] = [
         <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
         <path d="M16 6a3 3 0 0 1 0 6" />
         <path d="M18 13.5a5.5 5.5 0 0 1 2.5 4.5" />
-      </>
-    ),
-  },
-  {
-    href: "/sharp",
-    label: "Sharp",
-    matches: ["/sharp"],
-    iconPath: (
-      <>
-        <path d="M12 3v18" />
-        <path d="M4 9h16M4 15h16" />
       </>
     ),
   },

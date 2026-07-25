@@ -13,7 +13,6 @@ export type MainNavTab =
   | "live"
   | "bets"
   | "course"
-  | "sharp"
   | "games"
   | "analysis"
   | "commentary"
@@ -28,9 +27,8 @@ export type MainNavTab =
 // player page, not the course map.
 const TABS: Array<{ key: MainNavTab; href: string; label: string }> = [
   { key: "commentary", href: "/", label: "Insights" },
-  { key: "live", href: "/live", label: "Feed" },
+  { key: "live", href: "/live", label: "Shot Tracker" },
   { key: "bets", href: "/bets", label: "Bets" },
-  { key: "sharp", href: "/sharp", label: "Sharp" },
   { key: "games", href: "/games", label: "Games" },
   { key: "analysis", href: "/analysis", label: "Tools" },
 ];

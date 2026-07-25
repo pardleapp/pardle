@@ -90,7 +90,7 @@ export default async function SharpSharePage({ params }: PageProps) {
       <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
         <div className="brand-nav">
-          <MainNav active="sharp" />
+          <MainNav active="none" />
           <AuthChip />
         </div>
       </header>
