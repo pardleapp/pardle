@@ -19,6 +19,51 @@ import {
   type ForecastInputs,
 } from "@/lib/scoring-model/forecast";
 
+/** Pull every field member's target-round tee time from the /field
+ *  endpoint (which already merges DG teetimes with the leaderboard).
+ *  Returns fractional local hours. Empty when unavailable. */
+async function fetchFieldTeeHours(
+  tournamentId: string,
+  targetRound: 1 | 2 | 3 | 4,
+  originUrl: string,
+): Promise<number[]> {
+  try {
+    const url = `${originUrl.replace(/\/$/, "")}/api/scoring-model/field`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return [];
+    const j = (await res.json()) as {
+      tournamentId?: string | null;
+      players?: Array<{
+        teeTimes?: Record<string, string | undefined>;
+      }>;
+    };
+    if (j.tournamentId !== tournamentId) return [];
+    const out: number[] = [];
+    for (const p of j.players ?? []) {
+      const tt = p.teeTimes?.[String(targetRound)];
+      if (!tt) continue;
+      const m = tt.match(/^(\d{1,2}):(\d{2})$/);
+      if (!m) continue;
+      const hr = Number(m[1]);
+      const min = Number(m[2]);
+      if (
+        !Number.isFinite(hr) ||
+        !Number.isFinite(min) ||
+        hr < 0 ||
+        hr > 23 ||
+        min < 0 ||
+        min > 59
+      ) {
+        continue;
+      }
+      out.push(hr + min / 60);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -85,6 +130,13 @@ export async function POST(req: Request) {
     pinDifficultyAdder: body.pinDifficultyAdder,
     windOverride: body.windOverride,
     useHrrr: body.useHrrr,
+    // Field-wide tee times auto-fetched when the caller doesn't
+    // supply them, so the field forecast walks HRRR per hole at
+    // when the average field member plays each hole rather than
+    // a naive day-average.
+    fieldTeeHoursLocal:
+      body.fieldTeeHoursLocal ??
+      (await fetchFieldTeeHours(tournamentId, targetRound, originUrl)),
     levelShiftMode: body.levelShiftMode,
     levelShiftAttenuation: body.levelShiftAttenuation,
     priorRounds,

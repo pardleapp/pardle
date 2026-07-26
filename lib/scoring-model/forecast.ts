@@ -167,6 +167,13 @@ export interface ForecastInputs {
   windOverride?: { windMph: number; windDirDeg: number };
   /** Use HRRR for the target-round wind when no windOverride. Default true. */
   useHrrr?: boolean;
+  /** The field's tee times (local hours, fractional). When supplied
+   *  AND HRRR hourly is available, the FIELD forecast is computed
+   *  per hole using the average wind across each hole's actual play
+   *  window (15 min/hole from every tee time). This matches how the
+   *  per-player projection already handles wind. When omitted, the
+   *  field forecast falls back to the day-average wind. */
+  fieldTeeHoursLocal?: number[];
   /** How to blend prior-round residuals into the level shift. Default
    *  "most-recent-post-cut" for R3+, else "average". */
   levelShiftMode?: LevelShiftMode;
@@ -304,6 +311,7 @@ export async function runForecast(
     levelShiftAttenuation = 1,
     priorRounds = {},
     players = [],
+    fieldTeeHoursLocal,
   } = input;
   const autoYardage = input.autoYardage ?? autoYardageAndPins;
   const autoPins = input.autoPins ?? autoYardageAndPins;
@@ -449,6 +457,55 @@ export async function runForecast(
     windSource = "default-zero";
   }
 
+  // ── Fetch HRRR hourly once — used both for the field per-hole
+  // wind (when tee times supplied) and per-player projections. */
+  let hrrrHourlyEarly: HourlyWind[] = [];
+  if (coords && !windOverride && useHrrr) {
+    try {
+      hrrrHourlyEarly = await getHrrrHourlyWind(
+        coords.lat,
+        coords.lon,
+        targetDate,
+        coords.tz,
+      );
+    } catch {
+      /* fall back to day-avg */
+    }
+  }
+
+  /** Per-hole wind: when field tee times are supplied AND HRRR
+   *  hourly is available, compute the average wind at each hole's
+   *  actual play time (15 min/hole from every tee time in the field,
+   *  averaged). Otherwise use the day-average wind. */
+  const perHoleWind: Record<number, { windMph: number; windDirDeg: number }> = {};
+  const teeTimeAware =
+    Array.isArray(fieldTeeHoursLocal) &&
+    fieldTeeHoursLocal.length > 0 &&
+    hrrrHourlyEarly.length > 0;
+  if (teeTimeAware) {
+    for (let h = 1; h <= 18; h++) {
+      let uSum = 0;
+      let vSum = 0;
+      let n = 0;
+      for (const teeHour of fieldTeeHoursLocal!) {
+        const holeHour = teeHour + (h - 1) * 0.25;
+        const w = windAtHour(hrrrHourlyEarly, holeHour);
+        if (!w) continue;
+        const rad = (w.windDirDeg * Math.PI) / 180;
+        uSum += w.windMph * Math.cos(rad);
+        vSum += w.windMph * Math.sin(rad);
+        n += 1;
+      }
+      if (n === 0) continue;
+      const u = uSum / n;
+      const v = vSum / n;
+      perHoleWind[h] = {
+        windMph: Math.hypot(u, v),
+        windDirDeg: ((Math.atan2(v, u) * 180) / Math.PI + 360) % 360,
+      };
+    }
+  }
+
   // ── Per-hole projections + baseline sum ─────────────────────────
   const holeForecasts: HoleForecast[] = [];
   let modelDeltaSum = 0;
@@ -463,10 +520,14 @@ export async function runForecast(
     const override = effectiveHoles[h] ?? {};
     const yards = override.yards ?? fit.histMeanYards;
 
+    // Prefer per-hole tee-time-aware wind when available, else fall
+    // back to the day-average.
+    const holeWind = perHoleWind[h] ?? wind;
+
     const conditions: TodayConditions = {
       yards,
-      windSpeed: wind.windMph,
-      windDir: wind.windDirDeg,
+      windSpeed: holeWind.windMph,
+      windDir: holeWind.windDirDeg,
       pinX: override.pinX,
       pinY: override.pinY,
     };
@@ -504,8 +565,8 @@ export async function runForecast(
     const baseHead =
       fit.histMeanHeadByRound[targetRound] ?? fit.histMeanHead;
     const head =
-      wind.windMph *
-      Math.cos(((wind.windDirDeg - bearing) * Math.PI) / 180);
+      holeWind.windMph *
+      Math.cos(((holeWind.windDirDeg - bearing) * Math.PI) / 180);
     const windDelta = fit.bHead * (head - baseHead);
     const yardsDelta = fit.bYards * (yards - baseYards);
     const modelDelta = avgVsPar - baseAvg;
@@ -518,8 +579,8 @@ export async function runForecast(
       par: holePar,
       yards,
       cluster: clusterOverride ?? proj.matchedCluster,
-      windMph: wind.windMph,
-      windDirDeg: wind.windDirDeg,
+      windMph: holeWind.windMph,
+      windDirDeg: holeWind.windDirDeg,
       headwind: head,
       avgVsPar,
       clusterResidual,
@@ -606,22 +667,11 @@ export async function runForecast(
     fieldTotal + levelShiftAttenuated + pinDifficultyAdder;
   const fieldForecast = par + fieldForecastVsPar;
 
-  // ── Fetch HRRR hourly wind once (shared across all tee-time-
-  // aware player projections). Cheap in-process cache in
-  // getHrrrHourlyWind means we don't re-hit Open-Meteo. */
-  let hrrrHourly: HourlyWind[] = [];
-  if (coords && !windOverride) {
-    try {
-      hrrrHourly = await getHrrrHourlyWind(
-        coords.lat,
-        coords.lon,
-        targetDate,
-        coords.tz,
-      );
-    } catch {
-      /* no hourly — players fall back to day-avg wind */
-    }
-  }
+  // ── HRRR hourly wind — reuse the fetch from the field per-hole
+  // block above. `hrrrHourlyEarly` is populated when useHrrr is on
+  // AND coords are known; otherwise per-player projections fall
+  // back to day-avg wind. */
+  const hrrrHourly: HourlyWind[] = hrrrHourlyEarly;
 
   /** Per-player field-mean recompute with hourly wind. When we know
    *  the player's tee time we can trace the wind hour-by-hour along
@@ -759,7 +809,12 @@ export async function runForecast(
     tournamentId,
     targetRound,
     par,
-    wind: { ...wind, source: windSource },
+    wind: {
+      ...wind,
+      source: teeTimeAware
+        ? `${windSource} (tee-time-weighted across ${fieldTeeHoursLocal!.length} tee times)`
+        : windSource,
+    },
     historicalRoundMean: histMean,
     levelShift: rawLevelShift,
     levelShiftAttenuated,
