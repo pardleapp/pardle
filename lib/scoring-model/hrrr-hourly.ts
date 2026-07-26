@@ -103,6 +103,37 @@ export async function getHrrrHourlyWind(
   return out;
 }
 
+/** Aggregate an hourly wind series into a single vector-averaged
+ *  daily wind reading — the same shape a daily forecast would ship
+ *  (windAvgMph + windDirDeg). Averaging only over the play window
+ *  (default 7 AM - 7 PM local) keeps overnight calm periods from
+ *  diluting the round's effective wind. */
+export function summariseHrrrDay(
+  hourly: HourlyWind[],
+  playWindow: { fromHour: number; toHour: number } = {
+    fromHour: 7,
+    toHour: 19,
+  },
+): { windMph: number; windDirDeg: number } | null {
+  const inWindow = hourly.filter(
+    (h) => h.hour >= playWindow.fromHour && h.hour <= playWindow.toHour,
+  );
+  if (inWindow.length === 0) return null;
+  let uSum = 0;
+  let vSum = 0;
+  for (const h of inWindow) {
+    const rad = (h.windDirDeg * Math.PI) / 180;
+    uSum += h.windMph * Math.cos(rad);
+    vSum += h.windMph * Math.sin(rad);
+  }
+  const u = uSum / inWindow.length;
+  const v = vSum / inWindow.length;
+  return {
+    windMph: Math.hypot(u, v),
+    windDirDeg: ((Math.atan2(v, u) * 180) / Math.PI + 360) % 360,
+  };
+}
+
 /** Given an hourly wind series and a target hour (may be fractional,
  *  e.g. 13.5 for 1:30 PM), return the interpolated wind at that hour.
  *  Clamps to the series' available bounds — a target before the first

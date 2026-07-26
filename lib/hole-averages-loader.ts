@@ -167,6 +167,20 @@ export interface TodaySetupPerHole {
  *  Same shape as TodaySetupPerHole. */
 export type PriorRoundSetup = TodaySetupPerHole;
 
+/** Strategy for combining residuals from finished prior rounds into
+ *  a single level shift value applied to the target round.
+ *   - "average"              → weighted mean of every valid prior round
+ *   - "most-recent"          → use ONLY the highest-numbered valid prior round
+ *   - "most-recent-post-cut" → post-cut target rounds (target ≥ 3) use
+ *                              only the highest-numbered valid post-cut
+ *                              prior round (r ≥ 3). R2 target still uses
+ *                              R1. Auto-selects the right field-strength
+ *                              signal — R2's full-field residual is a
+ *                              poor predictor for R3/R4 which play the
+ *                              stronger cut-field, so this mode drops it.
+ */
+export type LevelShiftMode = "average" | "most-recent" | "most-recent-post-cut";
+
 /**
  * Load per-hole averages for `round` of `tournamentId`, applying the
  * live-first fallback chain (current round → previous round → previous
@@ -197,6 +211,9 @@ export async function loadHoleAveragesForRound(input: {
    *  vs-par residuals. Falls back to `holePars` for every round when
    *  absent. */
   priorHolePars?: Partial<Record<1 | 2 | 3 | 4, Record<number, number>>>;
+  /** How to combine multiple prior-round residuals into a single
+   *  level shift. Default "average". */
+  levelShiftMode?: LevelShiftMode;
   /** Absolute base URL for internal fetches (e.g. to the birdies API).
    *  Required when `todaySetup` is provided. */
   originUrl?: string;
@@ -215,6 +232,7 @@ export async function loadHoleAveragesForRound(input: {
     todaySetup,
     priorRoundsSetup,
     priorHolePars,
+    levelShiftMode = "average",
     originUrl,
   } = input;
   const currentRound = samplesFromSnapshot(snapshot, round);
@@ -275,22 +293,27 @@ export async function loadHoleAveragesForRound(input: {
   // tournament. For each finished round r < currentRound, compare
   // the field's actual per-hole avg-vs-par to what the model
   // (round-specific baseline + today-style pin/yards/wind) would
-  // have predicted. Average per-hole residual across finished rounds
-  // becomes the level shift applied to each hole's projection.
+  // have predicted. levelShiftMode picks which prior rounds feed the
+  // final shift (see LevelShiftMode docstring).
   let levelShift = 0;
+  const residualsByRound: Partial<Record<1 | 2 | 3 | 4, number>> = {};
   if (priorRoundsSetup) {
-    const residualsPerRound: number[] = [];
     for (let r = 1; r < round; r++) {
       const rk = r as 1 | 2 | 3 | 4;
       const setup = priorRoundsSetup[rk];
       if (!setup) continue;
       const pars = priorHolePars?.[rk] ?? holePars;
+      // Prefer the authoritative live sample from the pin sheet's
+      // scoringByRound (courseStats) — the snapshot loses finished
+      // players so its counts under-represent finished rounds.
+      const authoritativeLive = setup.liveVsParByHole ?? {};
       const samples = samplesFromSnapshot(snapshot, r);
-      // Confirm the round has meaningful data — skip an in-progress
-      // round so we don't level-shift off a half-played round.
       let sampleTotal = 0;
       for (const arr of Object.values(samples)) sampleTotal += arr.length;
-      if (sampleTotal < 500) continue;
+      const hasAuthLive = Object.keys(authoritativeLive).length >= 15;
+      // Skip an in-progress round with no authoritative source AND
+      // not enough snapshot samples — don't level-shift off half a round.
+      if (!hasAuthLive && sampleTotal < 500) continue;
       let sumResidualsPerHole = 0;
       let holesCounted = 0;
       for (let h = 1; h <= 18; h++) {
@@ -305,13 +328,20 @@ export async function loadHoleAveragesForRound(input: {
           typeof par !== "number"
         )
           continue;
-        const holeSamples = samples[h] ?? [];
-        const validSamples = holeSamples.filter(
-          (s) => Number.isFinite(s) && s > 0,
-        );
-        if (validSamples.length < 10) continue;
-        const actualAvg =
-          validSamples.reduce((a, b) => a + b, 0) / validSamples.length - par;
+        let actualAvg: number;
+        const authVsPar = authoritativeLive[h];
+        if (typeof authVsPar === "number") {
+          actualAvg = authVsPar;
+        } else {
+          const holeSamples = samples[h] ?? [];
+          const validSamples = holeSamples.filter(
+            (s) => Number.isFinite(s) && s > 0,
+          );
+          if (validSamples.length < 10) continue;
+          actualAvg =
+            validSamples.reduce((a, b) => a + b, 0) / validSamples.length -
+            par;
+        }
         const pin = setup.pinByHole?.[h];
         const proj = projectHoleAvgToPar({
           fit,
@@ -329,12 +359,32 @@ export async function loadHoleAveragesForRound(input: {
         holesCounted += 1;
       }
       if (holesCounted >= 15) {
-        residualsPerRound.push(sumResidualsPerHole / holesCounted);
+        residualsByRound[rk] = sumResidualsPerHole / holesCounted;
       }
     }
-    if (residualsPerRound.length > 0) {
+    // Pick the residual(s) to apply per the chosen mode.
+    const withResidual: Array<{ round: 1 | 2 | 3 | 4; value: number }> = [];
+    for (const [rStr, v] of Object.entries(residualsByRound)) {
+      if (typeof v === "number") {
+        withResidual.push({ round: Number(rStr) as 1 | 2 | 3 | 4, value: v });
+      }
+    }
+    if (withResidual.length > 0) {
+      let selected: typeof withResidual;
+      if (levelShiftMode === "most-recent") {
+        selected = [withResidual.sort((a, b) => b.round - a.round)[0]];
+      } else if (levelShiftMode === "most-recent-post-cut" && round >= 3) {
+        // Prefer the highest post-cut prior round (r ≥ 3). Falls back
+        // to most-recent overall if no post-cut prior round is done.
+        const postCut = withResidual.filter((r) => r.round >= 3);
+        selected = postCut.length
+          ? [postCut.sort((a, b) => b.round - a.round)[0]]
+          : [withResidual.sort((a, b) => b.round - a.round)[0]];
+      } else {
+        selected = withResidual;
+      }
       levelShift =
-        residualsPerRound.reduce((a, b) => a + b, 0) / residualsPerRound.length;
+        selected.reduce((a, b) => a + b.value, 0) / selected.length;
     }
   }
 

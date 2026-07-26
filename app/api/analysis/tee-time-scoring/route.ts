@@ -25,6 +25,10 @@ import { getDailyWeather, type DailyWeather } from "@/lib/weather/open-meteo";
 import { coordsForTournamentId } from "@/lib/weather/course-coords";
 import { loadHoleAveragesForRound } from "@/lib/hole-averages-loader";
 import { remainingHoles, sumRemainingToPar } from "@/lib/hole-averages";
+import {
+  getHrrrHourlyWind,
+  summariseHrrrDay,
+} from "@/lib/scoring-model/hrrr-hourly";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -500,6 +504,56 @@ export async function GET(req: Request) {
         : Promise.resolve(null),
       fetchLiveWeatherByRound(activeTournamentId, fieldRows),
     ]);
+    // Upgrade the FORECAST rounds' wind (any round dated ≥ today) to
+    // HRRR resolution. The default Open-Meteo GFS blend is fine for
+    // rounds that already happened, but tomorrow's forecast is much
+    // sharper on HRRR. Skips silently on any network error — the
+    // GFS-blend wind stays in place as fallback.
+    if (activeTournamentId && weatherByRound) {
+      const coords = coordsForTournamentId(activeTournamentId);
+      if (coords) {
+        const dates = HARDCODED_ROUND_DATES[activeTournamentId] ??
+          deriveRoundDates(fieldRows);
+        const todayIso = new Date().toISOString().slice(0, 10);
+        for (const r of [1, 2, 3, 4] as const) {
+          if (dates[r] >= todayIso) {
+            try {
+              const hourly = await getHrrrHourlyWind(
+                coords.lat,
+                coords.lon,
+                dates[r],
+                coords.tz,
+              );
+              const summary = summariseHrrrDay(hourly);
+              const w = weatherByRound[String(r)];
+              if (summary && w) {
+                w.windAvgMph = summary.windMph;
+                w.windDirDeg = summary.windDirDeg;
+              } else if (summary && !w) {
+                // Create a stub daily entry so buildSetup sees the wind.
+                weatherByRound[String(r)] = {
+                  date: dates[r],
+                  tempMaxF: null,
+                  tempMinF: null,
+                  windAvgMph: summary.windMph,
+                  windGustMph: null,
+                  windDirDeg: summary.windDirDeg,
+                  windDirCompass: null,
+                  precipInches: null,
+                  weatherCode: null,
+                  condition: "—",
+                  emoji: "",
+                  headline: "",
+                  hourly: [],
+                };
+              }
+            } catch {
+              /* swallow — leave GFS-blend value in place */
+            }
+          }
+        }
+      }
+    }
     // Apply the historical-augment step so pre-2023 events' replicated
     // per-round pins get scattered back to their actual positions
     // before we read yards/pin coords out of the sheet. See
@@ -587,6 +641,11 @@ export async function GET(req: Request) {
               Object.entries(priorRoundsSetup).filter(([, v]) => v),
             ) as Partial<Record<1 | 2 | 3 | 4, ReturnType<typeof buildSetup>>>,
             priorHolePars,
+            // For a post-cut target round (R3+), the R2 residual is
+            // a full-field signal and a poor predictor for the
+            // stronger cut-field playing R3/R4. Use only the highest-
+            // numbered post-cut prior round's residual instead.
+            levelShiftMode: r >= 3 ? "most-recent-post-cut" : "average",
             originUrl,
           });
         }),
