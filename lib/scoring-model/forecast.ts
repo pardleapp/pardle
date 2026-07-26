@@ -38,6 +38,19 @@ const HISTORICAL_ROUND_MEANS: Record<
   R2026525: { 1: 70.51, 2: 71.22, 3: 69.18, 4: 69.5 },
 };
 
+/** Hard-coded round dates per tournament. Same table as the
+ *  tee-time-scoring API uses — real dates for each round so the
+ *  wind fetch targets the correct day rather than the server's
+ *  system clock (which may be off from the tournament's dates). */
+const ROUND_DATES: Record<string, Record<1 | 2 | 3 | 4, string>> = {
+  R2026525: {
+    1: "2026-07-23",
+    2: "2026-07-24",
+    3: "2026-07-25",
+    4: "2026-07-26",
+  },
+};
+
 /** Per-round hole pars for the fitted courses — needed to convert
  *  the model's avg-vs-par output into an absolute score. */
 const COURSE_HOLE_PARS: Record<string, Record<number, number>> = {
@@ -350,20 +363,25 @@ export async function runForecast(
     HISTORICAL_ROUND_MEANS[tournamentId]?.[targetRound] ?? null;
 
   // ── Wind resolution ─────────────────────────────────────────────
+  // Target-round date: prefer the hard-coded per-tournament table
+  // (real tournament dates), else fall back to today's UTC. The
+  // fallback is a rough approximation when a tournament hasn't been
+  // added to the table.
+  const targetDate =
+    ROUND_DATES[tournamentId]?.[targetRound] ??
+    new Date().toISOString().slice(0, 10);
+
   let wind: { windMph: number; windDirDeg: number };
   let windSource: string;
   if (windOverride) {
     wind = windOverride;
     windSource = "user-override";
   } else if (useHrrr && coords) {
-    // Target-round date = today's UTC by default; leave dispatcher
-    // to override via a full round-date lookup in the future.
-    const today = new Date().toISOString().slice(0, 10);
     try {
       const hourly = await getHrrrHourlyWind(
         coords.lat,
         coords.lon,
-        today,
+        targetDate,
         coords.tz,
       );
       const summary = summariseHrrrDay(hourly);
@@ -382,9 +400,8 @@ export async function runForecast(
     }
   } else if (coords) {
     // GFS blend fallback
-    const today = new Date().toISOString().slice(0, 10);
     try {
-      const daily = await getDailyWeather(coords.lat, coords.lon, [today], coords.tz);
+      const daily = await getDailyWeather(coords.lat, coords.lon, [targetDate], coords.tz);
       const d = daily[0];
       if (
         d &&
