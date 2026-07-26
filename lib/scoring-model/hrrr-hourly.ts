@@ -52,6 +52,10 @@ export async function getHrrrHourlyWind(
   const cached = cache.get(cacheKey);
   if (cached && now - cached.ts < CACHE_TTL_MS) return cached.data;
 
+  // Open-Meteo rejects requests that combine start_date/end_date with
+  // past_days ("mutually exclusive"). The start_date/end_date already
+  // pins the exact window we want; past_days isn't needed and 400s
+  // the request silently, causing every wind lookup to fall back to 0.
   const url =
     `https://api.open-meteo.com/v1/forecast` +
     `?latitude=${lat}&longitude=${lon}` +
@@ -59,8 +63,7 @@ export async function getHrrrHourlyWind(
     `&wind_speed_unit=mph` +
     `&start_date=${date}&end_date=${date}` +
     `&timezone=${encodeURIComponent(timezone)}` +
-    `&models=gfs_hrrr` +
-    `&past_days=2`;
+    `&models=gfs_hrrr`;
 
   let payload: OpenMeteoHrrrResp | null = null;
   try {
