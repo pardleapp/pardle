@@ -26,9 +26,9 @@ export default function Page() {
       </header>
       <section
         style={{
-          maxWidth: 1200,
-          margin: "20px auto",
-          padding: "0 16px 60px",
+          // Fill the desktop-shell content column edge-to-edge — no
+          // maxWidth cap; the shell's grid track already sizes it.
+          padding: "20px 4px 60px",
         }}
       >
         <nav style={{ marginBottom: 12 }}>
