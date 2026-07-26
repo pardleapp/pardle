@@ -235,7 +235,7 @@ export default function ArticleLebiodaBet() {
         With an edge this size, the math on stake is direct. Kelly
         criterion sizing on a 15-point edge at these odds calls for
         about 25% of a betting bankroll. We committed £1,149. If the
-        model&apos;s right, he shoots 68 or better, our bet returns
+        model&apos;s right, he shoots 69 or better, our bet returns
         £765. And in the long run, this is exactly the shape of
         every position that grows a bankroll: model has proprietary
         signal, market has surface stats, position matches the gap.
