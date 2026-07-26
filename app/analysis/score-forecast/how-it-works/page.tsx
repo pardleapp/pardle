@@ -503,11 +503,14 @@ export default function HowItWorksPage() {
             18 holes by 1.4/18 = ~0.08 strokes easier.
           </P>
           <Example>
-            R3 at the 2026 3M Open played 3.5 strokes below the 8-year
-            R3 mean. With <em>&quot;Conditions like the most recent
-            finished round&quot;</em> selected, the R4 field forecast
-            gets a <Mono>−1.37</Mono> level shift applied across the
-            round — roughly 1.4 strokes softer than the historical R4.
+            When R3 plays softer than the historical R3 mean, that
+            softness carries forward. With{" "}
+            <em>&quot;Conditions like the most recent finished
+            round&quot;</em> selected for R4 at the 2026 3M Open, the
+            model measures R3&apos;s per-hole residuals and applies
+            them as a <Mono>−1.37</Mono> stroke level shift across the
+            round — expecting today to play ~1.4 strokes softer than
+            the historical R4 baseline.
           </Example>
         </ParamCard>
 
