@@ -140,6 +140,16 @@ function hhmmToHour(hhmm: string): number | null {
   return h + min / 60;
 }
 
+/** Skew adjustment auto-picked by SG tier — mirrors the server's
+ *  autoSkew. Elite players show a tighter mean-median gap than
+ *  below-average players (bigger blow-up right tail). */
+function autoSkewForSg(sg: number): number {
+  if (!Number.isFinite(sg)) return 0.25;
+  if (sg >= 1.5) return 0.2;
+  if (sg >= 0) return 0.25;
+  return 0.3;
+}
+
 // ── Component ──────────────────────────────────────────────────────
 export default function ForecastTool() {
   const [field, setField] = useState<FieldResp | null>(null);
@@ -243,9 +253,15 @@ export default function ForecastTool() {
           const sg = Number(p.sgTotal);
           if (!p.name.trim() || !Number.isFinite(sg)) return null;
           const wr = p.includeForm ? parseCsvNumbers(p.weekRounds) : [];
-          const cf = Number(p.compressionFactor);
-          const fw = Number(p.formWeight);
-          const skew = Number(p.skewAdjustment);
+          // Empty-string → Number → 0, which would silently zero
+          // out the adjustment. Trim first and only parse when
+          // non-empty so blanks fall through to server auto-defaults.
+          const cfStr = p.compressionFactor.trim();
+          const fwStr = p.formWeight.trim();
+          const skStr = p.skewAdjustment.trim();
+          const cf = cfStr ? Number(cfStr) : NaN;
+          const fw = fwStr ? Number(fwStr) : NaN;
+          const skew = skStr ? Number(skStr) : NaN;
           const teeHour = p.teeTime ? hhmmToHour(p.teeTime) : null;
           return {
             name: p.name.trim(),
@@ -526,26 +542,45 @@ export default function ForecastTool() {
               onlyRow={players.length === 1}
             />
           ))}
-          <button
-            type="button"
-            onClick={() => setPlayers((prev) => [...prev, emptyPlayer()])}
-            style={{ ...btnPrimary(), alignSelf: "flex-start" }}
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
           >
-            + Add player
-          </button>
+            <button
+              type="button"
+              onClick={runIt}
+              disabled={running}
+              style={{
+                ...btnPrimary(),
+                padding: "10px 22px",
+                fontSize: 15,
+                minWidth: 160,
+              }}
+            >
+              {running ? "Running…" : "Run forecast"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPlayers((prev) => [...prev, emptyPlayer()])}
+              style={{
+                padding: "8px 14px",
+                fontSize: 13,
+                fontWeight: 600,
+                border: "1px solid oklch(0.85 0.013 95)",
+                borderRadius: 6,
+                background: "white",
+                color: "oklch(0.3 0.02 150)",
+                cursor: "pointer",
+              }}
+            >
+              + Add another player
+            </button>
+          </div>
         </div>
-      </div>
-
-      {/* ── Run + results ─────────────────────────────────────── */}
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <button
-          type="button"
-          onClick={runIt}
-          disabled={running}
-          style={{ ...btnPrimary(), padding: "10px 20px", fontSize: 15 }}
-        >
-          {running ? "Running…" : "Run forecast"}
-        </button>
       </div>
 
       {result && result.ok && <ResultsPanel r={result} />}
@@ -597,13 +632,19 @@ function PlayerCard({
   }, [field, query]);
 
   const applyPlayer = (fp: FieldPlayer) => {
+    const sg = fp.sgTotal;
     onChange({
       playerId: fp.id,
       name: fp.name,
-      sgTotal: fp.sgTotal != null ? String(fp.sgTotal) : "",
+      sgTotal: sg != null ? String(sg) : "",
       weekRounds: fp.weekRounds.join(","),
       teeTimesByRound: fp.teeTimes,
       teeTime: fp.teeTimes[targetRound] ?? "",
+      // Auto-populate skew adjustment based on the player's SG tier
+      // so the median column reflects the Pardle-default gap
+      // (0.20 elite / 0.25 mid / 0.30 below-avg). User can still
+      // override in advanced.
+      skewAdjustment: sg != null ? String(autoSkewForSg(sg)) : "",
     });
     setQuery(fp.name);
     setDropdownOpen(false);
@@ -705,7 +746,20 @@ function PlayerCard({
             step="0.05"
             placeholder={row.playerId ? "auto" : "type or pick"}
             value={row.sgTotal}
-            onChange={(e) => onChange({ sgTotal: e.target.value })}
+            onChange={(e) => {
+              const v = e.target.value;
+              const sg = Number(v);
+              onChange({
+                sgTotal: v,
+                // Keep skew auto-tracking the SG tier, but only
+                // when the user hasn't manually overridden skew
+                // (a raw empty means "use auto"; anything else was
+                // their choice and stays put).
+                ...(v.trim() && Number.isFinite(sg)
+                  ? { skewAdjustment: String(autoSkewForSg(sg)) }
+                  : {}),
+              });
+            }}
             style={ip()}
           />
         </Field>
@@ -1111,6 +1165,7 @@ function Field({
   help?: string;
   children: React.ReactNode;
 }) {
+  const [hover, setHover] = useState(false);
   return (
     <label
       style={{
@@ -1127,21 +1182,65 @@ function Field({
           color: "oklch(0.5 0.02 150)",
           letterSpacing: 0.3,
           textTransform: "uppercase",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
         }}
-        title={help}
       >
         {label}
         {help && (
           <span
+            role="tooltip"
+            aria-label={help}
+            onMouseEnter={() => setHover(true)}
+            onMouseLeave={() => setHover(false)}
+            onFocus={() => setHover(true)}
+            onBlur={() => setHover(false)}
+            tabIndex={0}
             style={{
-              marginLeft: 4,
-              color: "oklch(0.6 0.02 150)",
-              fontWeight: 600,
+              position: "relative",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 14,
+              height: 14,
+              borderRadius: "50%",
+              border: "1px solid oklch(0.7 0.03 155)",
+              color: "oklch(0.5 0.03 155)",
+              background: "white",
+              fontSize: 10,
+              fontWeight: 700,
+              fontFamily: "serif",
               cursor: "help",
+              lineHeight: 1,
             }}
-            title={help}
           >
-            ⓘ
+            i
+            {hover && (
+              <span
+                role="tooltip"
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  left: 0,
+                  zIndex: 40,
+                  background: "oklch(0.22 0.03 155)",
+                  color: "white",
+                  padding: "8px 10px",
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  textTransform: "none",
+                  letterSpacing: 0,
+                  lineHeight: 1.4,
+                  width: 260,
+                  boxShadow: "0 6px 20px oklch(0 0 0 / 0.25)",
+                  pointerEvents: "none",
+                }}
+              >
+                {help}
+              </span>
+            )}
           </span>
         )}
       </span>
