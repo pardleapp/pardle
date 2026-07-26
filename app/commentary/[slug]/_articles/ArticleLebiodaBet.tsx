@@ -217,7 +217,7 @@ export default function ArticleLebiodaBet() {
         <Ingredient
           num="4"
           title="The hole 16 tell"
-          body="The pin on 16 is tucked in a corner the tour typically pairs with the FORWARD tee. That turns a 495-yard par 4 into a 301-yard drivable one. Every player in Lebioda's half of the field walks up to that tee box expecting to make birdie or better. Our per-hole projection has 16 playing 0.4 strokes under par for the field today — a single hole worth almost half a shot on his round total."
+          body="The pin on 16 is tucked in a corner the tour typically pairs with the FORWARD tee. That turns a 411-yard par 4 into a 301-yard drivable one. Every player in Lebioda's half of the field walks up to that tee box expecting to make birdie or better. Our per-hole projection has 16 playing 0.4 strokes under par for the field today — a single hole worth almost half a shot on his round total."
         />
       </div>
 
