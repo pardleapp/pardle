@@ -680,7 +680,7 @@ export default function HowItWorksPage() {
 
         <ParamCard
           name="Rounds this week (auto-filled)"
-          hook="The form signal — what has this week revealed?"
+          hook="Form is over/under-performance vs baseline, not raw score"
         >
           <P>
             Every player who&apos;s completed at least one round shows
@@ -689,10 +689,36 @@ export default function HowItWorksPage() {
             <strong>persistence factor</strong>.
           </P>
           <P>
+            <strong>
+              The form signal isn&apos;t the raw vs-par score.
+            </strong>{" "}
+            It&apos;s how much a player over- or under-performed{" "}
+            <em>their own expected score</em> for that round. Expected
+            is <Mono>field_mean − sgTotal</Mono>: an elite +3 SG
+            player in a field averaging even par is expected to shoot{" "}
+            <Mono>−3</Mono>, so an average tournament round for him is
+            a <em>negative</em> form signal — he under-performed his
+            baseline. A 0 SG player shooting the same round is
+            performing exactly to expectation and gets no form bump
+            either direction.
+          </P>
+          <Example>
+            Scheffler tees off in a field that averages <Mono>−1.5</Mono>{" "}
+            for the round. His season SG is <Mono>+2.9</Mono>, so he&apos;s
+            expected to shoot <Mono>−1.5 − 2.9 = −4.4</Mono>. If he
+            shoots the field average of <Mono>−1.5</Mono>, that&apos;s
+            a <Mono>+2.9</Mono> underperformance vs expected — the
+            model treats it as a negative form signal that would nudge
+            his projection <em>up</em> tomorrow (worse than his season
+            baseline suggests).
+          </Example>
+          <P>
             <strong>The persistence factor is the model&apos;s
             smartest trick.</strong> Not all strokes-gained categories
-            are equal. Some skills persist reliably from round to
-            round; others are dominated by noise.
+            persist equally from round to round. Once we know the
+            over/under-performance, we scale it by <em>which skills
+            drove it</em> — approach and driving carry forward
+            reliably, putting mostly regresses to the mean.
           </P>
           <div
             style={{
@@ -781,22 +807,19 @@ export default function HowItWorksPage() {
             </table>
           </div>
           <P>
-            A round of −6 driven by hot putting is much less predictive
-            of tomorrow than a round of −6 driven by hot approach. So
-            the model persistence-weights each round&apos;s excess
-            performance before averaging.
-          </P>
-          <P>
             The <strong>persistence factor</strong> shown on each
             round tile is that round&apos;s effective persistence
             divided by the neutral baseline (0.4875, the mean of the
             four weights). A category-balanced round produces the same
-            form bump the old vs-par-only model produced. Off-neutral
-            rounds tilt higher or lower.
+            form bump the old excess-only model produced; approach- or
+            driving-heavy rounds tilt above 1×; putt-heavy rounds tilt
+            below 1×.
           </P>
           <Example>
             <div style={{ marginBottom: 8 }}>
-              Same −6 vs par, two different players:
+              Two players who both beat their expected score by 3
+              shots this round. Same over-performance — but very
+              different signals about tomorrow:
             </div>
             <div
               style={{
@@ -810,12 +833,12 @@ export default function HowItWorksPage() {
               }}
             >
               <div>
-                <strong>Player A:</strong> OTT +0.5 · APP +4.0 · ARG
-                +1.0 · PUTT +0.5
+                <strong>Player A</strong> (approach-driven):
               </div>
+              <div>OTT +0.4 · APP +2.2 · ARG +0.2 · PUTT +0.2</div>
               <div style={{ color: T.emerald, marginTop: 4 }}>
-                Persistence factor ≈ 1.15× → model treats this as
-                −6.9 strokes of signal
+                Persistence factor ≈ 1.15× → −3 excess scales to −3.45
+                strokes of forward signal
               </div>
             </div>
             <div
@@ -829,12 +852,12 @@ export default function HowItWorksPage() {
               }}
             >
               <div>
-                <strong>Player B:</strong> OTT +0.5 · APP +0.5 · ARG
-                +1.0 · PUTT +4.0
+                <strong>Player B</strong> (putt-driven):
               </div>
+              <div>OTT +0.2 · APP +0.4 · ARG +0.2 · PUTT +2.2</div>
               <div style={{ color: T.tang, marginTop: 4 }}>
-                Persistence factor ≈ 0.75× → model treats this as
-                only −4.5 strokes of signal
+                Persistence factor ≈ 0.75× → same −3 excess scales to
+                only −2.25 strokes of forward signal
               </div>
             </div>
           </Example>
