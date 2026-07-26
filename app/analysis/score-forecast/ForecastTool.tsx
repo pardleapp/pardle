@@ -829,57 +829,54 @@ function PlayerCard({
         <div
           style={{
             marginTop: 10,
-            padding: 10,
+            padding: "14px 14px 12px",
             background: "oklch(0.98 0.005 155)",
             borderRadius: 6,
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-            gap: 10,
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: 20,
           }}
         >
           <Field
             label="Form weight"
             help="How much this week's rounds shift the projection. 0.2 default per Connolly-Rendleman shrinkage. 0 = ignore form, 0.5 = aggressive."
           >
-            <input
-              type="number"
-              step="0.05"
-              min="0"
-              max="1"
+            <Slider
+              min={0}
+              max={0.5}
+              step={0.05}
+              recommended={0.2}
               value={row.formWeight}
-              onChange={(e) => onChange({ formWeight: e.target.value })}
-              style={ip()}
+              onChange={(v) => onChange({ formWeight: v })}
             />
           </Field>
           <Field
             label="Skill compression"
             help="How much this course flattens the elite-vs-field gap. 0.83 default at bunching courses like this one. 1.0 = no compression."
           >
-            <input
-              type="number"
-              step="0.05"
-              min="0"
-              max="1.2"
+            <Slider
+              min={0.6}
+              max={1.2}
+              step={0.01}
+              recommended={0.83}
               value={row.compressionFactor}
-              onChange={(e) =>
-                onChange({ compressionFactor: e.target.value })
-              }
-              style={ip()}
+              onChange={(v) => onChange({ compressionFactor: v })}
             />
           </Field>
           <Field
             label="Skew adjustment"
             help="Mean-median gap. Auto by SG tier: elite ~0.20, mid ~0.25, below-avg ~0.30. Higher = more optimistic median vs mean."
           >
-            <input
-              type="number"
-              step="0.05"
-              min="0"
-              max="1"
-              placeholder="auto"
+            <Slider
+              min={0}
+              max={0.5}
+              step={0.01}
+              recommended={(() => {
+                const sg = Number(row.sgTotal);
+                return Number.isFinite(sg) ? autoSkewForSg(sg) : 0.25;
+              })()}
               value={row.skewAdjustment}
-              onChange={(e) => onChange({ skewAdjustment: e.target.value })}
-              style={ip()}
+              onChange={(v) => onChange({ skewAdjustment: v })}
             />
           </Field>
         </div>
@@ -1157,6 +1154,227 @@ function td(strong = false): React.CSSProperties {
     fontWeight: strong ? 700 : 500,
   };
 }
+/**
+ * Slider — horizontal range control for the advanced-panel numeric
+ * parameters. Renders:
+ *   - current value (mono, bold) with a "reset" affordance when the
+ *     user has moved off Pardle's recommendation
+ *   - the range input itself (native, restyled globally via <style>)
+ *   - an emerald tick on the track at the recommended value
+ *   - a caption underneath: "Pardle recommends X"
+ *
+ * Value is a STRING (mirrors the parent state) so callers can still
+ * represent an "auto" state as `""`; when empty we position the
+ * thumb at the recommendation but tag the display with "auto".
+ */
+function Slider({
+  min,
+  max,
+  step,
+  value,
+  onChange,
+  recommended,
+  format,
+}: {
+  min: number;
+  max: number;
+  step: number;
+  value: string;
+  onChange: (next: string) => void;
+  recommended: number;
+  format?: (v: number) => string;
+}) {
+  const fmt = format ?? ((v: number) => v.toFixed(2));
+  const isAuto = value.trim() === "";
+  const parsed = isAuto ? recommended : Number(value);
+  const displayed = Number.isFinite(parsed) ? parsed : recommended;
+  const clamped = Math.min(max, Math.max(min, displayed));
+  const pct = ((clamped - min) / (max - min)) * 100;
+  const recPct = ((recommended - min) / (max - min)) * 100;
+  const isRec = Math.abs(clamped - recommended) < step / 2;
+  const emerald = "oklch(0.42 0.15 155)";
+  const track = "oklch(0.88 0.008 95)";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <style>{`
+        .pv-slider {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 100%;
+          height: 22px;
+          background: transparent;
+          margin: 0;
+          padding: 0;
+          cursor: pointer;
+        }
+        .pv-slider:focus { outline: none; }
+        .pv-slider::-webkit-slider-runnable-track {
+          height: 6px;
+          border-radius: 3px;
+          background: transparent;
+        }
+        .pv-slider::-moz-range-track {
+          height: 6px;
+          border-radius: 3px;
+          background: transparent;
+        }
+        .pv-slider::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: ${emerald};
+          border: 2px solid white;
+          box-shadow: 0 1px 3px oklch(0 0 0 / 0.25);
+          margin-top: -6px;
+          cursor: grab;
+        }
+        .pv-slider::-webkit-slider-thumb:active { cursor: grabbing; }
+        .pv-slider::-moz-range-thumb {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: ${emerald};
+          border: 2px solid white;
+          box-shadow: 0 1px 3px oklch(0 0 0 / 0.25);
+          cursor: grab;
+        }
+      `}</style>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          gap: 8,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-mono, monospace)",
+            fontSize: 15,
+            fontWeight: 700,
+            color: "oklch(0.24 0.04 155)",
+          }}
+        >
+          {fmt(clamped)}
+          {isAuto && (
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "oklch(0.5 0.02 150)",
+                marginLeft: 6,
+                letterSpacing: 0.3,
+                fontFamily: "inherit",
+              }}
+            >
+              · AUTO
+            </span>
+          )}
+        </span>
+        {!isRec && !isAuto && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            style={{
+              border: "none",
+              background: "none",
+              padding: 0,
+              cursor: "pointer",
+              fontSize: 11,
+              fontWeight: 700,
+              color: emerald,
+              letterSpacing: 0.3,
+              textTransform: "uppercase",
+              fontFamily: "inherit",
+            }}
+          >
+            reset
+          </button>
+        )}
+      </div>
+      <div style={{ position: "relative", height: 22 }}>
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: "50%",
+            transform: "translateY(-50%)",
+            height: 6,
+            borderRadius: 3,
+            background: track,
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: "50%",
+            transform: "translateY(-50%)",
+            height: 6,
+            borderRadius: 3,
+            background: emerald,
+            width: `${pct}%`,
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          title={`Pardle recommends ${fmt(recommended)}`}
+          style={{
+            position: "absolute",
+            left: `${recPct}%`,
+            top: "50%",
+            transform: "translate(-50%, -50%)",
+            width: 2,
+            height: 14,
+            background: "oklch(0.24 0.04 155)",
+            borderRadius: 1,
+            pointerEvents: "none",
+          }}
+        />
+        <input
+          className="pv-slider"
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={clamped}
+          onChange={(e) => onChange(e.target.value)}
+          style={{ position: "relative", zIndex: 2 }}
+        />
+      </div>
+      <div
+        style={{
+          fontSize: 10.5,
+          color: "oklch(0.5 0.02 150)",
+          letterSpacing: 0.2,
+          display: "flex",
+          justifyContent: "space-between",
+          fontFamily: "var(--font-mono, monospace)",
+        }}
+      >
+        <span>{fmt(min)}</span>
+        <span
+          style={{
+            fontFamily: "inherit",
+            textTransform: "uppercase",
+            letterSpacing: 0.4,
+            fontWeight: 700,
+            color: "oklch(0.4 0.03 155)",
+          }}
+        >
+          Pardle recommends {fmt(recommended)}
+        </span>
+        <span>{fmt(max)}</span>
+      </div>
+    </div>
+  );
+}
+
 function Field({
   label,
   help,
