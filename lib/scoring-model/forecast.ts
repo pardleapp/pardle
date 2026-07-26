@@ -327,6 +327,20 @@ export async function runForecast(
         for (const h of pinSheet.holes ?? []) {
           const num = h.holeNumber;
           const cur = effectiveHoles[num] ?? {};
+          // Check whether the target round's pin is really posted for
+          // this hole (real coord, not the -1 sentinel). Orchestrator
+          // returns default scorecard yardage when a round hasn't been
+          // officially set — trusting that yardage blindly leads to
+          // e.g. R4 H16 = 411 (scorecard default) rather than the
+          // actual R4 setup which may still be pending.
+          const pinBy = h.pinByRound?.[String(targetRound)];
+          const pinConfirmed =
+            !!pinBy &&
+            typeof pinBy.x === "number" &&
+            typeof pinBy.y === "number" &&
+            pinBy.x !== -1 &&
+            pinBy.y !== -1;
+
           // Yardage source: manual delta beats target-round-auto.
           if (yardsDeltaFromRound && cur.yards == null) {
             const src =
@@ -335,25 +349,20 @@ export async function runForecast(
               cur.yards = src + yardsDeltaFromRound.totalDeltaYards / 18;
             }
           }
-          if (autoYardage && cur.yards == null) {
+          if (autoYardage && cur.yards == null && pinConfirmed) {
             const yBy = h.yardsByRound?.[String(targetRound)];
             if (typeof yBy === "number") cur.yards = yBy;
           }
-          // Pin coords — only when autoPins is enabled. Turning autoPins
-          // off effectively zeros every cluster residual so the caller
-          // can supply a single manual difficulty adjustment instead.
-          if (autoPins && cur.pinX == null && cur.pinY == null) {
-            const pinBy = h.pinByRound?.[String(targetRound)];
-            if (
-              pinBy &&
-              typeof pinBy.x === "number" &&
-              typeof pinBy.y === "number" &&
-              pinBy.x !== -1 &&
-              pinBy.y !== -1
-            ) {
-              cur.pinX = pinBy.x;
-              cur.pinY = pinBy.y;
-            }
+          // Pin coords — only when autoPins is enabled AND the round
+          // has a real coord (not the -1 sentinel).
+          if (
+            autoPins &&
+            cur.pinX == null &&
+            cur.pinY == null &&
+            pinConfirmed
+          ) {
+            cur.pinX = pinBy!.x;
+            cur.pinY = pinBy!.y;
           }
           effectiveHoles[num] = cur;
         }
