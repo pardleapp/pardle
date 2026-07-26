@@ -54,113 +54,55 @@ function H3({ children }: { children: React.ReactNode }) {
 export default function ArticleLebiodaBet() {
   return (
     <div style={{ minWidth: 0, maxWidth: "100%" }}>
-      {/* ── Bet slip visual ─────────────────────────────────── */}
-      <div
+      {/* ── Bet slip (actual screenshot from the sportsbook) ── */}
+      <figure
         style={{
-          margin: "0 0 32px",
-          padding: "20px 22px",
-          background:
-            "linear-gradient(135deg, oklch(0.22 0.04 155) 0%, oklch(0.30 0.05 155) 100%)",
-          color: "white",
+          margin: "0 0 28px",
+          padding: 20,
+          background: "oklch(0.98 0.005 95)",
+          border: "1px solid oklch(0.9 0.008 95)",
           borderRadius: 12,
-          boxShadow: "0 8px 32px oklch(0 0 0 / 0.25)",
-          fontFamily: proseFont,
+          textAlign: "center",
         }}
       >
         <div
           style={{
-            fontSize: 12,
+            fontSize: 11,
             letterSpacing: 1.5,
             textTransform: "uppercase",
-            color: "oklch(0.75 0.05 155)",
-            marginBottom: 8,
+            color: "oklch(0.5 0.02 150)",
+            marginBottom: 12,
             fontWeight: 700,
+            fontFamily: proseFont,
           }}
         >
           The bet
         </div>
-        <div
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/commentary/lebioda-bet-slip.png"
+          alt="Bet slip: Hank Lebioda R4 UNDER 69.5 at 1.666, stake £1,148.98, cash out £765.98"
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "baseline",
-            marginBottom: 14,
-            flexWrap: "wrap",
-            gap: 8,
+            width: "100%",
+            maxWidth: 480,
+            height: "auto",
+            display: "block",
+            margin: "0 auto",
+            borderRadius: 8,
+            imageRendering: "-webkit-optimize-contrast",
+          }}
+        />
+        <figcaption
+          style={{
+            fontSize: 12,
+            color: "oklch(0.5 0.02 150)",
+            marginTop: 10,
+            fontFamily: proseFont,
           }}
         >
-          <div style={{ fontSize: 22, fontWeight: 800 }}>
-            Hank Lebioda · R4 UNDER 69.5
-          </div>
-          <div
-            style={{
-              fontFamily: numFont,
-              fontSize: 22,
-              fontWeight: 800,
-              color: "oklch(0.85 0.14 90)",
-            }}
-          >
-            1.666
-          </div>
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 16,
-            paddingTop: 14,
-            borderTop: "1px solid oklch(0.45 0.05 155)",
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                letterSpacing: 1,
-                textTransform: "uppercase",
-                color: "oklch(0.75 0.05 155)",
-                fontWeight: 700,
-                marginBottom: 4,
-              }}
-            >
-              Stake
-            </div>
-            <div
-              style={{
-                fontFamily: numFont,
-                fontSize: 26,
-                fontWeight: 800,
-              }}
-            >
-              £1,149
-            </div>
-          </div>
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                letterSpacing: 1,
-                textTransform: "uppercase",
-                color: "oklch(0.75 0.05 155)",
-                fontWeight: 700,
-                marginBottom: 4,
-              }}
-            >
-              To win
-            </div>
-            <div
-              style={{
-                fontFamily: numFont,
-                fontSize: 26,
-                fontWeight: 800,
-                color: "oklch(0.85 0.14 90)",
-              }}
-            >
-              £765
-            </div>
-          </div>
-        </div>
-      </div>
+          UNDER 69.5 · 1.666 · £1,148.98 stake · £765.98 to win
+        </figcaption>
+      </figure>
 
       <P>
         <strong>The market prices him at 60%.</strong> Our model puts
