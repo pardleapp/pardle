@@ -54,15 +54,15 @@ function H3({ children }: { children: React.ReactNode }) {
 export default function ArticleLebiodaBet() {
   return (
     <div style={{ minWidth: 0, maxWidth: "100%" }}>
-      {/* ── Bet slip (actual screenshot from the sportsbook) ── */}
+      {/* ── Bet slip (HTML replica — sharp at any size, matches
+           the sportsbook slip Tom placed the bet on) ─────── */}
       <figure
         style={{
           margin: "0 0 28px",
-          padding: 20,
+          padding: "22px 20px",
           background: "oklch(0.98 0.005 95)",
           border: "1px solid oklch(0.9 0.008 95)",
           borderRadius: 12,
-          textAlign: "center",
         }}
       >
         <div
@@ -71,36 +71,105 @@ export default function ArticleLebiodaBet() {
             letterSpacing: 1.5,
             textTransform: "uppercase",
             color: "oklch(0.5 0.02 150)",
-            marginBottom: 12,
+            marginBottom: 14,
             fontWeight: 700,
             fontFamily: proseFont,
+            textAlign: "center",
           }}
         >
           The bet
         </div>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/commentary/lebioda-bet-slip.png"
-          alt="Bet slip: Hank Lebioda R4 UNDER 69.5 at 1.666, stake £1,148.98, cash out £765.98"
+        <div
           style={{
-            width: "100%",
-            height: "auto",
-            display: "block",
+            maxWidth: 540,
             margin: "0 auto",
-            borderRadius: 8,
-            imageRendering: "pixelated",
-          }}
-        />
-        <figcaption
-          style={{
-            fontSize: 12,
-            color: "oklch(0.5 0.02 150)",
-            marginTop: 10,
-            fontFamily: proseFont,
+            padding: "18px 20px 14px",
+            background: "white",
+            border: "1px solid #d9d9d9",
+            borderRadius: 6,
+            fontFamily:
+              "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+            color: "#1a1a1a",
+            boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
           }}
         >
-          UNDER 69.5 · 1.666 · £1,148.98 stake · £765.98 to win
-        </figcaption>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#666",
+              marginBottom: 6,
+            }}
+          >
+            Total
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              marginBottom: 14,
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ fontSize: 18, fontWeight: 700 }}>
+              UNDER 69.5
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>1.666</div>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              marginBottom: 4,
+            }}
+          >
+            <div style={{ fontSize: 15, color: "#555" }}>Stake</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>
+              £1,148.98
+            </div>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              marginBottom: 16,
+            }}
+          >
+            <div style={{ fontSize: 15, color: "#555" }}>To return</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>£765.98</div>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              gap: 14,
+              paddingTop: 10,
+              borderTop: "1px solid #eee",
+              fontSize: 13,
+              color: "#666",
+            }}
+          >
+            <span>Delete</span>
+            <span>Edit</span>
+            <span
+              style={{
+                background: "#7cb342",
+                color: "white",
+                padding: "6px 14px",
+                borderRadius: 4,
+                fontWeight: 700,
+                fontSize: 13,
+              }}
+            >
+              Cashout
+            </span>
+          </div>
+        </div>
       </figure>
 
       <P>
