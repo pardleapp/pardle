@@ -775,7 +775,12 @@ export async function runForecast(
   };
 }
 
-/** Fetch the pin sheet from the internal /api/course-pins endpoint. */
+/** Fetch the pin sheet — hits the orchestrator's courseStats query
+ *  directly rather than Pardle's cached /api/course-pins endpoint.
+ *  The Pardle endpoint has a 6-hour Redis cache that ends up serving
+ *  R3 pins as R4 placeholders (and missing R4 yardages) for hours
+ *  after the tour posts the real R4 setup. The forecast tool needs
+ *  the freshest data possible so it bypasses that cache. */
 interface PinSheetHole {
   holeNumber: number;
   yards?: number | null;
@@ -788,14 +793,104 @@ interface PinSheetShape {
 }
 async function fetchPinSheet(
   tournamentId: string,
-  originUrl: string,
+  _originUrl: string,
 ): Promise<PinSheetShape | null> {
-  const url = `${originUrl.replace(/\/$/, "")}/api/course-pins?tournamentId=${encodeURIComponent(tournamentId)}`;
+  const url = "https://orchestrator.pgatour.com/graphql";
+  const query = `{
+    courseStats(tournamentId:"${tournamentId}") {
+      courses {
+        roundHoleStats {
+          roundNum
+          holeStats {
+            ... on CourseHoleStats {
+              courseHoleNum
+              parValue
+              yards
+              scoringAverage
+              scoringAverageDiff
+              pinGreen {
+                leftToRightCoords {
+                  enhancedX
+                  enhancedY
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }`;
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": "da2-gsrx5bibzbb4njvhl7t37wqyl4",
+        Origin: "https://www.pgatour.com",
+      },
+      body: JSON.stringify({ query }),
+      cache: "no-store",
+    });
     if (!res.ok) return null;
-    const j = (await res.json()) as { pins?: PinSheetShape };
-    return j?.pins ?? null;
+    interface OrchCoords {
+      enhancedX?: number;
+      enhancedY?: number;
+    }
+    interface OrchHole {
+      courseHoleNum?: number;
+      yards?: number;
+      scoringAverageDiff?: number;
+      pinGreen?: { leftToRightCoords?: OrchCoords };
+    }
+    interface OrchRound {
+      roundNum?: number;
+      holeStats?: OrchHole[];
+    }
+    const j = (await res.json()) as {
+      data?: {
+        courseStats?: { courses?: Array<{ roundHoleStats?: OrchRound[] }> };
+      };
+    };
+    const rounds =
+      j.data?.courseStats?.courses?.[0]?.roundHoleStats ?? [];
+    // Assemble the per-hole shape the caller expects.
+    const byHole = new Map<number, PinSheetHole>();
+    for (const r of rounds) {
+      const roundNum = r.roundNum;
+      if (typeof roundNum !== "number") continue;
+      for (const h of r.holeStats ?? []) {
+        const num = h.courseHoleNum;
+        if (typeof num !== "number" || num < 1 || num > 18) continue;
+        const entry: PinSheetHole =
+          byHole.get(num) ?? {
+            holeNumber: num,
+            yardsByRound: {},
+            pinByRound: {},
+            scoringByRound: {},
+          };
+        if (typeof h.yards === "number" && h.yards > 0) {
+          entry.yardsByRound![String(roundNum)] = h.yards;
+        }
+        const coords = h.pinGreen?.leftToRightCoords;
+        if (
+          coords &&
+          typeof coords.enhancedX === "number" &&
+          typeof coords.enhancedY === "number"
+        ) {
+          entry.pinByRound![String(roundNum)] = {
+            x: coords.enhancedX,
+            y: coords.enhancedY,
+          };
+        }
+        if (typeof h.scoringAverageDiff === "number") {
+          entry.scoringByRound![String(roundNum)] = {
+            vsPar: h.scoringAverageDiff,
+          };
+        }
+        byHole.set(num, entry);
+      }
+    }
+    return { holes: Array.from(byHole.values()) };
   } catch {
     return null;
   }
