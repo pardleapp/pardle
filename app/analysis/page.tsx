@@ -5,6 +5,7 @@ import MainNav from "../MainNav";
 import CoursePinPreview from "./_previews/CoursePinPreview";
 import TeeTimePreview from "./_previews/TeeTimePreview";
 import TeeShotPreview from "./_previews/TeeShotPreview";
+import ScoreForecastPreview from "./_previews/ScoreForecastPreview";
 
 export const metadata = {
   title: `Tools — ${BRAND.name}`,
@@ -23,6 +24,14 @@ interface Card {
 }
 
 const CARDS: Card[] = [
+  {
+    href: "/analysis/score-forecast",
+    title: "Round score forecast",
+    blurb:
+      "Project the field and per-player round scores. Enter pin clusters, override yardage or wind, pick the level-shift mode (average or most-recent-post-cut), and add players with SG + this week's rounds for Bayesian form adjustment.",
+    status: "live",
+    Preview: ScoreForecastPreview,
+  },
   {
     href: "/analysis/course-heatmap",
     title: "Course & pin guide",
