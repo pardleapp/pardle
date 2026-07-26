@@ -208,23 +208,40 @@ function autoSkew(sgTotal: number): number {
 }
 
 /** Bayesian shrinkage of "this week's rounds" toward the season
- *  baseline. weekAvgVsFieldBaseline = mean of the player's rounds
- *  vs the FIELD-adjusted baseline they should have shot. */
+ *  baseline. Compares player's actual score EACH round to what they
+ *  should have shot given THAT round's actual field mean (soft-field
+ *  weeks pull the "expected" lower for every player), then shrinks
+ *  the average delta toward zero by the weight.
+ *
+ *  weekRounds are indexed by prior round: [R1_score, R2_score, ...].
+ *  fieldMeansByRound gives the field's vs-par mean per round. When
+ *  a field mean isn't available for a round, we fall back to the
+ *  "shoots vs par 0" assumption (season-baseline behaviour) for that
+ *  round only.
+ *
+ *  Returns strokes/round the projection should shift by. Negative =
+ *  player has been out-performing → lower expected score.
+ */
 function bayesianFormBump(
   weekRounds: number[] | undefined,
   sgTotal: number,
   weight: number,
+  fieldMeansByRound: Partial<Record<1 | 2 | 3 | 4, number>>,
 ): number {
   if (!weekRounds || weekRounds.length === 0) return 0;
-  // Weekly average vs par
-  const meanVsPar = weekRounds.reduce((a, b) => a + b, 0) / weekRounds.length;
-  // Expected weekly avg per baseline: 0 - sgTotal (SG positive means
-  // shoots below par → expected vs par is negative). We're rough
-  // here — course softness this week (level shift) is already
-  // applied to the field, so we compare to that.
-  const expectedVsPar = -sgTotal;
-  const overPerformance = meanVsPar - expectedVsPar; // negative = over-performing
-  return weight * overPerformance;
+  let sumOver = 0;
+  for (let i = 0; i < weekRounds.length; i++) {
+    const round = (i + 1) as 1 | 2 | 3 | 4;
+    const actualVsPar = weekRounds[i];
+    const fieldMean = fieldMeansByRound[round] ?? 0;
+    // Expected for this player in this specific field:
+    //   expected_vs_par = field_mean_vs_par − sgTotal
+    // A +3 SG player in a −2 vs-par field is expected at −5 vs par.
+    const expectedVsPar = fieldMean - sgTotal;
+    sumOver += actualVsPar - expectedVsPar; // negative = over-performing
+  }
+  const meanOver = sumOver / weekRounds.length;
+  return weight * meanOver;
 }
 
 // ── Main entry ─────────────────────────────────────────────────────
@@ -532,12 +549,35 @@ export async function runForecast(
   const fieldForecast = par + fieldForecastVsPar;
 
   // ── Per-player projections ─────────────────────────────────────
+  // Compute per-round field mean vs par from priorRounds observations.
+  // Used to make form adjustment context-aware — a player who shot
+  // "great" in a soft field may just be shooting to his skill, not
+  // out-performing baseline.
+  const fieldMeansByRound: Partial<Record<1 | 2 | 3 | 4, number>> = {};
+  for (const [rStr, obs] of Object.entries(priorRounds)) {
+    if (!obs) continue;
+    const r = Number(rStr) as 1 | 2 | 3 | 4;
+    let sum = 0;
+    let n = 0;
+    for (const v of Object.values(obs.vsParByHole)) {
+      if (typeof v === "number") {
+        sum += v;
+        n += 1;
+      }
+    }
+    if (n > 0) fieldMeansByRound[r] = sum; // sum of per-hole vs-par = round total vs par
+  }
   const playerForecasts: PlayerForecast[] = [];
   for (const p of players) {
     const compression = p.compressionFactor ?? 0.83;
     const compressedEdge = p.sgTotal * compression;
     const formWeight = p.formWeight ?? 0.2;
-    const formBump = bayesianFormBump(p.weekRounds, p.sgTotal, formWeight);
+    const formBump = bayesianFormBump(
+      p.weekRounds,
+      p.sgTotal,
+      formWeight,
+      fieldMeansByRound,
+    );
     const skewGap = p.skewAdjustment ?? autoSkew(p.sgTotal);
     // Player expected mean = field mean − compressed edge + form bump
     // (formBump is negative if he's been out-performing).
