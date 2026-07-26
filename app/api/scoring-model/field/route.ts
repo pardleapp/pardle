@@ -19,6 +19,69 @@ import {
   type PGAScorecard,
 } from "@/lib/golf-api/pgatour";
 
+const DG_BASE = "https://feeds.datagolf.com";
+
+/** DG field-updates → per-round tee times per player. Same data
+ *  source the tee-time-scoring API uses. Returns a map keyed by
+ *  dg_id → { round → HH:MM }. */
+async function loadDgTeeTimes(): Promise<
+  Map<number, Partial<Record<1 | 2 | 3 | 4, string>>>
+> {
+  const out = new Map<number, Partial<Record<1 | 2 | 3 | 4, string>>>();
+  const key = process.env.DATAGOLF_API_KEY || process.env.DATAGOLF;
+  if (!key) return out;
+  try {
+    const url = `${DG_BASE}/field-updates?tour=pga&key=${encodeURIComponent(key)}&file_format=json`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return out;
+    const j = (await res.json()) as {
+      field?: Array<{
+        dg_id?: number;
+        teetimes?: Array<{ round_num?: number; teetime?: string }>;
+      }>;
+    };
+    for (const p of j.field ?? []) {
+      if (!p.dg_id) continue;
+      const perRound: Partial<Record<1 | 2 | 3 | 4, string>> = {};
+      for (const t of p.teetimes ?? []) {
+        if (t.round_num == null || !t.teetime) continue;
+        const r = t.round_num as 1 | 2 | 3 | 4;
+        // Support "YYYY-MM-DD HH:MM" and "HH:MM" alike.
+        const m = t.teetime.match(/(\d{2}):(\d{2})/);
+        if (m) perRound[r] = `${m[1]}:${m[2]}`;
+      }
+      out.set(p.dg_id, perRound);
+    }
+  } catch {
+    /* DG unavailable — no tee times, model falls back to day avg */
+  }
+  return out;
+}
+
+/** Map orchestrator playerId (`player_num` in DG's field-updates) to
+ *  DG dg_id. Needs a second fetch of the field payload. */
+async function loadPgaIdToDgId(): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const key = process.env.DATAGOLF_API_KEY || process.env.DATAGOLF;
+  if (!key) return out;
+  try {
+    const url = `${DG_BASE}/field-updates?tour=pga&key=${encodeURIComponent(key)}&file_format=json`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return out;
+    const j = (await res.json()) as {
+      field?: Array<{ dg_id?: number; player_num?: number | string }>;
+    };
+    for (const p of j.field ?? []) {
+      if (p.dg_id != null && p.player_num != null) {
+        out.set(String(p.player_num), p.dg_id);
+      }
+    }
+  } catch {
+    /* skip */
+  }
+  return out;
+}
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -104,9 +167,11 @@ export async function GET() {
     });
   }
 
-  const [leaderboard, csvSg] = await Promise.all([
+  const [leaderboard, csvSg, dgTeeTimes, pgaToDg] = await Promise.all([
     getLeaderboard(tournamentId).catch(() => []),
     loadCsvSg(),
+    loadDgTeeTimes(),
+    loadPgaIdToDgId(),
   ]);
 
   // Build normalised name → SG lookup once
@@ -131,6 +196,8 @@ export async function GET() {
     thru: string;
     playerState: string;
     weekRounds: number[]; // completed rounds' vs-par scores
+    /** Tee times per round, "HH:MM" local. Empty when unavailable. */
+    teeTimes: Partial<Record<1 | 2 | 3 | 4, string>>;
   }
 
   const players: Player[] = [];
@@ -158,6 +225,8 @@ export async function GET() {
       }
       // Rounds come back in insertion order, roughly R1 → R4.
     }
+    const dgId = pgaToDg.get(lb.playerId);
+    const teeTimes = dgId != null ? dgTeeTimes.get(dgId) ?? {} : {};
     players.push({
       id: lb.playerId,
       name: lb.displayName,
@@ -167,6 +236,7 @@ export async function GET() {
       thru: lb.thru,
       playerState: lb.playerState,
       weekRounds,
+      teeTimes,
     });
   }
 

@@ -61,6 +61,7 @@ interface FieldPlayer {
   thru: string;
   playerState: string;
   weekRounds: number[];
+  teeTimes: Partial<Record<Round, string>>; // "HH:MM"
 }
 interface FieldResp {
   ok: boolean;
@@ -93,6 +94,12 @@ interface PlayerRow {
   name: string;
   sgTotal: string;
   weekRounds: string;
+  /** Tee time for the target round in "HH:MM" (local venue time).
+   *  Populated from the field endpoint when a player is selected. */
+  teeTime: string;
+  /** Cache of DG-provided tee times per round so switching target
+   *  round auto-updates the tee-time input. */
+  teeTimesByRound: Partial<Record<Round, string>>;
   includeForm: boolean;
   advancedOpen: boolean;
   formWeight: string;
@@ -105,6 +112,8 @@ const emptyPlayer = (): PlayerRow => ({
   name: "",
   sgTotal: "",
   weekRounds: "",
+  teeTime: "",
+  teeTimesByRound: {},
   includeForm: true,
   advancedOpen: false,
   formWeight: "0.2",
@@ -119,6 +128,16 @@ function parseCsvNumbers(s: string): number[] {
     .filter((x) => x.length > 0)
     .map((x) => Number(x))
     .filter((n) => Number.isFinite(n));
+}
+
+/** Parse "HH:MM" → fractional local hour (14.5 for 14:30). */
+function hhmmToHour(hhmm: string): number | null {
+  const m = hhmm.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return h + min / 60;
 }
 
 // ── Component ──────────────────────────────────────────────────────
@@ -227,6 +246,7 @@ export default function ForecastTool() {
           const cf = Number(p.compressionFactor);
           const fw = Number(p.formWeight);
           const skew = Number(p.skewAdjustment);
+          const teeHour = p.teeTime ? hhmmToHour(p.teeTime) : null;
           return {
             name: p.name.trim(),
             sgTotal: sg,
@@ -235,6 +255,8 @@ export default function ForecastTool() {
               Number.isFinite(fw) && p.includeForm ? fw : 0,
             compressionFactor: Number.isFinite(cf) ? cf : 0.83,
             skewAdjustment: Number.isFinite(skew) ? skew : undefined,
+            teeHourLocal: teeHour ?? undefined,
+            startHole: 1,
           };
         })
         .filter(Boolean);
@@ -265,6 +287,7 @@ export default function ForecastTool() {
     windMph,
     windDirDeg,
     players,
+    hhmmToHour, // eslint-disable-line
   ]);
 
   // Fire once the field roster is loaded so users see a baseline
@@ -273,6 +296,18 @@ export default function ForecastTool() {
     if (field?.tournamentId) void runIt();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [field?.tournamentId]);
+
+  // When the target round changes, refresh each picked player's
+  // tee-time input from their cached teeTimesByRound.
+  useEffect(() => {
+    setPlayers((prev) =>
+      prev.map((p) => {
+        if (!p.playerId) return p;
+        const tt = p.teeTimesByRound[targetRound] ?? "";
+        return tt !== p.teeTime ? { ...p, teeTime: tt } : p;
+      }),
+    );
+  }, [targetRound]);
 
   const setPlayerRow = (idx: number, patch: Partial<PlayerRow>) =>
     setPlayers((prev) =>
@@ -481,6 +516,7 @@ export default function ForecastTool() {
               key={idx}
               row={p}
               field={field}
+              targetRound={targetRound}
               onChange={(patch) => setPlayerRow(idx, patch)}
               onRemove={() =>
                 setPlayers((prev) =>
@@ -534,12 +570,14 @@ export default function ForecastTool() {
 function PlayerCard({
   row,
   field,
+  targetRound,
   onChange,
   onRemove,
   onlyRow,
 }: {
   row: PlayerRow;
   field: FieldResp | null;
+  targetRound: Round;
   onChange: (patch: Partial<PlayerRow>) => void;
   onRemove: () => void;
   onlyRow: boolean;
@@ -564,6 +602,8 @@ function PlayerCard({
       name: fp.name,
       sgTotal: fp.sgTotal != null ? String(fp.sgTotal) : "",
       weekRounds: fp.weekRounds.join(","),
+      teeTimesByRound: fp.teeTimes,
+      teeTime: fp.teeTimes[targetRound] ?? "",
     });
     setQuery(fp.name);
     setDropdownOpen(false);
@@ -582,7 +622,7 @@ function PlayerCard({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "2fr 1fr auto",
+          gridTemplateColumns: "2fr 1fr 0.8fr auto",
           gap: 10,
           alignItems: "end",
         }}
@@ -666,6 +706,17 @@ function PlayerCard({
             placeholder={row.playerId ? "auto" : "type or pick"}
             value={row.sgTotal}
             onChange={(e) => onChange({ sgTotal: e.target.value })}
+            style={ip()}
+          />
+        </Field>
+        <Field
+          label="Tee time"
+          help="Local time (HH:MM). When set, the model reads HRRR wind at the specific hour this player will face each hole — late tee times facing a building afternoon wind get a properly harder projection than a day-avg forecast."
+        >
+          <input
+            placeholder="HH:MM"
+            value={row.teeTime}
+            onChange={(e) => onChange({ teeTime: e.target.value })}
             style={ip()}
           />
         </Field>

@@ -17,6 +17,8 @@ import { getHoleBearings } from "./hole-bearings";
 import {
   getHrrrHourlyWind,
   summariseHrrrDay,
+  windAtHour,
+  type HourlyWind,
 } from "./hrrr-hourly";
 import { coordsForTournamentId } from "@/lib/weather/course-coords";
 import { getDailyWeather } from "@/lib/weather/open-meteo";
@@ -109,6 +111,16 @@ export interface PlayerInput {
   /** Weight on the form component (0 = ignore recent, 1 = fully lean
    *  in). Default 0.20 per Connolly-Rendleman-style shrinkage. */
   formWeight?: number;
+  /** Local tee time in fractional hours (e.g. 14.5 for 2:30 PM).
+   *  When provided AND HRRR hourly wind is available, the model
+   *  recomputes each hole's expected score using the wind at that
+   *  hole's play time (15 min per hole from tee-off). Late tee times
+   *  facing a building afternoon wind get a properly harder
+   *  projection than the day-average field forecast. */
+  teeHourLocal?: number;
+  /** Starting hole (1 or 10 typically). Only used with teeHourLocal;
+   *  defaults to 1 for regular non-shotgun rounds. */
+  startHole?: number;
 }
 
 export interface ForecastInputs {
@@ -197,6 +209,11 @@ export interface PlayerForecast {
     compressedEdge: number;
     formBump: number;
     skewGap: number;
+    /** True when the player's field mean was recomputed with tee-
+     *  time-specific hourly wind (vs the day-avg field forecast). */
+    teeTimeAdjusted?: boolean;
+    /** Wind at tee-off, when tee-time-adjusted. */
+    teeTimeWind?: { windMph: number; windDirDeg: number };
   };
 }
 
@@ -580,6 +597,74 @@ export async function runForecast(
     fieldTotal + levelShiftAttenuated + pinDifficultyAdder;
   const fieldForecast = par + fieldForecastVsPar;
 
+  // ── Fetch HRRR hourly wind once (shared across all tee-time-
+  // aware player projections). Cheap in-process cache in
+  // getHrrrHourlyWind means we don't re-hit Open-Meteo. */
+  let hrrrHourly: HourlyWind[] = [];
+  if (coords && !windOverride) {
+    try {
+      hrrrHourly = await getHrrrHourlyWind(
+        coords.lat,
+        coords.lon,
+        targetDate,
+        coords.tz,
+      );
+    } catch {
+      /* no hourly — players fall back to day-avg wind */
+    }
+  }
+
+  /** Per-player field-mean recompute with hourly wind. When we know
+   *  the player's tee time we can trace the wind hour-by-hour along
+   *  their round and produce a mean-anchored expectation that
+   *  reflects the actual wind they'll face — not the day average. */
+  function fieldMeanForTeeTime(
+    teeHour: number,
+    startHole: number,
+  ): { fieldForecastVsPar: number; teeWind: { windMph: number; windDirDeg: number } } | null {
+    if (hrrrHourly.length === 0) return null;
+    let sum = 0;
+    for (let step = 0; step < 18; step++) {
+      const holeNum = ((startHole - 1 + step) % 18) + 1;
+      const fit = coeffs!.holes[holeNum];
+      const bearing = bearings![holeNum];
+      if (!fit || typeof bearing !== "number") continue;
+      const holeHour = teeHour + step * 0.25; // 15 min/hole
+      const w = windAtHour(hrrrHourly, holeHour);
+      if (!w) return null;
+      const override = effectiveHoles[holeNum] ?? {};
+      const yards = override.yards ?? fit.histMeanYards;
+      const conditions: TodayConditions = {
+        yards,
+        windSpeed: w.windMph,
+        windDir: w.windDirDeg,
+        pinX: override.pinX,
+        pinY: override.pinY,
+      };
+      const p = projectHoleAvgToPar({
+        fit,
+        bearing,
+        conditions,
+        roundNum: targetRound,
+      });
+      let avg = p.modelAvgVsPar;
+      if (override.cluster && fit.clusterResiduals[override.cluster] != null) {
+        const autoRes = p.matchedCluster
+          ? fit.clusterResiduals[p.matchedCluster] ?? 0
+          : 0;
+        avg = avg - autoRes + fit.clusterResiduals[override.cluster];
+      }
+      // Apply the same level shift + pin adder per-hole share.
+      avg += (levelShiftAttenuated + pinDifficultyAdder) / 18;
+      sum += avg;
+    }
+    const startWind = windAtHour(hrrrHourly, teeHour);
+    return {
+      fieldForecastVsPar: sum,
+      teeWind: startWind ?? { windMph: wind.windMph, windDirDeg: wind.windDirDeg },
+    };
+  }
+
   // ── Per-player projections ─────────────────────────────────────
   // Compute per-round field mean vs par from priorRounds observations.
   // Used to make form adjustment context-aware — a player who shot
@@ -611,9 +696,29 @@ export async function runForecast(
       fieldMeansByRound,
     );
     const skewGap = p.skewAdjustment ?? autoSkew(p.sgTotal);
+
+    // Player-specific field baseline. If a tee time is given AND
+    // hourly HRRR data is available, walk the hourly wind along
+    // their round to get a wind-time-aware baseline. Otherwise fall
+    // back to the day-average field forecast.
+    let playerFieldMean = fieldForecast;
+    let teeTimeAdjusted = false;
+    let teeTimeWind: { windMph: number; windDirDeg: number } | undefined;
+    if (typeof p.teeHourLocal === "number" && hrrrHourly.length > 0) {
+      const walk = fieldMeanForTeeTime(
+        p.teeHourLocal,
+        p.startHole ?? 1,
+      );
+      if (walk) {
+        playerFieldMean = par + walk.fieldForecastVsPar;
+        teeTimeAdjusted = true;
+        teeTimeWind = walk.teeWind;
+      }
+    }
+
     // Player expected mean = field mean − compressed edge + form bump
     // (formBump is negative if he's been out-performing).
-    const expectedMean = fieldForecast - compressedEdge + formBump;
+    const expectedMean = playerFieldMean - compressedEdge + formBump;
     const expectedMedian = expectedMean - skewGap;
     playerForecasts.push({
       name: p.name,
@@ -623,10 +728,12 @@ export async function runForecast(
       expectedMean,
       expectedMedian,
       breakdown: {
-        fieldMean: fieldForecast,
+        fieldMean: playerFieldMean,
         compressedEdge,
         formBump,
         skewGap,
+        teeTimeAdjusted,
+        teeTimeWind,
       },
     });
   }
