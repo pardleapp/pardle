@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-// ── Types mirroring the API contract ───────────────────────────────
+// ── Types mirroring the API contracts ──────────────────────────────
 type Round = 1 | 2 | 3 | 4;
 type LevelShiftMode = "average" | "most-recent" | "most-recent-post-cut";
 
@@ -19,7 +19,7 @@ interface HoleForecast {
   windDelta: number;
   yardsDelta: number;
 }
-interface PlayerForecast {
+interface PlayerForecastResp {
   name: string;
   sgTotal: number;
   formAdjustment: number;
@@ -48,24 +48,65 @@ interface ForecastResp {
   fieldForecast?: number;
   fieldForecastVsPar?: number;
   holes?: HoleForecast[];
-  players?: PlayerForecast[];
+  players?: PlayerForecastResp[];
   warnings?: string[];
 }
 
-// ── Player input row ───────────────────────────────────────────────
-interface PlayerRow {
+interface FieldPlayer {
+  id: string;
   name: string;
-  sgTotal: string; // form state; parsed to number on send
-  weekRounds: string; // comma-sep list of vs-par values, e.g. "-2,-2,-6"
+  sgTotal: number | null;
+  position: string;
+  total: string;
+  thru: string;
+  playerState: string;
+  weekRounds: number[];
+}
+interface FieldResp {
+  ok: boolean;
+  tournamentId: string | null;
+  tournamentName: string | null;
+  players: FieldPlayer[];
+}
+
+/** Plain-English "conditions" selector → maps to raw mode + attenuation
+ *  under the hood. */
+type ConditionsPreset =
+  | "same-as-last-round"
+  | "based-on-r3"
+  | "based-on-r2"
+  | "based-on-r1"
+  | "average-of-week"
+  | "typical"; // ignore this week's data
+const CONDITIONS_LABEL: Record<ConditionsPreset, string> = {
+  "same-as-last-round": "Conditions like the most recent finished round",
+  "based-on-r3": "Conditions like R3",
+  "based-on-r2": "Conditions like R2",
+  "based-on-r1": "Conditions like R1",
+  "average-of-week": "Average of all finished rounds this week",
+  typical: "Typical (ignore this week's residuals)",
+};
+
+/** Player row in the local state — one per player being projected. */
+interface PlayerRow {
+  playerId: string; // "" while empty
+  name: string;
+  sgTotal: string;
+  weekRounds: string;
+  includeForm: boolean;
+  advancedOpen: boolean;
   formWeight: string;
   compressionFactor: string;
   skewAdjustment: string;
 }
 
 const emptyPlayer = (): PlayerRow => ({
+  playerId: "",
   name: "",
   sgTotal: "",
   weekRounds: "",
+  includeForm: true,
+  advancedOpen: false,
   formWeight: "0.2",
   compressionFactor: "0.83",
   skewAdjustment: "",
@@ -82,18 +123,16 @@ function parseCsvNumbers(s: string): number[] {
 
 // ── Component ──────────────────────────────────────────────────────
 export default function ForecastTool() {
-  const [tournamentId, setTournamentId] = useState<string>("R2026525");
+  const [field, setField] = useState<FieldResp | null>(null);
   const [targetRound, setTargetRound] = useState<Round>(4);
-  /** Yardage source: "auto" reads from the pin sheet (Pardle's
-   *  predicted yardage for the round); "manual" opens a 18-hole grid. */
-  const [yardsMode, setYardsMode] = useState<"auto" | "manual">("auto");
-  const [yardsByHole, setYardsByHole] = useState<Record<number, string>>({});
-  const [pinDifficultyAdder, setPinDifficultyAdder] = useState<string>("0");
-  const [levelShiftMode, setLevelShiftMode] = useState<LevelShiftMode | "auto">(
-    "auto",
+  const [conditions, setConditions] = useState<ConditionsPreset>(
+    "same-as-last-round",
   );
-  const [levelShiftAttenuation, setLevelShiftAttenuation] =
-    useState<string>("1");
+  const [yardsSource, setYardsSource] = useState<
+    "auto" | "delta-from-prior"
+  >("auto");
+  const [yardsDeltaSource, setYardsDeltaSource] = useState<Round>(3);
+  const [yardsDeltaTotal, setYardsDeltaTotal] = useState<string>("0");
   const [useHrrr, setUseHrrr] = useState<boolean>(true);
   const [windOverride, setWindOverride] = useState<boolean>(false);
   const [windMph, setWindMph] = useState<string>("");
@@ -103,45 +142,76 @@ export default function ForecastTool() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<ForecastResp | null>(null);
 
+  // Load field roster on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/scoring-model/field");
+        const json = (await res.json()) as FieldResp;
+        setField(json);
+      } catch {
+        /* no field — user can still enter SG manually */
+      }
+    })();
+  }, []);
+
+  // ── Translate ConditionsPreset → API level-shift params ─────────
+  const conditionsToApi = useCallback(
+    (
+      preset: ConditionsPreset,
+    ): { mode?: LevelShiftMode; attenuation: number } => {
+      switch (preset) {
+        case "same-as-last-round":
+          return { mode: "most-recent-post-cut", attenuation: 1 };
+        case "based-on-r3":
+          return { mode: "most-recent-post-cut", attenuation: 1 };
+        case "based-on-r2":
+          return { mode: "most-recent", attenuation: 1 };
+        case "based-on-r1":
+          return { mode: "most-recent", attenuation: 1 };
+        case "average-of-week":
+          return { mode: "average", attenuation: 1 };
+        case "typical":
+          return { mode: undefined, attenuation: 0 };
+      }
+    },
+    [],
+  );
+
   const runIt = useCallback(async () => {
     setRunning(true);
     try {
-      const holes: Record<number, { yards?: number }> = {};
-      if (yardsMode === "manual") {
-        for (let h = 1; h <= 18; h++) {
-          const y = yardsByHole[h]?.trim();
-          const yn = y ? Number(y) : undefined;
-          if (typeof yn === "number" && Number.isFinite(yn)) {
-            holes[h] = { yards: yn };
-          }
-        }
-      }
+      const conditionsApi = conditionsToApi(conditions);
       const body: Record<string, unknown> = {
-        tournamentId,
+        tournamentId: field?.tournamentId ?? undefined,
         targetRound,
-        holes,
-        // Auto-fetch pin sheet yards + pin coords unless the user
-        // opted into manual yardage entry (in which case honour their
-        // per-hole values; missing holes still fall back to pin sheet
-        // in "auto" mode).
-        autoYardageAndPins: yardsMode === "auto",
-        pinDifficultyAdder: Number(pinDifficultyAdder) || 0,
         useHrrr,
-        levelShiftAttenuation: Number(levelShiftAttenuation) || 1,
+        levelShiftAttenuation: conditionsApi.attenuation,
       };
-      if (levelShiftMode !== "auto") body.levelShiftMode = levelShiftMode;
+      if (conditionsApi.mode) body.levelShiftMode = conditionsApi.mode;
+      // Yardage source
+      if (yardsSource === "delta-from-prior") {
+        const d = Number(yardsDeltaTotal);
+        body.yardsDeltaFromRound = {
+          sourceRound: yardsDeltaSource,
+          totalDeltaYards: Number.isFinite(d) ? d : 0,
+        };
+        body.autoYardageAndPins = false; // block auto-yards; keep auto-pins via delta path
+      } else {
+        body.autoYardageAndPins = true;
+      }
       if (windOverride) {
         const w = Number(windMph);
-        const d = Number(windDirDeg);
-        if (Number.isFinite(w) && Number.isFinite(d)) {
-          body.windOverride = { windMph: w, windDirDeg: d };
+        const dir = Number(windDirDeg);
+        if (Number.isFinite(w) && Number.isFinite(dir)) {
+          body.windOverride = { windMph: w, windDirDeg: dir };
         }
       }
       const parsedPlayers = players
         .map((p) => {
           const sg = Number(p.sgTotal);
           if (!p.name.trim() || !Number.isFinite(sg)) return null;
-          const wr = parseCsvNumbers(p.weekRounds);
+          const wr = p.includeForm ? parseCsvNumbers(p.weekRounds) : [];
           const cf = Number(p.compressionFactor);
           const fw = Number(p.formWeight);
           const skew = Number(p.skewAdjustment);
@@ -149,7 +219,8 @@ export default function ForecastTool() {
             name: p.name.trim(),
             sgTotal: sg,
             weekRounds: wr.length ? wr : undefined,
-            formWeight: Number.isFinite(fw) ? fw : 0.2,
+            formWeight:
+              Number.isFinite(fw) && p.includeForm ? fw : 0,
             compressionFactor: Number.isFinite(cf) ? cf : 0.83,
             skewAdjustment: Number.isFinite(skew) ? skew : undefined,
           };
@@ -168,13 +239,13 @@ export default function ForecastTool() {
       setRunning(false);
     }
   }, [
-    tournamentId,
+    field,
     targetRound,
-    yardsMode,
-    yardsByHole,
-    pinDifficultyAdder,
-    levelShiftMode,
-    levelShiftAttenuation,
+    conditions,
+    conditionsToApi,
+    yardsSource,
+    yardsDeltaSource,
+    yardsDeltaTotal,
     useHrrr,
     windOverride,
     windMph,
@@ -182,12 +253,19 @@ export default function ForecastTool() {
     players,
   ]);
 
-  // Kick off once so users see a baseline result immediately.
+  // Fire once the field roster is loaded so users see a baseline
+  // (needs at least the tournamentId).
   useEffect(() => {
-    void runIt();
+    if (field?.tournamentId) void runIt();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [field?.tournamentId]);
 
+  const setPlayerRow = (idx: number, patch: Partial<PlayerRow>) =>
+    setPlayers((prev) =>
+      prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)),
+    );
+
+  // ── Render ─────────────────────────────────────────────────────
   return (
     <div style={{ display: "grid", gap: 20 }}>
       {/* ── Setup panel ────────────────────────────────────────── */}
@@ -196,326 +274,185 @@ export default function ForecastTool() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
             gap: 12,
             marginBottom: 12,
           }}
         >
-          <Field label="Tournament ID">
-            <input
-              value={tournamentId}
-              onChange={(e) => setTournamentId(e.target.value)}
-              style={ip()}
-            />
+          <Field label="Tournament">
+            <div
+              style={{
+                ...ip(),
+                display: "flex",
+                alignItems: "center",
+                background: "oklch(0.97 0.005 155)",
+                color: "oklch(0.3 0.03 155)",
+                fontWeight: 600,
+              }}
+            >
+              {field?.tournamentName ?? "Loading…"}
+            </div>
           </Field>
-          <Field label="Target round">
+          <Field label="Round to forecast">
             <select
               value={targetRound}
               onChange={(e) => setTargetRound(Number(e.target.value) as Round)}
               style={ip()}
             >
-              <option value={1}>R1</option>
-              <option value={2}>R2</option>
-              <option value={3}>R3</option>
-              <option value={4}>R4</option>
+              <option value={1}>Round 1</option>
+              <option value={2}>Round 2</option>
+              <option value={3}>Round 3</option>
+              <option value={4}>Round 4</option>
             </select>
           </Field>
-          <Field label="Setup adjustment (total strokes)">
-            <input
-              type="number"
-              step="0.1"
-              value={pinDifficultyAdder}
-              onChange={(e) => setPinDifficultyAdder(e.target.value)}
-              style={ip()}
-              title="Catch-all for setup effects the model can't otherwise see (green firmness, rough length, novel pins outside any historical cluster). Set to 0 if the pin sheet is fully known."
-            />
-          </Field>
-          <Field label="Yardage source">
+          <Field
+            label="Conditions"
+            help="How much do this week's finished rounds tell us about scoring for the forecast round?"
+          >
             <select
-              value={yardsMode}
+              value={conditions}
               onChange={(e) =>
-                setYardsMode(e.target.value as "auto" | "manual")
+                setConditions(e.target.value as ConditionsPreset)
               }
               style={ip()}
             >
-              <option value="auto">Pardle's predicted (from pin sheet)</option>
-              <option value="manual">Manual entry per hole</option>
+              {(
+                [
+                  "same-as-last-round",
+                  "based-on-r3",
+                  "based-on-r2",
+                  "based-on-r1",
+                  "average-of-week",
+                  "typical",
+                ] as ConditionsPreset[]
+              ).map((c) => (
+                <option key={c} value={c}>
+                  {CONDITIONS_LABEL[c]}
+                </option>
+              ))}
             </select>
           </Field>
-          <Field label="Level shift mode">
+          <Field
+            label="Yardage"
+            help="Pardle's prediction reads the pin sheet; delta lets you say 'course plays X yards longer/shorter than a prior round'."
+          >
             <select
-              value={levelShiftMode}
+              value={yardsSource}
               onChange={(e) =>
-                setLevelShiftMode(
-                  e.target.value as LevelShiftMode | "auto",
+                setYardsSource(
+                  e.target.value as "auto" | "delta-from-prior",
                 )
               }
               style={ip()}
             >
-              <option value="auto">Auto (post-cut for R3/R4)</option>
-              <option value="average">Average all prior rounds</option>
-              <option value="most-recent">Most-recent only</option>
-              <option value="most-recent-post-cut">
-                Most-recent post-cut only
+              <option value="auto">Pardle's prediction</option>
+              <option value="delta-from-prior">
+                Manual delta from a prior round
               </option>
             </select>
           </Field>
-          <Field label="Level shift attenuation (0–1)">
-            <input
-              type="number"
-              step="0.05"
-              min="0"
-              max="1"
-              value={levelShiftAttenuation}
-              onChange={(e) => setLevelShiftAttenuation(e.target.value)}
-              style={ip()}
-            />
-          </Field>
-          <Field label="HRRR wind">
-            <select
-              value={useHrrr ? "yes" : "no"}
-              onChange={(e) => setUseHrrr(e.target.value === "yes")}
-              style={ip()}
-            >
-              <option value="yes">Use HRRR (default)</option>
-              <option value="no">GFS blend</option>
-            </select>
-          </Field>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <input
-              type="checkbox"
-              checked={windOverride}
-              onChange={(e) => setWindOverride(e.target.checked)}
-            />
-            Manual wind override
-          </label>
-          {windOverride && (
+          {yardsSource === "delta-from-prior" && (
             <>
-              <Field label="Wind mph">
-                <input
-                  type="number"
-                  step="0.5"
-                  value={windMph}
-                  onChange={(e) => setWindMph(e.target.value)}
-                  style={ip(120)}
-                />
+              <Field label="Delta from round">
+                <select
+                  value={yardsDeltaSource}
+                  onChange={(e) =>
+                    setYardsDeltaSource(Number(e.target.value) as Round)
+                  }
+                  style={ip()}
+                >
+                  <option value={1}>R1</option>
+                  <option value={2}>R2</option>
+                  <option value={3}>R3</option>
+                  <option value={4}>R4</option>
+                </select>
               </Field>
-              <Field label="Wind FROM deg">
+              <Field label="Total delta (yards)">
                 <input
                   type="number"
-                  step="1"
-                  value={windDirDeg}
-                  onChange={(e) => setWindDirDeg(e.target.value)}
-                  style={ip(120)}
+                  step="5"
+                  value={yardsDeltaTotal}
+                  onChange={(e) => setYardsDeltaTotal(e.target.value)}
+                  style={ip()}
+                  placeholder="+100 = 100 yds longer"
                 />
               </Field>
             </>
           )}
+          <Field label="Wind">
+            <select
+              value={
+                windOverride ? "override" : useHrrr ? "hrrr" : "gfs-blend"
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "override") setWindOverride(true);
+                else {
+                  setWindOverride(false);
+                  setUseHrrr(v === "hrrr");
+                }
+              }}
+              style={ip()}
+            >
+              <option value="hrrr">Auto (HRRR forecast)</option>
+              <option value="gfs-blend">Auto (GFS blend)</option>
+              <option value="override">Manual override</option>
+            </select>
+          </Field>
         </div>
-      </div>
-
-      {/* ── Manual yardage grid (only when opted in) ─────────── */}
-      {yardsMode === "manual" && (
-        <div style={panel()}>
-          <h3 style={h3()}>Yardage per hole</h3>
-          <p style={helpText()}>
-            Enter yards for every hole. Any blank hole falls back to the
-            pin sheet if available, else the fit's historical mean.
-          </p>
+        {windOverride && (
           <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))",
-              gap: 8,
-            }}
+            style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}
           >
-            {Array.from({ length: 18 }, (_, i) => i + 1).map((h) => (
-              <div
-                key={h}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 4,
-                  padding: 6,
-                  border: "1px solid oklch(0.9 0.008 95)",
-                  borderRadius: 6,
-                  background: "white",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "oklch(0.35 0.03 155)",
-                    letterSpacing: 0.4,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  H{h}
-                </div>
-                <input
-                  placeholder="yds"
-                  type="number"
-                  value={yardsByHole[h] ?? ""}
-                  onChange={(e) =>
-                    setYardsByHole((prev) => ({
-                      ...prev,
-                      [h]: e.target.value,
-                    }))
-                  }
-                  style={{ ...ip(), fontSize: 13, padding: "4px 6px" }}
-                />
-              </div>
-            ))}
+            <Field label="Wind mph">
+              <input
+                type="number"
+                step="0.5"
+                value={windMph}
+                onChange={(e) => setWindMph(e.target.value)}
+                style={ip(120)}
+              />
+            </Field>
+            <Field label="Wind FROM (deg)">
+              <input
+                type="number"
+                step="1"
+                value={windDirDeg}
+                onChange={(e) => setWindDirDeg(e.target.value)}
+                style={ip(120)}
+              />
+            </Field>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* ── Players ────────────────────────────────────────────── */}
       <div style={panel()}>
-        <h3 style={h3()}>Players (optional)</h3>
+        <h3 style={h3()}>Players</h3>
         <p style={helpText()}>
-          Add players to see expected mean / median. weekRounds is a
-          comma-separated list of vs-par scores this week (e.g.{" "}
-          <code>-2,-2,-6</code> for R1/R2/R3). formWeight is the
-          Bayesian shrinkage weight (0 = ignore recent; 0.2 default
-          per Connolly-Rendleman shrinkage).
+          Search a player from the field. Strokes-gained rating auto-fills
+          from Pardle's pre-tournament model. Rounds played this week
+          also auto-fill so form adjustment works out of the box.
         </p>
-        <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ display: "grid", gap: 10 }}>
           {players.map((p, idx) => (
-            <div
+            <PlayerCard
               key={idx}
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "1.4fr 0.7fr 1fr 0.6fr 0.6fr 0.6fr auto",
-                gap: 6,
-                alignItems: "center",
-                padding: 8,
-                border: "1px solid oklch(0.9 0.008 95)",
-                borderRadius: 6,
-                background: "white",
-              }}
-            >
-              <input
-                placeholder="Name"
-                value={p.name}
-                onChange={(e) =>
-                  setPlayers((prev) =>
-                    prev.map((x, i) =>
-                      i === idx ? { ...x, name: e.target.value } : x,
-                    ),
-                  )
-                }
-                style={ip()}
-              />
-              <input
-                placeholder="SG total"
-                type="number"
-                step="0.05"
-                value={p.sgTotal}
-                onChange={(e) =>
-                  setPlayers((prev) =>
-                    prev.map((x, i) =>
-                      i === idx ? { ...x, sgTotal: e.target.value } : x,
-                    ),
-                  )
-                }
-                style={ip()}
-              />
-              <input
-                placeholder="Week rounds (vs par)"
-                value={p.weekRounds}
-                onChange={(e) =>
-                  setPlayers((prev) =>
-                    prev.map((x, i) =>
-                      i === idx ? { ...x, weekRounds: e.target.value } : x,
-                    ),
-                  )
-                }
-                style={ip()}
-              />
-              <input
-                placeholder="Form w"
-                type="number"
-                step="0.05"
-                min="0"
-                max="1"
-                value={p.formWeight}
-                onChange={(e) =>
-                  setPlayers((prev) =>
-                    prev.map((x, i) =>
-                      i === idx ? { ...x, formWeight: e.target.value } : x,
-                    ),
-                  )
-                }
-                style={ip()}
-                title="Bayesian shrinkage weight on this week's rounds (0-1)"
-              />
-              <input
-                placeholder="Comp"
-                type="number"
-                step="0.05"
-                min="0"
-                max="1.2"
-                value={p.compressionFactor}
-                onChange={(e) =>
-                  setPlayers((prev) =>
-                    prev.map((x, i) =>
-                      i === idx
-                        ? { ...x, compressionFactor: e.target.value }
-                        : x,
-                    ),
-                  )
-                }
-                style={ip()}
-                title="Compression on SG edge (0.83 default for bunching courses)"
-              />
-              <input
-                placeholder="Skew"
-                type="number"
-                step="0.05"
-                min="0"
-                max="1"
-                value={p.skewAdjustment}
-                onChange={(e) =>
-                  setPlayers((prev) =>
-                    prev.map((x, i) =>
-                      i === idx
-                        ? { ...x, skewAdjustment: e.target.value }
-                        : x,
-                    ),
-                  )
-                }
-                style={ip()}
-                title="Mean-median gap (blank = auto by SG tier)"
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  setPlayers((prev) =>
-                    prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev,
-                  )
-                }
-                style={btn()}
-              >
-                ✕
-              </button>
-            </div>
+              row={p}
+              field={field}
+              onChange={(patch) => setPlayerRow(idx, patch)}
+              onRemove={() =>
+                setPlayers((prev) =>
+                  prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev,
+                )
+              }
+              onlyRow={players.length === 1}
+            />
           ))}
           <button
             type="button"
             onClick={() => setPlayers((prev) => [...prev, emptyPlayer()])}
-            style={btnPrimary()}
+            style={{ ...btnPrimary(), alignSelf: "flex-start" }}
           >
             + Add player
           </button>
@@ -534,9 +471,7 @@ export default function ForecastTool() {
         </button>
       </div>
 
-      {result && result.ok && (
-        <ResultsPanel r={result} />
-      )}
+      {result && result.ok && <ResultsPanel r={result} />}
       {result && !result.ok && (
         <div
           style={{
@@ -554,8 +489,247 @@ export default function ForecastTool() {
   );
 }
 
-// ── Results ────────────────────────────────────────────────────────
+// ── PlayerCard ────────────────────────────────────────────────────
+function PlayerCard({
+  row,
+  field,
+  onChange,
+  onRemove,
+  onlyRow,
+}: {
+  row: PlayerRow;
+  field: FieldResp | null;
+  onChange: (patch: Partial<PlayerRow>) => void;
+  onRemove: () => void;
+  onlyRow: boolean;
+}) {
+  const [query, setQuery] = useState<string>(row.name);
+  useEffect(() => {
+    setQuery(row.name);
+  }, [row.name]);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || !field) return [] as FieldPlayer[];
+    return field.players
+      .filter((p) => p.name.toLowerCase().includes(q))
+      .slice(0, 12);
+  }, [field, query]);
+
+  const applyPlayer = (fp: FieldPlayer) => {
+    onChange({
+      playerId: fp.id,
+      name: fp.name,
+      sgTotal: fp.sgTotal != null ? String(fp.sgTotal) : "",
+      weekRounds: fp.weekRounds.join(","),
+    });
+    setQuery(fp.name);
+    setDropdownOpen(false);
+  };
+
+  return (
+    <div
+      style={{
+        padding: 12,
+        border: "1px solid oklch(0.9 0.008 95)",
+        borderRadius: 8,
+        background: "white",
+        position: "relative",
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr 1fr auto",
+          gap: 10,
+          alignItems: "end",
+        }}
+      >
+        <Field label="Player">
+          <input
+            type="search"
+            placeholder="Type to search field…"
+            value={query}
+            onFocus={() => setDropdownOpen(true)}
+            onBlur={() => setTimeout(() => setDropdownOpen(false), 150)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setDropdownOpen(true);
+              // Clear the underlying player when the search text changes
+              // — this is the user typing, not a selection.
+              if (row.playerId && e.target.value !== row.name) {
+                onChange({ playerId: "", name: e.target.value, sgTotal: "" });
+              } else {
+                onChange({ name: e.target.value });
+              }
+            }}
+            style={ip()}
+          />
+          {dropdownOpen && matches.length > 0 && (
+            <div
+              style={{
+                position: "absolute",
+                zIndex: 10,
+                marginTop: 2,
+                background: "white",
+                border: "1px solid oklch(0.85 0.013 95)",
+                borderRadius: 6,
+                boxShadow: "0 4px 12px rgba(15,23,42,0.08)",
+                maxHeight: 260,
+                overflowY: "auto",
+                minWidth: 260,
+              }}
+            >
+              {matches.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applyPlayer(m)}
+                  style={{
+                    display: "flex",
+                    width: "100%",
+                    padding: "6px 10px",
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    textAlign: "left",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ flex: 1 }}>{m.name}</span>
+                  {m.sgTotal != null && (
+                    <span
+                      style={{
+                        fontFamily: "var(--font-mono, monospace)",
+                        fontWeight: 700,
+                        color: "oklch(0.4 0.15 155)",
+                      }}
+                    >
+                      SG {m.sgTotal >= 0 ? "+" : ""}
+                      {m.sgTotal.toFixed(2)}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </Field>
+        <Field label="Season SG">
+          <input
+            type="number"
+            step="0.05"
+            placeholder={row.playerId ? "auto" : "type or pick"}
+            value={row.sgTotal}
+            onChange={(e) => onChange({ sgTotal: e.target.value })}
+            style={ip()}
+          />
+        </Field>
+        <Field label="Rounds this week (vs par)">
+          <input
+            placeholder="auto-filled"
+            value={row.weekRounds}
+            onChange={(e) => onChange({ weekRounds: e.target.value })}
+            style={ip()}
+          />
+        </Field>
+        <button type="button" onClick={onRemove} disabled={onlyRow} style={btn()}>
+          ✕
+        </button>
+      </div>
+      <div
+        style={{
+          marginTop: 8,
+          display: "flex",
+          gap: 12,
+          alignItems: "center",
+          fontSize: 12,
+          color: "oklch(0.45 0.02 155)",
+        }}
+      >
+        <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <input
+            type="checkbox"
+            checked={row.includeForm}
+            onChange={(e) => onChange({ includeForm: e.target.checked })}
+          />
+          Use form adjustment from this week's rounds
+        </label>
+        <button
+          type="button"
+          onClick={() => onChange({ advancedOpen: !row.advancedOpen })}
+          style={{ ...btn(), fontSize: 11 }}
+        >
+          {row.advancedOpen ? "Hide" : "Show"} advanced
+        </button>
+      </div>
+      {row.advancedOpen && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: 10,
+            background: "oklch(0.98 0.005 155)",
+            borderRadius: 6,
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+            gap: 10,
+          }}
+        >
+          <Field
+            label="Form weight"
+            help="How much this week's rounds shift the projection. 0.2 default per Connolly-Rendleman shrinkage. 0 = ignore form, 0.5 = aggressive."
+          >
+            <input
+              type="number"
+              step="0.05"
+              min="0"
+              max="1"
+              value={row.formWeight}
+              onChange={(e) => onChange({ formWeight: e.target.value })}
+              style={ip()}
+            />
+          </Field>
+          <Field
+            label="Skill compression"
+            help="How much this course flattens the elite-vs-field gap. 0.83 default at bunching courses like this one. 1.0 = no compression."
+          >
+            <input
+              type="number"
+              step="0.05"
+              min="0"
+              max="1.2"
+              value={row.compressionFactor}
+              onChange={(e) =>
+                onChange({ compressionFactor: e.target.value })
+              }
+              style={ip()}
+            />
+          </Field>
+          <Field
+            label="Skew adjustment"
+            help="Mean-median gap. Auto by SG tier: elite ~0.20, mid ~0.25, below-avg ~0.30. Higher = more optimistic median vs mean."
+          >
+            <input
+              type="number"
+              step="0.05"
+              min="0"
+              max="1"
+              placeholder="auto"
+              value={row.skewAdjustment}
+              onChange={(e) => onChange({ skewAdjustment: e.target.value })}
+              style={ip()}
+            />
+          </Field>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Results ────────────────────────────────────────────────────────
 function ResultsPanel({ r }: { r: ForecastResp }) {
   if (!r.holes || !r.fieldForecast) return null;
   return (
@@ -598,28 +772,6 @@ function ResultsPanel({ r }: { r: ForecastResp }) {
         />
       </div>
 
-      {/* Per-round residual breakdown */}
-      {r.levelShiftPerRound &&
-        Object.keys(r.levelShiftPerRound).length > 0 && (
-          <div style={{ marginBottom: 16, fontSize: 12 }}>
-            <span style={{ color: "oklch(0.5 0.02 150)" }}>
-              Per-round residuals:
-            </span>
-            {Object.entries(r.levelShiftPerRound).map(([rr, v]) => (
-              <span
-                key={rr}
-                style={{
-                  marginLeft: 8,
-                  fontFamily: "var(--font-mono, monospace)",
-                  fontWeight: 700,
-                }}
-              >
-                R{rr}: {v!.toFixed(3)} / hole
-              </span>
-            ))}
-          </div>
-        )}
-
       {/* Players table */}
       {r.players && r.players.length > 0 && (
         <div style={{ marginBottom: 16 }}>
@@ -644,9 +796,8 @@ function ResultsPanel({ r }: { r: ForecastResp }) {
                 <tr style={{ background: "oklch(0.97 0.005 95)" }}>
                   <th style={th()}>Player</th>
                   <th style={th()}>SG</th>
-                  <th style={th()}>Compressed edge</th>
+                  <th style={th()}>Edge</th>
                   <th style={th()}>Form bump</th>
-                  <th style={th()}>Skew gap</th>
                   <th style={th()}>Expected mean</th>
                   <th style={th()}>Expected median</th>
                 </tr>
@@ -664,7 +815,6 @@ function ResultsPanel({ r }: { r: ForecastResp }) {
                       {p.formAdjustment >= 0 ? "+" : ""}
                       {p.formAdjustment.toFixed(2)}
                     </td>
-                    <td style={td()}>−{p.breakdown.skewGap.toFixed(2)}</td>
                     <td style={{ ...td(), fontWeight: 700 }}>
                       {p.expectedMean.toFixed(2)}
                     </td>
@@ -800,11 +950,13 @@ function ip(minWidth = 100): React.CSSProperties {
     background: "white",
     minWidth,
     fontFamily: "inherit",
+    width: "100%",
+    boxSizing: "border-box",
   };
 }
 function btn(): React.CSSProperties {
   return {
-    padding: "4px 8px",
+    padding: "4px 10px",
     fontSize: 12,
     fontWeight: 600,
     border: "1px solid oklch(0.85 0.013 95)",
@@ -841,21 +993,28 @@ function td(strong = false): React.CSSProperties {
   return {
     padding: "6px 10px",
     borderBottom: "1px solid oklch(0.94 0.008 95)",
-    fontFamily: strong
-      ? "inherit"
-      : "var(--font-mono, monospace)",
+    fontFamily: strong ? "inherit" : "var(--font-mono, monospace)",
     fontWeight: strong ? 700 : 500,
   };
 }
 function Field({
   label,
+  help,
   children,
 }: {
   label: string;
+  help?: string;
   children: React.ReactNode;
 }) {
   return (
-    <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+    <label
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        position: "relative",
+      }}
+    >
       <span
         style={{
           fontSize: 11,
@@ -864,8 +1023,22 @@ function Field({
           letterSpacing: 0.3,
           textTransform: "uppercase",
         }}
+        title={help}
       >
         {label}
+        {help && (
+          <span
+            style={{
+              marginLeft: 4,
+              color: "oklch(0.6 0.02 150)",
+              fontWeight: 600,
+              cursor: "help",
+            }}
+            title={help}
+          >
+            ⓘ
+          </span>
+        )}
       </span>
       {children}
     </label>

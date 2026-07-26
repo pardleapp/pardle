@@ -113,6 +113,16 @@ export interface ForecastInputs {
    *  that weren't overridden. Turn off if you want the model to fall
    *  back to historical means without touching the pin sheet. */
   autoYardageAndPins?: boolean;
+  /** Alternative yardage-source: derive target-round yardage from a
+   *  PRIOR round's actual yardages plus a total-course delta. Useful
+   *  when the target round's yardages haven't been posted but the
+   *  user knows the setup is X yards longer/shorter than the prior
+   *  round they trust. Delta is applied evenly across all 18 holes
+   *  (each hole gets delta/18 yards). */
+  yardsDeltaFromRound?: {
+    sourceRound: 1 | 2 | 3 | 4;
+    totalDeltaYards: number;
+  };
   /** Flat stroke adder for setup effects the model can't otherwise
    *  see (green firmness, rough length, novel pins outside any
    *  historical cluster). Applied to the field forecast total. */
@@ -228,6 +238,7 @@ export async function runForecast(
     originUrl,
     holes = {},
     autoYardageAndPins = true,
+    yardsDeltaFromRound,
     pinDifficultyAdder = 0,
     windOverride,
     useHrrr = true,
@@ -249,27 +260,38 @@ export async function runForecast(
   for (const [hStr, o] of Object.entries(holes)) {
     effectiveHoles[Number(hStr)] = { ...o };
   }
-  if (autoYardageAndPins) {
+  if (autoYardageAndPins || yardsDeltaFromRound) {
     try {
       const pinSheet = await fetchPinSheet(tournamentId, originUrl);
       if (pinSheet) {
         for (const h of pinSheet.holes ?? []) {
           const num = h.holeNumber;
-          const yBy = h.yardsByRound?.[String(targetRound)];
-          const pinBy = h.pinByRound?.[String(targetRound)];
           const cur = effectiveHoles[num] ?? {};
-          if (typeof yBy === "number" && cur.yards == null) cur.yards = yBy;
-          if (
-            pinBy &&
-            typeof pinBy.x === "number" &&
-            typeof pinBy.y === "number" &&
-            pinBy.x !== -1 &&
-            pinBy.y !== -1 &&
-            cur.pinX == null &&
-            cur.pinY == null
-          ) {
-            cur.pinX = pinBy.x;
-            cur.pinY = pinBy.y;
+          // Yardage source: manual delta beats target-round-auto.
+          if (yardsDeltaFromRound && cur.yards == null) {
+            const src =
+              h.yardsByRound?.[String(yardsDeltaFromRound.sourceRound)];
+            if (typeof src === "number") {
+              cur.yards = src + yardsDeltaFromRound.totalDeltaYards / 18;
+            }
+          }
+          if (autoYardageAndPins && cur.yards == null) {
+            const yBy = h.yardsByRound?.[String(targetRound)];
+            if (typeof yBy === "number") cur.yards = yBy;
+          }
+          // Pin coords — always from target round when auto.
+          if (autoYardageAndPins && cur.pinX == null && cur.pinY == null) {
+            const pinBy = h.pinByRound?.[String(targetRound)];
+            if (
+              pinBy &&
+              typeof pinBy.x === "number" &&
+              typeof pinBy.y === "number" &&
+              pinBy.x !== -1 &&
+              pinBy.y !== -1
+            ) {
+              cur.pinX = pinBy.x;
+              cur.pinY = pinBy.y;
+            }
           }
           effectiveHoles[num] = cur;
         }
