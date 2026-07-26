@@ -31,7 +31,16 @@ export default function Page() {
           padding: "20px 4px 60px",
         }}
       >
-        <nav style={{ marginBottom: 12 }}>
+        <nav
+          style={{
+            marginBottom: 12,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
           <Link
             href="/analysis"
             style={{
@@ -43,6 +52,22 @@ export default function Page() {
           >
             ← All analyses
           </Link>
+          <Link
+            href="/analysis/score-forecast/how-it-works"
+            style={{
+              fontSize: 12,
+              color: "oklch(0.50 0.13 155)",
+              textDecoration: "none",
+              fontWeight: 800,
+              letterSpacing: 0.3,
+              textTransform: "uppercase",
+              padding: "6px 12px",
+              border: "1px solid oklch(0.50 0.13 155)",
+              borderRadius: 999,
+            }}
+          >
+            How the model works →
+          </Link>
         </nav>
         <h2
           style={{
@@ -50,6 +75,7 @@ export default function Page() {
             marginBottom: 6,
             fontFamily:
               "var(--font-archivo), 'Archivo', system-ui, sans-serif",
+            color: "oklch(0.26 0.04 155)",
           }}
         >
           Round score forecast
@@ -57,7 +83,7 @@ export default function Page() {
         <p
           style={{
             fontSize: 15,
-            color: "oklch(0.5 0.02 150)",
+            color: "oklch(0.35 0.03 155)",
             marginBottom: 22,
             lineHeight: 1.55,
             maxWidth: 900,
@@ -67,7 +93,17 @@ export default function Page() {
           auto-matched from the pin sheet; the model handles wind
           (HRRR), yardage (auto or manual), and level shift from
           finished rounds. Add players to see expected mean/median
-          with Bayesian form adjustment.
+          with Bayesian form adjustment.{" "}
+          <Link
+            href="/analysis/score-forecast/how-it-works"
+            style={{
+              color: "oklch(0.50 0.13 155)",
+              fontWeight: 700,
+              textDecoration: "underline",
+            }}
+          >
+            See how the model works →
+          </Link>
         </p>
         <ForecastTool />
       </section>
