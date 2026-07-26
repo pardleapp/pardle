@@ -21,6 +21,31 @@ import {
 
 const DG_BASE = "https://feeds.datagolf.com";
 
+/** DG skill-ratings — universal baseline SG per player, refreshed
+ *  weekly. Falls back for players who aren't in the event-specific
+ *  decomposition CSV (currently keyed to a different tournament). */
+async function loadDgSkillRatings(): Promise<Map<number, number>> {
+  const out = new Map<number, number>();
+  const key = process.env.DATAGOLF_API_KEY || process.env.DATAGOLF;
+  if (!key) return out;
+  try {
+    const url = `${DG_BASE}/preds/skill-ratings?display=value&key=${encodeURIComponent(key)}&file_format=json`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return out;
+    const j = (await res.json()) as {
+      players?: Array<{ dg_id?: number; sg_total?: number }>;
+    };
+    for (const p of j.players ?? []) {
+      if (p.dg_id != null && typeof p.sg_total === "number") {
+        out.set(p.dg_id, p.sg_total);
+      }
+    }
+  } catch {
+    /* skip */
+  }
+  return out;
+}
+
 /** DG field-updates → per-round tee times per player. Same data
  *  source the tee-time-scoring API uses. Returns a map keyed by
  *  dg_id → { round → HH:MM }. */
@@ -167,12 +192,14 @@ export async function GET() {
     });
   }
 
-  const [leaderboard, csvSg, dgTeeTimes, pgaToDg] = await Promise.all([
-    getLeaderboard(tournamentId).catch(() => []),
-    loadCsvSg(),
-    loadDgTeeTimes(),
-    loadPgaIdToDgId(),
-  ]);
+  const [leaderboard, csvSg, dgTeeTimes, pgaToDg, dgSkillByDgId] =
+    await Promise.all([
+      getLeaderboard(tournamentId).catch(() => []),
+      loadCsvSg(),
+      loadDgTeeTimes(),
+      loadPgaIdToDgId(),
+      loadDgSkillRatings(),
+    ]);
 
   // Build normalised name → SG lookup once
   const sgByNorm = new Map<string, number>();
@@ -202,7 +229,18 @@ export async function GET() {
 
   const players: Player[] = [];
   for (const lb of leaderboard) {
-    const sg = sgByNorm.get(normalise(lb.displayName)) ?? null;
+    // SG priority chain:
+    //   1. Event-specific CSV (final_prediction) if the player is in it
+    //   2. Universal DG skill-ratings sg_total via dg_id lookup
+    //   3. null (UI shows empty; user can type manually)
+    let sg = sgByNorm.get(normalise(lb.displayName)) ?? null;
+    if (sg == null) {
+      const dgId = pgaToDg.get(lb.playerId);
+      if (dgId != null) {
+        const dgSg = dgSkillByDgId.get(dgId);
+        if (typeof dgSg === "number") sg = dgSg;
+      }
+    }
     const sc = scorecards[lb.playerId];
     const weekRounds: number[] = [];
     if (sc?.rounds) {
