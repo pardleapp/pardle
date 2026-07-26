@@ -317,6 +317,56 @@ export default function ArticleLebiodaBet() {
       <P>
         <strong>Watching the leaderboard from 1:30 PM.</strong>
       </P>
+
+      {/* ── Try the tool callout ────────────────────────────── */}
+      <a
+        href="/analysis/score-forecast"
+        style={{
+          display: "block",
+          textDecoration: "none",
+          margin: "24px 0 0",
+          padding: "18px 20px",
+          background: emerald,
+          color: "white",
+          borderRadius: 12,
+          fontFamily: proseFont,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            letterSpacing: 1.5,
+            textTransform: "uppercase",
+            color: "oklch(0.85 0.06 155)",
+            fontWeight: 700,
+            marginBottom: 6,
+          }}
+        >
+          Try it yourself
+        </div>
+        <div
+          style={{
+            fontSize: 18,
+            fontWeight: 800,
+            marginBottom: 4,
+          }}
+        >
+          Round Score Forecast →
+        </div>
+        <div
+          style={{
+            fontSize: 14,
+            color: "oklch(0.92 0.03 155)",
+            lineHeight: 1.5,
+          }}
+        >
+          Find it under <strong>Tools</strong> in the sidebar. Search
+          any player in the field, pick a round, and the model runs
+          the same forecast we ran on Lebioda — hourly wind at their
+          tee time, pin-specific scoring, level shift from the most
+          recent finished round.
+        </div>
+      </a>
     </div>
   );
 }
