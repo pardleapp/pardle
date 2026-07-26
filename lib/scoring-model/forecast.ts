@@ -104,10 +104,18 @@ export interface ForecastInputs {
   targetRound: 1 | 2 | 3 | 4;
   /** Absolute origin URL for internal fetches (birdies API). */
   originUrl: string;
-  /** Per-hole overrides — cluster letter + yardage. */
+  /** Per-hole overrides — cluster letter + yardage. When null/absent
+   *  the model auto-populates from the pin sheet (yardsByRound +
+   *  nearest-centroid cluster match on pinByRound). */
   holes?: Record<number, HoleOverride>;
-  /** Flat stroke adder for "pins are harder/easier than model
-   *  expects". Applied to the field forecast total. */
+  /** When true (default), fetch yardages + pin coords from the pin
+   *  sheet for the target round and pre-populate any `holes` entries
+   *  that weren't overridden. Turn off if you want the model to fall
+   *  back to historical means without touching the pin sheet. */
+  autoYardageAndPins?: boolean;
+  /** Flat stroke adder for setup effects the model can't otherwise
+   *  see (green firmness, rough length, novel pins outside any
+   *  historical cluster). Applied to the field forecast total. */
   pinDifficultyAdder?: number;
   /** Wind override — user-specified value used instead of HRRR. */
   windOverride?: { windMph: number; windDirDeg: number };
@@ -219,6 +227,7 @@ export async function runForecast(
     targetRound,
     originUrl,
     holes = {},
+    autoYardageAndPins = true,
     pinDifficultyAdder = 0,
     windOverride,
     useHrrr = true,
@@ -227,6 +236,48 @@ export async function runForecast(
     priorRounds = {},
     players = [],
   } = input;
+
+  // Auto-populate yardage + pin coords from the pin sheet when the
+  // caller didn't supply overrides for those fields. The pin sheet
+  // is the authoritative source; the fit's histMeanYards is only a
+  // last-resort fallback when the sheet hasn't been posted for the
+  // target round.
+  const effectiveHoles: Record<
+    number,
+    { cluster?: string; yards?: number; pinX?: number; pinY?: number }
+  > = {};
+  for (const [hStr, o] of Object.entries(holes)) {
+    effectiveHoles[Number(hStr)] = { ...o };
+  }
+  if (autoYardageAndPins) {
+    try {
+      const pinSheet = await fetchPinSheet(tournamentId, originUrl);
+      if (pinSheet) {
+        for (const h of pinSheet.holes ?? []) {
+          const num = h.holeNumber;
+          const yBy = h.yardsByRound?.[String(targetRound)];
+          const pinBy = h.pinByRound?.[String(targetRound)];
+          const cur = effectiveHoles[num] ?? {};
+          if (typeof yBy === "number" && cur.yards == null) cur.yards = yBy;
+          if (
+            pinBy &&
+            typeof pinBy.x === "number" &&
+            typeof pinBy.y === "number" &&
+            pinBy.x !== -1 &&
+            pinBy.y !== -1 &&
+            cur.pinX == null &&
+            cur.pinY == null
+          ) {
+            cur.pinX = pinBy.x;
+            cur.pinY = pinBy.y;
+          }
+          effectiveHoles[num] = cur;
+        }
+      }
+    } catch {
+      /* pin sheet unavailable — fall back to fit means */
+    }
+  }
 
   const warnings: string[] = [];
   const par = COURSE_PAR[tournamentId] ?? 72;
@@ -312,13 +363,15 @@ export async function runForecast(
     if (!fit || typeof bearing !== "number") continue;
 
     const holePar = pars[h] ?? 4;
-    const override = holes[h] ?? {};
+    const override = effectiveHoles[h] ?? {};
     const yards = override.yards ?? fit.histMeanYards;
 
     const conditions: TodayConditions = {
       yards,
       windSpeed: wind.windMph,
       windDir: wind.windDirDeg,
+      pinX: override.pinX,
+      pinY: override.pinY,
     };
     let clusterOverride: string | null = null;
     if (override.cluster && fit.clusterResiduals[override.cluster] != null) {
@@ -330,14 +383,20 @@ export async function runForecast(
       conditions,
       roundNum: targetRound,
     });
-    // If user supplied a cluster letter, swap the cluster residual.
+    // If user supplied a cluster letter, swap the cluster residual
+    // (overriding the auto-matched one). Otherwise use whatever the
+    // projector matched from pinX/pinY.
     let avgVsPar = proj.modelAvgVsPar;
     let clusterResidual = 0;
     if (clusterOverride) {
-      // Recompute: remove the auto-matched cluster (which was 0
-      // because we didn't pass pinX/pinY) and add the user's letter.
+      // Remove auto-matched residual and add user's letter's residual.
+      const autoRes = proj.matchedCluster
+        ? fit.clusterResiduals[proj.matchedCluster] ?? 0
+        : 0;
       clusterResidual = fit.clusterResiduals[clusterOverride] ?? 0;
-      avgVsPar += clusterResidual;
+      avgVsPar = avgVsPar - autoRes + clusterResidual;
+    } else if (proj.matchedCluster) {
+      clusterResidual = fit.clusterResiduals[proj.matchedCluster] ?? 0;
     }
 
     // Break down wind / yardage / cluster deltas for the response.
@@ -361,7 +420,7 @@ export async function runForecast(
       hole: h,
       par: holePar,
       yards,
-      cluster: clusterOverride,
+      cluster: clusterOverride ?? proj.matchedCluster,
       windMph: wind.windMph,
       windDirDeg: wind.windDirDeg,
       headwind: head,
@@ -504,6 +563,32 @@ export async function runForecast(
     players: playerForecasts,
     warnings,
   };
+}
+
+/** Fetch the pin sheet from the internal /api/course-pins endpoint. */
+interface PinSheetHole {
+  holeNumber: number;
+  yards?: number | null;
+  yardsByRound?: Record<string, number>;
+  pinByRound?: Record<string, { x?: number; y?: number } | null>;
+  scoringByRound?: Record<string, { vsPar?: number } | null>;
+}
+interface PinSheetShape {
+  holes?: PinSheetHole[];
+}
+async function fetchPinSheet(
+  tournamentId: string,
+  originUrl: string,
+): Promise<PinSheetShape | null> {
+  const url = `${originUrl.replace(/\/$/, "")}/api/course-pins?tournamentId=${encodeURIComponent(tournamentId)}`;
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { pins?: PinSheetShape };
+    return j?.pins ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Utility: derive prior-round observations from the deployed

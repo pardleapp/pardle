@@ -84,7 +84,9 @@ function parseCsvNumbers(s: string): number[] {
 export default function ForecastTool() {
   const [tournamentId, setTournamentId] = useState<string>("R2026525");
   const [targetRound, setTargetRound] = useState<Round>(4);
-  const [pinsByHole, setPinsByHole] = useState<Record<number, string>>({});
+  /** Yardage source: "auto" reads from the pin sheet (Pardle's
+   *  predicted yardage for the round); "manual" opens a 18-hole grid. */
+  const [yardsMode, setYardsMode] = useState<"auto" | "manual">("auto");
   const [yardsByHole, setYardsByHole] = useState<Record<number, string>>({});
   const [pinDifficultyAdder, setPinDifficultyAdder] = useState<string>("0");
   const [levelShiftMode, setLevelShiftMode] = useState<LevelShiftMode | "auto">(
@@ -104,22 +106,25 @@ export default function ForecastTool() {
   const runIt = useCallback(async () => {
     setRunning(true);
     try {
-      const holes: Record<number, { cluster?: string; yards?: number }> = {};
-      for (let h = 1; h <= 18; h++) {
-        const c = pinsByHole[h]?.trim();
-        const y = yardsByHole[h]?.trim();
-        const yn = y ? Number(y) : undefined;
-        if (c || (typeof yn === "number" && Number.isFinite(yn))) {
-          holes[h] = {
-            cluster: c || undefined,
-            yards: Number.isFinite(yn) ? yn : undefined,
-          };
+      const holes: Record<number, { yards?: number }> = {};
+      if (yardsMode === "manual") {
+        for (let h = 1; h <= 18; h++) {
+          const y = yardsByHole[h]?.trim();
+          const yn = y ? Number(y) : undefined;
+          if (typeof yn === "number" && Number.isFinite(yn)) {
+            holes[h] = { yards: yn };
+          }
         }
       }
       const body: Record<string, unknown> = {
         tournamentId,
         targetRound,
         holes,
+        // Auto-fetch pin sheet yards + pin coords unless the user
+        // opted into manual yardage entry (in which case honour their
+        // per-hole values; missing holes still fall back to pin sheet
+        // in "auto" mode).
+        autoYardageAndPins: yardsMode === "auto",
         pinDifficultyAdder: Number(pinDifficultyAdder) || 0,
         useHrrr,
         levelShiftAttenuation: Number(levelShiftAttenuation) || 1,
@@ -165,7 +170,7 @@ export default function ForecastTool() {
   }, [
     tournamentId,
     targetRound,
-    pinsByHole,
+    yardsMode,
     yardsByHole,
     pinDifficultyAdder,
     levelShiftMode,
@@ -215,14 +220,27 @@ export default function ForecastTool() {
               <option value={4}>R4</option>
             </select>
           </Field>
-          <Field label="Pin difficulty adder (total strokes)">
+          <Field label="Setup adjustment (total strokes)">
             <input
               type="number"
               step="0.1"
               value={pinDifficultyAdder}
               onChange={(e) => setPinDifficultyAdder(e.target.value)}
               style={ip()}
+              title="Catch-all for setup effects the model can't otherwise see (green firmness, rough length, novel pins outside any historical cluster). Set to 0 if the pin sheet is fully known."
             />
+          </Field>
+          <Field label="Yardage source">
+            <select
+              value={yardsMode}
+              onChange={(e) =>
+                setYardsMode(e.target.value as "auto" | "manual")
+              }
+              style={ip()}
+            >
+              <option value="auto">Pardle's predicted (from pin sheet)</option>
+              <option value="manual">Manual entry per hole</option>
+            </select>
           </Field>
           <Field label="Level shift mode">
             <select
@@ -305,73 +323,62 @@ export default function ForecastTool() {
         </div>
       </div>
 
-      {/* ── Pin sheet input ────────────────────────────────────── */}
-      <div style={panel()}>
-        <h3 style={h3()}>Pin sheet (enter one cluster letter per hole)</h3>
-        <p style={helpText()}>
-          Cluster letters come from the course-heatmap tool (A, B, C…).
-          Leave blank to use the model default (no cluster residual).
-          Optional yardage overrides — leave blank to use the fit's
-          historical mean yardage.
-        </p>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-            gap: 8,
-          }}
-        >
-          {Array.from({ length: 18 }, (_, i) => i + 1).map((h) => (
-            <div
-              key={h}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-                padding: 6,
-                border: "1px solid oklch(0.9 0.008 95)",
-                borderRadius: 6,
-                background: "white",
-              }}
-            >
+      {/* ── Manual yardage grid (only when opted in) ─────────── */}
+      {yardsMode === "manual" && (
+        <div style={panel()}>
+          <h3 style={h3()}>Yardage per hole</h3>
+          <p style={helpText()}>
+            Enter yards for every hole. Any blank hole falls back to the
+            pin sheet if available, else the fit's historical mean.
+          </p>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))",
+              gap: 8,
+            }}
+          >
+            {Array.from({ length: 18 }, (_, i) => i + 1).map((h) => (
               <div
+                key={h}
                 style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "oklch(0.35 0.03 155)",
-                  letterSpacing: 0.4,
-                  textTransform: "uppercase",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
+                  padding: 6,
+                  border: "1px solid oklch(0.9 0.008 95)",
+                  borderRadius: 6,
+                  background: "white",
                 }}
               >
-                H{h}
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "oklch(0.35 0.03 155)",
+                    letterSpacing: 0.4,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  H{h}
+                </div>
+                <input
+                  placeholder="yds"
+                  type="number"
+                  value={yardsByHole[h] ?? ""}
+                  onChange={(e) =>
+                    setYardsByHole((prev) => ({
+                      ...prev,
+                      [h]: e.target.value,
+                    }))
+                  }
+                  style={{ ...ip(), fontSize: 13, padding: "4px 6px" }}
+                />
               </div>
-              <input
-                placeholder="Cluster"
-                value={pinsByHole[h] ?? ""}
-                onChange={(e) =>
-                  setPinsByHole((prev) => ({
-                    ...prev,
-                    [h]: e.target.value.toUpperCase().slice(0, 1),
-                  }))
-                }
-                style={{ ...ip(), fontSize: 13, padding: "4px 6px" }}
-              />
-              <input
-                placeholder="yds"
-                type="number"
-                value={yardsByHole[h] ?? ""}
-                onChange={(e) =>
-                  setYardsByHole((prev) => ({
-                    ...prev,
-                    [h]: e.target.value,
-                  }))
-                }
-                style={{ ...ip(), fontSize: 13, padding: "4px 6px" }}
-              />
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Players ────────────────────────────────────────────── */}
       <div style={panel()}>

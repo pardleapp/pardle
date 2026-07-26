@@ -62,10 +62,11 @@ export default function Page() {
             lineHeight: 1.5,
           }}
         >
-          Project field and per-player round scores. Enter pin cluster
-          per hole; the model handles wind (HRRR), yardage, and level
-          shift from finished rounds. Add players to see expected
-          mean/median with form adjustment.
+          Project field and per-player round scores. Pin clusters are
+          auto-matched from the pin sheet; the model handles wind
+          (HRRR), yardage (auto or manual), and level shift from
+          finished rounds. Add players to see expected mean/median
+          with Bayesian form adjustment.
         </p>
         <ForecastTool />
       </section>
