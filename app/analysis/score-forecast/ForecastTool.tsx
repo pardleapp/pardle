@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // ── Types mirroring the API contracts ──────────────────────────────
 type Round = 1 | 2 | 3 | 4;
@@ -361,7 +361,11 @@ export default function ForecastTool() {
     <div style={{ display: "grid", gap: 20 }}>
       {/* ── Setup panel ────────────────────────────────────────── */}
       <div style={panel()}>
-        <h3 style={h3()}>Setup</h3>
+        <SectionHeader
+          step={1}
+          title="Setup"
+          subtitle="Tournament, round, and how the model should read this week's conditions"
+        />
         <div
           style={{
             display: "grid",
@@ -546,12 +550,11 @@ export default function ForecastTool() {
 
       {/* ── Players ────────────────────────────────────────────── */}
       <div style={panel()}>
-        <h3 style={h3()}>Players</h3>
-        <p style={helpText()}>
-          Search a player from the field. Strokes-gained rating auto-fills
-          from Pardle's pre-tournament model. Rounds played this week
-          also auto-fill so form adjustment works out of the box.
-        </p>
+        <SectionHeader
+          step={2}
+          title="Players"
+          subtitle="Search the field — SG rating, tee time, and week rounds auto-fill"
+        />
         <div style={{ display: "grid", gap: 10 }}>
           {players.map((p, idx) => (
             <PlayerCard
@@ -582,24 +585,36 @@ export default function ForecastTool() {
               disabled={running}
               style={{
                 ...btnPrimary(),
-                padding: "10px 22px",
-                fontSize: 15,
-                minWidth: 160,
+                minWidth: 200,
+                opacity: running ? 0.85 : 1,
+                cursor: running ? "wait" : "pointer",
               }}
             >
-              {running ? "Running…" : "Run forecast"}
+              {running ? (
+                <>
+                  <RunningDots />
+                  <span>Running forecast</span>
+                </>
+              ) : (
+                <>
+                  <span aria-hidden style={{ fontSize: 18, lineHeight: 1 }}>
+                    →
+                  </span>
+                  <span>Run forecast</span>
+                </>
+              )}
             </button>
             <button
               type="button"
               onClick={() => setPlayers((prev) => [...prev, emptyPlayer()])}
               style={{
-                padding: "8px 14px",
-                fontSize: 13,
-                fontWeight: 600,
-                border: "1px solid oklch(0.85 0.013 95)",
-                borderRadius: 6,
+                padding: "10px 16px",
+                fontSize: 14,
+                fontWeight: 700,
+                border: `1px solid ${T.line}`,
+                borderRadius: 8,
                 background: "white",
-                color: "oklch(0.3 0.02 150)",
+                color: T.ink,
                 cursor: "pointer",
               }}
             >
@@ -894,185 +909,47 @@ function PlayerCard({
 
 // ── Results ────────────────────────────────────────────────────────
 function ResultsPanel({ r }: { r: ForecastResp }) {
-  if (!r.holes || !r.fieldForecast) return null;
+  if (!r.holes || !r.fieldForecast || r.par == null) return null;
+  const par = r.par;
+  const holes = r.holes;
+  const players = r.players;
   return (
-    <div style={panel()}>
-      <h3 style={h3()}>Results — R{r.targetRound}</h3>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: 12,
-          marginBottom: 16,
-        }}
-      >
-        <Stat
-          label="Field forecast"
-          value={r.fieldForecast!.toFixed(2)}
-          sub={`${(r.fieldForecastVsPar ?? 0) >= 0 ? "+" : ""}${(r.fieldForecastVsPar ?? 0).toFixed(2)} vs par ${r.par}`}
-        />
-        <Stat
-          label="Historical mean"
-          value={r.historicalRoundMean?.toFixed(2) ?? "—"}
-        />
-        <Stat
-          label="Wind"
-          value={
-            r.wind
-              ? `${r.wind.windMph.toFixed(1)} mph ${r.wind.windDirDeg.toFixed(0)}°`
-              : "—"
-          }
-          sub={r.wind?.source}
-        />
-        <Stat
-          label="Level shift"
-          value={r.levelShift?.toFixed(2) ?? "0.00"}
-          sub={
-            r.levelShiftAttenuated !== r.levelShift
-              ? `attenuated → ${r.levelShiftAttenuated?.toFixed(2)}`
-              : r.levelShiftMode
-          }
-        />
-      </div>
-
-      {/* Players table */}
-      {r.players && r.players.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <h4 style={{ fontSize: 14, marginBottom: 8 }}>
-            Player projections
-          </h4>
-          <div
-            style={{
-              overflowX: "auto",
-              border: "1px solid oklch(0.9 0.008 95)",
-              borderRadius: 6,
-            }}
-          >
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: 13,
-              }}
-            >
-              <thead>
-                <tr style={{ background: "oklch(0.97 0.005 95)" }}>
-                  <th style={th()}>Player</th>
-                  <th style={th()}>SG</th>
-                  <th style={th()}>Edge</th>
-                  <th style={th()}>Form bump</th>
-                  <th style={th()}>Expected mean</th>
-                  <th style={th()}>Expected median</th>
-                </tr>
-              </thead>
-              <tbody>
-                {r.players.map((p, i) => (
-                  <tr key={i}>
-                    <td style={td(true)}>{p.name}</td>
-                    <td style={td()}>{p.sgTotal.toFixed(2)}</td>
-                    <td style={td()}>
-                      {p.breakdown.compressedEdge >= 0 ? "+" : ""}
-                      {p.breakdown.compressedEdge.toFixed(2)}
-                    </td>
-                    <td style={td()}>
-                      {p.formAdjustment >= 0 ? "+" : ""}
-                      {p.formAdjustment.toFixed(2)}
-                    </td>
-                    <td style={{ ...td(), fontWeight: 700 }}>
-                      {p.expectedMean.toFixed(2)}
-                    </td>
-                    <td style={{ ...td(), fontWeight: 800 }}>
-                      {p.expectedMedian.toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+    <div
+      style={{
+        ...panel(),
+        border: `1.5px solid ${T.emerald}`,
+        boxShadow: "0 4px 24px oklch(0.4 0.13 155 / 0.10)",
+      }}
+    >
+      <SectionHeader
+        step={3}
+        title={`Round ${r.targetRound} forecast`}
+        subtitle={`Par ${par} · field baseline for the round`}
+        accent
+      />
+      <HeroForecast r={r} />
+      <SecondaryStrip r={r} />
+      {players && players.length > 0 && (
+        <PlayerProjections players={players} par={par} />
       )}
-
-      {/* Per-hole table */}
-      <details>
-        <summary style={{ cursor: "pointer", fontWeight: 700, fontSize: 14 }}>
-          Per-hole breakdown ({r.holes.length} holes)
-        </summary>
-        <div
-          style={{
-            marginTop: 8,
-            overflowX: "auto",
-            border: "1px solid oklch(0.9 0.008 95)",
-            borderRadius: 6,
-          }}
-        >
-          <table
-            style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}
-          >
-            <thead>
-              <tr style={{ background: "oklch(0.97 0.005 95)" }}>
-                <th style={th()}>H</th>
-                <th style={th()}>Par</th>
-                <th style={th()}>Yds</th>
-                <th style={th()}>Cluster</th>
-                <th style={th()}>Head</th>
-                <th style={th()}>Cluster res</th>
-                <th style={th()}>Wind Δ</th>
-                <th style={th()}>Yards Δ</th>
-                <th style={th()}>Total vs par</th>
-              </tr>
-            </thead>
-            <tbody>
-              {r.holes.map((h) => (
-                <tr key={h.hole}>
-                  <td style={td(true)}>{h.hole}</td>
-                  <td style={td()}>{h.par}</td>
-                  <td style={td()}>{h.yards.toFixed(0)}</td>
-                  <td style={td()}>{h.cluster ?? "—"}</td>
-                  <td style={td()}>{h.headwind.toFixed(1)}</td>
-                  <td style={td()}>
-                    {h.clusterResidual >= 0 ? "+" : ""}
-                    {h.clusterResidual.toFixed(3)}
-                  </td>
-                  <td style={td()}>
-                    {h.windDelta >= 0 ? "+" : ""}
-                    {h.windDelta.toFixed(3)}
-                  </td>
-                  <td style={td()}>
-                    {h.yardsDelta >= 0 ? "+" : ""}
-                    {h.yardsDelta.toFixed(3)}
-                  </td>
-                  <td
-                    style={{
-                      ...td(),
-                      fontWeight: 700,
-                      color:
-                        h.avgVsPar < 0
-                          ? "oklch(0.4 0.15 155)"
-                          : h.avgVsPar > 0
-                            ? "oklch(0.45 0.15 28)"
-                            : "inherit",
-                    }}
-                  >
-                    {h.avgVsPar >= 0 ? "+" : ""}
-                    {h.avgVsPar.toFixed(3)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
-
+      <HoleStrip holes={holes} par={par} />
       {r.warnings && r.warnings.length > 0 && (
         <div
           style={{
             marginTop: 12,
+            padding: "10px 12px",
+            background: "oklch(0.97 0.05 40)",
+            border: `1px solid oklch(0.85 0.10 40)`,
+            borderRadius: 6,
             fontSize: 12,
-            color: "oklch(0.45 0.15 28)",
+            color: "oklch(0.35 0.15 28)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
           }}
         >
           {r.warnings.map((w, i) => (
-            <div key={i}>⚠️ {w}</div>
+            <div key={i}>⚠︎ {w}</div>
           ))}
         </div>
       )}
@@ -1080,36 +957,737 @@ function ResultsPanel({ r }: { r: ForecastResp }) {
   );
 }
 
+/** The hero — the answer, at full weight. Huge mono number with a
+ *  colour-coded vs-par lockup, elevated on an emerald-tinted card so
+ *  it clearly reads as the payoff of the whole tool. */
+function HeroForecast({ r }: { r: ForecastResp }) {
+  const target = r.fieldForecast ?? 0;
+  const live = useCountUp(target, 700);
+  const vsPar = r.fieldForecastVsPar ?? 0;
+  const under = vsPar < 0;
+  const scoreColor = under ? T.up : vsPar > 0 ? T.down : T.ink;
+  return (
+    <div
+      style={{
+        marginBottom: 16,
+        padding: "26px 26px 22px",
+        borderRadius: 14,
+        background: `linear-gradient(135deg, ${T.emeraldTint} 0%, ${T.card} 100%)`,
+        border: `1px solid ${T.line}`,
+        display: "grid",
+        gridTemplateColumns: "1fr auto",
+        gap: 20,
+        alignItems: "center",
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 11,
+            letterSpacing: 1.5,
+            textTransform: "uppercase",
+            color: T.emeraldD,
+            fontWeight: 800,
+            fontFamily: T.fontUi,
+            marginBottom: 6,
+          }}
+        >
+          Field forecast · R{r.targetRound}
+        </div>
+        <div
+          style={{
+            fontSize: "clamp(48px, 8vw, 68px)",
+            fontFamily: T.fontMono,
+            fontWeight: 800,
+            color: T.heroInk,
+            lineHeight: 1,
+            letterSpacing: -0.02,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {live.toFixed(2)}
+        </div>
+        <div
+          style={{
+            marginTop: 8,
+            display: "flex",
+            alignItems: "baseline",
+            gap: 10,
+            flexWrap: "wrap",
+          }}
+        >
+          <div
+            style={{
+              fontFamily: T.fontMono,
+              fontWeight: 800,
+              fontSize: 20,
+              color: scoreColor,
+              letterSpacing: -0.01,
+            }}
+          >
+            {vsPar >= 0 ? "+" : ""}
+            {vsPar.toFixed(2)}
+          </div>
+          <div
+            style={{
+              fontSize: 13,
+              color: T.muted,
+              fontFamily: T.fontUi,
+              fontWeight: 600,
+            }}
+          >
+            vs par {r.par ?? "—"} · {under ? "under" : vsPar > 0 ? "over" : "level"}
+          </div>
+        </div>
+      </div>
+      <div
+        style={{
+          padding: "10px 14px",
+          borderRadius: 8,
+          background: "white",
+          border: `1px solid ${T.line}`,
+          textAlign: "right",
+          fontFamily: T.fontUi,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            color: T.muted,
+            fontWeight: 800,
+            marginBottom: 4,
+          }}
+        >
+          Model delta
+        </div>
+        <div
+          style={{
+            fontFamily: T.fontMono,
+            fontWeight: 800,
+            fontSize: 18,
+            color: T.ink,
+          }}
+        >
+          {(r.modelDelta ?? 0) >= 0 ? "+" : ""}
+          {(r.modelDelta ?? 0).toFixed(2)}
+        </div>
+        <div
+          style={{
+            fontSize: 10,
+            color: T.dim,
+            marginTop: 2,
+          }}
+        >
+          vs historical mean
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Slim horizontal strip of ancillary metrics — small, muted, factual;
+ *  supports the hero without competing with it. */
+function SecondaryStrip({ r }: { r: ForecastResp }) {
+  const items: Array<{ label: string; value: string; sub?: string }> = [
+    {
+      label: "Historical mean",
+      value: r.historicalRoundMean?.toFixed(2) ?? "—",
+      sub: "8-yr avg for this round",
+    },
+    {
+      label: "Wind",
+      value: r.wind
+        ? `${r.wind.windMph.toFixed(1)} mph`
+        : "—",
+      sub: r.wind
+        ? `from ${r.wind.windDirDeg.toFixed(0)}° · ${r.wind.source}`
+        : undefined,
+    },
+    {
+      label: "Level shift",
+      value:
+        (r.levelShift ?? 0) >= 0
+          ? `+${(r.levelShift ?? 0).toFixed(2)}`
+          : (r.levelShift ?? 0).toFixed(2),
+      sub:
+        r.levelShiftAttenuated !== r.levelShift
+          ? `attenuated → ${r.levelShiftAttenuated?.toFixed(2)}`
+          : r.levelShiftMode,
+    },
+    {
+      label: "Pin adder",
+      value:
+        (r.pinDifficultyAdder ?? 0) >= 0
+          ? `+${(r.pinDifficultyAdder ?? 0).toFixed(2)}`
+          : (r.pinDifficultyAdder ?? 0).toFixed(2),
+      sub: (r.pinDifficultyAdder ?? 0) !== 0 ? "manual override" : "auto (cluster-matched)",
+    },
+  ];
+  return (
+    <div
+      style={{
+        marginBottom: 20,
+        padding: "12px 16px",
+        borderRadius: 10,
+        background: T.soft,
+        border: `1px solid ${T.line}`,
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+        gap: 12,
+        fontFamily: T.fontUi,
+      }}
+    >
+      {items.map((it) => (
+        <div
+          key={it.label}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            minWidth: 0,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              letterSpacing: 0.8,
+              textTransform: "uppercase",
+              color: T.muted,
+              fontWeight: 800,
+            }}
+          >
+            {it.label}
+          </div>
+          <div
+            style={{
+              fontFamily: T.fontMono,
+              fontSize: 16,
+              fontWeight: 700,
+              color: T.ink,
+              letterSpacing: -0.01,
+            }}
+          >
+            {it.value}
+          </div>
+          {it.sub && (
+            <div
+              style={{
+                fontSize: 11,
+                color: T.dim,
+                fontWeight: 500,
+              }}
+            >
+              {it.sub}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PlayerProjections({
+  players,
+  par,
+}: {
+  players: NonNullable<ForecastResp["players"]>;
+  par: number;
+}) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div
+        style={{
+          fontSize: 11,
+          letterSpacing: 1,
+          textTransform: "uppercase",
+          color: T.muted,
+          fontWeight: 800,
+          marginBottom: 10,
+          fontFamily: T.fontUi,
+        }}
+      >
+        Player projections
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {players.map((p, i) => {
+          const meanVsPar = p.expectedMean - par;
+          const medVsPar = p.expectedMedian - par;
+          const under = meanVsPar < 0;
+          return (
+            <div
+              key={i}
+              style={{
+                padding: "14px 16px",
+                border: `1px solid ${T.line}`,
+                borderLeft: `3px solid ${under ? T.up : T.down}`,
+                borderRadius: 10,
+                background: T.card,
+                display: "grid",
+                gridTemplateColumns: "1fr auto auto",
+                gap: 16,
+                alignItems: "center",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: T.fontUi,
+                    fontSize: 16,
+                    fontWeight: 800,
+                    color: T.ink,
+                  }}
+                >
+                  {p.name}
+                </div>
+                <div
+                  style={{
+                    marginTop: 4,
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 14,
+                    fontSize: 11,
+                    color: T.muted,
+                    fontFamily: T.fontUi,
+                    fontWeight: 600,
+                    letterSpacing: 0.2,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  <span>
+                    SG{" "}
+                    <span
+                      style={{ fontFamily: T.fontMono, color: T.ink }}
+                    >
+                      {p.sgTotal >= 0 ? "+" : ""}
+                      {p.sgTotal.toFixed(2)}
+                    </span>
+                  </span>
+                  <span>
+                    Edge{" "}
+                    <span
+                      style={{ fontFamily: T.fontMono, color: T.ink }}
+                    >
+                      {p.breakdown.compressedEdge >= 0 ? "+" : ""}
+                      {p.breakdown.compressedEdge.toFixed(2)}
+                    </span>
+                  </span>
+                  <span>
+                    Form{" "}
+                    <span
+                      style={{ fontFamily: T.fontMono, color: T.ink }}
+                    >
+                      {p.formAdjustment >= 0 ? "+" : ""}
+                      {p.formAdjustment.toFixed(2)}
+                    </span>
+                  </span>
+                </div>
+              </div>
+              <PlayerScoreBox
+                label="Mean"
+                value={p.expectedMean}
+                vsPar={meanVsPar}
+              />
+              <PlayerScoreBox
+                label="Median"
+                value={p.expectedMedian}
+                vsPar={medVsPar}
+                accent
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PlayerScoreBox({
+  label,
+  value,
+  vsPar,
+  accent = false,
+}: {
+  label: string;
+  value: number;
+  vsPar: number;
+  accent?: boolean;
+}) {
+  const color = vsPar < 0 ? T.up : vsPar > 0 ? T.down : T.ink;
+  return (
+    <div
+      style={{
+        padding: "8px 14px",
+        borderRadius: 8,
+        background: accent ? T.emeraldTint : "white",
+        border: `1px solid ${accent ? T.emerald : T.line}`,
+        textAlign: "right",
+        minWidth: 90,
+        fontFamily: T.fontUi,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 9,
+          letterSpacing: 1,
+          textTransform: "uppercase",
+          color: accent ? T.emeraldD : T.muted,
+          fontWeight: 800,
+          marginBottom: 2,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontFamily: T.fontMono,
+          fontSize: 20,
+          fontWeight: 800,
+          color: T.heroInk,
+          letterSpacing: -0.01,
+        }}
+      >
+        {value.toFixed(2)}
+      </div>
+      <div
+        style={{
+          fontFamily: T.fontMono,
+          fontSize: 11,
+          fontWeight: 700,
+          color,
+          marginTop: 2,
+        }}
+      >
+        {vsPar >= 0 ? "+" : ""}
+        {vsPar.toFixed(2)}
+      </div>
+    </div>
+  );
+}
+
+/** 18-hole colour-coded strip — an inviting expandable panel that
+ *  shows each hole's projected score at a glance. Emerald for
+ *  under-par holes, tang for over-par, saturation scaled to
+ *  magnitude. Closed by default; expanding reveals per-hole detail. */
+function HoleStrip({
+  holes,
+  par,
+}: {
+  holes: NonNullable<ForecastResp["holes"]>;
+  par: number;
+}) {
+  const [open, setOpen] = useState(false);
+  // Amplitude for colour scaling — clip at 0.4 vs par (a routinely
+  // hard hole) so a truly brutal one doesn't wash the rest out.
+  const cap = 0.4;
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: "100%",
+          padding: "10px 14px",
+          background: T.soft,
+          border: `1px solid ${T.line}`,
+          borderRadius: 10,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          fontFamily: T.fontUi,
+          color: T.ink,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flex: 1,
+            minWidth: 0,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 800,
+              letterSpacing: 0.5,
+              textTransform: "uppercase",
+              color: T.muted,
+            }}
+          >
+            Per-hole projection
+          </span>
+          {!open && (
+            <div
+              style={{
+                display: "flex",
+                gap: 2,
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              {holes.map((h) => {
+                const mag = Math.min(1, Math.abs(h.avgVsPar) / cap);
+                const bg =
+                  h.avgVsPar < 0
+                    ? `oklch(${0.86 - 0.2 * mag} 0.13 155)`
+                    : h.avgVsPar > 0
+                      ? `oklch(${0.86 - 0.2 * mag} 0.15 40)`
+                      : T.soft;
+                return (
+                  <div
+                    key={h.hole}
+                    title={`H${h.hole} · ${(h.avgVsPar >= 0 ? "+" : "") + h.avgVsPar.toFixed(3)} vs par`}
+                    style={{
+                      flex: 1,
+                      minWidth: 6,
+                      height: 22,
+                      borderRadius: 3,
+                      background: bg,
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: T.emerald,
+            fontFamily: T.fontUi,
+          }}
+        >
+          {open ? "Hide detail ▲" : "Expand ▼"}
+        </span>
+      </button>
+      {open && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: 14,
+            border: `1px solid ${T.line}`,
+            borderRadius: 10,
+            background: T.card,
+          }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(6, 1fr)",
+              gap: 8,
+            }}
+          >
+            {holes.map((h) => {
+              const mag = Math.min(1, Math.abs(h.avgVsPar) / cap);
+              const chipBg =
+                h.avgVsPar < 0
+                  ? `oklch(${0.94 - 0.06 * mag} 0.08 155)`
+                  : h.avgVsPar > 0
+                    ? `oklch(${0.95 - 0.06 * mag} 0.10 40)`
+                    : T.soft;
+              const chipInk =
+                h.avgVsPar < 0
+                  ? T.up
+                  : h.avgVsPar > 0
+                    ? T.down
+                    : T.ink;
+              return (
+                <div
+                  key={h.hole}
+                  style={{
+                    padding: "10px 8px",
+                    background: chipBg,
+                    border: `1px solid ${T.line}`,
+                    borderRadius: 8,
+                    textAlign: "center",
+                    fontFamily: T.fontUi,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "baseline",
+                      marginBottom: 4,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 10,
+                        letterSpacing: 0.5,
+                        color: T.muted,
+                        fontWeight: 800,
+                      }}
+                    >
+                      H{h.hole}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: T.dim,
+                        fontFamily: T.fontMono,
+                        fontWeight: 700,
+                      }}
+                    >
+                      P{h.par}·{h.yards.toFixed(0)}y
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: T.fontMono,
+                      fontSize: 15,
+                      fontWeight: 800,
+                      color: chipInk,
+                      letterSpacing: -0.01,
+                    }}
+                  >
+                    {h.avgVsPar >= 0 ? "+" : ""}
+                    {h.avgVsPar.toFixed(2)}
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 3,
+                      fontSize: 9,
+                      color: T.dim,
+                      fontFamily: T.fontMono,
+                      fontWeight: 600,
+                    }}
+                  >
+                    W {h.headwind >= 0 ? "+" : ""}
+                    {h.headwind.toFixed(0)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 10,
+              borderTop: `1px dashed ${T.line}`,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              gap: 8,
+              flexWrap: "wrap",
+              fontFamily: T.fontUi,
+              fontSize: 11,
+              color: T.muted,
+            }}
+          >
+            <span>
+              Round total{" "}
+              <span
+                style={{
+                  fontFamily: T.fontMono,
+                  fontWeight: 800,
+                  fontSize: 14,
+                  color: T.ink,
+                }}
+              >
+                {holes
+                  .reduce((a, h) => a + h.avgVsPar, 0)
+                  .toFixed(2)}{" "}
+                vs par {par}
+              </span>
+            </span>
+            <span style={{ display: "inline-flex", gap: 12 }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    background: T.up,
+                    borderRadius: 2,
+                  }}
+                />
+                Under par
+              </span>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    background: T.down,
+                    borderRadius: 2,
+                  }}
+                />
+                Over par
+              </span>
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Design tokens (mirrors design-handoff/social-v2.css) ──────────
+// Kept as plain constants so the file stays self-contained — the
+// tool is under /analysis and doesn't ship the pv-theme wrapper.
+const T = {
+  bg: "oklch(0.972 0.009 95)",
+  card: "oklch(0.995 0.004 95)",
+  soft: "oklch(0.945 0.012 95)",
+  line: "oklch(0.90 0.013 95)",
+  lineSoft: "oklch(0.94 0.008 95)",
+  ink: "oklch(0.26 0.04 155)",
+  muted: "oklch(0.50 0.02 150)",
+  dim: "oklch(0.62 0.018 150)",
+  emerald: "oklch(0.50 0.13 155)",
+  emeraldD: "oklch(0.38 0.13 156)",
+  emeraldTint: "oklch(0.96 0.04 155)",
+  up: "oklch(0.52 0.14 150)",
+  down: "oklch(0.57 0.19 28)",
+  heroInk: "oklch(0.16 0.04 155)",
+  fontUi: "var(--font-archivo), 'Archivo', system-ui, sans-serif",
+  fontMono: "'IBM Plex Mono', ui-monospace, monospace",
+};
+
 // ── Style helpers ──────────────────────────────────────────────────
 function panel(): React.CSSProperties {
   return {
-    padding: 18,
-    border: "1px solid oklch(0.9 0.008 95)",
-    borderRadius: 8,
-    background: "oklch(0.99 0.003 95)",
-  };
-}
-function h3(): React.CSSProperties {
-  return {
-    margin: "0 0 10px",
-    fontSize: 18,
-    fontFamily: "var(--font-archivo), 'Archivo', system-ui, sans-serif",
+    padding: 20,
+    border: `1px solid ${T.line}`,
+    borderRadius: 12,
+    background: T.card,
+    boxShadow: "0 1px 0 oklch(0 0 0 / 0.02)",
   };
 }
 function helpText(): React.CSSProperties {
   return {
     fontSize: 13,
-    color: "oklch(0.5 0.02 150)",
+    color: T.muted,
     marginBottom: 14,
-    lineHeight: 1.5,
+    lineHeight: 1.55,
+    fontFamily: T.fontUi,
   };
 }
 function ip(minWidth = 100): React.CSSProperties {
   return {
-    padding: "8px 10px",
+    padding: "9px 11px",
     fontSize: 14,
-    border: "1px solid oklch(0.85 0.013 95)",
-    borderRadius: 4,
+    color: T.ink,
+    border: `1px solid ${T.line}`,
+    borderRadius: 6,
     background: "white",
     minWidth,
     fontFamily: "inherit",
@@ -1122,44 +1700,185 @@ function btn(): React.CSSProperties {
     padding: "6px 12px",
     fontSize: 13,
     fontWeight: 600,
-    border: "1px solid oklch(0.85 0.013 95)",
-    borderRadius: 4,
+    border: `1px solid ${T.line}`,
+    borderRadius: 6,
     background: "white",
+    color: T.ink,
     cursor: "pointer",
   };
 }
 function btnPrimary(): React.CSSProperties {
   return {
-    padding: "8px 14px",
-    fontSize: 14,
-    fontWeight: 700,
-    border: "1px solid oklch(0.25 0.15 155)",
-    borderRadius: 6,
-    background: "oklch(0.35 0.15 155)",
+    padding: "12px 22px",
+    fontSize: 15,
+    fontWeight: 800,
+    letterSpacing: 0.2,
+    border: `1px solid ${T.emeraldD}`,
+    borderRadius: 8,
+    background: T.emerald,
     color: "white",
     cursor: "pointer",
+    boxShadow: "0 2px 6px oklch(0.4 0.13 155 / 0.30)",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 10,
   };
 }
 function th(): React.CSSProperties {
   return {
     textAlign: "left",
     padding: "10px 12px",
-    borderBottom: "1px solid oklch(0.9 0.008 95)",
-    fontSize: 12,
+    borderBottom: `1px solid ${T.line}`,
+    fontSize: 11,
     fontWeight: 800,
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
     textTransform: "uppercase",
-    color: "oklch(0.35 0.03 155)",
+    color: T.muted,
+    fontFamily: T.fontUi,
   };
 }
 function td(strong = false): React.CSSProperties {
   return {
-    padding: "8px 12px",
-    borderBottom: "1px solid oklch(0.94 0.008 95)",
+    padding: "10px 12px",
+    borderBottom: `1px solid ${T.lineSoft}`,
     fontSize: 14,
-    fontFamily: strong ? "inherit" : "var(--font-mono, monospace)",
-    fontWeight: strong ? 700 : 500,
+    color: T.ink,
+    fontFamily: strong ? T.fontUi : T.fontMono,
+    fontWeight: strong ? 700 : 600,
   };
+}
+
+/** Three pulsing dots used as the loading state on the primary CTA. */
+function RunningDots() {
+  return (
+    <span
+      aria-hidden
+      style={{
+        display: "inline-flex",
+        gap: 4,
+        alignItems: "center",
+      }}
+    >
+      <style>{`
+        @keyframes pv-fc-bounce {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+          30% { transform: translateY(-4px); opacity: 1; }
+        }
+        .pv-fc-dot {
+          width: 6px; height: 6px; border-radius: 50%; background: white;
+          animation: pv-fc-bounce 1s ease-in-out infinite;
+        }
+        .pv-fc-dot:nth-child(2) { animation-delay: 0.15s; }
+        .pv-fc-dot:nth-child(3) { animation-delay: 0.3s; }
+      `}</style>
+      <span className="pv-fc-dot" />
+      <span className="pv-fc-dot" />
+      <span className="pv-fc-dot" />
+    </span>
+  );
+}
+
+/** Numbered stepped section header — the visual spine of the tool.
+ *  Setup → Players → Results should read as a numbered progression. */
+function SectionHeader({
+  step,
+  title,
+  subtitle,
+  accent = false,
+}: {
+  step: number;
+  title: string;
+  subtitle?: string;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        marginBottom: 12,
+      }}
+    >
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: "50%",
+          background: accent ? T.emerald : T.soft,
+          color: accent ? "white" : T.ink,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: T.fontMono,
+          fontWeight: 800,
+          fontSize: 14,
+          flexShrink: 0,
+          border: accent ? "none" : `1px solid ${T.line}`,
+        }}
+      >
+        {step}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <h3
+          style={{
+            margin: 0,
+            fontFamily: T.fontUi,
+            fontSize: accent ? 22 : 18,
+            fontWeight: 800,
+            color: T.ink,
+            letterSpacing: -0.005,
+          }}
+        >
+          {title}
+        </h3>
+        {subtitle && (
+          <div
+            style={{
+              fontSize: 12,
+              color: T.muted,
+              fontFamily: T.fontUi,
+              fontWeight: 600,
+            }}
+          >
+            {subtitle}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Animated count-up for the hero forecast number — nudges it from 0
+ *  to its final value over ~600ms on first render, so the hero has a
+ *  moment of "live model" motion when the result appears. Uses a rAF
+ *  ease-out; skips if the user prefers reduced motion. */
+function useCountUp(target: number, durationMs = 700): number {
+  const [value, setValue] = useState(target);
+  const targetRef = useRef(target);
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ) {
+      setValue(target);
+      targetRef.current = target;
+      return;
+    }
+    const from = targetRef.current === target ? 0 : targetRef.current;
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / durationMs);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setValue(from + (target - from) * eased);
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else targetRef.current = target;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, durationMs]);
+  return value;
 }
 /** SG persistence weights — must match server-side constants in
  *  lib/scoring-model/forecast.ts. Used purely for display so users
@@ -1195,69 +1914,101 @@ function fmtSgVal(v: number | null | undefined): string {
 
 /** Render the row that used to be "Rounds this week: -2,-2,-6" —
  *  now shows per-round SG breakdown from DataGolf live stats plus
- *  the persistence factor the model will apply to that round. */
+ *  the persistence factor the model will apply to that round.
+ *
+ *  Each round renders as a premium data tile:
+ *   - Large score chip (top-right, colour-coded by scoring)
+ *   - Aligned OTT / APP / ARG / PUTT grid with tiny signed bars
+ *     that show visually how much each category contributed
+ *   - Persistence factor as a labelled footer
+ */
 function WeekRoundsRow({ row }: { row: PlayerRow }) {
   const rounds = parseCsvNumbers(row.weekRounds);
   const sgArr = row.weekRoundsSg;
   return (
     <div
       style={{
-        marginTop: 8,
+        marginTop: 12,
         display: "flex",
         flexDirection: "column",
-        gap: 6,
+        gap: 8,
       }}
     >
       <div
         style={{
           fontSize: 11,
-          letterSpacing: 0.3,
+          letterSpacing: 0.8,
           textTransform: "uppercase",
-          color: "oklch(0.5 0.02 150)",
-          fontWeight: 700,
+          color: T.muted,
+          fontWeight: 800,
+          fontFamily: T.fontUi,
         }}
       >
         Rounds this week (auto-filled)
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+          gap: 10,
+        }}
+      >
         {rounds.map((vsPar, i) => {
           const sg = sgArr[i] ?? null;
           const persist = sg ? effectivePersistenceFactor(sg) : null;
+          const chipColor =
+            vsPar < 0 ? T.up : vsPar > 0 ? T.down : T.ink;
+          const chipBg =
+            vsPar < 0
+              ? "oklch(0.94 0.06 155)"
+              : vsPar > 0
+                ? "oklch(0.95 0.08 40)"
+                : T.soft;
           return (
             <div
               key={i}
               style={{
-                border: "1px solid oklch(0.9 0.008 95)",
-                borderRadius: 6,
-                padding: "6px 10px",
-                background: "white",
-                fontSize: 11,
+                border: `1px solid ${T.line}`,
+                borderRadius: 10,
+                padding: 12,
+                background: T.card,
                 display: "flex",
                 flexDirection: "column",
-                gap: 3,
-                minWidth: 130,
+                gap: 10,
               }}
             >
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  alignItems: "baseline",
+                  alignItems: "center",
                 }}
               >
                 <span
                   style={{
-                    fontWeight: 700,
-                    color: "oklch(0.3 0.02 150)",
+                    fontFamily: T.fontUi,
+                    fontWeight: 800,
+                    fontSize: 12,
+                    letterSpacing: 0.6,
+                    textTransform: "uppercase",
+                    color: T.muted,
                   }}
                 >
-                  R{i + 1}
+                  Round {i + 1}
                 </span>
                 <span
                   style={{
-                    fontFamily: "var(--font-mono, monospace)",
-                    fontWeight: 700,
-                    color: "oklch(0.24 0.04 155)",
+                    padding: "3px 10px",
+                    borderRadius: 999,
+                    background: chipBg,
+                    color: chipColor,
+                    fontFamily: T.fontMono,
+                    fontWeight: 800,
+                    fontSize: 15,
+                    letterSpacing: -0.01,
+                    border: `1px solid ${chipColor}`,
+                    minWidth: 46,
+                    textAlign: "center",
                   }}
                 >
                   {vsPar >= 0 ? "+" : ""}
@@ -1270,41 +2021,62 @@ function WeekRoundsRow({ row }: { row: PlayerRow }) {
                     style={{
                       display: "grid",
                       gridTemplateColumns: "1fr 1fr",
-                      gap: "0 8px",
-                      fontFamily: "var(--font-mono, monospace)",
-                      fontSize: 10,
-                      color: "oklch(0.5 0.02 150)",
+                      gap: 6,
                     }}
                   >
-                    <span>OTT {fmtSgVal(sg.sgOtt)}</span>
-                    <span>APP {fmtSgVal(sg.sgApp)}</span>
-                    <span>ARG {fmtSgVal(sg.sgArg)}</span>
-                    <span>PUTT {fmtSgVal(sg.sgPutt)}</span>
+                    <SgCategoryRow label="OTT" value={sg.sgOtt} />
+                    <SgCategoryRow label="APP" value={sg.sgApp} />
+                    <SgCategoryRow label="ARG" value={sg.sgArg} />
+                    <SgCategoryRow label="PUTT" value={sg.sgPutt} />
                   </div>
                   {persist != null && (
                     <div
                       style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        letterSpacing: 0.3,
-                        color:
-                          persist > 1.05
-                            ? "oklch(0.4 0.15 155)"
-                            : persist < 0.95
-                              ? "oklch(0.45 0.15 40)"
-                              : "oklch(0.5 0.02 150)",
+                        marginTop: 2,
+                        paddingTop: 8,
+                        borderTop: `1px dashed ${T.line}`,
+                        display: "flex",
+                        alignItems: "baseline",
+                        justifyContent: "space-between",
+                        fontFamily: T.fontUi,
                       }}
                     >
-                      persistence {persist.toFixed(2)}×
+                      <span
+                        style={{
+                          fontSize: 10,
+                          letterSpacing: 0.6,
+                          textTransform: "uppercase",
+                          color: T.muted,
+                          fontWeight: 800,
+                        }}
+                      >
+                        Persistence
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: T.fontMono,
+                          fontSize: 14,
+                          fontWeight: 800,
+                          color:
+                            persist > 1.05
+                              ? T.emerald
+                              : persist < 0.95
+                                ? T.down
+                                : T.ink,
+                        }}
+                      >
+                        {persist.toFixed(2)}×
+                      </span>
                     </div>
                   )}
                 </>
               ) : (
                 <div
                   style={{
-                    fontSize: 10,
-                    color: "oklch(0.55 0.02 150)",
+                    fontSize: 11,
+                    color: T.dim,
                     fontStyle: "italic",
+                    fontFamily: T.fontUi,
                   }}
                 >
                   SG breakdown not posted yet
@@ -1313,6 +2085,94 @@ function WeekRoundsRow({ row }: { row: PlayerRow }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/** One row in the SG grid — label + signed mono value + tiny bar.
+ *  Bar length is proportional to |SG|, capped at +/-3 strokes so a
+ *  hot round doesn't crush the smaller categories. */
+function SgCategoryRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | null | undefined;
+}) {
+  const v = value ?? null;
+  const cap = 3;
+  const mag = v == null ? 0 : Math.min(1, Math.abs(v) / cap);
+  const barColor = v == null ? T.line : v >= 0 ? T.up : T.down;
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        minWidth: 0,
+        fontFamily: T.fontUi,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+        }}
+      >
+        <span
+          style={{
+            fontSize: 10,
+            letterSpacing: 0.6,
+            fontWeight: 800,
+            color: T.muted,
+          }}
+        >
+          {label}
+        </span>
+        <span
+          style={{
+            fontFamily: T.fontMono,
+            fontSize: 13,
+            fontWeight: 700,
+            color: v == null ? T.dim : v >= 0 ? T.up : T.down,
+            letterSpacing: -0.01,
+          }}
+        >
+          {fmtSgVal(v)}
+        </span>
+      </div>
+      <div
+        style={{
+          position: "relative",
+          height: 4,
+          background: T.soft,
+          borderRadius: 2,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            left: v != null && v < 0 ? `${50 - mag * 50}%` : "50%",
+            width: `${mag * 50}%`,
+            top: 0,
+            bottom: 0,
+            background: barColor,
+            borderRadius: 2,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: 0,
+            bottom: 0,
+            width: 1,
+            background: T.line,
+          }}
+        />
       </div>
     </div>
   );
