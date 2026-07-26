@@ -79,6 +79,8 @@ export async function POST(req: Request) {
     originUrl,
     holes: body.holes,
     autoYardageAndPins: body.autoYardageAndPins,
+    autoYardage: body.autoYardage,
+    autoPins: body.autoPins,
     yardsDeltaFromRound: body.yardsDeltaFromRound,
     pinDifficultyAdder: body.pinDifficultyAdder,
     windOverride: body.windOverride,

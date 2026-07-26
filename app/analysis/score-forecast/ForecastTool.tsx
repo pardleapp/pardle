@@ -133,6 +133,11 @@ export default function ForecastTool() {
   >("auto");
   const [yardsDeltaSource, setYardsDeltaSource] = useState<Round>(3);
   const [yardsDeltaTotal, setYardsDeltaTotal] = useState<string>("0");
+  /** Pin difficulty source: "auto" auto-matches from the pin sheet's
+   *  pinByRound coords; "manual" turns off cluster matching and lets
+   *  the user set a single total-round stroke adjustment. */
+  const [pinsSource, setPinsSource] = useState<"auto" | "manual">("auto");
+  const [pinManualAdjustment, setPinManualAdjustment] = useState<string>("0");
   const [useHrrr, setUseHrrr] = useState<boolean>(true);
   const [windOverride, setWindOverride] = useState<boolean>(false);
   const [windMph, setWindMph] = useState<string>("");
@@ -196,9 +201,16 @@ export default function ForecastTool() {
           sourceRound: yardsDeltaSource,
           totalDeltaYards: Number.isFinite(d) ? d : 0,
         };
-        body.autoYardageAndPins = false; // block auto-yards; keep auto-pins via delta path
+        body.autoYardage = false;
       } else {
-        body.autoYardageAndPins = true;
+        body.autoYardage = true;
+      }
+      // Pin source
+      if (pinsSource === "manual") {
+        body.autoPins = false;
+        body.pinDifficultyAdder = Number(pinManualAdjustment) || 0;
+      } else {
+        body.autoPins = true;
       }
       if (windOverride) {
         const w = Number(windMph);
@@ -246,6 +258,8 @@ export default function ForecastTool() {
     yardsSource,
     yardsDeltaSource,
     yardsDeltaTotal,
+    pinsSource,
+    pinManualAdjustment,
     useHrrr,
     windOverride,
     windMph,
@@ -378,6 +392,33 @@ export default function ForecastTool() {
                 />
               </Field>
             </>
+          )}
+          <Field
+            label="Pins"
+            help="Pardle auto-matches each hole's pin position to its historical cluster. Choose manual to skip that and add a single total-round stroke adjustment for pin difficulty (e.g. +0.5 if you think today's sheet is harder than the model would say)."
+          >
+            <select
+              value={pinsSource}
+              onChange={(e) =>
+                setPinsSource(e.target.value as "auto" | "manual")
+              }
+              style={ip()}
+            >
+              <option value="auto">Pardle's automated clusters</option>
+              <option value="manual">Manual scoring adjustment</option>
+            </select>
+          </Field>
+          {pinsSource === "manual" && (
+            <Field label="Pin adjustment (total strokes for the round)">
+              <input
+                type="number"
+                step="0.1"
+                value={pinManualAdjustment}
+                onChange={(e) => setPinManualAdjustment(e.target.value)}
+                style={ip()}
+                placeholder="+0.5 = 0.5 stroke harder"
+              />
+            </Field>
           )}
           <Field label="Wind">
             <select
@@ -541,7 +582,7 @@ function PlayerCard({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "2fr 1fr 1fr auto",
+          gridTemplateColumns: "2fr 1fr auto",
           gap: 10,
           alignItems: "end",
         }}
@@ -628,18 +669,31 @@ function PlayerCard({
             style={ip()}
           />
         </Field>
-        <Field label="Rounds this week (vs par)">
-          <input
-            placeholder="auto-filled"
-            value={row.weekRounds}
-            onChange={(e) => onChange({ weekRounds: e.target.value })}
-            style={ip()}
-          />
-        </Field>
         <button type="button" onClick={onRemove} disabled={onlyRow} style={btn()}>
           ✕
         </button>
       </div>
+      {row.weekRounds && (
+        <div
+          style={{
+            marginTop: 6,
+            fontSize: 11,
+            color: "oklch(0.5 0.02 150)",
+          }}
+        >
+          Rounds this week (auto-filled):{" "}
+          <span
+            style={{
+              fontFamily: "var(--font-mono, monospace)",
+              fontWeight: 700,
+              color: "oklch(0.3 0.02 150)",
+            }}
+          >
+            {row.weekRounds}
+          </span>{" "}
+          — used for form adjustment when the toggle below is on.
+        </div>
+      )}
       <div
         style={{
           marginTop: 8,

@@ -111,8 +111,19 @@ export interface ForecastInputs {
   /** When true (default), fetch yardages + pin coords from the pin
    *  sheet for the target round and pre-populate any `holes` entries
    *  that weren't overridden. Turn off if you want the model to fall
-   *  back to historical means without touching the pin sheet. */
+   *  back to historical means without touching the pin sheet.
+   *  Kept for backwards compat with older callers — new callers
+   *  should use `autoYardage` / `autoPins` independently. */
   autoYardageAndPins?: boolean;
+  /** Independent control: fetch target-round yardage from the pin
+   *  sheet. Defaults to autoYardageAndPins (else true). */
+  autoYardage?: boolean;
+  /** Independent control: fetch target-round pin coords and auto-match
+   *  to cluster residuals. Defaults to autoYardageAndPins (else true).
+   *  Turning this off means every hole's cluster residual = 0 —
+   *  useful when the caller wants to specify pin difficulty as a
+   *  single manual adjustment via `pinDifficultyAdder` instead. */
+  autoPins?: boolean;
   /** Alternative yardage-source: derive target-round yardage from a
    *  PRIOR round's actual yardages plus a total-course delta. Useful
    *  when the target round's yardages haven't been posted but the
@@ -264,6 +275,8 @@ export async function runForecast(
     priorRounds = {},
     players = [],
   } = input;
+  const autoYardage = input.autoYardage ?? autoYardageAndPins;
+  const autoPins = input.autoPins ?? autoYardageAndPins;
 
   // Auto-populate yardage + pin coords from the pin sheet when the
   // caller didn't supply overrides for those fields. The pin sheet
@@ -277,7 +290,7 @@ export async function runForecast(
   for (const [hStr, o] of Object.entries(holes)) {
     effectiveHoles[Number(hStr)] = { ...o };
   }
-  if (autoYardageAndPins || yardsDeltaFromRound) {
+  if (autoYardage || autoPins || yardsDeltaFromRound) {
     try {
       const pinSheet = await fetchPinSheet(tournamentId, originUrl);
       if (pinSheet) {
@@ -292,12 +305,14 @@ export async function runForecast(
               cur.yards = src + yardsDeltaFromRound.totalDeltaYards / 18;
             }
           }
-          if (autoYardageAndPins && cur.yards == null) {
+          if (autoYardage && cur.yards == null) {
             const yBy = h.yardsByRound?.[String(targetRound)];
             if (typeof yBy === "number") cur.yards = yBy;
           }
-          // Pin coords — always from target round when auto.
-          if (autoYardageAndPins && cur.pinX == null && cur.pinY == null) {
+          // Pin coords — only when autoPins is enabled. Turning autoPins
+          // off effectively zeros every cluster residual so the caller
+          // can supply a single manual difficulty adjustment instead.
+          if (autoPins && cur.pinX == null && cur.pinY == null) {
             const pinBy = h.pinByRound?.[String(targetRound)];
             if (
               pinBy &&
