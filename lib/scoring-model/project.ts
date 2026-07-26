@@ -31,6 +31,64 @@ import type {
  *  projection. Fewer players = model gets more weight. */
 export const TARGET_LIVE_SAMPLE = 30;
 
+/** Look up a pin-specific residual for a given pin coord. Finds
+ *  historical pin instances within `radius` of the target coord,
+ *  weight-averages their `residualToBase` values (weighted by sample
+ *  size), and returns that as the pin's expected difficulty vs the
+ *  round baseline. When there are no nearby historical pins, returns
+ *  null and callers fall back to the cluster residual.
+ *
+ *  This isolates course-condition residuals (softness, greens
+ *  receptive, etc.) from pin-position variance WITHIN a cluster —
+ *  the previous cluster-average approach treated a pin sitting at
+ *  the easy end of a cluster's range as evidence of course
+ *  softness, which was systematically wrong.
+ *
+ *  When `roundNum` is passed we PREFER same-round historical pins
+ *  (still allow other rounds as a fallback if the same-round pool
+ *  is too thin), so R4 lookups don't get contaminated by R1 pins
+ *  at the same spot playing very differently. */
+export function pinSpecificResidual(
+  fit: HoleFit,
+  pinX: number,
+  pinY: number,
+  radius = 0.05,
+  roundNum?: 1 | 2 | 3 | 4,
+  minTotalWeight = 40,
+): {
+  residual: number;
+  matches: number;
+  totalWeight: number;
+} | null {
+  if (fit.historicalPins.length === 0) return null;
+  const sameRound: typeof fit.historicalPins = [];
+  const otherRound: typeof fit.historicalPins = [];
+  for (const p of fit.historicalPins) {
+    if (Math.hypot(p.x - pinX, p.y - pinY) > radius) continue;
+    if (roundNum != null && p.round === roundNum) sameRound.push(p);
+    else otherRound.push(p);
+  }
+  // Prefer same-round matches when they carry enough sample weight;
+  // otherwise pool with other rounds so we don't degrade to the
+  // cluster mean unnecessarily.
+  let candidates = sameRound;
+  const sameWeight = candidates.reduce((a, b) => a + b.total, 0);
+  if (sameWeight < minTotalWeight) {
+    candidates = [...sameRound, ...otherRound];
+  }
+  if (candidates.length === 0) return null;
+  const totalWeight = candidates.reduce((a, b) => a + b.total, 0);
+  if (totalWeight <= 0) return null;
+  const weighted =
+    candidates.reduce((a, b) => a + b.residualToBase * b.total, 0) /
+    totalWeight;
+  return {
+    residual: weighted,
+    matches: candidates.length,
+    totalWeight,
+  };
+}
+
 /** Auto-match today's pin coords to the nearest cluster centroid.
  *  Returns { letter, distance } or null if the fit has no clusters. */
 export function matchPinToCluster(
@@ -97,7 +155,9 @@ export function projectHoleAvgToPar({
     bearing,
   );
 
-  // Pin cluster residual (0 if we can't match).
+  // Pin difficulty term. Preferred: pin-specific residual from
+  // nearest historical pins to this coord (isolates pin variance
+  // from course conditions). Fallback: cluster average.
   let clusterRes = 0;
   let matchedCluster: string | null = null;
   let clusterMatchDistance: number | null = null;
@@ -110,6 +170,18 @@ export function projectHoleAvgToPar({
       matchedCluster = match.letter;
       clusterMatchDistance = match.distance;
       clusterRes = fit.clusterResiduals[match.letter] ?? 0;
+    }
+    // Override with pin-specific residual when the sample is thick
+    // enough. Same signal, less variance contamination.
+    const specific = pinSpecificResidual(
+      fit,
+      conditions.pinX,
+      conditions.pinY,
+      0.05,
+      roundNum,
+    );
+    if (specific && specific.totalWeight >= 40) {
+      clusterRes = specific.residual;
     }
   }
 

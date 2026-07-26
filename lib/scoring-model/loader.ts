@@ -269,6 +269,8 @@ export async function getScoringModel(
           headwind: head,
           avgVsPar: pin.avgVsPar,
           total: pin.total,
+          pinX: pin.x,
+          pinY: pin.y,
         });
       }
     }

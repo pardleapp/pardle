@@ -24,6 +24,12 @@ export interface FitRow {
   /** Sample-size weight for this pin (number of player rounds behind
    *  the avgVsPar figure). Rows are weighted by sqrt(total) in WLS. */
   total: number;
+  /** Pin coordinate on the 0-1 normalised green frame. Used to
+   *  populate HoleFit.historicalPins so callers can do pin-specific
+   *  nearest-neighbour lookups (isolating pin-position variance from
+   *  course-condition residuals). */
+  pinX?: number;
+  pinY?: number;
 }
 
 /** Fitted coefficients + baseline stats for one hole. */
@@ -63,6 +69,23 @@ export interface HoleFit {
   histMeanYardsByRound: Partial<Record<1 | 2 | 3 | 4, number>>;
   /** Per-round historical mean headwind (weighted). */
   histMeanHeadByRound: Partial<Record<1 | 2 | 3 | 4, number>>;
+  /** Per-pin historical residuals — one entry per historical pin
+   *  instance used in fitting. Lets callers estimate the difficulty
+   *  of a SPECIFIC pin coord rather than falling back to the cluster
+   *  average. Each entry's `residualToBase` is
+   *      pin.avgVsPar − (roundBaseline + windDelta + yardsDelta)
+   *  i.e. what the pin plays vs a "typical round at typical conditions"
+   *  for this hole. Radius-based nearest-neighbour lookup at forecast
+   *  time isolates course-condition residuals from pin-position
+   *  variance within a cluster. */
+  historicalPins: Array<{
+    x: number;
+    y: number;
+    round: number;
+    avgVsPar: number;
+    residualToBase: number;
+    total: number;
+  }>;
   /** Number of fit rows. Below ~6 the fit is unreliable. */
   rowCount: number;
 }

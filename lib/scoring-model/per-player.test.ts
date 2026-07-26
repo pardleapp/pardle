@@ -26,6 +26,7 @@ function fixtureCoeffs(): ScoringModelCoefficients {
       histMeanAvgVsParByRound: {},
       histMeanYardsByRound: {},
       histMeanHeadByRound: {},
+      historicalPins: [],
       rowCount: 20,
     };
   }

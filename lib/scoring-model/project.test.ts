@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeHeadwind,
   matchPinToCluster,
+  pinSpecificResidual,
   projectHoleAvgToPar,
   TARGET_LIVE_SAMPLE,
 } from "./project";
@@ -32,6 +33,7 @@ function fixtureFit(overrides: Partial<HoleFit> = {}): HoleFit {
     histMeanAvgVsParByRound: {},
     histMeanYardsByRound: {},
     histMeanHeadByRound: {},
+    historicalPins: [],
     rowCount: 30,
     ...overrides,
   };
@@ -190,5 +192,61 @@ describe("projectHoleAvgToPar", () => {
       roundNum: 3,
     });
     expect(proj.modelAvgVsPar).toBeCloseTo(-0.5, 4);
+  });
+});
+
+describe("pinSpecificResidual", () => {
+  it("returns null when the fit has no historical pins", () => {
+    const fit = fixtureFit();
+    expect(pinSpecificResidual(fit, 0.3, 0.3)).toBeNull();
+  });
+
+  it("weight-averages nearby historical pins' residuals", () => {
+    const fit = fixtureFit({
+      historicalPins: [
+        // Two nearby pins — one heavier, one lighter
+        { x: 0.31, y: 0.31, round: 3, avgVsPar: -0.2, residualToBase: -0.10, total: 150 },
+        { x: 0.29, y: 0.29, round: 3, avgVsPar: -0.4, residualToBase: -0.30, total: 100 },
+        // One far away — should be excluded by the radius filter
+        { x: 0.90, y: 0.90, round: 3, avgVsPar: 0.5, residualToBase: 0.50, total: 200 },
+      ],
+    });
+    const res = pinSpecificResidual(fit, 0.3, 0.3, 0.05, 3);
+    expect(res).not.toBeNull();
+    expect(res!.matches).toBe(2);
+    // Weighted: (-0.10 × 150 + -0.30 × 100) / 250 = -0.18
+    expect(res!.residual).toBeCloseTo(-0.18, 3);
+    expect(res!.totalWeight).toBe(250);
+  });
+
+  it("returns null when nearest pins don't meet weight floor", () => {
+    const fit = fixtureFit({
+      historicalPins: [
+        // Only one nearby pin with tiny sample
+        { x: 0.31, y: 0.31, round: 3, avgVsPar: -0.2, residualToBase: -0.10, total: 5 },
+      ],
+    });
+    // Even with matches, if total weight < 40 the helper returns
+    // the tiny reading but callers should treat it as insufficient.
+    const res = pinSpecificResidual(fit, 0.3, 0.3, 0.05, 3);
+    expect(res).not.toBeNull();
+    expect(res!.totalWeight).toBe(5);
+    // Caller in the loader wraps this with `totalWeight >= 40` guard.
+  });
+
+  it("prefers same-round matches over other-round pins", () => {
+    const fit = fixtureFit({
+      historicalPins: [
+        // Two R3 pins nearby with big sample → satisfies weight floor
+        { x: 0.31, y: 0.31, round: 3, avgVsPar: -0.3, residualToBase: -0.20, total: 100 },
+        { x: 0.29, y: 0.29, round: 3, avgVsPar: -0.3, residualToBase: -0.20, total: 100 },
+        // R1 pin nearby with different residual — should NOT be used
+        { x: 0.30, y: 0.30, round: 1, avgVsPar: 0.5, residualToBase: 0.60, total: 200 },
+      ],
+    });
+    const res = pinSpecificResidual(fit, 0.3, 0.3, 0.05, 3);
+    expect(res).not.toBeNull();
+    expect(res!.matches).toBe(2);
+    expect(res!.residual).toBeCloseTo(-0.20, 3);
   });
 });

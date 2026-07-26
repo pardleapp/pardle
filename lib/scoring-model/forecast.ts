@@ -11,7 +11,7 @@
  */
 
 import "server-only";
-import { projectHoleAvgToPar } from "./project";
+import { projectHoleAvgToPar, pinSpecificResidual } from "./project";
 import { getScoringModel } from "./loader";
 import { getHoleBearings } from "./hole-bearings";
 import {
@@ -86,6 +86,10 @@ export interface PriorRoundObservation {
   setup: {
     yardsByHole: Record<number, number>;
     clusterByHole?: Record<number, string>;
+    /** Actual pin coord (0-1 normalised) per hole for that round.
+     *  Used by pinSpecificResidual to isolate course-condition
+     *  effects from pin-position variance within a cluster. */
+    pinByHole?: Record<number, { x: number; y: number }>;
     wind: { windMph: number; windDirDeg: number };
   };
 }
@@ -612,11 +616,34 @@ export async function runForecast(
         typeof yards !== "number"
       )
         continue;
-      const clusterLetter = obs.setup.clusterByHole?.[h];
-      const cluster =
-        clusterLetter && fit.clusterResiduals[clusterLetter] != null
-          ? fit.clusterResiduals[clusterLetter]
-          : 0;
+      // Pin difficulty term — prefer PIN-SPECIFIC historical residual
+      // (nearest-neighbour lookup in the fit's historicalPins) so we
+      // isolate course-condition residuals from pin-position variance
+      // within a cluster. Falls through to cluster residual when the
+      // exact pin coord isn't in the historical sample, else to 0.
+      let pinTerm = 0;
+      const pinCoord = obs.setup.pinByHole?.[h];
+      let pinSource: "pin-specific" | "cluster" | "none" = "none";
+      if (pinCoord) {
+        const specific = pinSpecificResidual(
+          fit,
+          pinCoord.x,
+          pinCoord.y,
+          0.05,
+          r,
+        );
+        if (specific && specific.totalWeight >= 40) {
+          pinTerm = specific.residual;
+          pinSource = "pin-specific";
+        }
+      }
+      if (pinSource === "none") {
+        const clusterLetter = obs.setup.clusterByHole?.[h];
+        if (clusterLetter && fit.clusterResiduals[clusterLetter] != null) {
+          pinTerm = fit.clusterResiduals[clusterLetter];
+          pinSource = "cluster";
+        }
+      }
       const baseAvg =
         fit.histMeanAvgVsParByRound[r] ?? fit.histMeanAvgVsPar;
       const baseYards = fit.histMeanYardsByRound[r] ?? fit.histMeanYards;
@@ -628,7 +655,7 @@ export async function runForecast(
         );
       const predicted =
         baseAvg +
-        cluster +
+        pinTerm +
         fit.bHead * (head - baseHead) +
         fit.bYards * (yards - baseYards);
       sumResid += actualVsPar - predicted;
@@ -1019,14 +1046,25 @@ export async function fetchPriorRoundObservations(
       const wind = dailyByRound[r] ?? { windMph: 0, windDirDeg: 0 };
       const vsParByHole: Record<number, number> = {};
       const yardsByHole: Record<number, number> = {};
+      const pinByHole: Record<number, { x: number; y: number }> = {};
       for (const h of holes) {
         const sc = h.scoringByRound?.[String(r)];
         const yds = h.yardsByRound?.[String(r)];
+        const pin = h.pinByRound?.[String(r)];
         if (sc && typeof sc.vsPar === "number") {
           vsParByHole[h.holeNumber] = sc.vsPar;
         }
         if (typeof yds === "number") {
           yardsByHole[h.holeNumber] = yds;
+        }
+        if (
+          pin &&
+          typeof pin.x === "number" &&
+          typeof pin.y === "number" &&
+          pin.x !== -1 &&
+          pin.y !== -1
+        ) {
+          pinByHole[h.holeNumber] = { x: pin.x, y: pin.y };
         }
       }
       if (Object.keys(vsParByHole).length >= 15) {
@@ -1034,6 +1072,7 @@ export async function fetchPriorRoundObservations(
           vsParByHole,
           setup: {
             yardsByHole,
+            pinByHole,
             wind,
           },
         };

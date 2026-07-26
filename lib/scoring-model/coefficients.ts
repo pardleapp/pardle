@@ -119,6 +119,44 @@ export function assembleHoleFit(
     histMeanYardsByRound[r] = a.sYds / a.w;
     histMeanHeadByRound[r] = a.sHead / a.w;
   }
+  // Per-pin historical residuals. For each row (a single pin
+  // instance in a specific round), compute:
+  //   residualToBase = avgVsPar
+  //                    − (roundBaseline + b_yards × (yards − roundYardsMean)
+  //                       + b_head × (head − roundHeadMean))
+  // The result isolates PIN POSITION difficulty from yardage and
+  // wind. Callers doing nearest-neighbour lookups (e.g. the level-
+  // shift calc) can weight by `total` and average across nearby
+  // historical pins to get a pin-specific expected residual.
+  const historicalPins: HoleFit["historicalPins"] = [];
+  for (const r of rows) {
+    if (typeof r.pinX !== "number" || typeof r.pinY !== "number") continue;
+    const roundBase =
+      perRoundAgg[r.round]?.rows && perRoundAgg[r.round]!.rows >= 3
+        ? perRoundAgg[r.round]!.sAvg / perRoundAgg[r.round]!.w
+        : totalSum / totalW;
+    const roundYardsMean =
+      perRoundAgg[r.round]?.rows && perRoundAgg[r.round]!.rows >= 3
+        ? perRoundAgg[r.round]!.sYds / perRoundAgg[r.round]!.w
+        : totalYds / totalW;
+    const roundHeadMean =
+      perRoundAgg[r.round]?.rows && perRoundAgg[r.round]!.rows >= 3
+        ? perRoundAgg[r.round]!.sHead / perRoundAgg[r.round]!.w
+        : totalHead / totalW;
+    const yardsAdj = fit.bYards * (r.yards - roundYardsMean);
+    const headAdj = fit.bHead * (r.headwind - roundHeadMean);
+    const residualToBase =
+      r.avgVsPar - (roundBase + yardsAdj + headAdj);
+    historicalPins.push({
+      x: r.pinX,
+      y: r.pinY,
+      round: r.round,
+      avgVsPar: r.avgVsPar,
+      residualToBase,
+      total: r.total,
+    });
+  }
+
   return {
     bYards: fit.bYards,
     bHead: fit.bHead,
@@ -131,6 +169,7 @@ export function assembleHoleFit(
     histMeanAvgVsParByRound,
     histMeanYardsByRound,
     histMeanHeadByRound,
+    historicalPins,
     rowCount: rows.length,
   };
 }
