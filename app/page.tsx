@@ -30,6 +30,13 @@ interface Article {
 // now lives at /).
 const ARTICLES: Article[] = [
   {
+    slug: "why-we-bet-1149-on-hank-lebioda",
+    title: "Why we bet £1,149 on Hank Lebioda",
+    dek: "The market has him at 60%. Our model has him at 75%. That's the biggest edge we've seen this week — here's exactly how we got there.",
+    date: "2026-07-26",
+    tag: "R4 bet",
+  },
+  {
     slug: "3m-open-r3-scheffler-dynamics",
     title: "Exploring Scheffler round score dynamics: 3M Open R3",
     dek: "Walking the full pricing exercise on Scheffler's over/under 66.5 — field mean, personal edge, course compression, and the mean-vs-median gap that decides where the fair line actually sits.",

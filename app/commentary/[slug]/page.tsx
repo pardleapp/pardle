@@ -8,6 +8,7 @@ import ArticlePinDifficulty from "./_articles/ArticlePinDifficulty";
 import ArticleR2Preview from "./_articles/ArticleR2Preview";
 import ArticleR2ScoringForecast from "./_articles/ArticleR2ScoringForecast";
 import ArticleSchefflerR3Dynamics from "./_articles/ArticleSchefflerR3Dynamics";
+import ArticleLebiodaBet from "./_articles/ArticleLebiodaBet";
 
 interface Article {
   slug: string;
@@ -19,6 +20,14 @@ interface Article {
 }
 
 const ARTICLES: Record<string, Article> = {
+  "why-we-bet-1149-on-hank-lebioda": {
+    slug: "why-we-bet-1149-on-hank-lebioda",
+    title: "Why we bet £1,149 on Hank Lebioda",
+    dek: "The market has him at 60%. Our model has him at 75%. That's the biggest edge we've seen this week — here's exactly how we got there.",
+    date: "2026-07-26",
+    tag: "R4 bet",
+    Body: ArticleLebiodaBet,
+  },
   "3m-open-r3-scheffler-dynamics": {
     slug: "3m-open-r3-scheffler-dynamics",
     title: "Exploring Scheffler round score dynamics: 3M Open R3",
