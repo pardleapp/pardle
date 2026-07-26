@@ -79,9 +79,25 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
+/** Look up an article by slug tolerantly. Browsers percent-encode
+ *  non-ASCII (the `£` in the Lebioda slug becomes `%C2%A3`), and
+ *  Next.js sometimes hands us the decoded form and sometimes the
+ *  raw encoded form depending on how the URL entered the request.
+ *  Try both. */
+function findArticle(rawSlug: string): Article | undefined {
+  if (ARTICLES[rawSlug]) return ARTICLES[rawSlug];
+  try {
+    const decoded = decodeURIComponent(rawSlug);
+    if (ARTICLES[decoded]) return ARTICLES[decoded];
+  } catch {
+    /* malformed URI — fall through */
+  }
+  return undefined;
+}
+
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const a = ARTICLES[slug];
+  const a = findArticle(slug);
   if (!a) return { title: `Insights — ${BRAND.name}` };
   return {
     title: `${a.title} — ${BRAND.name}`,
@@ -93,7 +109,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CommentaryArticle({ params }: Props) {
   const { slug } = await params;
-  const a = ARTICLES[slug];
+  const a = findArticle(slug);
   if (!a) notFound();
   const Body = a.Body;
   const dateStr = new Date(a.date + "T12:00:00Z").toLocaleDateString("en-GB", {
