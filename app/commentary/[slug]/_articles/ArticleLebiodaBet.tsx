@@ -205,7 +205,7 @@ export default function ArticleLebiodaBet() {
             label: "Our edge",
             value: "+15pp",
             color: emerald,
-            sub: "Every £100 wins £25 long-run",
+            sub: "+25% expected return per £ staked",
           },
         ].map((s) => (
           <div

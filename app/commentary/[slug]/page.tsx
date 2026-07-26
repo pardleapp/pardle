@@ -19,15 +19,20 @@ interface Article {
   Body: React.ComponentType;
 }
 
+const LEBIODA_ARTICLE: Article = {
+  slug: "why-we-bet-£1149-on-hank-lebioda",
+  title: "Why we bet £1,149 on Hank Lebioda",
+  dek: "The market has him at 60%. Our model has him at 75%. That's the biggest edge we've seen this week — here's exactly how we got there.",
+  date: "2026-07-26",
+  tag: "R4 bet",
+  Body: ArticleLebiodaBet,
+};
+
 const ARTICLES: Record<string, Article> = {
-  "why-we-bet-1149-on-hank-lebioda": {
-    slug: "why-we-bet-1149-on-hank-lebioda",
-    title: "Why we bet £1,149 on Hank Lebioda",
-    dek: "The market has him at 60%. Our model has him at 75%. That's the biggest edge we've seen this week — here's exactly how we got there.",
-    date: "2026-07-26",
-    tag: "R4 bet",
-    Body: ArticleLebiodaBet,
-  },
+  "why-we-bet-£1149-on-hank-lebioda": LEBIODA_ARTICLE,
+  // Legacy slug from initial publish — kept so any early share
+  // link still resolves to the same article.
+  "why-we-bet-1149-on-hank-lebioda": LEBIODA_ARTICLE,
   "3m-open-r3-scheffler-dynamics": {
     slug: "3m-open-r3-scheffler-dynamics",
     title: "Exploring Scheffler round score dynamics: 3M Open R3",
