@@ -477,9 +477,10 @@ export default function HowItWorksPage() {
           >
             <li>
               <strong>Conditions like the most recent finished
-              round</strong> (default for R3+): if R3 played 3.8 under
-              par because greens were receptive and pins were fair,
-              the model expects today to play similarly soft.
+              round</strong> (default for R3+): if yesterday played
+              softer than typical because greens were receptive and
+              pins were fair, the model expects today to play
+              similarly.
             </li>
             <li>
               <strong>Based on R3 / R2 / R1</strong>: anchor on a
@@ -491,16 +492,15 @@ export default function HowItWorksPage() {
             </li>
             <li>
               <strong>Typical setup for this course</strong>: ignore
-              this week&apos;s data entirely and use the 8-year
-              historical baseline for this round.
+              this week&apos;s data entirely and use the historical
+              baseline for this round.
             </li>
           </ul>
           <P>
             Behind the scenes this becomes a <strong>level shift</strong> —
             a per-hole stroke adjustment carried over from the
-            reference round(s). If yesterday played 1.4 strokes under
-            historical average, the model shifts each of today&apos;s
-            18 holes by 1.4/18 = ~0.08 strokes easier.
+            reference round(s). The measured softness of the reference
+            round is spread evenly across today&apos;s 18 holes.
           </P>
           <Example>
             When R3 plays softer than the historical R3 mean, that
@@ -540,20 +540,11 @@ export default function HowItWorksPage() {
         <ParamCard name="Pins" hook="Cluster-match, or a manual scoring adjustment">
           <P>
             <strong>Pardle&apos;s automated clusters</strong>{" "}
-            (default): eight years of pin-by-pin scoring at this
+            (default): several years of pin-by-pin scoring at this
             course have been clustered by green zone (front-right,
             back-left, etc.). Each hole&apos;s pin position today is
-            matched to its nearest historical cluster, and the
-            model uses that cluster&apos;s residual scoring
-            difficulty.
-          </P>
-          <P>
-            <strong>Pin-specific residual (Option A) refinement</strong>:
-            when we have thick enough historical sample at a specific
-            pin coordinate (≥40 rounds), the model uses the exact-
-            coordinate residual instead of the cluster average — this
-            isolates course-condition softness from pin-position
-            variance within a cluster.
+            matched to its nearest historical cluster, and the model
+            uses that cluster&apos;s residual scoring difficulty.
           </P>
           <P>
             <strong>Manual scoring adjustment</strong>: skip the
@@ -595,11 +586,14 @@ export default function HowItWorksPage() {
             back.
           </P>
           <Example>
-            The 8th at TPC Twin Cities plays approximately{" "}
-            <Mono>+0.02</Mono> vs par per mph of headwind based on 8
-            years of historical scoring. On a 15 mph SSW day pointing
-            straight into hole 8 (bearing 200°), the model expects the
-            hole to play ~0.30 strokes harder than its baseline.
+            A long par-3 that plays roughly south sits with its
+            bearing pointing straight into an SSW wind (bearing ~200°),
+            so the full wind speed acts as headwind. A short par-4
+            playing north-west with the same SSW wind sees only a
+            fraction of that as headwind — the model computes the
+            component of the wind vector along each hole&apos;s
+            bearing and multiplies by that hole&apos;s own fitted
+            coefficient.
           </Example>
         </ParamCard>
 
@@ -634,17 +628,17 @@ export default function HowItWorksPage() {
             }}
           >
             <li>
-              <Mono>+3.0 SG</Mono>: elite (Scheffler, top-of-the-world level)
+              Roughly <Mono>+3 SG</Mono>: elite, top-of-the-world level
             </li>
             <li>
-              <Mono>+1.5 SG</Mono>: top-50-in-the-world level
+              Roughly <Mono>+1.5 SG</Mono>: top-50-in-the-world level
             </li>
             <li>
-              <Mono>+0.5 SG</Mono>: solid tour regular
+              Roughly <Mono>+0.5 SG</Mono>: solid tour regular
             </li>
             <li>
-              <Mono>−0.5 SG</Mono>: below-average tour player, cut
-              risk most weeks
+              Roughly <Mono>−0.5 SG</Mono>: below-average tour player,
+              cut risk most weeks
             </li>
           </ul>
           <P>
@@ -665,16 +659,18 @@ export default function HowItWorksPage() {
           <P>
             This matters most when a late tee time faces a building
             afternoon wind. On a calm morning that gusts up by
-            mid-afternoon, the day-average forecast would understate
-            the difficulty for a late group by 0.5–1.0 strokes.
+            mid-afternoon, the day-average forecast blends the two
+            regimes and understates the difficulty for the late
+            group.
           </P>
           <Example>
-            Two players with identical SG. Player A tees off at 7:00
-            AM in 4 mph wind; Player B tees off at 1:30 PM in 12 mph
-            wind. Under the day-average model both project the same
-            round score. With tee-time-aware wind, Player B&apos;s
-            projection is ~0.6 strokes harder — a meaningful edge for
-            betting UNDER Player A.
+            Two players with identical SG, one teeing off at 7:00 AM
+            when the wind is light and one at 1:30 PM when the wind
+            has built. Under the day-average model they project the
+            same score. With tee-time-aware wind, the late tee&apos;s
+            projection is meaningfully harder — a systematic edge for
+            betting the morning group UNDER and the afternoon group
+            OVER.
           </Example>
         </ParamCard>
 
@@ -694,20 +690,21 @@ export default function HowItWorksPage() {
             </strong>{" "}
             It&apos;s how much a player over- or under-performed{" "}
             <em>their own expected score</em> for that round. Expected
-            is <Mono>field_mean − sgTotal</Mono>: an elite +3 SG
-            player in a field averaging even par is expected to shoot{" "}
-            <Mono>−3</Mono>, so an average tournament round for him is
-            a <em>negative</em> form signal — he under-performed his
-            baseline. A 0 SG player shooting the same round is
-            performing exactly to expectation and gets no form bump
-            either direction.
+            is <Mono>field_mean − sgTotal</Mono>: an elite ~+3 SG
+            player in a field averaging even par is expected to shoot
+            around <Mono>−3</Mono>, so an average tournament round for
+            him is a <em>negative</em> form signal — he under-
+            performed his baseline. A 0 SG player shooting the same
+            round is performing exactly to expectation and gets no
+            form bump either direction.
           </P>
           <Example>
-            Scheffler tees off in a field that averages <Mono>−1.5</Mono>{" "}
-            for the round. His season SG is <Mono>+2.9</Mono>, so he&apos;s
-            expected to shoot <Mono>−1.5 − 2.9 = −4.4</Mono>. If he
-            shoots the field average of <Mono>−1.5</Mono>, that&apos;s
-            a <Mono>+2.9</Mono> underperformance vs expected — the
+            Say Scheffler tees off in a field that averages{" "}
+            <Mono>−1.5</Mono> for the round. His season SG is roughly{" "}
+            <Mono>+2.83</Mono>, so he&apos;s expected to shoot around{" "}
+            <Mono>−1.5 − 2.83 = −4.33</Mono>. If he shoots the field
+            average of <Mono>−1.5</Mono>, that&apos;s a{" "}
+            <Mono>+2.83</Mono> underperformance vs expected — the
             model treats it as a negative form signal that would nudge
             his projection <em>up</em> tomorrow (worse than his season
             baseline suggests).
@@ -835,9 +832,9 @@ export default function HowItWorksPage() {
               <div>
                 <strong>Player A</strong> (approach-driven):
               </div>
-              <div>OTT +0.4 · APP +2.2 · ARG +0.2 · PUTT +0.2</div>
+              <div>OTT +0.5 · APP +2.5 · ARG +0.0 · PUTT +0.0</div>
               <div style={{ color: T.emerald, marginTop: 4 }}>
-                Persistence factor ≈ 1.15× → −3 excess scales to −3.45
+                Persistence factor ≈ 1.25× → −3 excess scales to −3.75
                 strokes of forward signal
               </div>
             </div>
@@ -854,10 +851,10 @@ export default function HowItWorksPage() {
               <div>
                 <strong>Player B</strong> (putt-driven):
               </div>
-              <div>OTT +0.2 · APP +0.4 · ARG +0.2 · PUTT +2.2</div>
+              <div>OTT +0.0 · APP +0.5 · ARG +0.0 · PUTT +2.5</div>
               <div style={{ color: T.tang, marginTop: 4 }}>
-                Persistence factor ≈ 0.75× → same −3 excess scales to
-                only −2.25 strokes of forward signal
+                Persistence factor ≈ 0.72× → same −3 excess scales to
+                only −2.15 strokes of forward signal
               </div>
             </div>
           </Example>
@@ -1019,7 +1016,7 @@ export default function HowItWorksPage() {
 
         <ParamCard
           name="Model delta"
-          hook="Today's forecast vs the 8-year historical"
+          hook="Today's forecast vs the historical baseline"
         >
           <P>
             How much easier or harder the model expects this round to
@@ -1030,16 +1027,16 @@ export default function HowItWorksPage() {
             <Mono>−0.5</Mono> means today should play half a stroke
             easier than a typical R4 here. <Mono>+1.2</Mono> means
             it&apos;s shaping up as one of the harder R4s in the
-            8-year record.
+            historical record.
           </P>
         </ParamCard>
 
         <ParamCard
           name="Historical mean"
-          hook="Untouched 8-year baseline"
+          hook="Untouched historical baseline"
         >
           <P>
-            The 8-year average total-strokes score for this specific
+            The historical average total-strokes score for this specific
             round number at this course, with no adjustment for
             today&apos;s conditions. Useful as an anchor: the field
             forecast should feel roughly like historical mean + level
