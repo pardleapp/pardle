@@ -84,12 +84,11 @@ export default function ArticleLebiodaBet() {
           alt="Bet slip: Hank Lebioda R4 UNDER 69.5 at 1.666, stake £1,148.98, cash out £765.98"
           style={{
             width: "100%",
-            maxWidth: 480,
             height: "auto",
             display: "block",
             margin: "0 auto",
             borderRadius: 8,
-            imageRendering: "-webkit-optimize-contrast",
+            imageRendering: "pixelated",
           }}
         />
         <figcaption
