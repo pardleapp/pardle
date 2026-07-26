@@ -46,20 +46,21 @@ export default function Page() {
         </nav>
         <h2
           style={{
-            fontSize: 22,
-            marginBottom: 4,
+            fontSize: 26,
+            marginBottom: 6,
             fontFamily:
-              "var(--font-archivo), 'Archivo', system-uwi, sans-serif",
+              "var(--font-archivo), 'Archivo', system-ui, sans-serif",
           }}
         >
           Round score forecast
         </h2>
         <p
           style={{
-            fontSize: 13,
+            fontSize: 15,
             color: "oklch(0.5 0.02 150)",
-            marginBottom: 20,
-            lineHeight: 1.5,
+            marginBottom: 22,
+            lineHeight: 1.55,
+            maxWidth: 900,
           }}
         >
           Project field and per-player round scores. Pin clusters are

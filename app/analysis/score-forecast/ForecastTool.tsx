@@ -1079,7 +1079,7 @@ function ResultsPanel({ r }: { r: ForecastResp }) {
 // ── Style helpers ──────────────────────────────────────────────────
 function panel(): React.CSSProperties {
   return {
-    padding: 16,
+    padding: 18,
     border: "1px solid oklch(0.9 0.008 95)",
     borderRadius: 8,
     background: "oklch(0.99 0.003 95)",
@@ -1087,23 +1087,23 @@ function panel(): React.CSSProperties {
 }
 function h3(): React.CSSProperties {
   return {
-    margin: "0 0 8px",
-    fontSize: 16,
+    margin: "0 0 10px",
+    fontSize: 18,
     fontFamily: "var(--font-archivo), 'Archivo', system-ui, sans-serif",
   };
 }
 function helpText(): React.CSSProperties {
   return {
-    fontSize: 12,
+    fontSize: 13,
     color: "oklch(0.5 0.02 150)",
-    marginBottom: 12,
+    marginBottom: 14,
     lineHeight: 1.5,
   };
 }
 function ip(minWidth = 100): React.CSSProperties {
   return {
-    padding: "6px 8px",
-    fontSize: 13,
+    padding: "8px 10px",
+    fontSize: 14,
     border: "1px solid oklch(0.85 0.013 95)",
     borderRadius: 4,
     background: "white",
@@ -1115,8 +1115,8 @@ function ip(minWidth = 100): React.CSSProperties {
 }
 function btn(): React.CSSProperties {
   return {
-    padding: "4px 10px",
-    fontSize: 12,
+    padding: "6px 12px",
+    fontSize: 13,
     fontWeight: 600,
     border: "1px solid oklch(0.85 0.013 95)",
     borderRadius: 4,
@@ -1126,8 +1126,8 @@ function btn(): React.CSSProperties {
 }
 function btnPrimary(): React.CSSProperties {
   return {
-    padding: "6px 12px",
-    fontSize: 13,
+    padding: "8px 14px",
+    fontSize: 14,
     fontWeight: 700,
     border: "1px solid oklch(0.25 0.15 155)",
     borderRadius: 6,
@@ -1139,9 +1139,9 @@ function btnPrimary(): React.CSSProperties {
 function th(): React.CSSProperties {
   return {
     textAlign: "left",
-    padding: "8px 10px",
+    padding: "10px 12px",
     borderBottom: "1px solid oklch(0.9 0.008 95)",
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 800,
     letterSpacing: 0.3,
     textTransform: "uppercase",
@@ -1150,8 +1150,9 @@ function th(): React.CSSProperties {
 }
 function td(strong = false): React.CSSProperties {
   return {
-    padding: "6px 10px",
+    padding: "8px 12px",
     borderBottom: "1px solid oklch(0.94 0.008 95)",
+    fontSize: 14,
     fontFamily: strong ? "inherit" : "var(--font-mono, monospace)",
     fontWeight: strong ? 700 : 500,
   };
@@ -1177,7 +1178,7 @@ function Field({
     >
       <span
         style={{
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: 600,
           color: "oklch(0.5 0.02 150)",
           letterSpacing: 0.3,
@@ -1202,13 +1203,13 @@ function Field({
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              width: 14,
-              height: 14,
+              width: 16,
+              height: 16,
               borderRadius: "50%",
               border: "1px solid oklch(0.7 0.03 155)",
               color: "oklch(0.5 0.03 155)",
               background: "white",
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: 700,
               fontFamily: "serif",
               cursor: "help",
@@ -1226,14 +1227,14 @@ function Field({
                   zIndex: 40,
                   background: "oklch(0.22 0.03 155)",
                   color: "white",
-                  padding: "8px 10px",
+                  padding: "10px 12px",
                   borderRadius: 6,
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: 500,
                   textTransform: "none",
                   letterSpacing: 0,
-                  lineHeight: 1.4,
-                  width: 260,
+                  lineHeight: 1.45,
+                  width: 280,
                   boxShadow: "0 6px 20px oklch(0 0 0 / 0.25)",
                   pointerEvents: "none",
                 }}
@@ -1260,7 +1261,7 @@ function Stat({
   return (
     <div
       style={{
-        padding: 12,
+        padding: 14,
         border: "1px solid oklch(0.9 0.008 95)",
         borderRadius: 6,
         background: "white",
@@ -1268,19 +1269,19 @@ function Stat({
     >
       <div
         style={{
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: 700,
           color: "oklch(0.5 0.02 150)",
           textTransform: "uppercase",
           letterSpacing: 0.4,
-          marginBottom: 4,
+          marginBottom: 6,
         }}
       >
         {label}
       </div>
       <div
         style={{
-          fontSize: 20,
+          fontSize: 24,
           fontWeight: 800,
           fontFamily: "var(--font-mono, monospace)",
         }}
@@ -1289,7 +1290,7 @@ function Stat({
       </div>
       {sub && (
         <div
-          style={{ fontSize: 11, color: "oklch(0.5 0.02 150)", marginTop: 4 }}
+          style={{ fontSize: 12, color: "oklch(0.5 0.02 150)", marginTop: 5 }}
         >
           {sub}
         </div>
