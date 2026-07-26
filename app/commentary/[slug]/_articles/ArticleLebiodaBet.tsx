@@ -193,11 +193,11 @@ export default function ArticleLebiodaBet() {
         will look like at TPC Twin Cities specifically.
       </P>
       <P>
-        Our model can, because it&apos;s built from three things
+        Our model can, because it&apos;s built from four things
         bookmakers don&apos;t use:
       </P>
 
-      {/* ── Three model ingredients ─────────────────────────── */}
+      {/* ── Four model ingredients ──────────────────────────── */}
       <div style={{ display: "grid", gap: 14, margin: "16px 0 8px" }}>
         <Ingredient
           num="1"
@@ -211,8 +211,13 @@ export default function ArticleLebiodaBet() {
         />
         <Ingredient
           num="3"
-          title="Sunday will play like Saturday"
-          body="The field shot 3.8 under par yesterday because the greens were receptive and the pins fair. Our model measured that softness, isolated it from the pin-position effect, and correctly carried the persistent slice into today's forecast. Bookmakers don't do that — they price Sunday like a fresh round."
+          title="Sunday will play like Saturday — and the heat guarantees it"
+          body="The field shot 3.8 under par yesterday because the greens were receptive and the pins fair. Sunday's temperatures are set to be brutal — the kind of heat where a superintendent's only choice is to soak the greens overnight, or the putting surfaces burn out and a $30M restoration project turns brown on national TV. Soft overnight = receptive Sunday. Same setup. Our model measured yesterday's softness, isolated it from the pin-position effect, and carried it straight through into today's forecast. Bookmakers don't do that — they price Sunday like a fresh round."
+        />
+        <Ingredient
+          num="4"
+          title="The hole 16 tell"
+          body="The pin on 16 is tucked in a corner the tour typically pairs with the FORWARD tee. That turns a 495-yard par 4 into a 301-yard drivable one. Every player in Lebioda's half of the field walks up to that tee box expecting to make birdie or better. Our per-hole projection has 16 playing 0.4 strokes under par for the field today — a single hole worth almost half a shot on his round total."
         />
       </div>
 
