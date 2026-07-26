@@ -18,8 +18,58 @@ import {
   getScorecards,
   type PGAScorecard,
 } from "@/lib/golf-api/pgatour";
+import { getFullLiveStats } from "@/lib/golf-api/datagolf";
+import type { RoundSgBreakdown } from "@/lib/scoring-model/forecast";
 
 const DG_BASE = "https://feeds.datagolf.com";
+
+/** DG per-round SG breakdown per player, for rounds 1-4. Each call
+ *  to /preds/live-tournament-stats returns one round's SG numbers
+ *  for every player currently in the field. We fan out the round
+ *  fetches in parallel, then transpose into a per-dgId map. Any
+ *  round that hasn't started (or returns empty) simply produces no
+ *  entry for that round in the inner map. */
+async function loadDgLiveSgByRound(): Promise<
+  Map<number, Partial<Record<1 | 2 | 3 | 4, RoundSgBreakdown>>>
+> {
+  const out = new Map<
+    number,
+    Partial<Record<1 | 2 | 3 | 4, RoundSgBreakdown>>
+  >();
+  const rounds: Array<1 | 2 | 3 | 4> = [1, 2, 3, 4];
+  const perRound = await Promise.all(
+    rounds.map((r) =>
+      getFullLiveStats(r).catch(() => [] as Awaited<
+        ReturnType<typeof getFullLiveStats>
+      >),
+    ),
+  );
+  perRound.forEach((rows, idx) => {
+    const r = rounds[idx];
+    for (const row of rows) {
+      const dgIdNum = Number(row.dgId);
+      if (!Number.isFinite(dgIdNum)) continue;
+      // Skip rows with zero signal — the DG endpoint returns entries
+      // for players who haven't started this round yet with all-null
+      // SG. Storing those would just noise up the persistence math.
+      const anySig =
+        row.sgOtt != null ||
+        row.sgApp != null ||
+        row.sgArg != null ||
+        row.sgPutt != null;
+      if (!anySig) continue;
+      const existing = out.get(dgIdNum) ?? {};
+      existing[r] = {
+        sgOtt: row.sgOtt,
+        sgApp: row.sgApp,
+        sgArg: row.sgArg,
+        sgPutt: row.sgPutt,
+      };
+      out.set(dgIdNum, existing);
+    }
+  });
+  return out;
+}
 
 /** DG skill-ratings — universal baseline SG per player, refreshed
  *  weekly. Falls back for players who aren't in the event-specific
@@ -192,14 +242,26 @@ export async function GET() {
     });
   }
 
-  const [leaderboard, csvSg, dgTeeTimes, pgaToDg, dgSkillByDgId] =
-    await Promise.all([
-      getLeaderboard(tournamentId).catch(() => []),
-      loadCsvSg(),
-      loadDgTeeTimes(),
-      loadPgaIdToDgId(),
-      loadDgSkillRatings(),
-    ]);
+  const [
+    leaderboard,
+    csvSg,
+    dgTeeTimes,
+    pgaToDg,
+    dgSkillByDgId,
+    dgSgByRound,
+  ] = await Promise.all([
+    getLeaderboard(tournamentId).catch(() => []),
+    loadCsvSg(),
+    loadDgTeeTimes(),
+    loadPgaIdToDgId(),
+    loadDgSkillRatings(),
+    loadDgLiveSgByRound().catch(
+      () => new Map<
+        number,
+        Partial<Record<1 | 2 | 3 | 4, RoundSgBreakdown>>
+      >(),
+    ),
+  ]);
 
   // Build normalised name → SG lookup once
   const sgByNorm = new Map<string, number>();
@@ -223,6 +285,11 @@ export async function GET() {
     thru: string;
     playerState: string;
     weekRounds: number[]; // completed rounds' vs-par scores
+    /** Per-round SG breakdown (index-aligned with weekRounds) so the
+     *  model can persistence-weight each round's form contribution.
+     *  Entries can be null when DG hasn't posted SG for that round
+     *  yet even though the round is complete. */
+    weekRoundsSg: Array<RoundSgBreakdown | null>;
     /** Tee times per round, "HH:MM" local. Empty when unavailable. */
     teeTimes: Partial<Record<1 | 2 | 3 | 4, string>>;
   }
@@ -243,11 +310,15 @@ export async function GET() {
     }
     const sc = scorecards[lb.playerId];
     const weekRounds: number[] = [];
+    const completedRoundNums: Array<1 | 2 | 3 | 4> = [];
     if (sc?.rounds) {
+      // Collect (round, vs-par) tuples so we can pair with DG SG by
+      // ROUND NUMBER, not by array index (defensive against a rounds
+      // dict that iterates non-sequentially).
+      const collected: Array<{ round: 1 | 2 | 3 | 4; vsPar: number }> = [];
       for (const [rStr, holes] of Object.entries(sc.rounds)) {
         const r = Number(rStr);
-        if (!Number.isFinite(r)) continue;
-        // Only count fully-completed rounds (all 18 holes scored).
+        if (!Number.isFinite(r) || r < 1 || r > 4) continue;
         const played = holes.filter((h) => {
           const s = Number(h.score);
           return Number.isFinite(s) && s > 0;
@@ -259,12 +330,20 @@ export async function GET() {
           strokes += Number(h.score);
           par += h.par;
         }
-        weekRounds.push(strokes - par);
+        collected.push({ round: r as 1 | 2 | 3 | 4, vsPar: strokes - par });
       }
-      // Rounds come back in insertion order, roughly R1 → R4.
+      collected.sort((a, b) => a.round - b.round);
+      for (const c of collected) {
+        weekRounds.push(c.vsPar);
+        completedRoundNums.push(c.round);
+      }
     }
     const dgId = pgaToDg.get(lb.playerId);
     const teeTimes = dgId != null ? dgTeeTimes.get(dgId) ?? {} : {};
+    const dgSgForPlayer = dgId != null ? dgSgByRound.get(dgId) : undefined;
+    const weekRoundsSg: Array<RoundSgBreakdown | null> = completedRoundNums.map(
+      (r) => dgSgForPlayer?.[r] ?? null,
+    );
     players.push({
       id: lb.playerId,
       name: lb.displayName,
@@ -274,6 +353,7 @@ export async function GET() {
       thru: lb.thru,
       playerState: lb.playerState,
       weekRounds,
+      weekRoundsSg,
       teeTimes,
     });
   }

@@ -168,7 +168,7 @@ export async function GET() {
         "number 0-1 (default 1.0; 0 = ignore level shift)",
       priorRounds: "auto-fetched when omitted",
       players:
-        "Array<{ name, sgTotal, compressionFactor?, skewAdjustment?, weekRounds?, formWeight? }>",
+        "Array<{ name, sgTotal, compressionFactor?, skewAdjustment?, weekRounds?, weekRoundsSg?: Array<{ sgOtt?, sgApp?, sgArg?, sgPutt? } | null>, formWeight? }>",
     },
   });
 }

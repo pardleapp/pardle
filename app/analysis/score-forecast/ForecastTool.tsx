@@ -52,6 +52,12 @@ interface ForecastResp {
   warnings?: string[];
 }
 
+interface RoundSg {
+  sgOtt?: number | null;
+  sgApp?: number | null;
+  sgArg?: number | null;
+  sgPutt?: number | null;
+}
 interface FieldPlayer {
   id: string;
   name: string;
@@ -61,6 +67,10 @@ interface FieldPlayer {
   thru: string;
   playerState: string;
   weekRounds: number[];
+  /** Index-aligned with weekRounds. Present when DG live stats have
+   *  posted an SG breakdown for that finished round. Drives the
+   *  persistence-weighted form adjustment on the server. */
+  weekRoundsSg: Array<RoundSg | null>;
   teeTimes: Partial<Record<Round, string>>; // "HH:MM"
 }
 interface FieldResp {
@@ -94,6 +104,11 @@ interface PlayerRow {
   name: string;
   sgTotal: string;
   weekRounds: string;
+  /** Per-round SG breakdown captured when the player was picked from
+   *  the field. Sent alongside weekRounds when its length matches the
+   *  parsed weekRounds count — otherwise dropped so the server
+   *  quietly falls back to the vs-par-only form model. */
+  weekRoundsSg: Array<RoundSg | null>;
   /** Tee time for the target round in "HH:MM" (local venue time).
    *  Populated from the field endpoint when a player is selected. */
   teeTime: string;
@@ -112,6 +127,7 @@ const emptyPlayer = (): PlayerRow => ({
   name: "",
   sgTotal: "",
   weekRounds: "",
+  weekRoundsSg: [],
   teeTime: "",
   teeTimesByRound: {},
   includeForm: true,
@@ -263,10 +279,20 @@ export default function ForecastTool() {
           const fw = fwStr ? Number(fwStr) : NaN;
           const skew = skStr ? Number(skStr) : NaN;
           const teeHour = p.teeTime ? hhmmToHour(p.teeTime) : null;
+          // SG breakdown is sent through only when it lines up with
+          // the parsed weekRounds count — protects against a user
+          // hand-editing the round CSV to a different length.
+          const sgAligned =
+            p.includeForm &&
+            wr.length > 0 &&
+            p.weekRoundsSg.length === wr.length
+              ? p.weekRoundsSg
+              : undefined;
           return {
             name: p.name.trim(),
             sgTotal: sg,
             weekRounds: wr.length ? wr : undefined,
+            weekRoundsSg: sgAligned,
             formWeight:
               Number.isFinite(fw) && p.includeForm ? fw : 0,
             compressionFactor: Number.isFinite(cf) ? cf : 0.83,
@@ -638,6 +664,7 @@ function PlayerCard({
       name: fp.name,
       sgTotal: sg != null ? String(sg) : "",
       weekRounds: fp.weekRounds.join(","),
+      weekRoundsSg: fp.weekRoundsSg,
       teeTimesByRound: fp.teeTimes,
       teeTime: fp.teeTimes[targetRound] ?? "",
       // Auto-populate skew adjustment based on the player's SG tier
@@ -778,27 +805,7 @@ function PlayerCard({
           ✕
         </button>
       </div>
-      {row.weekRounds && (
-        <div
-          style={{
-            marginTop: 6,
-            fontSize: 11,
-            color: "oklch(0.5 0.02 150)",
-          }}
-        >
-          Rounds this week (auto-filled):{" "}
-          <span
-            style={{
-              fontFamily: "var(--font-mono, monospace)",
-              fontWeight: 700,
-              color: "oklch(0.3 0.02 150)",
-            }}
-          >
-            {row.weekRounds}
-          </span>{" "}
-          — used for form adjustment when the toggle below is on.
-        </div>
-      )}
+      {row.weekRounds && <WeekRoundsRow row={row} />}
       <div
         style={{
           marginTop: 8,
@@ -1154,6 +1161,163 @@ function td(strong = false): React.CSSProperties {
     fontWeight: strong ? 700 : 500,
   };
 }
+/** SG persistence weights — must match server-side constants in
+ *  lib/scoring-model/forecast.ts. Used purely for display so users
+ *  can see WHY a given round is worth more or less than face value. */
+const SG_PERSIST_WEIGHTS = { ott: 0.65, app: 0.6, arg: 0.4, putt: 0.3 };
+const SG_PERSIST_NEUTRAL =
+  (SG_PERSIST_WEIGHTS.ott +
+    SG_PERSIST_WEIGHTS.app +
+    SG_PERSIST_WEIGHTS.arg +
+    SG_PERSIST_WEIGHTS.putt) /
+  4;
+
+function effectivePersistenceFactor(sg: RoundSg): number | null {
+  const ott = Math.abs(sg.sgOtt ?? 0);
+  const app = Math.abs(sg.sgApp ?? 0);
+  const arg = Math.abs(sg.sgArg ?? 0);
+  const putt = Math.abs(sg.sgPutt ?? 0);
+  const total = ott + app + arg + putt;
+  if (total < 0.05) return null;
+  const eff =
+    (ott * SG_PERSIST_WEIGHTS.ott +
+      app * SG_PERSIST_WEIGHTS.app +
+      arg * SG_PERSIST_WEIGHTS.arg +
+      putt * SG_PERSIST_WEIGHTS.putt) /
+    total;
+  return eff / SG_PERSIST_NEUTRAL;
+}
+
+function fmtSgVal(v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  return (v >= 0 ? "+" : "") + v.toFixed(1);
+}
+
+/** Render the row that used to be "Rounds this week: -2,-2,-6" —
+ *  now shows per-round SG breakdown from DataGolf live stats plus
+ *  the persistence factor the model will apply to that round. */
+function WeekRoundsRow({ row }: { row: PlayerRow }) {
+  const rounds = parseCsvNumbers(row.weekRounds);
+  const sgArr = row.weekRoundsSg;
+  return (
+    <div
+      style={{
+        marginTop: 8,
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          letterSpacing: 0.3,
+          textTransform: "uppercase",
+          color: "oklch(0.5 0.02 150)",
+          fontWeight: 700,
+        }}
+      >
+        Rounds this week (auto-filled)
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {rounds.map((vsPar, i) => {
+          const sg = sgArr[i] ?? null;
+          const persist = sg ? effectivePersistenceFactor(sg) : null;
+          return (
+            <div
+              key={i}
+              style={{
+                border: "1px solid oklch(0.9 0.008 95)",
+                borderRadius: 6,
+                padding: "6px 10px",
+                background: "white",
+                fontSize: 11,
+                display: "flex",
+                flexDirection: "column",
+                gap: 3,
+                minWidth: 130,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "baseline",
+                }}
+              >
+                <span
+                  style={{
+                    fontWeight: 700,
+                    color: "oklch(0.3 0.02 150)",
+                  }}
+                >
+                  R{i + 1}
+                </span>
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono, monospace)",
+                    fontWeight: 700,
+                    color: "oklch(0.24 0.04 155)",
+                  }}
+                >
+                  {vsPar >= 0 ? "+" : ""}
+                  {vsPar}
+                </span>
+              </div>
+              {sg ? (
+                <>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "0 8px",
+                      fontFamily: "var(--font-mono, monospace)",
+                      fontSize: 10,
+                      color: "oklch(0.5 0.02 150)",
+                    }}
+                  >
+                    <span>OTT {fmtSgVal(sg.sgOtt)}</span>
+                    <span>APP {fmtSgVal(sg.sgApp)}</span>
+                    <span>ARG {fmtSgVal(sg.sgArg)}</span>
+                    <span>PUTT {fmtSgVal(sg.sgPutt)}</span>
+                  </div>
+                  {persist != null && (
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        letterSpacing: 0.3,
+                        color:
+                          persist > 1.05
+                            ? "oklch(0.4 0.15 155)"
+                            : persist < 0.95
+                              ? "oklch(0.45 0.15 40)"
+                              : "oklch(0.5 0.02 150)",
+                      }}
+                    >
+                      persistence {persist.toFixed(2)}×
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: "oklch(0.55 0.02 150)",
+                    fontStyle: "italic",
+                  }}
+                >
+                  SG breakdown not posted yet
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Slider — horizontal range control for the advanced-panel numeric
  * parameters. Renders:

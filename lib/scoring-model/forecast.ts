@@ -94,6 +94,19 @@ export interface PriorRoundObservation {
   };
 }
 
+/** Per-round SG decomposition (strokes gained vs field). All values
+ *  are optional so callers can supply whatever DataGolf returned. */
+export interface RoundSgBreakdown {
+  /** Off-the-tee — most persistent, weight 0.65. */
+  sgOtt?: number | null;
+  /** Approach — highly persistent, weight 0.60. */
+  sgApp?: number | null;
+  /** Around-the-green — moderately persistent, weight 0.40. */
+  sgArg?: number | null;
+  /** Putting — least persistent, weight 0.30. */
+  sgPutt?: number | null;
+}
+
 /** Per-player skill + form knobs. */
 export interface PlayerInput {
   /** Display name — echoed back in the response. */
@@ -112,6 +125,14 @@ export interface PlayerInput {
   /** This week's per-round scores-vs-par so far. Feeds the Bayesian
    *  form adjustment. */
   weekRounds?: number[];
+  /** Optional per-round SG decomposition (from DataGolf live stats).
+   *  When present the form bump becomes PERSISTENCE-WEIGHTED — an
+   *  approach-driven round of -6 carries more signal into the next
+   *  round than a putt-driven -6, since SG:APP persists year-over-year
+   *  ~0.60 while SG:PUTT persists only ~0.30. Index-aligned with
+   *  weekRounds; entries can be null when DG doesn't have a breakdown
+   *  for that round yet. */
+  weekRoundsSg?: Array<RoundSgBreakdown | null>;
   /** Weight on the form component (0 = ignore recent, 1 = fully lean
    *  in). Default 0.20 per Connolly-Rendleman-style shrinkage. */
   formWeight?: number;
@@ -225,6 +246,12 @@ export interface PlayerForecast {
     teeTimeAdjusted?: boolean;
     /** Wind at tee-off, when tee-time-adjusted. */
     teeTimeWind?: { windMph: number; windDirDeg: number };
+    /** Per-round SG-persistence factor (1.0 = category-neutral,
+     *  matches the old vs-par-only model; >1 = overperformance came
+     *  from persistent skills like approach; <1 = came from putting).
+     *  Index-aligned with the caller's weekRoundsSg input; entries
+     *  are null when that round had no SG breakdown supplied. */
+    formPersistencePerRound?: Array<number | null>;
   };
 }
 
@@ -259,6 +286,58 @@ function autoSkew(sgTotal: number): number {
   return 0.3;
 }
 
+/** SG persistence coefficients — how much of an SG category
+ *  overperformance in one round carries into the next. These are
+ *  round-to-round persistence figures adapted from Broadie's SG
+ *  literature (Every Shot Counts) and DataGolf's own skill-decay
+ *  work. Off-the-tee and approach are core skills that show up
+ *  reliably; around-the-green and putting have much bigger noise
+ *  components (green firmness, weather-affected roll speed) that
+ *  wash out inside a week.
+ *
+ *  A category-neutral (evenly distributed) round has an "effective
+ *  persistence" equal to the arithmetic mean of these weights =
+ *  0.4875. We normalise so a neutral round produces the same form
+ *  bump the old vs-par-only model produced — that keeps the meaning
+ *  of the user-facing `formWeight` (default 0.20) unchanged. */
+export const SG_PERSISTENCE_WEIGHTS = {
+  ott: 0.65,
+  app: 0.6,
+  arg: 0.4,
+  putt: 0.3,
+} as const;
+const NEUTRAL_PERSISTENCE =
+  (SG_PERSISTENCE_WEIGHTS.ott +
+    SG_PERSISTENCE_WEIGHTS.app +
+    SG_PERSISTENCE_WEIGHTS.arg +
+    SG_PERSISTENCE_WEIGHTS.putt) /
+  4;
+
+/** Given a round's SG decomposition, how persistent is this specific
+ *  performance? A round of +2 driven entirely by hot putting scores
+ *  low (persistence ≈ 0.30); a round of +2 driven by approach scores
+ *  high (persistence ≈ 0.60). Weighted by |SG_cat| — the categories
+ *  that CONTRIBUTED to this round's SG total drive the persistence
+ *  reading. Returns null when there's essentially no SG signal to
+ *  weight (all categories near zero). */
+export function effectivePersistenceForRound(
+  b: RoundSgBreakdown,
+): number | null {
+  const ott = Math.abs(b.sgOtt ?? 0);
+  const app = Math.abs(b.sgApp ?? 0);
+  const arg = Math.abs(b.sgArg ?? 0);
+  const putt = Math.abs(b.sgPutt ?? 0);
+  const total = ott + app + arg + putt;
+  if (total < 0.05) return null; // no meaningful signal
+  return (
+    (ott * SG_PERSISTENCE_WEIGHTS.ott +
+      app * SG_PERSISTENCE_WEIGHTS.app +
+      arg * SG_PERSISTENCE_WEIGHTS.arg +
+      putt * SG_PERSISTENCE_WEIGHTS.putt) /
+    total
+  );
+}
+
 /** Bayesian shrinkage of "this week's rounds" toward the season
  *  baseline. Compares player's actual score EACH round to what they
  *  should have shot given THAT round's actual field mean (soft-field
@@ -271,11 +350,18 @@ function autoSkew(sgTotal: number): number {
  *  "shoots vs par 0" assumption (season-baseline behaviour) for that
  *  round only.
  *
+ *  When `weekRoundsSg[i]` is present for a round, that round's raw
+ *  excess is multiplied by (effectivePersistence / neutralPersistence)
+ *  before averaging — so an approach-driven -6 pushes the form bump
+ *  further than a putt-driven -6, but a category-neutral -6 lands in
+ *  the same place the old model did.
+ *
  *  Returns strokes/round the projection should shift by. Negative =
  *  player has been out-performing → lower expected score.
  */
 function bayesianFormBump(
   weekRounds: number[] | undefined,
+  weekRoundsSg: Array<RoundSgBreakdown | null> | undefined,
   sgTotal: number,
   weight: number,
   fieldMeansByRound: Partial<Record<1 | 2 | 3 | 4, number>>,
@@ -290,7 +376,17 @@ function bayesianFormBump(
     //   expected_vs_par = field_mean_vs_par − sgTotal
     // A +3 SG player in a −2 vs-par field is expected at −5 vs par.
     const expectedVsPar = fieldMean - sgTotal;
-    sumOver += actualVsPar - expectedVsPar; // negative = over-performing
+    let over = actualVsPar - expectedVsPar; // negative = over-performing
+
+    // Persistence-weight when we have this round's SG decomposition.
+    const sg = weekRoundsSg?.[i] ?? null;
+    if (sg) {
+      const eff = effectivePersistenceForRound(sg);
+      if (eff != null) {
+        over = over * (eff / NEUTRAL_PERSISTENCE);
+      }
+    }
+    sumOver += over;
   }
   const meanOver = sumOver / weekRounds.length;
   return weight * meanOver;
@@ -777,10 +873,22 @@ export async function runForecast(
     const formWeight = p.formWeight ?? 0.2;
     const formBump = bayesianFormBump(
       p.weekRounds,
+      p.weekRoundsSg,
       p.sgTotal,
       formWeight,
       fieldMeansByRound,
     );
+    // Per-round persistence factor for the UI subtitle — 1.0 means
+    // the round was category-balanced (behaves like the old model),
+    // >1 means the excess came from persistent skills (approach/
+    // driving), <1 means it came from putting.
+    const formPersistencePerRound: Array<number | null> = (
+      p.weekRoundsSg ?? []
+    ).map((sg) => {
+      if (!sg) return null;
+      const eff = effectivePersistenceForRound(sg);
+      return eff == null ? null : eff / NEUTRAL_PERSISTENCE;
+    });
     const skewGap = p.skewAdjustment ?? autoSkew(p.sgTotal);
 
     // Player-specific field baseline. If a tee time is given AND
@@ -820,6 +928,7 @@ export async function runForecast(
         skewGap,
         teeTimeAdjusted,
         teeTimeWind,
+        formPersistencePerRound,
       },
     });
   }
