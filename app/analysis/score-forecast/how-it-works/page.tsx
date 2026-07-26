@@ -237,6 +237,35 @@ function Example({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Qualitative 5-dot strength meter — used to convey relative
+ *  weighting without exposing exact coefficients. Filled dots are
+ *  emerald, empty dots are the line token. */
+function StrengthBar({ strength }: { strength: number }) {
+  const cells = [1, 2, 3, 4, 5];
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        gap: 3,
+        alignItems: "center",
+      }}
+      aria-label={`Strength ${strength} of 5`}
+    >
+      {cells.map((c) => (
+        <span
+          key={c}
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: "50%",
+            background: c <= strength ? T.emerald : T.line,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function Mono({ children }: { children: React.ReactNode }) {
   return (
     <span
@@ -503,14 +532,14 @@ export default function HowItWorksPage() {
             round is spread evenly across today&apos;s 18 holes.
           </P>
           <Example>
-            When R3 plays softer than the historical R3 mean, that
-            softness carries forward. With{" "}
+            When yesterday plays softer than the historical mean for
+            that round, the softness carries forward. With{" "}
             <em>&quot;Conditions like the most recent finished
-            round&quot;</em> selected for R4 at the 2026 3M Open, the
-            model measures R3&apos;s per-hole residuals and applies
-            them as a <Mono>−1.37</Mono> stroke level shift across the
-            round — expecting today to play ~1.4 strokes softer than
-            the historical R4 baseline.
+            round&quot;</em> selected, the model measures the prior
+            round&apos;s per-hole residuals and applies them as a
+            level shift across today&apos;s round — expecting today to
+            play softer than the untouched historical baseline by the
+            same amount the prior round did.
           </Example>
         </ParamCard>
 
@@ -689,25 +718,25 @@ export default function HowItWorksPage() {
               The form signal isn&apos;t the raw vs-par score.
             </strong>{" "}
             It&apos;s how much a player over- or under-performed{" "}
-            <em>their own expected score</em> for that round. Expected
-            is <Mono>field_mean − sgTotal</Mono>: an elite ~+3 SG
-            player in a field averaging even par is expected to shoot
-            around <Mono>−3</Mono>, so an average tournament round for
-            him is a <em>negative</em> form signal — he under-
-            performed his baseline. A 0 SG player shooting the same
-            round is performing exactly to expectation and gets no
-            form bump either direction.
+            <em>their own expected score</em> for that round — the
+            round&apos;s actual field average adjusted for the
+            player&apos;s season SG. An elite player is expected
+            further under par than the field mean; an average tour
+            player is expected right at it. An average tournament
+            round for an elite player is a <em>negative</em> form
+            signal because he under-performed his baseline. A tour-
+            average player shooting the same round is performing
+            exactly to expectation and gets no form bump either
+            direction.
           </P>
           <Example>
-            Say Scheffler tees off in a field that averages{" "}
-            <Mono>−1.5</Mono> for the round. His season SG is roughly{" "}
-            <Mono>+2.83</Mono>, so he&apos;s expected to shoot around{" "}
-            <Mono>−1.5 − 2.83 = −4.33</Mono>. If he shoots the field
-            average of <Mono>−1.5</Mono>, that&apos;s a{" "}
-            <Mono>+2.83</Mono> underperformance vs expected — the
-            model treats it as a negative form signal that would nudge
-            his projection <em>up</em> tomorrow (worse than his season
-            baseline suggests).
+            Say the field averages a few strokes under par for the
+            round. An elite player is expected to shoot several
+            strokes further under than that. If he shoots only the
+            field average, the model treats that as a negative form
+            signal — several shots of underperformance vs expected —
+            and nudges his projection <em>up</em> tomorrow (worse than
+            his season baseline suggests).
           </Example>
           <P>
             <strong>The persistence factor is the model&apos;s
@@ -750,14 +779,14 @@ export default function HowItWorksPage() {
                   <th
                     style={{
                       padding: "10px 12px",
-                      textAlign: "right",
+                      textAlign: "left",
                       color: T.muted,
                       fontSize: 12,
                       letterSpacing: 0.5,
                       textTransform: "uppercase",
                     }}
                   >
-                    Persistence
+                    Predictive strength
                   </th>
                   <th
                     style={{
@@ -775,25 +804,17 @@ export default function HowItWorksPage() {
               </thead>
               <tbody>
                 {[
-                  ["Off-the-tee (OTT)", "0.65", "Very repeatable — driving swing"],
-                  ["Approach (APP)", "0.60", "Highly repeatable — iron accuracy"],
-                  ["Around-the-green (ARG)", "0.40", "Moderate — chipping, some noise"],
-                  ["Putting (PUTT)", "0.30", "Mostly noise round to round"],
-                ].map(([cat, pers, note]) => (
-                  <tr key={cat} style={{ borderTop: `1px solid ${T.line}` }}>
+                  ["Off-the-tee (OTT)", 5, "Very repeatable — driving swing"],
+                  ["Approach (APP)", 4, "Highly repeatable — iron accuracy"],
+                  ["Around-the-green (ARG)", 3, "Moderate — chipping, some noise"],
+                  ["Putting (PUTT)", 2, "Mostly noise round to round"],
+                ].map(([cat, strength, note]) => (
+                  <tr key={String(cat)} style={{ borderTop: `1px solid ${T.line}` }}>
                     <td style={{ padding: "10px 12px", color: T.ink }}>
                       {cat}
                     </td>
-                    <td
-                      style={{
-                        padding: "10px 12px",
-                        textAlign: "right",
-                        fontFamily: T.fontMono,
-                        fontWeight: 700,
-                        color: T.ink,
-                      }}
-                    >
-                      {pers}
+                    <td style={{ padding: "10px 12px" }}>
+                      <StrengthBar strength={strength as number} />
                     </td>
                     <td style={{ padding: "10px 12px", color: T.muted }}>
                       {note}
@@ -805,22 +826,20 @@ export default function HowItWorksPage() {
           </div>
           <P>
             The <strong>persistence factor</strong> shown on each
-            round tile is that round&apos;s effective persistence
-            divided by the neutral baseline (0.4875, the mean of the
-            four weights). A category-balanced round produces the same
-            form bump the old excess-only model produced; approach- or
-            driving-heavy rounds tilt above 1×; putt-heavy rounds tilt
-            below 1×.
+            round tile compares that round&apos;s skill mix to a
+            category-balanced round. A balanced round sits at 1×;
+            approach- or driving-heavy rounds tilt above 1× and count
+            for more; putt-heavy rounds tilt below 1× and count for
+            less.
           </P>
           <Example>
             <div style={{ marginBottom: 8 }}>
-              Two players who both beat their expected score by 3
-              shots this round. Same over-performance — but very
-              different signals about tomorrow:
+              Two players who both beat their expected score by the
+              same 3 shots this round. Same over-performance — but
+              very different signals about tomorrow:
             </div>
             <div
               style={{
-                fontFamily: T.fontMono,
                 fontSize: 13,
                 background: "white",
                 padding: 10,
@@ -829,18 +848,20 @@ export default function HowItWorksPage() {
                 marginBottom: 6,
               }}
             >
-              <div>
-                <strong>Player A</strong> (approach-driven):
+              <div style={{ fontWeight: 700, marginBottom: 2 }}>
+                Player A — approach-driven round
               </div>
-              <div>OTT +0.5 · APP +2.5 · ARG +0.0 · PUTT +0.0</div>
-              <div style={{ color: T.emerald, marginTop: 4 }}>
-                Persistence factor ≈ 1.25× → −3 excess scales to −3.75
-                strokes of forward signal
+              <div style={{ color: T.muted, marginBottom: 6 }}>
+                Most of the SG total came from iron play, a repeatable
+                skill.
+              </div>
+              <div style={{ color: T.emerald, fontWeight: 700 }}>
+                Persistence factor above 1× — the model carries a
+                stronger form bump into tomorrow&apos;s projection.
               </div>
             </div>
             <div
               style={{
-                fontFamily: T.fontMono,
                 fontSize: 13,
                 background: "white",
                 padding: 10,
@@ -848,13 +869,17 @@ export default function HowItWorksPage() {
                 border: `1px solid ${T.line}`,
               }}
             >
-              <div>
-                <strong>Player B</strong> (putt-driven):
+              <div style={{ fontWeight: 700, marginBottom: 2 }}>
+                Player B — putt-driven round
               </div>
-              <div>OTT +0.0 · APP +0.5 · ARG +0.0 · PUTT +2.5</div>
-              <div style={{ color: T.tang, marginTop: 4 }}>
-                Persistence factor ≈ 0.72× → same −3 excess scales to
-                only −2.15 strokes of forward signal
+              <div style={{ color: T.muted, marginBottom: 6 }}>
+                Most of the SG total came from hot putting, which
+                regresses hard round-to-round.
+              </div>
+              <div style={{ color: T.tang, fontWeight: 700 }}>
+                Persistence factor below 1× — same 3 shots of
+                over-performance, but the model discounts it and
+                barely nudges tomorrow&apos;s projection.
               </div>
             </div>
           </Example>
@@ -878,39 +903,23 @@ export default function HowItWorksPage() {
           hook="How much this week's rounds shift the projection"
         >
           <P>
-            <Mono>0</Mono> = ignore form entirely, project purely from
-            season SG. <Mono>0.5</Mono> = aggressive; heavily lean on
-            this week&apos;s scoring.
+            <strong>Slide left</strong> to ignore form entirely and
+            project purely from season SG.{" "}
+            <strong>Slide right</strong> to lean heavily on this
+            week&apos;s scoring.
           </P>
           <P>
-            <strong>Default 0.20</strong> — the sweet spot from the
-            Connolly-Rendleman shrinkage literature. Enough to catch a
-            genuine hot streak, not so much that a few outlier rounds
-            dominate the projection.
+            The default sits at Pardle&apos;s calibrated value —
+            informed by the Connolly-Rendleman shrinkage literature
+            and our own back-testing. Enough to catch a genuine hot
+            streak, not so much that a few outlier rounds dominate.
           </P>
           <P>
-            The math is straightforward Bayesian shrinkage:
-          </P>
-          <div
-            style={{
-              margin: "8px 0 12px",
-              padding: "10px 14px",
-              background: T.soft,
-              borderRadius: 6,
-              fontFamily: T.fontMono,
-              fontSize: 14,
-              color: T.ink,
-              lineHeight: 1.5,
-            }}
-          >
-            form_bump = weight × mean(actual_vs_par − expected_vs_par)
-            <br />
-            expected_vs_par = field_mean − sgTotal
-          </div>
-          <P>
-            A player who beat expectations by 2 strokes per round on
-            average, with the default 0.20 weight, gets a{" "}
-            <Mono>−0.4</Mono> stroke bump on today&apos;s projection.
+            The mechanics: the model measures how much a player has
+            over- or under-performed their expectation across their
+            played rounds this week, then applies a fraction of that
+            average delta to the projection. Small fraction, real
+            signal.
           </P>
         </ParamCard>
 
@@ -924,18 +933,23 @@ export default function HowItWorksPage() {
             everyone scores in a tight band regardless of talent.
           </P>
           <P>
-            <strong>1.0</strong> = no compression; the player&apos;s
-            edge translates 1:1. <strong>0.83</strong> = 17% shrink,
-            typical at bunching-friendly venues like TPC Twin Cities.
-            <strong> Below 0.6</strong> would flatten the field
-            unrealistically — the tool caps the slider at 0.6.
+            <strong>Slide right</strong> for no compression — the
+            player&apos;s season edge translates 1:1 into the
+            projection. <strong>Slide left</strong> for aggressive
+            compression at bunching-friendly venues, where an elite
+            player&apos;s edge shrinks meaningfully.
+          </P>
+          <P>
+            The default is set per-course-type based on eight-plus
+            years of scoring dispersion at each venue. At TPC Twin
+            Cities the field bunches, so the default compresses the
+            raw SG number by a notable but not-extreme amount.
           </P>
           <Example>
-            An elite +3.0 SG player at TPC Twin Cities. With no
-            compression (1.0) the model expects them to beat the field
-            mean by 3.0 strokes. With 0.83 compression (the default
-            here), it expects only 2.5 strokes of edge — the extra
-            0.5 strokes are &quot;washed out&quot; by the course.
+            An elite +3 SG player at a bunching course expects to
+            outperform the field by <em>less</em> than 3 strokes —
+            some of that raw edge gets washed out by a setup where the
+            gap between top and mid tightens.
           </Example>
         </ParamCard>
 
@@ -960,17 +974,22 @@ export default function HowItWorksPage() {
             }}
           >
             <li>
-              Elite (SG ≥ 1.5): <Mono>~0.20</Mono> — tight
-              distribution, blow-ups rare
+              <strong>Elite players</strong>: tightest gap — blow-ups
+              are rare, so mean and median sit close together.
             </li>
             <li>
-              Mid-tier (SG 0–1.5): <Mono>~0.25</Mono>
+              <strong>Mid-tier players</strong>: moderate gap.
             </li>
             <li>
-              Below average (SG &lt; 0): <Mono>~0.30</Mono> — wider
-              right tail, more blow-ups
+              <strong>Below-average players</strong>: widest gap —
+              wider right tail, more blow-ups.
             </li>
           </ul>
+          <P>
+            The default gap is picked automatically from the
+            player&apos;s season SG tier. You can override with the
+            slider if you have a reason to.
+          </P>
           <P>
             <strong>Why this matters for betting:</strong> the median
             is your typical outcome. The mean is inflated by rare
@@ -979,12 +998,12 @@ export default function HowItWorksPage() {
             to compare against.
           </P>
           <Example>
-            A player&apos;s projected mean is 68.4 with skew 0.30. The
-            median is <Mono>68.4 − 0.30 = 68.1</Mono>. Against an
-            UNDER 69.5 line, the mean is 1.1 shots under; the median
-            is 1.4 shots under. The extra buffer comes from
-            recognising that most rounds this player plays actually
-            fall below their long-run mean.
+            A player&apos;s projected mean sits a fraction of a stroke
+            higher than their projected median because of that fat
+            right tail. Against an UNDER 69.5 line, the median offers
+            a meaningfully bigger buffer than the mean — that extra
+            cushion is why the tool leads with median for UNDER
+            decisions.
           </Example>
         </ParamCard>
 
@@ -1067,10 +1086,13 @@ export default function HowItWorksPage() {
             this week has been playing soft.
           </P>
           <P>
-            When you see <Mono>attenuated → −0.68</Mono>, that means
-            the raw level shift (say −1.37) was scaled down by 50%
-            because the Conditions preset applies attenuation for
-            uncertainty about overnight drying/firming.
+            When you see an <em>attenuated</em> value next to the
+            level shift, the Conditions preset has scaled the raw
+            measurement down. That&apos;s a hedge against overnight
+            drying or firming: when we&apos;re not fully confident
+            yesterday&apos;s softness will persist unchanged, the
+            model carries a fraction of it forward instead of the
+            whole thing.
           </P>
         </ParamCard>
 
