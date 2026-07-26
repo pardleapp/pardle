@@ -47,18 +47,12 @@ export const metadata: Metadata = {
   title: ogTitle,
   description,
   applicationName: BRAND.name,
-  openGraph: {
-    title: ogTitle,
-    description,
-    url: BRAND.url,
-    siteName: BRAND.name,
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: ogTitle,
-    description,
-  },
+  // No default openGraph or twitter metadata — bare Pardle links
+  // should paste as plain URLs, no unfurl card. Pages that DO want
+  // a rich share card (share/bet, share/sharp, c/[token], r/[token])
+  // set their own openGraph + twitter explicitly.
+  openGraph: null,
+  twitter: null,
   // PWA meta — iOS Safari respects these for "Add to Home Screen":
   // app launches standalone (no browser chrome) with a dark status
   // bar that matches our v4 background. Manifest itself is served
