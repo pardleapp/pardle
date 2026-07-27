@@ -70,6 +70,33 @@ interface CourseHistoryResp {
   hostingEvents?: string[];
 }
 
+interface ArchetypeDim {
+  dim: string;
+  label: string;
+  unit: string;
+  groupMean: number;
+  tourMean: number;
+  tourStd: number;
+  zScore: number;
+  interpretation: string;
+}
+interface ArchetypeResp {
+  ok: boolean;
+  error?: string;
+  courseName?: string;
+  outperformerSample?: number;
+  playersMatched?: number;
+  playersUnmatched?: string[];
+  distinguishing?: ArchetypeDim[];
+  sample?: Array<{
+    name: string;
+    playerId: string;
+    roundsAtCourse: number;
+    outperformanceSgOtt: number;
+    stats: Record<string, number | undefined>;
+  }>;
+}
+
 type SortKey =
   | "outperformanceCombined"
   | "outperformanceSgOtt"
@@ -91,6 +118,8 @@ export default function CourseHistoryTool() {
 
   const [data, setData] = useState<CourseHistoryResp | null>(null);
   const [loading, setLoading] = useState(false);
+  const [archetype, setArchetype] = useState<ArchetypeResp | null>(null);
+  const [archetypeLoading, setArchetypeLoading] = useState(false);
   const [minRounds, setMinRounds] = useState(4);
   const [sortKey, setSortKey] = useState<SortKey>("outperformanceCombined");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
@@ -135,6 +164,7 @@ export default function CourseHistoryTool() {
     (async () => {
       setLoading(true);
       setData(null);
+      setArchetype(null);
       try {
         const res = await fetch(
           `/api/course-history?course=${encodeURIComponent(selectedCourse)}`,
@@ -156,6 +186,35 @@ export default function CourseHistoryTool() {
       cancelled = true;
     };
   }, [selectedCourse]);
+
+  // Load ballstriking archetype once the main history is in.
+  useEffect(() => {
+    if (!selectedCourse || !data?.ok) return;
+    let cancelled = false;
+    (async () => {
+      setArchetypeLoading(true);
+      setArchetype(null);
+      try {
+        const res = await fetch(
+          `/api/course-history/archetype?course=${encodeURIComponent(selectedCourse)}`,
+        );
+        const j = (await res.json()) as ArchetypeResp;
+        if (!cancelled) setArchetype(j);
+      } catch (e) {
+        if (!cancelled) {
+          setArchetype({
+            ok: false,
+            error: e instanceof Error ? e.message : "fetch failed",
+          });
+        }
+      } finally {
+        if (!cancelled) setArchetypeLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCourse, data?.ok]);
 
   const filteredCourses = useMemo(() => {
     const q = courseQuery.trim().toLowerCase();
@@ -432,12 +491,18 @@ export default function CourseHistoryTool() {
           </div>
         )}
         {!loading && data?.ok && rows.length > 0 && (
-          <RankingTable
-            rows={rows}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSort={clickSort}
-          />
+          <>
+            <ArchetypePanel
+              loading={archetypeLoading}
+              archetype={archetype}
+            />
+            <RankingTable
+              rows={rows}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={clickSort}
+            />
+          </>
         )}
         {!loading && data?.ok && rows.length === 0 && (
           <div
@@ -453,6 +518,285 @@ export default function CourseHistoryTool() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Archetype panel ────────────────────────────────────────────────
+/** Small helper: format a number to a sensible precision for its
+ *  dimension unit. */
+function fmtVal(v: number, unit: string): string {
+  if (unit === "mph" || unit === "yd" || unit === "ft" || unit === "°") {
+    return v.toFixed(1);
+  }
+  if (unit === "rpm") return Math.round(v).toString();
+  return v.toFixed(2);
+}
+
+function ArchetypePanel({
+  loading,
+  archetype,
+}: {
+  loading: boolean;
+  archetype: ArchetypeResp | null;
+}) {
+  if (loading) {
+    return (
+      <div
+        style={{
+          marginBottom: 20,
+          padding: 20,
+          background: T.soft,
+          border: `1px solid ${T.line}`,
+          borderRadius: 10,
+          color: T.muted,
+          fontFamily: T.fontUi,
+          textAlign: "center",
+        }}
+      >
+        Computing ballstriking archetype…
+      </div>
+    );
+  }
+  if (!archetype) return null;
+  if (!archetype.ok) {
+    // Silent 404 when we couldn't build one — the ranking table is
+    // still useful without an archetype.
+    return null;
+  }
+  const dist = archetype.distinguishing ?? [];
+  const sample = archetype.sample ?? [];
+
+  return (
+    <div
+      style={{
+        marginBottom: 20,
+        padding: "18px 20px",
+        border: `1px solid ${T.line}`,
+        borderRadius: 12,
+        background: `linear-gradient(135deg, ${T.emeraldTint} 0%, ${T.card} 100%)`,
+        fontFamily: T.fontUi,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          letterSpacing: 1.4,
+          textTransform: "uppercase",
+          color: T.emeraldD,
+          fontWeight: 800,
+          marginBottom: 4,
+        }}
+      >
+        Ballstriking archetype
+      </div>
+      <h4
+        style={{
+          margin: 0,
+          fontSize: 18,
+          fontWeight: 800,
+          color: T.ink,
+          marginBottom: 8,
+        }}
+      >
+        Who outperforms off-the-tee here
+      </h4>
+      <p
+        style={{
+          margin: "0 0 14px",
+          fontSize: 13,
+          color: T.muted,
+          lineHeight: 1.5,
+          maxWidth: 780,
+        }}
+      >
+        Averaged ball-flight profile of the top{" "}
+        <strong>{archetype.playersMatched}</strong> OTT outperformers
+        at this course (out of{" "}
+        <strong>{archetype.outperformerSample}</strong> we ranked),
+        compared to the tour-wide average. z is standard-deviations
+        away from the tour mean.
+      </p>
+
+      {dist.length === 0 ? (
+        <div
+          style={{
+            padding: 14,
+            background: "white",
+            border: `1px solid ${T.line}`,
+            borderRadius: 8,
+            color: T.muted,
+            fontSize: 13,
+          }}
+        >
+          No strong archetype at this course — the outperformer group
+          doesn&apos;t differ from tour-average ballstrikers by more
+          than half a standard deviation on any dimension. Course fit
+          here may come from short game / green-reading rather than
+          driver profile.
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(220px, 100%), 1fr))",
+            gap: 10,
+            marginBottom: 12,
+          }}
+        >
+          {dist.slice(0, 6).map((d) => {
+            const above = d.zScore >= 0;
+            const strong = Math.abs(d.zScore) >= 1;
+            const color = above ? T.emerald : T.tang;
+            return (
+              <div
+                key={d.dim}
+                style={{
+                  padding: "12px 14px",
+                  background: "white",
+                  border: `1px solid ${T.line}`,
+                  borderLeft: `3px solid ${color}`,
+                  borderRadius: 8,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 10,
+                    letterSpacing: 1,
+                    textTransform: "uppercase",
+                    color: T.muted,
+                    fontWeight: 800,
+                    marginBottom: 4,
+                  }}
+                >
+                  {d.label}
+                </div>
+                <div
+                  style={{
+                    fontFamily: T.fontMono,
+                    fontSize: 20,
+                    fontWeight: 800,
+                    color: T.ink,
+                    letterSpacing: -0.01,
+                  }}
+                >
+                  {fmtVal(d.groupMean, d.unit)}
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: T.dim,
+                      fontFamily: T.fontUi,
+                      fontWeight: 700,
+                      marginLeft: 4,
+                    }}
+                  >
+                    {d.unit}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontSize: 12,
+                    color,
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "baseline",
+                    gap: 6,
+                  }}
+                >
+                  <span style={{ fontFamily: T.fontMono, fontWeight: 800 }}>
+                    z {d.zScore >= 0 ? "+" : ""}
+                    {d.zScore.toFixed(2)}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 600 }}>
+                    {strong ? "· strong signal" : ""}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontSize: 12,
+                    color: T.muted,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {d.interpretation} · tour avg{" "}
+                  <span style={{ fontFamily: T.fontMono, fontWeight: 700 }}>
+                    {fmtVal(d.tourMean, d.unit)}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {sample.length > 0 && (
+        <details style={{ marginTop: 6 }}>
+          <summary
+            style={{
+              cursor: "pointer",
+              color: T.emerald,
+              fontSize: 12,
+              fontWeight: 800,
+              letterSpacing: 0.3,
+              textTransform: "uppercase",
+              userSelect: "none",
+            }}
+          >
+            Who&apos;s in the group? ({sample.length} matched of{" "}
+            {archetype.outperformerSample})
+          </summary>
+          <div
+            style={{
+              marginTop: 10,
+              padding: 12,
+              background: "white",
+              border: `1px solid ${T.line}`,
+              borderRadius: 8,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 6,
+              fontSize: 12,
+            }}
+          >
+            {sample.map((p) => (
+              <span
+                key={p.playerId}
+                title={`Rounds at course: ${p.roundsAtCourse} · Δ SG:OTT ${
+                  p.outperformanceSgOtt >= 0 ? "+" : ""
+                }${p.outperformanceSgOtt.toFixed(2)}`}
+                style={{
+                  padding: "4px 10px",
+                  background: T.soft,
+                  border: `1px solid ${T.line}`,
+                  borderRadius: 999,
+                  color: T.ink,
+                  fontWeight: 700,
+                  fontFamily: T.fontUi,
+                }}
+              >
+                {p.name}
+              </span>
+            ))}
+            {archetype.playersUnmatched &&
+              archetype.playersUnmatched.length > 0 && (
+                <div
+                  style={{
+                    width: "100%",
+                    fontSize: 11,
+                    color: T.dim,
+                    marginTop: 6,
+                  }}
+                >
+                  Skipped (no tee-shot profile):{" "}
+                  {archetype.playersUnmatched.join(", ")}
+                </div>
+              )}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
