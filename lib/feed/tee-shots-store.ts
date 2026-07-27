@@ -23,7 +23,10 @@ import type { TeeShotRecord } from "@/lib/golf-api/pgatour";
 
 const redis = Redis.fromEnv();
 
-const PLAYER_TTL_SECONDS = 30 * 24 * 60 * 60;
+// 1 year — matches the backfill script (see scripts/backfill-tee-
+// shots.mjs). Historical tee-shot records don't change once the event
+// is done; a shorter TTL would force needless multi-hour re-backfills.
+const PLAYER_TTL_SECONDS = 365 * 24 * 60 * 60;
 
 export function teePlayerKey(playerId: string): string {
   return `tee:player:${playerId}`;

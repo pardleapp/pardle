@@ -2,7 +2,10 @@
  * scripts/backfill-tee-shots.mjs
  *
  * Populate Redis with per-player tee-shot radar records for the last
- * two PGA Tour seasons. Powers the /analysis/tee-shots page.
+ * four PGA Tour seasons (2022-23 through 2025-26). Powers both the
+ * /analysis/tee-shots page and the course-history archetype
+ * regression, which needs as many players' driver profiles as
+ * possible to spot venue-fit correlations.
  *
  * For each completed event in the covered seasons:
  *   1. leaderboardV2 → full field playerIds + displayNames
@@ -13,17 +16,23 @@
  *      normalizedTrajectoryV2 entry.
  *   4. Merge each player's records into Redis via lib/feed/tee-shots-store.
  *
+ * Records are cached with a 1-YEAR TTL (was 30d) so historical
+ * backfills don't need to be re-run every month. A single fresh run
+ * of the two most recent seasons on a monthly cron keeps everything
+ * warm.
+ *
  * Resume-friendly: the script marks each (tournamentId) in Redis after
  * completion so a re-run only picks up new events + retries failures.
  *
- *   node scripts/backfill-tee-shots.mjs                       # both seasons
- *   node scripts/backfill-tee-shots.mjs --season 2026         # one season
+ *   node scripts/backfill-tee-shots.mjs                       # all four seasons
+ *   node scripts/backfill-tee-shots.mjs --season 2024         # one season
  *   node scripts/backfill-tee-shots.mjs --event R2026033      # one event
  *   node scripts/backfill-tee-shots.mjs --force               # ignore resume marks
  *   node scripts/backfill-tee-shots.mjs --limit 5             # first N events
  *
  * Runtime is a wall-clock function of orchestrator response time —
- * budget several hours for a full two-season backfill.
+ * budget 8-15 hours for a full four-season backfill on the default
+ * chunk size. Best to run overnight or one --season at a time.
  */
 
 import { readFile } from "node:fs/promises";
@@ -84,9 +93,11 @@ function argValue(flag) {
   const i = argv.indexOf(flag);
   return i >= 0 ? argv[i + 1] : null;
 }
+// Default: 4 PGA Tour seasons. Season labels are "final year" — so
+// 2023 = 2022-23 season, 2026 = 2025-26 season.
 const SEASONS = argValue("--season")
   ? [Number(argValue("--season"))]
-  : [2025, 2026];
+  : [2023, 2024, 2025, 2026];
 const EVENT_FILTER = argValue("--event");
 const FORCE = argv.includes("--force");
 const LIMIT = argValue("--limit") ? Number(argValue("--limit")) : Infinity;
@@ -94,7 +105,10 @@ const LIMIT = argValue("--limit") ? Number(argValue("--limit")) : Infinity;
 // ── Config ─────────────────────────────────────────────────────────
 const GQL_URL = "https://orchestrator.pgatour.com/graphql";
 const SHOT_CHUNK_SIZE = 3; // matches lib/golf-api/pgatour SHOT_CHUNK_SIZE
-const PLAYER_TTL_SECONDS = 30 * 24 * 60 * 60;
+// 1 year — historical tee-shot data doesn't change once an event's
+// done. A shorter TTL just forces the whole multi-hour backfill to be
+// re-run needlessly.
+const PLAYER_TTL_SECONDS = 365 * 24 * 60 * 60;
 const BACKFILL_MARK_KEY = "tee:backfill:done"; // Redis set of tournamentIds
 const TEE_INDEX_KEY = "tee:index";
 const teePlayerKey = (pid) => `tee:player:${pid}`;
