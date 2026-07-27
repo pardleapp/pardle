@@ -105,6 +105,34 @@ interface ArchetypeResp {
   underperformerTail?: ArchetypeSamplePlayer[];
 }
 
+interface ForecastFit {
+  n: number;
+  r2Train: number;
+  r2Cv: number;
+  reliable: boolean;
+  betas: {
+    intercept: number;
+    ballSpeed: number;
+    apexHeight: number;
+    curve: number;
+  };
+}
+interface ForecastPlayer {
+  name: string;
+  playerId: string;
+  isTrainingSample: boolean;
+  roundsAtCourse: number;
+  predictedResidualPerRd: number;
+  actualResidualPerRd: number | null;
+}
+interface ForecastResp {
+  ok: boolean;
+  error?: string;
+  courseName?: string;
+  fit?: ForecastFit;
+  players?: ForecastPlayer[];
+}
+
 type SortKey =
   | "outperformanceCombined"
   | "outperformanceSgOtt"
@@ -114,7 +142,9 @@ type SortKey =
   | "atCourseSgApp"
   | "baselineCombined"
   | "roundsPlayed"
-  | "name";
+  | "name"
+  | "predictedOtt"
+  | "modelGap";
 
 // ── Main component ─────────────────────────────────────────────────
 export default function CourseHistoryTool() {
@@ -128,6 +158,7 @@ export default function CourseHistoryTool() {
   const [loading, setLoading] = useState(false);
   const [archetype, setArchetype] = useState<ArchetypeResp | null>(null);
   const [archetypeLoading, setArchetypeLoading] = useState(false);
+  const [forecast, setForecast] = useState<ForecastResp | null>(null);
   const [minRounds, setMinRounds] = useState(4);
   const [sortKey, setSortKey] = useState<SortKey>("outperformanceCombined");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
@@ -195,19 +226,33 @@ export default function CourseHistoryTool() {
     };
   }, [selectedCourse]);
 
-  // Load ballstriking archetype once the main history is in.
+  // Load ballstriking archetype + forecast once the main history is in.
+  // The two fetches run in parallel — archetype for the descriptive
+  // signal, forecast for the per-player predicted residual.
   useEffect(() => {
     if (!selectedCourse || !data?.ok) return;
     let cancelled = false;
     (async () => {
       setArchetypeLoading(true);
       setArchetype(null);
+      setForecast(null);
       try {
-        const res = await fetch(
-          `/api/course-history/archetype?course=${encodeURIComponent(selectedCourse)}`,
-        );
-        const j = (await res.json()) as ArchetypeResp;
-        if (!cancelled) setArchetype(j);
+        const [aRes, fRes] = await Promise.all([
+          fetch(
+            `/api/course-history/archetype?course=${encodeURIComponent(selectedCourse)}`,
+          ),
+          fetch(
+            `/api/course-history/forecast?course=${encodeURIComponent(selectedCourse)}`,
+          ),
+        ]);
+        const [a, f] = await Promise.all([
+          aRes.json() as Promise<ArchetypeResp>,
+          fRes.json() as Promise<ForecastResp>,
+        ]);
+        if (!cancelled) {
+          setArchetype(a);
+          setForecast(f);
+        }
       } catch (e) {
         if (!cancelled) {
           setArchetype({
@@ -245,11 +290,26 @@ export default function CourseHistoryTool() {
     const filtered = data.players.filter(
       (p) => p.roundsPlayed >= minRounds,
     );
+    // Parent sorter only handles the base course-history columns;
+    // predicted/gap are re-sorted inside RankingTable using the
+    // forecast lookup (which only exists there).
+    const parentHandledKeys: SortKey[] = [
+      "outperformanceCombined",
+      "outperformanceSgOtt",
+      "outperformanceSgApp",
+      "atCourseCombined",
+      "atCourseSgOtt",
+      "atCourseSgApp",
+      "baselineCombined",
+      "roundsPlayed",
+      "name",
+    ];
+    if (!parentHandledKeys.includes(sortKey)) return filtered;
     const sorted = [...filtered].sort((a, b) => {
       const dir = sortDir === "desc" ? -1 : 1;
       if (sortKey === "name") return dir * a.name.localeCompare(b.name);
-      const av = a[sortKey] as number;
-      const bv = b[sortKey] as number;
+      const av = a[sortKey as keyof PlayerCourseStats] as number;
+      const bv = b[sortKey as keyof PlayerCourseStats] as number;
       return dir * (av - bv);
     });
     return sorted;
@@ -503,12 +563,14 @@ export default function CourseHistoryTool() {
             <ArchetypePanel
               loading={archetypeLoading}
               archetype={archetype}
+              forecast={forecast}
             />
             <RankingTable
               rows={rows}
               sortKey={sortKey}
               sortDir={sortDir}
               onSort={clickSort}
+              forecast={forecast}
             />
           </>
         )}
@@ -544,9 +606,11 @@ function fmtVal(v: number, unit: string): string {
 function ArchetypePanel({
   loading,
   archetype,
+  forecast,
 }: {
   loading: boolean;
   archetype: ArchetypeResp | null;
+  forecast: ForecastResp | null;
 }) {
   if (loading) {
     return (
@@ -653,6 +717,10 @@ function ArchetypePanel({
         .
       </div>
 
+      {forecast?.ok && forecast.fit && (
+        <ForecastFitReadout fit={forecast.fit} />
+      )}
+
       {dist.length === 0 ? (
         <div
           style={{
@@ -734,6 +802,137 @@ function ArchetypePanel({
             )}
         </details>
       )}
+    </div>
+  );
+}
+
+/** Summary of the WLS course-fit model: how many training rows it
+ *  saw, cross-validated R² (the honest metric), and whether the
+ *  reliability floor cleared. Sits above the ranking table so the
+ *  reader knows whether to trust the Pred OTT column. */
+function ForecastFitReadout({ fit }: { fit: ForecastFit }) {
+  const cvColor = fit.reliable ? T.emerald : T.tang;
+  return (
+    <div
+      style={{
+        margin: "0 0 14px",
+        padding: "12px 14px",
+        background: "white",
+        border: `1px solid ${fit.reliable ? T.line : T.tang}`,
+        borderLeft: `3px solid ${cvColor}`,
+        borderRadius: 8,
+        display: "grid",
+        gridTemplateColumns:
+          "repeat(auto-fit, minmax(min(150px, 100%), 1fr))",
+        gap: 12,
+        alignItems: "center",
+        fontFamily: T.fontUi,
+        maxWidth: 780,
+      }}
+    >
+      <div>
+        <div
+          style={{
+            fontSize: 9.5,
+            letterSpacing: 0.6,
+            textTransform: "uppercase",
+            color: T.muted,
+            fontWeight: 800,
+          }}
+        >
+          Course-fit forecast
+        </div>
+        <div
+          style={{
+            fontSize: 13,
+            color: T.ink,
+            fontWeight: 700,
+            marginTop: 2,
+          }}
+        >
+          Ball speed · apex · curve → predicted SG:OTT residual
+        </div>
+      </div>
+      <div>
+        <div
+          style={{
+            fontSize: 9.5,
+            letterSpacing: 0.6,
+            textTransform: "uppercase",
+            color: T.muted,
+            fontWeight: 800,
+          }}
+        >
+          Training rows
+        </div>
+        <div
+          style={{
+            fontFamily: T.fontMono,
+            fontWeight: 800,
+            fontSize: 15,
+            color: T.ink,
+          }}
+        >
+          {fit.n}
+        </div>
+      </div>
+      <div>
+        <div
+          style={{
+            fontSize: 9.5,
+            letterSpacing: 0.6,
+            textTransform: "uppercase",
+            color: T.muted,
+            fontWeight: 800,
+          }}
+        >
+          Train R²
+        </div>
+        <div
+          style={{
+            fontFamily: T.fontMono,
+            fontWeight: 800,
+            fontSize: 15,
+            color: T.dim,
+          }}
+        >
+          {fit.r2Train.toFixed(2)}
+        </div>
+      </div>
+      <div>
+        <div
+          style={{
+            fontSize: 9.5,
+            letterSpacing: 0.6,
+            textTransform: "uppercase",
+            color: T.muted,
+            fontWeight: 800,
+          }}
+        >
+          CV R²
+        </div>
+        <div
+          style={{
+            fontFamily: T.fontMono,
+            fontWeight: 800,
+            fontSize: 15,
+            color: cvColor,
+          }}
+        >
+          {fit.r2Cv.toFixed(2)}
+        </div>
+        <div
+          style={{
+            fontSize: 10,
+            color: cvColor,
+            fontWeight: 700,
+            letterSpacing: 0.3,
+            textTransform: "uppercase",
+          }}
+        >
+          {fit.reliable ? "trusted" : "too flimsy"}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1116,17 +1315,58 @@ function CorrelationBar({ r }: { r: number }) {
 }
 
 // ── Ranking table ──────────────────────────────────────────────────
+/** Normalise a display name for cross-source lookup (matches the
+ *  server-side normaliser in lib/course-history/forecast.ts). */
+function normalisePlayerName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\b(jr|sr|ii|iii|iv|v)\.?$/i, "")
+    .replace(/[.'’]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 function RankingTable({
   rows,
   sortKey,
   sortDir,
   onSort,
+  forecast,
 }: {
   rows: PlayerCourseStats[];
   sortKey: SortKey;
   sortDir: "asc" | "desc";
   onSort: (k: SortKey) => void;
+  forecast: ForecastResp | null;
 }) {
+  // Build the name → predicted-residual lookup once per render.
+  const predByName = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!forecast?.ok || !forecast.players) return m;
+    for (const p of forecast.players) {
+      m.set(normalisePlayerName(p.name), p.predictedResidualPerRd);
+    }
+    return m;
+  }, [forecast]);
+  const forecastReliable = forecast?.ok && forecast.fit?.reliable === true;
+  const showForecast = forecastReliable && predByName.size > 0;
+
+  // If sorting by predicted or gap, re-sort in memory since the parent
+  // sorter only knows about the base course-history columns.
+  const orderedRows = useMemo(() => {
+    if (sortKey !== "predictedOtt" && sortKey !== "modelGap") return rows;
+    const dir = sortDir === "desc" ? -1 : 1;
+    return [...rows].sort((a, b) => {
+      const pa = predByName.get(normalisePlayerName(a.name)) ?? -Infinity;
+      const pb = predByName.get(normalisePlayerName(b.name)) ?? -Infinity;
+      if (sortKey === "predictedOtt") return dir * (pa - pb);
+      // modelGap = actual − predicted (positive = over-shot our model)
+      const ga = a.outperformanceSgOtt - pa;
+      const gb = b.outperformanceSgOtt - pb;
+      return dir * (ga - gb);
+    });
+  }, [rows, sortKey, sortDir, predByName]);
+
   return (
     <div
       style={{
@@ -1142,7 +1382,7 @@ function RankingTable({
           width: "100%",
           borderCollapse: "collapse",
           fontFamily: T.fontUi,
-          minWidth: 800,
+          minWidth: showForecast ? 950 : 800,
         }}
       >
         <thead>
@@ -1154,33 +1394,60 @@ function RankingTable({
             <Th sortable label="At course sum" k="atCourseCombined" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             <Th sortable label="Baseline sum" k="baselineCombined" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             <Th sortable label="Δ OTT" k="outperformanceSgOtt" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            {showForecast && (
+              <>
+                <Th sortable label="Pred OTT" k="predictedOtt" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent />
+                <Th sortable label="Gap" k="modelGap" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+              </>
+            )}
             <Th sortable label="Δ APP" k="outperformanceSgApp" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             <Th sortable label="Outperf." k="outperformanceCombined" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent />
           </tr>
         </thead>
         <tbody>
-          {rows.map((p, i) => (
-            <tr
-              key={p.dgId}
-              style={{
-                background: i % 2 === 0 ? "white" : T.soft,
-              }}
-            >
-              <td style={td()}>
-                <span style={{ fontWeight: 800, color: T.ink }}>
-                  {p.name}
-                </span>
-              </td>
-              <td style={{ ...td(true) }}>{p.roundsPlayed}</td>
-              <SgCell value={p.atCourseSgOtt} />
-              <SgCell value={p.atCourseSgApp} />
-              <SgCell value={p.atCourseCombined} strong />
-              <SgCell value={p.baselineCombined} muted />
-              <SgCell value={p.outperformanceSgOtt} sign />
-              <SgCell value={p.outperformanceSgApp} sign />
-              <SgCell value={p.outperformanceCombined} sign accent />
-            </tr>
-          ))}
+          {orderedRows.map((p, i) => {
+            const pred = predByName.get(normalisePlayerName(p.name));
+            const gap =
+              typeof pred === "number"
+                ? p.outperformanceSgOtt - pred
+                : null;
+            return (
+              <tr
+                key={p.dgId}
+                style={{
+                  background: i % 2 === 0 ? "white" : T.soft,
+                }}
+              >
+                <td style={td()}>
+                  <span style={{ fontWeight: 800, color: T.ink }}>
+                    {p.name}
+                  </span>
+                </td>
+                <td style={{ ...td(true) }}>{p.roundsPlayed}</td>
+                <SgCell value={p.atCourseSgOtt} />
+                <SgCell value={p.atCourseSgApp} />
+                <SgCell value={p.atCourseCombined} strong />
+                <SgCell value={p.baselineCombined} muted />
+                <SgCell value={p.outperformanceSgOtt} sign />
+                {showForecast && (
+                  <>
+                    {typeof pred === "number" ? (
+                      <SgCell value={pred} sign accent />
+                    ) : (
+                      <td style={{ ...td(), color: T.dim }}>—</td>
+                    )}
+                    {typeof gap === "number" ? (
+                      <SgCell value={gap} sign muted />
+                    ) : (
+                      <td style={{ ...td(), color: T.dim }}>—</td>
+                    )}
+                  </>
+                )}
+                <SgCell value={p.outperformanceSgApp} sign />
+                <SgCell value={p.outperformanceCombined} sign accent />
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
