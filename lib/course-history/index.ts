@@ -62,7 +62,7 @@ const KEY_YEAR_BASELINE = (year: number) =>
  *  count). Populated incrementally as we fetch event data.
  *  v2 = bumped from v1 which was cached partially-populated due to
  *  the old 60s warmup timeout being hit before every event landed. */
-const KEY_COURSE_INDEX = "course-history:course-index:v2";
+const KEY_COURSE_INDEX = "course-history:course-index:v3";
 
 function slugify(s: string): string {
   return s
@@ -717,13 +717,12 @@ export interface CuratedCourse {
 export async function getCuratedCourses(): Promise<CuratedCourse[]> {
   let index = await getCourseIndex();
   if (Object.keys(index).length === 0) {
-    // Cold path — walk the event list directly and trigger a fetch
-    // for each (event, year). Every call hits the per-event Redis
-    // cache first (so already-fetched events cost only a Redis GET),
-    // but each call ALSO updates the course index as a side effect,
-    // which is the whole point of this warm-up. Going through
-    // getYearlyPlayerBaselines here would short-circuit on already-
-    // cached year baselines and never touch the per-event path.
+    // Cold path — walk the event list, fetch every (event, year)
+    // batch's records, and assemble the entire course index in
+    // memory, then write it to Redis in ONE shot at the end. The
+    // per-call side-effect update in getCachedEventYearRounds races
+    // between concurrent workers on the same Redis JSON blob, so a
+    // batch build sidesteps that entirely.
     const eventList = await getCachedEventList();
     const pairs: Array<{
       eventId: number;
@@ -745,10 +744,44 @@ export async function getCuratedCourses(): Promise<CuratedCourse[]> {
         year: e.calendar_year,
       });
     }
-    await pMapLimit(pairs, FETCH_CONCURRENCY, (p) =>
-      getCachedEventYearRounds(p.eventId, p.year, p.eventName),
+    const batches = await pMapLimit(pairs, FETCH_CONCURRENCY, (p) =>
+      getCachedEventYearRounds(p.eventId, p.year, p.eventName).then(
+        (records) => ({ ...p, records }),
+      ),
     );
-    index = await getCourseIndex();
+    // Assemble the index locally (no redis reads/writes in the loop).
+    const fresh: CourseIndex = {};
+    for (const b of batches) {
+      const perCourse = new Map<string, number>();
+      for (const r of b.records) {
+        if (!r.courseName) continue;
+        perCourse.set(
+          r.courseName,
+          (perCourse.get(r.courseName) ?? 0) + 1,
+        );
+      }
+      for (const [courseName, rounds] of perCourse) {
+        const existing = fresh[courseName] ?? [];
+        // Deduplicate by (eventId, year) in case the event-list has
+        // duplicate entries.
+        const filtered = existing.filter(
+          (o) => !(o.eventId === b.eventId && o.year === b.year),
+        );
+        filtered.push({
+          eventId: b.eventId,
+          eventName: b.eventName,
+          year: b.year,
+          rounds,
+        });
+        fresh[courseName] = filtered;
+      }
+    }
+    if (redis) {
+      await redis
+        .set(KEY_COURSE_INDEX, fresh, { ex: 60 * 24 * 60 * 60 })
+        .catch(() => null);
+    }
+    index = fresh;
   }
   const out: CuratedCourse[] = [];
   for (const [courseName, occs] of Object.entries(index)) {
