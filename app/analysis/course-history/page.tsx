@@ -83,14 +83,22 @@ export default function Page() {
             maxWidth: 900,
           }}
         >
-          Ballstriking course fit for every PGA Tour recurring event.
+          Ballstriking course fit for every PGA Tour venue since 2019.
+          Rounds are grouped by <strong>course</strong>, not event —
+          so a rotating tournament like The Open Championship gets
+          split cleanly by venue (Royal Troon vs St Andrews vs Royal
+          Portrush) instead of being mashed into one meaningless
+          aggregate.
+          <br />
+          <br />
           We look only at SG:OTT and SG:APP — the two buckets that
           carry the strongest signal about how a course rewards a
           player&apos;s tee-to-green skills. The default ranking is
           <strong> outperformance</strong>: at-course SG minus each
           player&apos;s baseline{" "}
           <em>for the year of that round</em>, computed leave-one-out
-          from every other PGA event they played that year. Baselines
+          from every other PGA event they played that year (excluding
+          every event that used this same course). Baselines
           recalibrate every season, so a rookie who broke out in 2024
           isn&apos;t judged against his 2019 form.
         </p>

@@ -37,9 +37,11 @@ const T = {
 };
 
 // ── Types mirroring the API ────────────────────────────────────────
-interface CuratedEvent {
-  eventId: number;
-  eventName: string;
+interface CuratedCourse {
+  courseName: string;
+  totalRounds: number;
+  yearsPresent: number;
+  hostingEvents: string[];
   mostRecentYear: number;
 }
 interface PlayerCourseStats {
@@ -61,11 +63,11 @@ interface PlayerCourseStats {
 interface CourseHistoryResp {
   ok: boolean;
   error?: string;
-  eventId?: number;
   eventName?: string;
   courseName?: string;
   yearsCovered?: number[];
   players?: PlayerCourseStats[];
+  hostingEvents?: string[];
 }
 
 type SortKey =
@@ -81,10 +83,11 @@ type SortKey =
 
 // ── Main component ─────────────────────────────────────────────────
 export default function CourseHistoryTool() {
-  const [events, setEvents] = useState<CuratedEvent[] | null>(null);
-  const [eventQuery, setEventQuery] = useState("");
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [courses, setCourses] = useState<CuratedCourse[] | null>(null);
+  const [courseQuery, setCourseQuery] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [warming, setWarming] = useState(false);
 
   const [data, setData] = useState<CourseHistoryResp | null>(null);
   const [loading, setLoading] = useState(false);
@@ -92,42 +95,49 @@ export default function CourseHistoryTool() {
   const [sortKey, setSortKey] = useState<SortKey>("outperformanceCombined");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
 
-  // Load event list
+  // Load course list. First cold hit can take up to a minute while
+  // the server warms the DataGolf/Redis caches, so we show a
+  // "Loading courses…" state until we hear back.
   useEffect(() => {
     (async () => {
+      setWarming(true);
       try {
-        const res = await fetch("/api/course-history/events");
+        const res = await fetch("/api/course-history/courses");
         const j = (await res.json()) as {
           ok?: boolean;
-          events?: CuratedEvent[];
+          courses?: CuratedCourse[];
         };
-        if (j.ok && j.events) {
-          setEvents(j.events);
-          // Auto-select 3M Open (event 525) if present so the tool
-          // has data on first paint. Otherwise pick the first.
+        if (j.ok && j.courses) {
+          setCourses(j.courses);
+          // Auto-select TPC Twin Cities if present so the tool has
+          // data on first paint. Otherwise pick the most-rounds
+          // course as a sensible default.
           const preferred =
-            j.events.find((e) => e.eventId === 525) ?? j.events[0];
+            j.courses.find((c) => c.courseName === "TPC Twin Cities") ??
+            [...j.courses].sort((a, b) => b.totalRounds - a.totalRounds)[0];
           if (preferred) {
-            setSelectedEventId(preferred.eventId);
-            setEventQuery(preferred.eventName);
+            setSelectedCourse(preferred.courseName);
+            setCourseQuery(preferred.courseName);
           }
         }
       } catch {
         /* silent — user can try again */
+      } finally {
+        setWarming(false);
       }
     })();
   }, []);
 
-  // Load course history when event changes
+  // Load course history when the selected course changes.
   useEffect(() => {
-    if (selectedEventId == null) return;
+    if (!selectedCourse) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
       setData(null);
       try {
         const res = await fetch(
-          `/api/course-history?eventId=${selectedEventId}`,
+          `/api/course-history?course=${encodeURIComponent(selectedCourse)}`,
         );
         const j = (await res.json()) as CourseHistoryResp;
         if (!cancelled) setData(j);
@@ -145,16 +155,23 @@ export default function CourseHistoryTool() {
     return () => {
       cancelled = true;
     };
-  }, [selectedEventId]);
+  }, [selectedCourse]);
 
-  const filteredEvents = useMemo(() => {
-    const q = eventQuery.trim().toLowerCase();
-    if (!events) return [];
-    if (!q) return events.slice(0, 40);
-    return events
-      .filter((e) => e.eventName.toLowerCase().includes(q))
-      .slice(0, 40);
-  }, [events, eventQuery]);
+  const filteredCourses = useMemo(() => {
+    const q = courseQuery.trim().toLowerCase();
+    if (!courses) return [];
+    // Hide venues with fewer than 12 rounds ever — too small a sample
+    // to say anything meaningful about course fit.
+    const legible = courses.filter((c) => c.totalRounds >= 12);
+    if (!q) return legible.slice(0, 60);
+    return legible
+      .filter(
+        (c) =>
+          c.courseName.toLowerCase().includes(q) ||
+          c.hostingEvents.some((e) => e.toLowerCase().includes(q)),
+      )
+      .slice(0, 60);
+  }, [courses, courseQuery]);
 
   const rows = useMemo(() => {
     if (!data?.players) return [];
@@ -183,8 +200,6 @@ export default function CourseHistoryTool() {
     [sortKey],
   );
 
-  const selectedEvent = events?.find((e) => e.eventId === selectedEventId);
-
   return (
     <div style={{ display: "grid", gap: 20 }}>
       {/* Setup panel */}
@@ -192,17 +207,30 @@ export default function CourseHistoryTool() {
         <SectionHeader
           step={1}
           title="Course"
-          subtitle="Pick any PGA Tour recurring event since 2019"
+          subtitle="Pick any PGA Tour venue since 2019"
         />
         <div style={{ display: "grid", gap: 16 }}>
-          <Field label="Event / course">
+          <Field
+            label="Course"
+            help={
+              warming
+                ? "First load can take up to a minute — we're warming DataGolf's per-year baselines. Subsequent picks are instant."
+                : "Type a course name (or a hosting event's name — e.g. type 'Genesis' to find Riviera)."
+            }
+          >
             <div style={{ position: "relative" }}>
               <input
                 type="text"
-                placeholder={events ? "Type to search…" : "Loading events…"}
-                value={eventQuery}
+                placeholder={
+                  warming
+                    ? "Warming baselines (~60s)…"
+                    : courses
+                      ? "Type a course or hosting event…"
+                      : "Loading courses…"
+                }
+                value={courseQuery}
                 onChange={(e) => {
-                  setEventQuery(e.target.value);
+                  setCourseQuery(e.target.value);
                   setDropdownOpen(true);
                 }}
                 onFocus={() => setDropdownOpen(true)}
@@ -210,16 +238,16 @@ export default function CourseHistoryTool() {
                   setTimeout(() => setDropdownOpen(false), 200)
                 }
                 style={ip()}
-                disabled={events == null}
+                disabled={courses == null}
               />
-              {dropdownOpen && filteredEvents.length > 0 && (
+              {dropdownOpen && filteredCourses.length > 0 && (
                 <div
                   style={{
                     position: "absolute",
                     top: "calc(100% + 4px)",
                     left: 0,
                     right: 0,
-                    maxHeight: 320,
+                    maxHeight: 380,
                     overflowY: "auto",
                     background: "white",
                     border: `1px solid ${T.line}`,
@@ -229,26 +257,26 @@ export default function CourseHistoryTool() {
                     fontFamily: T.fontUi,
                   }}
                 >
-                  {filteredEvents.map((ev) => (
+                  {filteredCourses.map((c) => (
                     <button
-                      key={ev.eventId}
+                      key={c.courseName}
                       type="button"
                       onMouseDown={(e) => {
                         e.preventDefault();
-                        setSelectedEventId(ev.eventId);
-                        setEventQuery(ev.eventName);
+                        setSelectedCourse(c.courseName);
+                        setCourseQuery(c.courseName);
                         setDropdownOpen(false);
                       }}
                       style={{
                         width: "100%",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
+                        display: "grid",
+                        gridTemplateColumns: "1fr auto",
+                        alignItems: "start",
                         gap: 8,
                         padding: "10px 12px",
                         border: "none",
                         background:
-                          ev.eventId === selectedEventId
+                          c.courseName === selectedCourse
                             ? T.emeraldTint
                             : "white",
                         color: T.ink,
@@ -260,19 +288,44 @@ export default function CourseHistoryTool() {
                         borderBottom: `1px solid ${T.lineSoft}`,
                       }}
                     >
-                      <span style={{ flex: 1, minWidth: 0 }}>
-                        {ev.eventName}
-                      </span>
-                      <span
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: T.ink, fontWeight: 700 }}>
+                          {c.courseName}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11.5,
+                            color: T.muted,
+                            fontWeight: 600,
+                            marginTop: 2,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {c.hostingEvents.slice(0, 2).join(" · ")}
+                          {c.hostingEvents.length > 2
+                            ? ` +${c.hostingEvents.length - 2}`
+                            : ""}
+                        </div>
+                      </div>
+                      <div
                         style={{
                           fontFamily: T.fontMono,
                           fontSize: 12,
                           color: T.muted,
                           fontWeight: 700,
+                          textAlign: "right",
+                          whiteSpace: "nowrap",
                         }}
                       >
-                        {ev.mostRecentYear}
-                      </span>
+                        {c.totalRounds} rds
+                        <br />
+                        <span style={{ fontSize: 10, color: T.dim }}>
+                          {c.yearsPresent} yr
+                          {c.yearsPresent === 1 ? "" : "s"}
+                        </span>
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -312,9 +365,7 @@ export default function CourseHistoryTool() {
         <SectionHeader
           step={2}
           title={
-            data?.courseName
-              ? `${data.courseName}`
-              : selectedEvent?.eventName ?? "Course rankings"
+            data?.courseName ?? selectedCourse ?? "Course rankings"
           }
           subtitle={
             data?.yearsCovered && data.yearsCovered.length > 0
@@ -323,6 +374,35 @@ export default function CourseHistoryTool() {
           }
           accent
         />
+        {data?.hostingEvents && data.hostingEvents.length > 0 && (
+          <div
+            style={{
+              marginTop: -6,
+              marginBottom: 12,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 6,
+            }}
+          >
+            {data.hostingEvents.map((e) => (
+              <span
+                key={e}
+                style={{
+                  fontSize: 11,
+                  fontFamily: T.fontUi,
+                  fontWeight: 700,
+                  color: T.emeraldD,
+                  background: T.emeraldTint,
+                  padding: "3px 8px",
+                  borderRadius: 999,
+                  letterSpacing: 0.2,
+                }}
+              >
+                {e}
+              </span>
+            ))}
+          </div>
+        )}
 
         {loading && (
           <div

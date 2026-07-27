@@ -51,11 +51,24 @@ const CURRENT_YEAR = 2026;
 const KEY_ROUND = (eventId: number, year: number) =>
   `course-history:round:${eventId}:${year}`;
 const KEY_EVENT_LIST = "course-history:event-list:pga";
-// v2 = per-year leave-one-out baselines. Bumped from v1 (current-day
-// DG skill snapshot) to invalidate stale aggregates.
-const KEY_AGGREGATE = (eventId: number) => `course-history:agg:v2:${eventId}`;
+// v3 = course-based aggregation (was event-based v2). Some events
+// change courses year to year (The Open, various signature events),
+// so we now group by course_name instead of event_id.
+const KEY_AGGREGATE_COURSE = (courseName: string) =>
+  `course-history:agg-course:v3:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
+/** Course index mapping course_name → occurrences (event, year, round
+ *  count). Populated incrementally as we fetch event data. */
+const KEY_COURSE_INDEX = "course-history:course-index:v1";
+
+function slugify(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 /** Concurrency limit when fanning out getHistoricalRounds calls for
  *  a cold-cache year baseline. Kept modest to be nice to DataGolf. */
@@ -125,12 +138,19 @@ export interface PlayerCourseStats {
 
 /** Response shape from the course-history endpoint. */
 export interface CourseHistoryResponse {
+  /** Legacy: -1 when the aggregation was course-based (the common
+   *  path). Retained for backwards-compat with any old-shape callers. */
   eventId: number;
+  /** Display label — the primary hosting event name, or "X + N more"
+   *  when the course has been used by multiple events. */
   eventName: string;
   courseName: string;
   yearsCovered: number[];
   players: PlayerCourseStats[];
   cachedAt: string;
+  /** All PGA events that have used this course in HISTORICAL_YEARS.
+   *  Rendered as chips beneath the course-name header on the client. */
+  hostingEvents?: string[];
 }
 
 // ── Cached fetchers ────────────────────────────────────────────────
@@ -226,7 +246,7 @@ async function getYearlyPlayerBaselines(
   const perEventRounds = await pMapLimit(
     yearEvents,
     FETCH_CONCURRENCY,
-    (ev) => getCachedEventYearRounds(ev.event_id, year),
+    (ev) => getCachedEventYearRounds(ev.event_id, year, ev.event_name),
   );
 
   const out: YearBaseline = new Map();
@@ -274,21 +294,84 @@ async function getYearlyPlayerBaselines(
   return out;
 }
 
+/** Course occurrence — one (event, year) that hosted this course. */
+export interface CourseOccurrence {
+  eventId: number;
+  eventName: string;
+  year: number;
+  rounds: number;
+}
+
+/** The full course index — courseName → array of occurrences. */
+type CourseIndex = Record<string, CourseOccurrence[]>;
+
+async function getCourseIndex(): Promise<CourseIndex> {
+  if (!redis) return {};
+  const cached = await redis
+    .get<CourseIndex>(KEY_COURSE_INDEX)
+    .catch(() => null);
+  return cached ?? {};
+}
+
+/** Update the course index with a fresh event-year batch of records.
+ *  Called as a side effect of `getCachedEventYearRounds`. Idempotent
+ *  — replaces existing entries for the same (eventId, year). */
+async function updateCourseIndex(
+  eventId: number,
+  year: number,
+  eventName: string,
+  records: RoundRecord[],
+): Promise<void> {
+  if (!redis || records.length === 0) return;
+  const perCourse = new Map<string, number>();
+  for (const r of records) {
+    if (!r.courseName) continue;
+    perCourse.set(r.courseName, (perCourse.get(r.courseName) ?? 0) + 1);
+  }
+  if (perCourse.size === 0) return;
+  const index = (await getCourseIndex()) ?? {};
+  for (const [courseName, rounds] of perCourse) {
+    const existing = index[courseName] ?? [];
+    // Remove any prior entry for this (eventId, year) so a repeated
+    // fetch just replaces the count instead of duplicating.
+    const filtered = existing.filter(
+      (e) => !(e.eventId === eventId && e.year === year),
+    );
+    filtered.push({ eventId, eventName, year, rounds });
+    index[courseName] = filtered;
+  }
+  // TTL: 60 days — the index survives longer than any single
+  // event-year cache; it's fine to hold stale entries here.
+  await redis
+    .set(KEY_COURSE_INDEX, index, { ex: 60 * 24 * 60 * 60 })
+    .catch(() => null);
+}
+
 /** Fetch (and cache) one event-year historical round dump. Returns
  *  a flat list of round records ready for aggregation. */
 async function getCachedEventYearRounds(
   eventId: number,
   year: number,
+  eventName?: string,
 ): Promise<RoundRecord[]> {
   if (redis) {
     const cached = await redis
       .get<RoundRecord[]>(KEY_ROUND(eventId, year))
       .catch(() => null);
-    if (cached && Array.isArray(cached)) return cached;
+    if (cached && Array.isArray(cached)) {
+      // Even on cache hit we opportunistically refresh the course
+      // index — cheap and keeps the index in sync when a new
+      // event-year appears.
+      if (eventName) {
+        await updateCourseIndex(eventId, year, eventName, cached);
+      }
+      return cached;
+    }
   }
   try {
     const payload = await getHistoricalRounds(eventId, year, "pga");
     const records: RoundRecord[] = [];
+    const effectiveEventName = eventName ?? payload.event_name ?? "";
     for (const s of payload.scores ?? []) {
       if (!Number.isFinite(s.dg_id)) continue;
       const playerName = flipName(s.player_name);
@@ -314,6 +397,7 @@ async function getCachedEventYearRounds(
         .set(KEY_ROUND(eventId, year), records, { ex: CACHE_TTL_ROUND })
         .catch(() => null);
     }
+    await updateCourseIndex(eventId, year, effectiveEventName, records);
     return records;
   } catch {
     // Event/year missing (event didn't exist yet, tour rotation, etc.) —
@@ -337,27 +421,52 @@ function flipName(raw: string): string {
 
 // ── Main aggregation ───────────────────────────────────────────────
 
-/** Aggregate one event's historical rounds into per-player course
- *  stats. Cached in Redis for CACHE_TTL_AGGREGATE seconds so refreshes
- *  are cheap during the current tournament week. */
-export async function getCourseHistory(
-  eventId: number,
+/** Aggregate all rounds played at a SPECIFIC course (across any event
+ *  that hosted it), into per-player course stats. This is the primary
+ *  entry point — grouping by course name means a rotating event like
+ *  The Open Championship gets split into separate cards for Royal
+ *  Troon, St Andrews, Royal Portrush etc. rather than mashing every
+ *  venue into one meaningless aggregate.
+ *
+ *  Uses per-year leave-one-out baselines, but the "left out" set is
+ *  every (eventId, year) tuple that used the target course in that
+ *  year — so if The Open was at St Andrews in 2015 and 2022, the St
+ *  Andrews query subtracts BOTH those (eventId, year) contributions
+ *  from each player's per-year baseline. */
+export async function getCourseHistoryByCourse(
+  courseName: string,
 ): Promise<CourseHistoryResponse | null> {
+  const cleanCourse = courseName.trim();
+  if (!cleanCourse) return null;
+
   if (redis) {
     const cached = await redis
-      .get<CourseHistoryResponse>(KEY_AGGREGATE(eventId))
+      .get<CourseHistoryResponse>(KEY_AGGREGATE_COURSE(cleanCourse))
       .catch(() => null);
     if (cached && cached.players) return cached;
   }
 
-  const [targetRounds, eventList] = await Promise.all([
-    Promise.all(
-      HISTORICAL_YEARS.map((y) => getCachedEventYearRounds(eventId, y)),
-    ),
-    getCachedEventList(),
-  ]);
+  // Find which (event, year) tuples hosted this course. If the
+  // course-index is empty (nothing cached yet) we can't discover
+  // occurrences without fetching every PGA event — the caller
+  // should have hit /api/course-history/courses first, which warms
+  // the index.
+  const index = await getCourseIndex();
+  const occurrences = index[cleanCourse];
+  if (!occurrences || occurrences.length === 0) return null;
 
-  const allRounds = targetRounds.flat();
+  // Fetch each occurrence's cached rounds and filter to this course.
+  const roundBatches = await Promise.all(
+    occurrences.map((o) =>
+      getCachedEventYearRounds(o.eventId, o.year, o.eventName),
+    ),
+  );
+  const allRounds: RoundRecord[] = [];
+  for (const batch of roundBatches) {
+    for (const r of batch) {
+      if (r.courseName === cleanCourse) allRounds.push(r);
+    }
+  }
   if (allRounds.length === 0) return null;
 
   // Which years does the target event actually have data for? Only
@@ -379,20 +488,24 @@ export async function getCourseHistory(
     baselinesByYear.set(yearsWithData[i], yearBaselineArr[i]);
   }
 
-  // Event metadata: prefer the most recent event-list entry that
-  // matches this eventId (name is stable year to year).
-  const eventMeta = eventList
-    .filter((e) => e.event_id === eventId)
-    .sort((a, b) => b.calendar_year - a.calendar_year)[0];
-  const eventName = eventMeta?.event_name ?? `Event ${eventId}`;
+  // For each year, gather the set of eventIds that hosted this
+  // course. Baseline for a player-year excludes ALL of those events
+  // that year (not just one), so a course that hosted multiple
+  // events in a single year is still cleanly separated.
+  const excludedByYear = new Map<number, Set<number>>();
+  for (const o of occurrences) {
+    const set = excludedByYear.get(o.year) ?? new Set<number>();
+    set.add(o.eventId);
+    excludedByYear.set(o.year, set);
+  }
 
   /** Look up a player's leave-one-out baseline SG:OTT + SG:APP for a
-   *  specific year. Removes the target event's contribution from the
-   *  year total so the baseline reflects "how did they play OTHER
-   *  events this year" rather than being contaminated by the rounds
-   *  we're grading. Returns null if the player has no rounds outside
-   *  the target event that year — in which case the caller should
-   *  skip this round rather than use zero. */
+   *  specific year, excluding all events that used the target course
+   *  that year. So a Riviera query subtracts BOTH the Genesis
+   *  Invitational rounds and any other Riviera-hosted event that
+   *  year, leaving only OTHER-COURSE rounds as the baseline. Returns
+   *  null if the player has no rounds outside those events that year
+   *  — the caller then skips this round for baseline purposes. */
   function leaveOneOutBaseline(
     dgId: number,
     year: number,
@@ -401,14 +514,23 @@ export async function getCourseHistory(
     if (!yearBaseline) return null;
     const row = yearBaseline.get(dgId);
     if (!row) return null;
-    const evContrib = row.byEvent[eventId] ?? {
-      sumOtt: 0,
-      sumApp: 0,
-      rounds: 0,
-    };
-    const otherOtt = row.sumOtt - evContrib.sumOtt;
-    const otherApp = row.sumApp - evContrib.sumApp;
-    const otherRounds = row.rounds - evContrib.rounds;
+    const excludedEvents = excludedByYear.get(year);
+    let excludedOtt = 0;
+    let excludedApp = 0;
+    let excludedRounds = 0;
+    if (excludedEvents) {
+      for (const eid of excludedEvents) {
+        const evContrib = row.byEvent[eid];
+        if (evContrib) {
+          excludedOtt += evContrib.sumOtt;
+          excludedApp += evContrib.sumApp;
+          excludedRounds += evContrib.rounds;
+        }
+      }
+    }
+    const otherOtt = row.sumOtt - excludedOtt;
+    const otherApp = row.sumApp - excludedApp;
+    const otherRounds = row.rounds - excludedRounds;
     if (otherRounds <= 0) return null;
     return {
       sgOtt: otherOtt / otherRounds,
@@ -537,21 +659,87 @@ export async function getCourseHistory(
     new Set(allRounds.map((r) => r.year)),
   ).sort();
 
+  // Which events have hosted this course? Deduped list for the UI.
+  const eventNames = Array.from(
+    new Set(occurrences.map((o) => o.eventName).filter(Boolean)),
+  ).sort();
+  const eventNameLabel =
+    eventNames.length === 0
+      ? cleanCourse
+      : eventNames.length === 1
+        ? eventNames[0]
+        : `${eventNames[0]} + ${eventNames.length - 1} more`;
+
   const response: CourseHistoryResponse = {
-    eventId,
-    eventName,
-    courseName: modalCourse,
+    eventId: -1,
+    eventName: eventNameLabel,
+    courseName: cleanCourse,
     yearsCovered,
     players,
     cachedAt: new Date(0).toISOString(),
+    hostingEvents: eventNames,
   };
 
   if (redis) {
     await redis
-      .set(KEY_AGGREGATE(eventId), response, { ex: CACHE_TTL_AGGREGATE })
+      .set(KEY_AGGREGATE_COURSE(cleanCourse), response, {
+        ex: CACHE_TTL_AGGREGATE,
+      })
       .catch(() => null);
   }
   return response;
+}
+
+/** One course entry in the searchable list, with metadata for the UI. */
+export interface CuratedCourse {
+  courseName: string;
+  /** Total rounds across all (event, year) occurrences at this course
+   *  — a rough "sample size" hint that helps the UI hide venues with
+   *  too little data to be useful. */
+  totalRounds: number;
+  /** Number of distinct years this course has appeared in the
+   *  historical window. */
+  yearsPresent: number;
+  /** Distinct hosting events, alphabetically sorted. */
+  hostingEvents: string[];
+  /** Most-recent year this course was played. */
+  mostRecentYear: number;
+}
+
+/** Return the curated course list built from the course index. If the
+ *  index is empty (nothing has been cached yet), warms it by fetching
+ *  per-year baselines for every HISTORICAL_YEAR — that's the same
+ *  fetch fanout that a first `getCourseHistoryByCourse` would trigger,
+ *  so callers still hitting the tool cold see a single slow first
+ *  request rather than a "no data" screen. */
+export async function getCuratedCourses(): Promise<CuratedCourse[]> {
+  let index = await getCourseIndex();
+  if (Object.keys(index).length === 0) {
+    // Cold path — warm all years' data (which triggers the course-index
+    // update as a side effect). This is expensive on very-first hit
+    // but only happens once per Redis cache lifetime.
+    await Promise.all(
+      HISTORICAL_YEARS.map((y) => getYearlyPlayerBaselines(y)),
+    );
+    index = await getCourseIndex();
+  }
+  const out: CuratedCourse[] = [];
+  for (const [courseName, occs] of Object.entries(index)) {
+    const totalRounds = occs.reduce((a, b) => a + b.rounds, 0);
+    const yearsPresent = new Set(occs.map((o) => o.year)).size;
+    const hostingEvents = Array.from(
+      new Set(occs.map((o) => o.eventName).filter(Boolean)),
+    ).sort();
+    const mostRecentYear = Math.max(...occs.map((o) => o.year));
+    out.push({
+      courseName,
+      totalRounds,
+      yearsPresent,
+      hostingEvents,
+      mostRecentYear,
+    });
+  }
+  return out.sort((a, b) => a.courseName.localeCompare(b.courseName));
 }
 
 /** Curated list of PGA Tour recurring events with SG data, sorted by

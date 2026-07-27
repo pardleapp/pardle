@@ -16,38 +16,29 @@
  */
 
 import { NextResponse } from "next/server";
-import { getCourseHistory } from "@/lib/course-history";
+import { getCourseHistoryByCourse } from "@/lib/course-history";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-// Cold-cache computation for a course fans out ~40 DataGolf event
-// fetches per year × 7 years = up to 280 API calls before we can
-// respond. Even at concurrency 20 that can bump against Vercel's
-// default 15s serverless timeout, so allow up to 60s here — after
-// the first hit everything is served out of Redis.
+// Cold-cache computation for a course fans out DataGolf event fetches
+// for the course-index warm-up. After the first hit everything is
+// served out of Redis in <200ms.
 export const maxDuration = 60;
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const eventIdRaw = url.searchParams.get("eventId");
-  if (!eventIdRaw) {
+  const course = url.searchParams.get("course");
+  if (!course) {
     return NextResponse.json(
-      { ok: false, error: "missing eventId query param" },
-      { status: 400 },
-    );
-  }
-  const eventId = Number(eventIdRaw);
-  if (!Number.isFinite(eventId) || eventId <= 0) {
-    return NextResponse.json(
-      { ok: false, error: "invalid eventId" },
+      { ok: false, error: "missing course query param" },
       { status: 400 },
     );
   }
   try {
-    const data = await getCourseHistory(eventId);
+    const data = await getCourseHistoryByCourse(course);
     if (!data) {
       return NextResponse.json(
-        { ok: false, error: "no historical data for this event" },
+        { ok: false, error: "no historical data for this course" },
         { status: 404 },
       );
     }
