@@ -48,24 +48,25 @@ const CACHE_TTL_BASELINE_LIVE = 6 * 60 * 60; // 6h for the current in-progress y
 
 const CURRENT_YEAR = 2026;
 
-// v2 = round records now carry the normalised course_name
-// (aliases + suffix-stripping) so PGA Championship / U.S. Open years
-// at existing venues merge into the same course-index entry.
+// Kept at v1 — records may contain the raw un-normalised course_name
+// from DataGolf. Normalisation happens on READ (see below) so that
+// cached data survives a normaliser change without needing a full
+// refetch pass.
 const KEY_ROUND = (eventId: number, year: number) =>
-  `course-history:round:v2:${eventId}:${year}`;
+  `course-history:round:${eventId}:${year}`;
 const KEY_EVENT_LIST = "course-history:event-list:pga";
-// v3 = course-based aggregation (was event-based v2). Some events
-// change courses year to year (The Open, various signature events),
-// so we now group by course_name instead of event_id.
+// v4 = course names now normalised on read (aliases + suffix
+// stripping) so pre-normaliser cached aggregates get invalidated
+// and rebuilt on top of the correct venue groupings.
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v3:${slugify(courseName)}`;
+  `course-history:agg-course:v4:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
  *  count). Populated incrementally as we fetch event data.
  *  v2 = bumped from v1 which was cached partially-populated due to
  *  the old 60s warmup timeout being hit before every event landed. */
-const KEY_COURSE_INDEX = "course-history:course-index:v5";
+const KEY_COURSE_INDEX = "course-history:course-index:v6";
 
 function slugify(s: string): string {
   return s
@@ -372,13 +373,22 @@ async function getCachedEventYearRounds(
       if (cached.length === 0 && year >= CURRENT_YEAR - 3) {
         // Fall through to refetch — don't return the empty cache.
       } else {
+        // Normalise cached records' course names on read so that
+        // records cached before the normaliser existed still return
+        // canonical venue names to callers. Zero cost for records
+        // that already carry the canonical name.
+        const normalised = cached.map((r) =>
+          r.courseName && normaliseCourseName(r.courseName) !== r.courseName
+            ? { ...r, courseName: normaliseCourseName(r.courseName) }
+            : r,
+        );
         // Non-empty or old year — trust the cache. Even on cache hit
         // we opportunistically refresh the course index so a new
         // event-year gets indexed as soon as its data lands.
         if (eventName) {
-          await updateCourseIndex(eventId, year, eventName, cached);
+          await updateCourseIndex(eventId, year, eventName, normalised);
         }
-        return cached;
+        return normalised;
       }
     }
   }
