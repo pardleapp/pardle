@@ -1286,6 +1286,7 @@ function FieldContextBand({ r }: { r: ForecastResp }) {
   const pinAdd = r.pinDifficultyAdder ?? 0;
   return (
     <div
+      className="pv-field-context"
       style={{
         marginBottom: 18,
         padding: "12px 16px",
@@ -1299,7 +1300,25 @@ function FieldContextBand({ r }: { r: ForecastResp }) {
         fontFamily: T.fontUi,
       }}
     >
+      {/* Mobile layout: stack the two cells vertically, drop the
+          right-border divider, and gap them with a dashed rule. The
+          auto-1fr grid was pinching both cells at phone widths. */}
+      <style>{`
+        @media (max-width: 640px) {
+          .pv-field-context {
+            grid-template-columns: 1fr !important;
+            gap: 10px !important;
+          }
+          .pv-field-context .pv-field-context-left {
+            padding-right: 0 !important;
+            padding-bottom: 10px !important;
+            border-right: none !important;
+            border-bottom: 1px dashed ${T.line} !important;
+          }
+        }
+      `}</style>
       <div
+        className="pv-field-context-left"
         style={{
           display: "flex",
           flexDirection: "column",

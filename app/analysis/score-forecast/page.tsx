@@ -17,6 +17,23 @@ export const dynamic = "force-dynamic";
 export default function Page() {
   return (
     <main className="container container-wide v4-theme pv-theme">
+      {/*
+        On mobile the top ribbon collapses to just the AuthChip because
+        the wordmark and nav tabs are already hidden by v4-theme. That
+        leaves an empty white strip with a floating Sign in pill — pure
+        vertical waste when there's already a bottom nav. Hide the
+        whole ribbon under the phone breakpoint so the intro copy sits
+        directly under the safari URL bar.
+      */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @media (max-width: 767px) {
+              body header.brand.brand-split { display: none !important; }
+            }
+          `,
+        }}
+      />
       <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
         <div className="brand-nav">
@@ -28,7 +45,10 @@ export default function Page() {
         style={{
           // Fill the desktop-shell content column edge-to-edge — no
           // maxWidth cap; the shell's grid track already sizes it.
+          // Bottom padding is bigger on mobile to clear the fixed
+          // bottom nav (~60px + safe-area).
           padding: "20px 4px 60px",
+          paddingBottom: "calc(80px + env(safe-area-inset-bottom, 0px))",
         }}
       >
         <nav
