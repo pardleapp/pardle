@@ -16,7 +16,11 @@ import { getCuratedCourses } from "@/lib/course-history";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-export const maxDuration = 60;
+// Cold warmup walks ~280 event-year pairs. Most are Redis cache
+// hits after our earlier per-event fetches, but the very first hit
+// on a brand-new deploy needs headroom to complete without being
+// cut off by Vercel's timeout.
+export const maxDuration = 300;
 
 export async function GET() {
   try {
