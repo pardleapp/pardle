@@ -280,6 +280,12 @@ export async function GET() {
     id: string;
     name: string;
     sgTotal: number | null;
+    /** Where sgTotal came from — event-specific means the CSV
+     *  `final_prediction`, which already includes DataGolf's course-
+     *  fit adjustment for THIS event. season-generic means the
+     *  fallback universal skill rating, no course fit applied. Drives
+     *  the compression-factor default in the model. */
+    sgSource: "event-specific" | "season-generic" | null;
     position: string;
     total: string;
     thru: string;
@@ -301,11 +307,16 @@ export async function GET() {
     //   2. Universal DG skill-ratings sg_total via dg_id lookup
     //   3. null (UI shows empty; user can type manually)
     let sg = sgByNorm.get(normalise(lb.displayName)) ?? null;
+    let sgSource: "event-specific" | "season-generic" | null =
+      sg != null ? "event-specific" : null;
     if (sg == null) {
       const dgId = pgaToDg.get(lb.playerId);
       if (dgId != null) {
         const dgSg = dgSkillByDgId.get(dgId);
-        if (typeof dgSg === "number") sg = dgSg;
+        if (typeof dgSg === "number") {
+          sg = dgSg;
+          sgSource = "season-generic";
+        }
       }
     }
     const sc = scorecards[lb.playerId];
@@ -348,6 +359,7 @@ export async function GET() {
       id: lb.playerId,
       name: lb.displayName,
       sgTotal: sg,
+      sgSource,
       position: lb.position,
       total: lb.total,
       thru: lb.thru,

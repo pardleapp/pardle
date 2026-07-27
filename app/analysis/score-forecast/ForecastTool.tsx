@@ -18,6 +18,8 @@ interface HoleForecast {
   clusterResidual: number;
   windDelta: number;
   yardsDelta: number;
+  fitRowCount?: number;
+  lowSample?: boolean;
 }
 interface PlayerForecastResp {
   name: string;
@@ -47,6 +49,8 @@ interface ForecastResp {
   modelDelta?: number;
   fieldForecast?: number;
   fieldForecastVsPar?: number;
+  /** One-σ spread of the field-round-score distribution today. */
+  fieldForecastSigma?: number;
   holes?: HoleForecast[];
   players?: PlayerForecastResp[];
   warnings?: string[];
@@ -62,6 +66,9 @@ interface FieldPlayer {
   id: string;
   name: string;
   sgTotal: number | null;
+  /** Where sgTotal came from — signals whether the number already
+   *  includes course-fit (event-specific) or is season-generic. */
+  sgSource: "event-specific" | "season-generic" | null;
   position: string;
   total: string;
   thru: string;
@@ -103,6 +110,10 @@ interface PlayerRow {
   playerId: string; // "" while empty
   name: string;
   sgTotal: string;
+  /** Signals whether sgTotal already includes course-fit adjustment
+   *  (from CSV) or is a season-generic universal rating. Passed to
+   *  the server so it can pick the right compression default. */
+  sgSource: "event-specific" | "season-generic" | null;
   weekRounds: string;
   /** Per-round SG breakdown captured when the player was picked from
    *  the field. Sent alongside weekRounds when its length matches the
@@ -126,6 +137,7 @@ const emptyPlayer = (): PlayerRow => ({
   playerId: "",
   name: "",
   sgTotal: "",
+  sgSource: null,
   weekRounds: "",
   weekRoundsSg: [],
   teeTime: "",
@@ -190,6 +202,12 @@ export default function ForecastTool() {
   const [players, setPlayers] = useState<PlayerRow[]>([emptyPlayer()]);
 
   const [running, setRunning] = useState(false);
+  /** Modal state for the "you're using both level shift AND a pin
+   *  adder" double-count warning. Non-null when we're waiting on the
+   *  user to confirm or cancel. */
+  const [doubleCountConfirm, setDoubleCountConfirm] = useState<
+    null | (() => void)
+  >(null);
   const [result, setResult] = useState<ForecastResp | null>(null);
 
   // Load field roster on mount
@@ -288,14 +306,17 @@ export default function ForecastTool() {
             p.weekRoundsSg.length === wr.length
               ? p.weekRoundsSg
               : undefined;
+          const defaultCompression =
+            p.sgSource === "event-specific" ? 1.0 : 0.83;
           return {
             name: p.name.trim(),
             sgTotal: sg,
+            sgSource: p.sgSource ?? undefined,
             weekRounds: wr.length ? wr : undefined,
             weekRoundsSg: sgAligned,
             formWeight:
               Number.isFinite(fw) && p.includeForm ? fw : 0,
-            compressionFactor: Number.isFinite(cf) ? cf : 0.83,
+            compressionFactor: Number.isFinite(cf) ? cf : defaultCompression,
             skewAdjustment: Number.isFinite(skew) ? skew : undefined,
             teeHourLocal: teeHour ?? undefined,
             startHole: 1,
@@ -331,6 +352,26 @@ export default function ForecastTool() {
     players,
     hhmmToHour, // eslint-disable-line
   ]);
+
+  /** Wraps runIt with the double-count warning. If BOTH a non-typical
+   *  Conditions preset (which will apply a level shift) AND a non-
+   *  zero manual pin adjustment are set, prompt the user before
+   *  running — because both terms compress the "how hard is today"
+   *  signal and layering them stacks the effects. */
+  const attemptRun = useCallback(() => {
+    const manualPinActive =
+      pinsSource === "manual" &&
+      Math.abs(Number(pinManualAdjustment) || 0) > 0.01;
+    const levelShiftActive = conditions !== "typical";
+    if (manualPinActive && levelShiftActive) {
+      setDoubleCountConfirm(() => () => {
+        setDoubleCountConfirm(null);
+        void runIt();
+      });
+      return;
+    }
+    void runIt();
+  }, [pinsSource, pinManualAdjustment, conditions, runIt]);
 
   // Fire once the field roster is loaded so users see a baseline
   // (needs at least the tournamentId).
@@ -581,7 +622,7 @@ export default function ForecastTool() {
           >
             <button
               type="button"
-              onClick={runIt}
+              onClick={attemptRun}
               disabled={running}
               style={{
                 ...btnPrimary(),
@@ -638,6 +679,12 @@ export default function ForecastTool() {
           Error: {result.error}
         </div>
       )}
+      {doubleCountConfirm && (
+        <DoubleCountModal
+          onCancel={() => setDoubleCountConfirm(null)}
+          onConfirm={doubleCountConfirm}
+        />
+      )}
     </div>
   );
 }
@@ -674,14 +721,22 @@ function PlayerCard({
 
   const applyPlayer = (fp: FieldPlayer) => {
     const sg = fp.sgTotal;
+    // Compression default is source-aware: CSV `final_prediction`
+    // already includes course-fit, so applying venue compression on
+    // top would double-compress. Season-generic ratings still take
+    // the venue compression.
+    const defaultCompression =
+      fp.sgSource === "event-specific" ? "1.0" : "0.83";
     onChange({
       playerId: fp.id,
       name: fp.name,
       sgTotal: sg != null ? String(sg) : "",
+      sgSource: fp.sgSource,
       weekRounds: fp.weekRounds.join(","),
       weekRoundsSg: fp.weekRoundsSg,
       teeTimesByRound: fp.teeTimes,
       teeTime: fp.teeTimes[targetRound] ?? "",
+      compressionFactor: defaultCompression,
       // Auto-populate skew adjustment based on the player's SG tier
       // so the median column reflects the Pardle-default gap
       // (0.20 elite / 0.25 mid / 0.30 below-avg). User can still
@@ -874,13 +929,13 @@ function PlayerCard({
           </Field>
           <Field
             label="Skill compression"
-            help="How much this course flattens the elite-vs-field gap. 0.83 default at bunching courses like this one. 1.0 = no compression."
+            help="How much this course flattens the elite-vs-field gap. Default depends on the SG source: event-specific SG (already course-fit-adjusted) uses 1.0; season-generic SG uses 0.83 at bunching courses like this."
           >
             <Slider
               min={0.6}
               max={1.2}
               step={0.01}
-              recommended={0.83}
+              recommended={row.sgSource === "event-specific" ? 1.0 : 0.83}
               value={row.compressionFactor}
               onChange={(v) => onChange({ compressionFactor: v })}
             />
@@ -1038,6 +1093,23 @@ function HeroForecast({ r }: { r: ForecastResp }) {
           >
             vs par {r.par ?? "—"} · {under ? "under" : vsPar > 0 ? "over" : "level"}
           </div>
+          {typeof r.fieldForecastSigma === "number" &&
+            r.fieldForecastSigma > 0 && (
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 11,
+                  letterSpacing: 0.3,
+                  color: T.dim,
+                  fontFamily: T.fontUi,
+                  fontWeight: 600,
+                }}
+              >
+                ± <span style={{ fontFamily: T.fontMono, fontWeight: 700 }}>
+                  {r.fieldForecastSigma.toFixed(2)}
+                </span> · one-σ round spread
+              </div>
+            )}
         </div>
       </div>
       <div
@@ -1562,6 +1634,22 @@ function HoleStrip({
                     W {h.headwind >= 0 ? "+" : ""}
                     {h.headwind.toFixed(0)}
                   </div>
+                  {h.lowSample && (
+                    <div
+                      title={`Thin historical sample (${h.fitRowCount ?? "few"} rows) — projection carries extra uncertainty.`}
+                      style={{
+                        marginTop: 3,
+                        fontSize: 8.5,
+                        letterSpacing: 0.4,
+                        color: T.tang,
+                        fontWeight: 800,
+                        textTransform: "uppercase",
+                        fontFamily: T.fontUi,
+                      }}
+                    >
+                      ⚠ thin sample
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1657,6 +1745,7 @@ const T = {
   emeraldTint: "oklch(0.96 0.04 155)",
   up: "oklch(0.52 0.14 150)",
   down: "oklch(0.57 0.19 28)",
+  tang: "oklch(0.66 0.18 45)",
   heroInk: "oklch(0.16 0.04 155)",
   fontUi: "var(--font-archivo), 'Archivo', system-ui, sans-serif",
   fontMono: "'IBM Plex Mono', ui-monospace, monospace",
@@ -1775,6 +1864,144 @@ function RunningDots() {
       <span className="pv-fc-dot" />
       <span className="pv-fc-dot" />
     </span>
+  );
+}
+
+/** Warning modal that fires when the user tries to run the forecast
+ *  with BOTH a non-typical Conditions preset (which applies a level
+ *  shift) AND a non-zero manual pin adjustment. Both terms compress
+ *  the "how hard is today" signal in overlapping ways — layering them
+ *  double-counts. The modal lets the user cancel to un-stack the two
+ *  or proceed anyway if they really do mean to add both. */
+function DoubleCountModal({
+  onCancel,
+  onConfirm,
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "oklch(0.2 0.04 155 / 0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 100,
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: 480,
+          width: "100%",
+          background: T.card,
+          border: `1px solid ${T.line}`,
+          borderRadius: 12,
+          padding: 22,
+          boxShadow: "0 12px 40px oklch(0 0 0 / 0.3)",
+          fontFamily: T.fontUi,
+          color: T.ink,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            letterSpacing: 1.5,
+            textTransform: "uppercase",
+            color: T.tang,
+            fontWeight: 800,
+            marginBottom: 6,
+          }}
+        >
+          Heads up · possible double count
+        </div>
+        <h4
+          style={{
+            fontSize: 18,
+            fontWeight: 800,
+            margin: "0 0 10px",
+          }}
+        >
+          You&apos;re combining a level shift with a manual pin
+          adjustment
+        </h4>
+        <p
+          style={{
+            fontSize: 14,
+            lineHeight: 1.55,
+            margin: "0 0 16px",
+            color: T.ink,
+          }}
+        >
+          The <strong>Conditions</strong> preset already carries a
+          per-hole level shift over from the reference round(s), which
+          captures overall course softness including pin-position
+          effects. Adding a <strong>manual pin adjustment</strong> on
+          top stacks the two — the projection will be shifted more
+          than either knob alone would suggest.
+        </p>
+        <p
+          style={{
+            fontSize: 13,
+            lineHeight: 1.5,
+            margin: "0 0 18px",
+            color: T.muted,
+          }}
+        >
+          Usually you want <em>either</em>: (a) Conditions preset +
+          automated pins, or (b) &quot;Typical setup&quot; conditions
+          + manual pin adjustment.
+        </p>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            justifyContent: "flex-end",
+            flexWrap: "wrap",
+          }}
+        >
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{
+              padding: "10px 16px",
+              fontSize: 14,
+              fontWeight: 700,
+              border: `1px solid ${T.line}`,
+              borderRadius: 8,
+              background: "white",
+              color: T.ink,
+              cursor: "pointer",
+            }}
+          >
+            Let me fix it
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            style={{
+              padding: "10px 16px",
+              fontSize: 14,
+              fontWeight: 800,
+              border: `1px solid ${T.tang}`,
+              borderRadius: 8,
+              background: T.tang,
+              color: "white",
+              cursor: "pointer",
+            }}
+          >
+            Run anyway
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

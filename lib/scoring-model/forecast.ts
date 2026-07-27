@@ -114,9 +114,18 @@ export interface PlayerInput {
   /** Season-long SG total vs full field (positive = better than field
    *  average per round). */
   sgTotal: number;
+  /** Where the sgTotal figure came from. When `"event-specific"` the
+   *  number already includes course-fit adjustment (via DataGolf's
+   *  pre-tournament decomposition CSV `final_prediction`), so applying
+   *  the course-type compression factor on top would double-compress.
+   *  In that case the default compressionFactor becomes 1.0 unless
+   *  the caller explicitly overrides it. `"season-generic"` means the
+   *  number is a season-long universal SG rating (no event fit
+   *  applied), so the venue's compression correctly applies. */
+  sgSource?: "event-specific" | "season-generic";
   /** Compression factor applied to sgTotal at this course. 1.0 = no
    *  compression, 0.83 = 17% shrink (typical at bunching-friendly
-   *  venues). */
+   *  venues). Default depends on sgSource — see the sgSource docs. */
   compressionFactor?: number;
   /** Mean-median gap for this player's personal round distribution.
    *  Elite (~0.15-0.2), mid-tier (~0.25), below-avg (~0.3). Default
@@ -227,6 +236,15 @@ export interface HoleForecast {
   clusterResidual: number;
   windDelta: number;
   yardsDelta: number;
+  /** Number of historical (pin, round) rows behind this hole's fit.
+   *  Small values (< SAMPLE_LOW_THRESHOLD) mean the projection for
+   *  this hole is thinly-supported — the UI badges those so the
+   *  reader knows which per-hole numbers deserve less trust. */
+  fitRowCount: number;
+  /** True when this hole's historical sample is thin enough that
+   *  the model's per-hole projection carries meaningful uncertainty
+   *  beyond the field-level σ. */
+  lowSample: boolean;
 }
 
 export interface PlayerForecast {
@@ -270,6 +288,11 @@ export interface ForecastResponse {
   modelDelta: number;
   fieldForecast: number;
   fieldForecastVsPar: number;
+  /** One-standard-deviation width of the field-round-score
+   *  distribution today. Combines a base historical round-score
+   *  spread with an inflation term when small-sample holes are
+   *  driving material portions of the projection. */
+  fieldForecastSigma: number;
   holes: HoleForecast[];
   players: PlayerForecast[];
   warnings: string[];
@@ -277,13 +300,59 @@ export interface ForecastResponse {
 
 // ── Helpers ────────────────────────────────────────────────────────
 
+/** Below this many historical fit rows, a hole's per-hole projection
+ *  is flagged as low-sample. Roughly 30 rows corresponds to ~4 years
+ *  of tour play at that hole — thin enough that a single outlier pin
+ *  can move the projection meaningfully. */
+export const SAMPLE_LOW_THRESHOLD = 30;
+
+/** Baseline standard deviation of a PGA Tour field-average round
+ *  score. Empirically observed on tour events: field-round means sit
+ *  in a distribution ~1.3-1.6 strokes wide. We use 1.4 as the base
+ *  and inflate when the current model has thinly-sampled holes. */
+const BASE_FIELD_ROUND_SIGMA = 1.4;
+
+/** Continuous skew as a function of season SG total — replaces the
+ *  discrete 0.20/0.25/0.30 bands that produced a 25% jump in mean-
+ *  median gap at SG = 1.5 and SG = 0. Anchored on the same three
+ *  reference points so the tail behaviour still matches empirical
+ *  observation (elite 0.20, tour-average 0.25, below-average 0.30):
+ *
+ *    sgTotal ≤ 0    : 0.30
+ *    0 < sg < 1.5   : linear interp 0.30 → 0.20
+ *    sgTotal ≥ 1.5  : 0.20
+ *
+ *  Clamped so extreme SG inputs don't produce silly skew values. */
 function autoSkew(sgTotal: number): number {
-  // Empirical range: elite (SG ≥ 1.5) ~0.20; mid (0.0–1.5) ~0.25;
-  // below-avg (< 0.0) ~0.30. Bigger gap for worse players due to
-  // heavier blow-up right tail.
+  if (!Number.isFinite(sgTotal)) return 0.25;
   if (sgTotal >= 1.5) return 0.2;
-  if (sgTotal >= 0) return 0.25;
-  return 0.3;
+  if (sgTotal <= 0) return 0.3;
+  const t = sgTotal / 1.5; // 0 → 1 as SG goes 0 → 1.5
+  return 0.3 - 0.1 * t;
+}
+
+/** Scale the base skew by expected round conditions — harder rounds
+ *  produce fatter right tails (more triples, lost balls) and widen
+ *  the mean-median gap even for elite players. Anchored at 1.0 when
+ *  conditions match historical baseline; grows above 1.0 when the
+ *  field forecast is meaningfully harder than typical. */
+function conditionsSkewMultiplier(
+  fieldForecastVsPar: number,
+  historicalMeanVsPar: number | null,
+): number {
+  if (
+    historicalMeanVsPar == null ||
+    !Number.isFinite(historicalMeanVsPar) ||
+    !Number.isFinite(fieldForecastVsPar)
+  ) {
+    return 1;
+  }
+  // How much harder than typical is today? Positive delta → wider tail.
+  const delta = fieldForecastVsPar - historicalMeanVsPar;
+  // 3-stroke-harder-than-typical round widens skew by ~30%; capped so
+  // extreme days don't produce runaway skew values.
+  const factor = 1 + Math.max(-0.2, Math.min(0.35, delta * 0.1));
+  return factor;
 }
 
 /** SG persistence coefficients — how much of an SG category
@@ -359,6 +428,14 @@ export function effectivePersistenceForRound(
  *  Returns strokes/round the projection should shift by. Negative =
  *  player has been out-performing → lower expected score.
  */
+/** Bayesian prior weight in "equivalent rounds". Controls how much
+ *  the form estimator shrinks toward the season baseline when the
+ *  player has few completed rounds this week: `effective_weight =
+ *  weight × n / (n + PRIOR_N_ROUNDS)`. With PRIOR_N_ROUNDS = 2, one
+ *  completed round gets ⅓ of the full weight; two get half; three
+ *  get 60% (0.6 × 0.20 = 0.12 effective on the average excess). */
+const PRIOR_N_ROUNDS = 2;
+
 function bayesianFormBump(
   weekRounds: number[] | undefined,
   weekRoundsSg: Array<RoundSgBreakdown | null> | undefined,
@@ -388,8 +465,12 @@ function bayesianFormBump(
     }
     sumOver += over;
   }
-  const meanOver = sumOver / weekRounds.length;
-  return weight * meanOver;
+  const n = weekRounds.length;
+  const meanOver = sumOver / n;
+  // Sample-size shrinkage: 1 round of data doesn't count the same as
+  // 3. Effective weight ramps up with more rounds observed.
+  const sampleShrink = n / (n + PRIOR_N_ROUNDS);
+  return weight * sampleShrink * meanOver;
 }
 
 // ── Main entry ─────────────────────────────────────────────────────
@@ -686,6 +767,8 @@ export async function runForecast(
       clusterResidual,
       windDelta,
       yardsDelta,
+      fitRowCount: fit.rowCount,
+      lowSample: fit.rowCount < SAMPLE_LOW_THRESHOLD,
     });
   }
 
@@ -698,7 +781,12 @@ export async function runForecast(
   for (const [rStr, obs] of Object.entries(priorRounds)) {
     const r = Number(rStr) as 1 | 2 | 3 | 4;
     if (!obs || r >= targetRound) continue;
-    let sumResid = 0;
+    // Weight each hole's contribution by that hole's historical sample
+    // size (fit.rowCount). Small-sample holes contribute less so a
+    // single unusual pin at a thinly-observed hole can't outsize
+    // the round-total level shift.
+    let sumWeightedResid = 0;
+    let sumWeight = 0;
     let n = 0;
     for (let h = 1; h <= 18; h++) {
       const fit = coeffs.holes[h];
@@ -754,10 +842,14 @@ export async function runForecast(
         pinTerm +
         fit.bHead * (head - baseHead) +
         fit.bYards * (yards - baseYards);
-      sumResid += actualVsPar - predicted;
+      const w = Math.max(1, fit.rowCount);
+      sumWeightedResid += (actualVsPar - predicted) * w;
+      sumWeight += w;
       n += 1;
     }
-    if (n >= 15) levelShiftPerRound[r] = sumResid / n;
+    if (n >= 15 && sumWeight > 0) {
+      levelShiftPerRound[r] = sumWeightedResid / sumWeight;
+    }
   }
 
   const availableRounds = Object.entries(levelShiftPerRound)
@@ -868,7 +960,13 @@ export async function runForecast(
   }
   const playerForecasts: PlayerForecast[] = [];
   for (const p of players) {
-    const compression = p.compressionFactor ?? 0.83;
+    // Compression default is source-aware. DataGolf's event-specific
+    // sgTotal (from decomposition CSV `final_prediction`) already
+    // includes course-fit adjustment for THIS event, so applying the
+    // venue's compression on top would double-compress. Season-generic
+    // SG numbers correctly take the venue compression.
+    const defaultCompression = p.sgSource === "event-specific" ? 1.0 : 0.83;
+    const compression = p.compressionFactor ?? defaultCompression;
     const compressedEdge = p.sgTotal * compression;
     const formWeight = p.formWeight ?? 0.2;
     const formBump = bayesianFormBump(
@@ -889,7 +987,14 @@ export async function runForecast(
       const eff = effectivePersistenceForRound(sg);
       return eff == null ? null : eff / NEUTRAL_PERSISTENCE;
     });
-    const skewGap = p.skewAdjustment ?? autoSkew(p.sgTotal);
+    // Skew: continuous by SG tier, then scaled by expected round
+    // conditions (harder round → wider mean-median gap for everyone).
+    const baseSkew = p.skewAdjustment ?? autoSkew(p.sgTotal);
+    const skewConditionMult = conditionsSkewMultiplier(
+      fieldForecastVsPar,
+      histMean != null ? histMean - par : null,
+    );
+    const skewGap = baseSkew * skewConditionMult;
 
     // Player-specific field baseline. If a tee time is given AND
     // hourly HRRR data is available, walk the hourly wind along
@@ -940,6 +1045,13 @@ export async function runForecast(
     h.avgVsPar += perHoleAdd;
   }
 
+  // Field-forecast σ: baseline PGA-tour field-round spread plus an
+  // inflation term for thinly-sampled holes. Each low-sample hole
+  // contributes ~0.05 strokes of extra uncertainty to the round total.
+  const lowSampleHoles = holeForecasts.filter((h) => h.lowSample).length;
+  const fieldForecastSigma =
+    BASE_FIELD_ROUND_SIGMA + lowSampleHoles * 0.05;
+
   return {
     ok: true,
     tournamentId,
@@ -960,6 +1072,7 @@ export async function runForecast(
     modelDelta: modelDeltaSum,
     fieldForecast,
     fieldForecastVsPar,
+    fieldForecastSigma,
     holes: holeForecasts,
     players: playerForecasts,
     warnings,
