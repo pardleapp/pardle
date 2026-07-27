@@ -62,7 +62,7 @@ const KEY_YEAR_BASELINE = (year: number) =>
  *  count). Populated incrementally as we fetch event data.
  *  v2 = bumped from v1 which was cached partially-populated due to
  *  the old 60s warmup timeout being hit before every event landed. */
-const KEY_COURSE_INDEX = "course-history:course-index:v3";
+const KEY_COURSE_INDEX = "course-history:course-index:v4";
 
 function slugify(s: string): string {
   return s
@@ -361,13 +361,23 @@ async function getCachedEventYearRounds(
       .get<RoundRecord[]>(KEY_ROUND(eventId, year))
       .catch(() => null);
     if (cached && Array.isArray(cached)) {
-      // Even on cache hit we opportunistically refresh the course
-      // index — cheap and keeps the index in sync when a new
-      // event-year appears.
-      if (eventName) {
-        await updateCourseIndex(eventId, year, eventName, cached);
+      // Stale-empty-cache guard: if the cached data is empty AND the
+      // year is recent (this-year or last-year), don't trust it —
+      // DataGolf may just not have posted the event's SG data yet
+      // when we fetched. Fall through to refetch so late-season
+      // events (Truist Championship, PGA Championship at Quail
+      // Hollow etc.) update once DG publishes.
+      if (cached.length === 0 && year >= CURRENT_YEAR - 1) {
+        // Fall through to refetch — don't return the empty cache.
+      } else {
+        // Non-empty or old year — trust the cache. Even on cache hit
+        // we opportunistically refresh the course index so a new
+        // event-year gets indexed as soon as its data lands.
+        if (eventName) {
+          await updateCourseIndex(eventId, year, eventName, cached);
+        }
+        return cached;
       }
-      return cached;
     }
   }
   try {

@@ -609,7 +609,7 @@ function ArchetypePanel({
       </h4>
       <p
         style={{
-          margin: "0 0 14px",
+          margin: "0 0 8px",
           fontSize: 13,
           color: T.muted,
           lineHeight: 1.5,
@@ -621,11 +621,37 @@ function ArchetypePanel({
         (matched from{" "}
         <strong>{archetype.eligiblePlayers}</strong> eligible with 8+
         rounds at the course) between OTT outperformance and each
-        ball-flight dimension. Positive r means higher values track
-        higher outperformance. Ball speed, apex height and shot curve
+        ball-flight dimension. Ball speed, apex height and shot curve
         are always shown; other dimensions appear when the signal is
         material.
       </p>
+      <div
+        style={{
+          margin: "0 0 14px",
+          padding: "10px 14px",
+          background: "white",
+          border: `1px dashed ${T.line}`,
+          borderRadius: 8,
+          fontSize: 12,
+          color: T.muted,
+          lineHeight: 1.5,
+          maxWidth: 780,
+        }}
+      >
+        <strong style={{ color: T.ink }}>What does r mean?</strong>{" "}
+        Pearson correlation, ranging from −1 to +1. Positive values
+        mean higher stat values track higher outperformance; negative
+        values mean lower stat values do. Rules of thumb:{" "}
+        <span style={{ color: T.dim }}>|r| &lt; 0.15 weak</span> ·{" "}
+        <span style={{ color: T.ink, fontWeight: 700 }}>
+          0.15–0.3 moderate
+        </span>{" "}
+        ·{" "}
+        <span style={{ color: T.emerald, fontWeight: 800 }}>
+          ≥ 0.3 strong
+        </span>
+        .
+      </div>
 
       {dist.length === 0 ? (
         <div
@@ -651,180 +677,9 @@ function ArchetypePanel({
             marginBottom: 12,
           }}
         >
-          {dist.slice(0, 6).map((d) => {
-            const positive = d.correlation >= 0;
-            const strong = Math.abs(d.correlation) >= 0.3;
-            const color = positive ? T.emerald : T.tang;
-            return (
-              <div
-                key={d.dim}
-                style={{
-                  padding: "12px 14px",
-                  background: "white",
-                  border: `1px solid ${T.line}`,
-                  borderLeft: `3px solid ${
-                    Math.abs(d.correlation) < 0.05 ? T.line : color
-                  }`,
-                  borderRadius: 8,
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "baseline",
-                    marginBottom: 4,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 10,
-                      letterSpacing: 1,
-                      textTransform: "uppercase",
-                      color: T.muted,
-                      fontWeight: 800,
-                    }}
-                  >
-                    {d.label}
-                    {d.isPriority && (
-                      <span
-                        style={{
-                          marginLeft: 6,
-                          padding: "1px 6px",
-                          borderRadius: 4,
-                          background: T.emeraldTint,
-                          color: T.emeraldD,
-                          fontSize: 8.5,
-                          letterSpacing: 0.6,
-                        }}
-                      >
-                        KEY
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div
-                  style={{
-                    fontFamily: T.fontMono,
-                    fontSize: 20,
-                    fontWeight: 800,
-                    color,
-                    letterSpacing: -0.01,
-                  }}
-                >
-                  r {d.correlation >= 0 ? "+" : ""}
-                  {d.correlation.toFixed(2)}
-                  {strong && (
-                    <span
-                      style={{
-                        marginLeft: 8,
-                        fontSize: 11,
-                        color: T.dim,
-                        fontFamily: T.fontUi,
-                        fontWeight: 700,
-                      }}
-                    >
-                      strong
-                    </span>
-                  )}
-                </div>
-                <div
-                  style={{
-                    marginTop: 6,
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 8,
-                    fontFamily: T.fontUi,
-                    fontSize: 11,
-                    color: T.muted,
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{
-                        color: T.emerald,
-                        fontWeight: 700,
-                        fontSize: 9.5,
-                        letterSpacing: 0.5,
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Top tail
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: T.fontMono,
-                        fontWeight: 700,
-                        color: T.ink,
-                        fontSize: 13,
-                      }}
-                    >
-                      {fmtVal(d.topTailMean, d.unit)}{" "}
-                      <span style={{ color: T.dim, fontWeight: 600 }}>
-                        {d.unit}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <div
-                      style={{
-                        color: T.tang,
-                        fontWeight: 700,
-                        fontSize: 9.5,
-                        letterSpacing: 0.5,
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Bottom tail
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: T.fontMono,
-                        fontWeight: 700,
-                        color: T.ink,
-                        fontSize: 13,
-                      }}
-                    >
-                      {fmtVal(d.bottomTailMean, d.unit)}{" "}
-                      <span style={{ color: T.dim, fontWeight: 600 }}>
-                        {d.unit}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    marginTop: 6,
-                    fontSize: 12,
-                    color: T.ink,
-                    fontWeight: 600,
-                    lineHeight: 1.4,
-                  }}
-                >
-                  Course-fit players show{" "}
-                  <span style={{ color, fontWeight: 800 }}>
-                    {d.interpretation}
-                  </span>
-                  .
-                </div>
-                <div
-                  style={{
-                    marginTop: 3,
-                    fontSize: 11,
-                    color: T.dim,
-                    fontFamily: T.fontUi,
-                  }}
-                >
-                  n={d.n} · tour avg{" "}
-                  <span
-                    style={{ fontFamily: T.fontMono, fontWeight: 700 }}
-                  >
-                    {fmtVal(d.tourMean, d.unit)}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+          {dist.slice(0, 6).map((d) => (
+            <DimensionCard key={d.dim} d={d} />
+          ))}
         </div>
       )}
 
@@ -947,6 +802,314 @@ function ExtremeList({
             </span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/** One dimension card in the archetype panel. Layout:
+ *   - Top row: label + KEY badge + big r value + strength tag
+ *   - Bar: horizontal correlation bar with 0 in the middle,
+ *     +/-0.15 and +/-0.3 as landmarks, and a dot marker at the
+ *     dimension's r
+ *   - Two-column top-tail vs bottom-tail readout with tangible
+ *     values in the dimension's own units
+ *   - One-line English interpretation
+ *   - Meta row: n, tour average
+ */
+function DimensionCard({ d }: { d: ArchetypeDim }) {
+  const positive = d.correlation >= 0;
+  const strong = Math.abs(d.correlation) >= 0.3;
+  const moderate = Math.abs(d.correlation) >= 0.15 && !strong;
+  const flat = Math.abs(d.correlation) < 0.05;
+  const color = flat ? T.dim : positive ? T.emerald : T.tang;
+  const strengthLabel = strong
+    ? "STRONG"
+    : moderate
+      ? "MODERATE"
+      : flat
+        ? "FLAT"
+        : "WEAK";
+  return (
+    <div
+      style={{
+        padding: "12px 14px",
+        background: "white",
+        border: `1px solid ${T.line}`,
+        borderLeft: `3px solid ${flat ? T.line : color}`,
+        borderRadius: 8,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          gap: 8,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            color: T.muted,
+            fontWeight: 800,
+          }}
+        >
+          {d.label}
+          {d.isPriority && (
+            <span
+              style={{
+                marginLeft: 6,
+                padding: "1px 6px",
+                borderRadius: 4,
+                background: T.emeraldTint,
+                color: T.emeraldD,
+                fontSize: 8.5,
+                letterSpacing: 0.6,
+              }}
+            >
+              KEY
+            </span>
+          )}
+        </div>
+        <div
+          style={{
+            fontSize: 9,
+            letterSpacing: 0.6,
+            color: flat ? T.dim : color,
+            fontWeight: 800,
+          }}
+        >
+          {strengthLabel}
+        </div>
+      </div>
+      <div
+        style={{
+          fontFamily: T.fontMono,
+          fontSize: 22,
+          fontWeight: 800,
+          color,
+          letterSpacing: -0.01,
+          marginTop: 2,
+        }}
+      >
+        r {d.correlation >= 0 ? "+" : ""}
+        {d.correlation.toFixed(2)}
+      </div>
+      <CorrelationBar r={d.correlation} />
+      <div
+        style={{
+          marginTop: 10,
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 8,
+          fontFamily: T.fontUi,
+          fontSize: 11,
+          color: T.muted,
+        }}
+      >
+        <div>
+          <div
+            style={{
+              color: T.emerald,
+              fontWeight: 700,
+              fontSize: 9.5,
+              letterSpacing: 0.5,
+              textTransform: "uppercase",
+            }}
+          >
+            Top tail
+          </div>
+          <div
+            style={{
+              fontFamily: T.fontMono,
+              fontWeight: 700,
+              color: T.ink,
+              fontSize: 13,
+            }}
+          >
+            {fmtVal(d.topTailMean, d.unit)}{" "}
+            <span style={{ color: T.dim, fontWeight: 600 }}>
+              {d.unit}
+            </span>
+          </div>
+        </div>
+        <div>
+          <div
+            style={{
+              color: T.tang,
+              fontWeight: 700,
+              fontSize: 9.5,
+              letterSpacing: 0.5,
+              textTransform: "uppercase",
+            }}
+          >
+            Bottom tail
+          </div>
+          <div
+            style={{
+              fontFamily: T.fontMono,
+              fontWeight: 700,
+              color: T.ink,
+              fontSize: 13,
+            }}
+          >
+            {fmtVal(d.bottomTailMean, d.unit)}{" "}
+            <span style={{ color: T.dim, fontWeight: 600 }}>
+              {d.unit}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div
+        style={{
+          marginTop: 6,
+          fontSize: 12,
+          color: T.ink,
+          fontWeight: 600,
+          lineHeight: 1.4,
+        }}
+      >
+        {flat ? (
+          <span style={{ color: T.muted }}>
+            No clear signal — this dimension doesn&apos;t predict
+            outperformance here.
+          </span>
+        ) : (
+          <>
+            Course-fit players show{" "}
+            <span style={{ color, fontWeight: 800 }}>
+              {d.interpretation}
+            </span>
+            .
+          </>
+        )}
+      </div>
+      <div
+        style={{
+          marginTop: 3,
+          fontSize: 11,
+          color: T.dim,
+          fontFamily: T.fontUi,
+        }}
+      >
+        n={d.n} · tour avg{" "}
+        <span style={{ fontFamily: T.fontMono, fontWeight: 700 }}>
+          {fmtVal(d.tourMean, d.unit)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Horizontal correlation bar. −0.5 → +0.5 range on the axis so
+ *  moderate/strong signals show meaningfully. Middle at 0. Weak/
+ *  moderate boundaries at ±0.15, moderate/strong at ±0.3 — drawn as
+ *  faint vertical tick lines. The value itself renders as a filled
+ *  segment (bar) from 0 to r plus a dot marker at r. Colour matches
+ *  card colour (emerald for +, tang for −, dim for flat). */
+function CorrelationBar({ r }: { r: number }) {
+  const SCALE_MAX = 0.5;
+  const flat = Math.abs(r) < 0.05;
+  const color = flat ? T.dim : r >= 0 ? T.emerald : T.tang;
+  // Clamp r into the display range so extreme values don't overflow.
+  const clamped = Math.max(-SCALE_MAX, Math.min(SCALE_MAX, r));
+  // Positions as percentages along the bar (0% = -0.5, 100% = +0.5).
+  const pct = (v: number) => ((v + SCALE_MAX) / (2 * SCALE_MAX)) * 100;
+  const rPct = pct(clamped);
+  const midPct = 50;
+  // Filled segment goes from mid to r's position.
+  const barLeft = Math.min(midPct, rPct);
+  const barWidth = Math.abs(rPct - midPct);
+  return (
+    <div
+      style={{
+        marginTop: 8,
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+      }}
+    >
+      <div
+        style={{
+          position: "relative",
+          height: 8,
+          borderRadius: 4,
+          background: T.soft,
+          border: `1px solid ${T.line}`,
+        }}
+      >
+        {/* moderate boundaries at +/-0.15 */}
+        {[pct(-0.3), pct(-0.15), pct(0.15), pct(0.3)].map((p, i) => (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              left: `${p}%`,
+              top: -1,
+              bottom: -1,
+              width: 1,
+              background: T.line,
+            }}
+          />
+        ))}
+        {/* midline (0) */}
+        <div
+          style={{
+            position: "absolute",
+            left: `${midPct}%`,
+            top: -2,
+            bottom: -2,
+            width: 1.5,
+            background: T.dim,
+          }}
+        />
+        {/* filled segment from 0 to r */}
+        <div
+          style={{
+            position: "absolute",
+            top: 1,
+            bottom: 1,
+            left: `${barLeft}%`,
+            width: `${barWidth}%`,
+            background: color,
+            borderRadius: 2,
+            opacity: flat ? 0.35 : 1,
+          }}
+        />
+        {/* marker dot at r */}
+        <div
+          style={{
+            position: "absolute",
+            top: -3,
+            left: `calc(${rPct}% - 6px)`,
+            width: 12,
+            height: 12,
+            borderRadius: "50%",
+            background: color,
+            border: "2px solid white",
+            boxShadow: "0 1px 2px oklch(0 0 0 / 0.2)",
+          }}
+        />
+      </div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: 9,
+          color: T.dim,
+          fontFamily: T.fontMono,
+          fontWeight: 700,
+          letterSpacing: 0.3,
+        }}
+      >
+        <span>−0.5</span>
+        <span>−0.3</span>
+        <span>0</span>
+        <span>+0.3</span>
+        <span>+0.5</span>
       </div>
     </div>
   );

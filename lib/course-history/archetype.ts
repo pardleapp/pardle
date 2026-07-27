@@ -49,11 +49,11 @@ const redis = (() => {
 const CACHE_TTL_TOUR_STATS = 24 * 60 * 60;
 const CACHE_TTL_ARCHETYPE = 6 * 60 * 60;
 const KEY_TOUR_STATS = "course-history:tour-stats:v1";
-// v2 = archetype now uses BOTH extremes (top outperformers vs bottom
-// underperformers) with delta signals, not just top-vs-tour. Bumped
-// to invalidate the old v1 aggregates.
+// v3 = archetype now regresses across the full pool (not just
+// extremes) and excludes landing side + aim direction as
+// non-course-fit dimensions. Bumped to invalidate v2/v1.
 const KEY_ARCHETYPE = (courseName: string) =>
-  `course-history:archetype:v2:${slugify(courseName)}`;
+  `course-history:archetype:v3:${slugify(courseName)}`;
 
 /** Minimum tee shots a player needs before we trust their profile. */
 const MIN_SHOTS_PER_PLAYER = 100;
@@ -77,6 +77,15 @@ const PRIORITY_DIMENSIONS: ProfileDimension[] = [
   "apexHeight",
   "curve",
 ];
+
+/** Dimensions we deliberately exclude from the archetype panel. Both
+ *  are effectively aim/dispersion measures that don't tell us
+ *  anything meaningful about course fit — courses don't reward
+ *  players for aiming right of the fairway on average. */
+const EXCLUDED_DIMENSIONS = new Set<ProfileDimension>([
+  "carrySide",
+  "horizontalLaunchAngle",
+]);
 
 function slugify(s: string): string {
   return s
@@ -396,6 +405,7 @@ export async function getCourseArchetype(
   // Compute the full-pool correlation + tail contrast per dimension.
   const rows: ArchetypeDimensionRow[] = [];
   for (const d of PROFILE_DIMENSIONS) {
+    if (EXCLUDED_DIMENSIONS.has(d)) continue;
     const isPriority = PRIORITY_DIMENSIONS.includes(d);
     const xs: number[] = [];
     const ys: number[] = [];
