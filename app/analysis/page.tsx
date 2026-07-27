@@ -28,7 +28,7 @@ const CARDS: Card[] = [
     href: "/analysis/score-forecast",
     title: "Round score forecast",
     blurb:
-      "Project the field and per-player round scores. Enter pin clusters, override yardage or wind, pick the level-shift mode (average or most-recent-post-cut), and add players with SG + this week's rounds for Bayesian form adjustment.",
+      "Project field and per-player round scores. HRRR wind, level shift, persistence-weighted form.",
     status: "live",
     Preview: ScoreForecastPreview,
   },
@@ -36,7 +36,7 @@ const CARDS: Card[] = [
     href: "/analysis/course-heatmap",
     title: "Course & pin guide",
     blurb:
-      "Every green on the property at a glance — this week's four pin positions overlaid on each aerial. Click any card for putt paths, multi-season birdie history, and per-round scoring.",
+      "Every green at a glance with this week's four pin positions. Putt paths and per-round scoring on tap.",
     status: "live",
     Preview: CoursePinPreview,
   },
@@ -44,7 +44,7 @@ const CARDS: Card[] = [
     href: "/analysis/tee-time-scoring",
     title: "Tee time vs skill-adjusted score",
     blurb:
-      "Scatter of every finisher's round score minus their pre-tournament skill projection, plotted against tee time. Toggle to a field-scoring heatmap by hole and hour to see which waves had it easier and which holes bit hardest.",
+      "See which waves had it easier — round score minus pre-tournament skill, plotted against tee time.",
     status: "live",
     Preview: TeeTimePreview,
   },
@@ -52,7 +52,7 @@ const CARDS: Card[] = [
     href: "/analysis/tee-shots",
     title: "Off-the-tee shot shape",
     blurb:
-      "Every driver-off-the-tee ball flight from the last two seasons. Pick a player to see their average shape, dispersion cloud, and the closest matches in the field ranked by radar profile.",
+      "Every player's driver ball flight — average shape, dispersion cloud, closest matches in the field.",
     status: "live",
     Preview: TeeShotPreview,
   },
@@ -61,6 +61,38 @@ const CARDS: Card[] = [
 export default function AnalysisIndex() {
   return (
     <main className="container container-wide v4-theme pv-theme">
+      {/*
+        On mobile the top ribbon collapses to just the AuthChip (the
+        wordmark + nav tabs are hidden by v4-theme). That leaves an
+        empty white strip with a floating Sign in pill — pure vertical
+        waste when there's already a bottom nav. Hide it under the
+        phone breakpoint.
+
+        Also caps each tool card's preview height on mobile — the
+        illustrations were eating ~200px per card and making the list
+        scroll forever. Smaller previews + tighter card padding keeps
+        four tools legible in one thumb-flick.
+      */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @media (max-width: 767px) {
+              body header.brand.brand-split { display: none !important; }
+              .pv-tool-card-preview {
+                max-height: 130px !important;
+                overflow: hidden;
+              }
+              .pv-tool-card-body {
+                padding: 14px 16px 16px !important;
+              }
+              .pv-tool-card-body h3 { font-size: 16.5px !important; }
+              .pv-tool-card-body p { font-size: 13.5px !important; }
+              .pv-tools-intro { font-size: 13.5px !important; margin-bottom: 16px !important; }
+              .pv-tools-heading { font-size: 22px !important; }
+            }
+          `,
+        }}
+      />
       <header className="brand brand-split">
         <h1>{BRAND.name}</h1>
         <div className="brand-nav">
@@ -73,9 +105,11 @@ export default function AnalysisIndex() {
           maxWidth: 1280,
           margin: "20px 0",
           padding: "0 16px 60px",
+          paddingBottom: "calc(80px + env(safe-area-inset-bottom, 0px))",
         }}
       >
         <h2
+          className="pv-tools-heading"
           style={{
             fontSize: 24,
             fontFamily:
@@ -86,6 +120,7 @@ export default function AnalysisIndex() {
           Tools
         </h2>
         <p
+          className="pv-tools-intro"
           style={{
             fontSize: 14,
             color: "oklch(0.5 0.02 150)",
@@ -95,10 +130,8 @@ export default function AnalysisIndex() {
             lineHeight: 1.5,
           }}
         >
-          Deep-dive views on how a tournament&apos;s playing — who&apos;s
-          out-performing their pre-round skill, how much conditions
-          shifted across the day, etc. Numbers-heavy; refreshes as
-          rounds complete.
+          Deep-dive views on how a tournament&apos;s playing. Numbers-
+          heavy; refreshes as rounds complete.
         </p>
         <ul
           style={{
@@ -106,9 +139,9 @@ export default function AnalysisIndex() {
             padding: 0,
             margin: 0,
             display: "grid",
-            gap: 18,
+            gap: 14,
             gridTemplateColumns:
-              "repeat(auto-fit, minmax(400px, 1fr))",
+              "repeat(auto-fit, minmax(min(400px, 100%), 1fr))",
           }}
         >
           {CARDS.map((card) => {
@@ -129,8 +162,13 @@ export default function AnalysisIndex() {
                   flexDirection: "column",
                 }}
               >
-                <Preview />
-                <div style={{ padding: "20px 20px 22px" }}>
+                <div className="pv-tool-card-preview">
+                  <Preview />
+                </div>
+                <div
+                  className="pv-tool-card-body"
+                  style={{ padding: "20px 20px 22px" }}
+                >
                   <div
                     style={{
                       display: "flex",
