@@ -32,6 +32,9 @@ interface PlayerForecastResp {
     compressedEdge: number;
     formBump: number;
     skewGap: number;
+    teeTimeAdjusted?: boolean;
+    teeTimeWind?: { windMph: number; windDirDeg: number };
+    formPersistencePerRound?: Array<number | null>;
   };
 }
 interface ForecastResp {
@@ -979,13 +982,23 @@ function ResultsPanel({ r }: { r: ForecastResp }) {
       <SectionHeader
         step={3}
         title={`Round ${r.targetRound} forecast`}
-        subtitle={`Par ${par} · field baseline for the round`}
+        subtitle={
+          players && players.length > 0
+            ? `Par ${par} · projected round score`
+            : `Par ${par} · field baseline for the round`
+        }
         accent
       />
-      <HeroForecast r={r} />
-      <SecondaryStrip r={r} />
-      {players && players.length > 0 && (
-        <PlayerProjections players={players} par={par} />
+      {players && players.length > 0 ? (
+        <>
+          <FieldContextBand r={r} />
+          <PlayerHero players={players} par={par} />
+        </>
+      ) : (
+        <>
+          <HeroForecast r={r} />
+          <SecondaryStrip r={r} />
+        </>
       )}
       <HoleStrip holes={holes} par={par} />
       {r.warnings && r.warnings.length > 0 && (
@@ -1260,153 +1273,157 @@ function SecondaryStrip({ r }: { r: ForecastResp }) {
   );
 }
 
-function PlayerProjections({
-  players,
-  par,
-}: {
-  players: NonNullable<ForecastResp["players"]>;
-  par: number;
-}) {
-  return (
-    <div style={{ marginBottom: 20 }}>
-      <div
-        style={{
-          fontSize: 11,
-          letterSpacing: 1,
-          textTransform: "uppercase",
-          color: T.muted,
-          fontWeight: 800,
-          marginBottom: 10,
-          fontFamily: T.fontUi,
-        }}
-      >
-        Player projections
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {players.map((p, i) => {
-          const meanVsPar = p.expectedMean - par;
-          const medVsPar = p.expectedMedian - par;
-          const under = meanVsPar < 0;
-          return (
-            <div
-              key={i}
-              style={{
-                padding: "14px 16px",
-                border: `1px solid ${T.line}`,
-                borderLeft: `3px solid ${under ? T.up : T.down}`,
-                borderRadius: 10,
-                background: T.card,
-                display: "grid",
-                gridTemplateColumns: "1fr auto auto",
-                gap: 16,
-                alignItems: "center",
-              }}
-            >
-              <div style={{ minWidth: 0 }}>
-                <div
-                  style={{
-                    fontFamily: T.fontUi,
-                    fontSize: 16,
-                    fontWeight: 800,
-                    color: T.ink,
-                  }}
-                >
-                  {p.name}
-                </div>
-                <div
-                  style={{
-                    marginTop: 4,
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 14,
-                    fontSize: 11,
-                    color: T.muted,
-                    fontFamily: T.fontUi,
-                    fontWeight: 600,
-                    letterSpacing: 0.2,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  <span>
-                    SG{" "}
-                    <span
-                      style={{ fontFamily: T.fontMono, color: T.ink }}
-                    >
-                      {p.sgTotal >= 0 ? "+" : ""}
-                      {p.sgTotal.toFixed(2)}
-                    </span>
-                  </span>
-                  <span>
-                    Edge{" "}
-                    <span
-                      style={{ fontFamily: T.fontMono, color: T.ink }}
-                    >
-                      {p.breakdown.compressedEdge >= 0 ? "+" : ""}
-                      {p.breakdown.compressedEdge.toFixed(2)}
-                    </span>
-                  </span>
-                  <span>
-                    Form{" "}
-                    <span
-                      style={{ fontFamily: T.fontMono, color: T.ink }}
-                    >
-                      {p.formAdjustment >= 0 ? "+" : ""}
-                      {p.formAdjustment.toFixed(2)}
-                    </span>
-                  </span>
-                </div>
-              </div>
-              <PlayerScoreBox
-                label="Mean"
-                value={p.expectedMean}
-                vsPar={meanVsPar}
-              />
-              <PlayerScoreBox
-                label="Median"
-                value={p.expectedMedian}
-                vsPar={medVsPar}
-                accent
-              />
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function PlayerScoreBox({
-  label,
-  value,
-  vsPar,
-  accent = false,
-}: {
-  label: string;
-  value: number;
-  vsPar: number;
-  accent?: boolean;
-}) {
-  const color = vsPar < 0 ? T.up : vsPar > 0 ? T.down : T.ink;
+/** Slim context band that sits ABOVE the player hero when at least
+ *  one player is projected. Shows the field baseline (small),
+ *  followed by the ancillary metrics as a horizontal row. This is
+ *  the "for reference, here's what the average player shoots" band
+ *  — the player projection is the star, this is just supporting. */
+function FieldContextBand({ r }: { r: ForecastResp }) {
+  const fieldForecast = r.fieldForecast ?? 0;
+  const vsPar = r.fieldForecastVsPar ?? 0;
+  const sigma = r.fieldForecastSigma;
+  const modelDelta = r.modelDelta ?? 0;
+  const pinAdd = r.pinDifficultyAdder ?? 0;
   return (
     <div
       style={{
-        padding: "8px 14px",
-        borderRadius: 8,
-        background: accent ? T.emeraldTint : "white",
-        border: `1px solid ${accent ? T.emerald : T.line}`,
-        textAlign: "right",
-        minWidth: 90,
+        marginBottom: 18,
+        padding: "12px 16px",
+        background: T.soft,
+        border: `1px solid ${T.line}`,
+        borderRadius: 10,
+        display: "grid",
+        gridTemplateColumns: "auto 1fr",
+        gap: 20,
+        alignItems: "center",
         fontFamily: T.fontUi,
       }}
     >
       <div
         style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          paddingRight: 20,
+          borderRight: `1px solid ${T.line}`,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            color: T.muted,
+            fontWeight: 800,
+          }}
+        >
+          Field baseline · R{r.targetRound}
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          <span
+            style={{
+              fontFamily: T.fontMono,
+              fontSize: 22,
+              fontWeight: 800,
+              color: T.ink,
+              letterSpacing: -0.01,
+            }}
+          >
+            {fieldForecast.toFixed(2)}
+          </span>
+          <span
+            style={{
+              fontFamily: T.fontMono,
+              fontSize: 14,
+              fontWeight: 700,
+              color: vsPar < 0 ? T.up : vsPar > 0 ? T.down : T.ink,
+            }}
+          >
+            {vsPar >= 0 ? "+" : ""}
+            {vsPar.toFixed(2)}
+          </span>
+          {typeof sigma === "number" && sigma > 0 && (
+            <span
+              style={{
+                fontSize: 12,
+                color: T.dim,
+                fontWeight: 600,
+              }}
+            >
+              ± {sigma.toFixed(2)}
+            </span>
+          )}
+        </div>
+      </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
+          gap: 14,
+        }}
+      >
+        <MiniStat
+          label="Model Δ"
+          value={
+            (modelDelta >= 0 ? "+" : "") + modelDelta.toFixed(2)
+          }
+        />
+        <MiniStat
+          label="Historical"
+          value={r.historicalRoundMean?.toFixed(2) ?? "—"}
+        />
+        <MiniStat
+          label="Wind"
+          value={r.wind ? `${r.wind.windMph.toFixed(1)} mph` : "—"}
+          sub={r.wind ? `from ${r.wind.windDirDeg.toFixed(0)}°` : undefined}
+        />
+        <MiniStat
+          label="Level shift"
+          value={
+            (r.levelShift ?? 0) >= 0
+              ? `+${(r.levelShift ?? 0).toFixed(2)}`
+              : (r.levelShift ?? 0).toFixed(2)
+          }
+        />
+        <MiniStat
+          label="Pin adder"
+          value={
+            pinAdd !== 0
+              ? (pinAdd >= 0 ? "+" : "") + pinAdd.toFixed(2)
+              : "auto"
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 1,
+        fontFamily: T.fontUi,
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{
           fontSize: 9,
-          letterSpacing: 1,
+          letterSpacing: 0.8,
           textTransform: "uppercase",
-          color: accent ? T.emeraldD : T.muted,
+          color: T.muted,
           fontWeight: 800,
-          marginBottom: 2,
         }}
       >
         {label}
@@ -1414,26 +1431,303 @@ function PlayerScoreBox({
       <div
         style={{
           fontFamily: T.fontMono,
-          fontSize: 20,
+          fontSize: 14,
+          fontWeight: 700,
+          color: T.ink,
+        }}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div
+          style={{
+            fontSize: 10,
+            color: T.dim,
+            fontWeight: 500,
+          }}
+        >
+          {sub}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** PlayerHero — the star of the results panel when at least one
+ *  player has been projected. Each player renders as a big card:
+ *  huge name, huge mean/median mono numbers with colour-coded
+ *  vs-par lockups, and a breakdown row of SG / edge / form / tee
+ *  time. This is the payoff a bettor actually cares about. */
+function PlayerHero({
+  players,
+  par,
+}: {
+  players: NonNullable<ForecastResp["players"]>;
+  par: number;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+        marginBottom: 18,
+      }}
+    >
+      {players.map((p, i) => (
+        <PlayerHeroCard key={i} player={p} par={par} />
+      ))}
+    </div>
+  );
+}
+
+function PlayerHeroCard({
+  player,
+  par,
+}: {
+  player: NonNullable<ForecastResp["players"]>[number];
+  par: number;
+}) {
+  const meanTarget = player.expectedMean;
+  const medTarget = player.expectedMedian;
+  const meanLive = useCountUp(meanTarget, 700);
+  const medLive = useCountUp(medTarget, 700);
+  const meanVsPar = meanTarget - par;
+  const medVsPar = medTarget - par;
+  const under = medVsPar < 0;
+  const railColor = under ? T.emerald : medVsPar > 0 ? T.tang : T.line;
+  return (
+    <div
+      style={{
+        padding: "24px 26px",
+        borderRadius: 14,
+        background: `linear-gradient(135deg, ${T.emeraldTint} 0%, ${T.card} 100%)`,
+        border: `1px solid ${T.line}`,
+        borderLeft: `5px solid ${railColor}`,
+        display: "flex",
+        flexDirection: "column",
+        gap: 18,
+      }}
+    >
+      <div>
+        <div
+          style={{
+            fontSize: 11,
+            letterSpacing: 1.5,
+            textTransform: "uppercase",
+            color: T.emeraldD,
+            fontWeight: 800,
+            fontFamily: T.fontUi,
+            marginBottom: 4,
+          }}
+        >
+          Round projection
+        </div>
+        <div
+          style={{
+            fontSize: 28,
+            fontWeight: 800,
+            color: T.heroInk,
+            letterSpacing: -0.005,
+            fontFamily: T.fontUi,
+            lineHeight: 1.1,
+          }}
+        >
+          {player.name}
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 24,
+        }}
+      >
+        <PlayerHeroScore
+          label="Expected mean"
+          value={meanLive}
+          vsPar={meanVsPar}
+          help="Long-run average if this player played the round 1,000 times"
+        />
+        <PlayerHeroScore
+          label="Expected median"
+          value={medLive}
+          vsPar={medVsPar}
+          accent
+          help="Middle outcome — the typical round. Use for UNDER bets."
+        />
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+          gap: 12,
+          padding: "12px 14px",
+          background: T.card,
+          borderRadius: 8,
+          border: `1px solid ${T.line}`,
+          fontFamily: T.fontUi,
+        }}
+      >
+        <BreakdownStat
+          label="Season SG"
+          value={player.sgTotal}
+          format={(v) => (v >= 0 ? "+" : "") + v.toFixed(2)}
+        />
+        <BreakdownStat
+          label="Course edge"
+          value={player.breakdown.compressedEdge}
+          format={(v) => (v >= 0 ? "+" : "") + v.toFixed(2)}
+        />
+        <BreakdownStat
+          label="Form"
+          value={player.formAdjustment}
+          format={(v) => (v >= 0 ? "+" : "") + v.toFixed(2)}
+        />
+        <BreakdownStat
+          label="Field @ tee"
+          value={player.breakdown.fieldMean}
+          format={(v) => v.toFixed(2)}
+          sub={
+            player.breakdown.teeTimeAdjusted
+              ? "tee-time-adjusted"
+              : "day average"
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+/** One of the two big score columns inside PlayerHeroCard. */
+function PlayerHeroScore({
+  label,
+  value,
+  vsPar,
+  accent = false,
+  help,
+}: {
+  label: string;
+  value: number;
+  vsPar: number;
+  accent?: boolean;
+  help?: string;
+}) {
+  const color = vsPar < 0 ? T.up : vsPar > 0 ? T.down : T.ink;
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div
+        style={{
+          fontSize: 11,
+          letterSpacing: 1.4,
+          textTransform: "uppercase",
+          color: accent ? T.emeraldD : T.muted,
+          fontWeight: 800,
+          fontFamily: T.fontUi,
+          marginBottom: 6,
+        }}
+        title={help}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: "clamp(40px, 6vw, 56px)",
+          fontFamily: T.fontMono,
           fontWeight: 800,
           color: T.heroInk,
-          letterSpacing: -0.01,
+          lineHeight: 1,
+          letterSpacing: -0.02,
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {value.toFixed(2)}
       </div>
       <div
         style={{
-          fontFamily: T.fontMono,
-          fontSize: 11,
-          fontWeight: 700,
-          color,
-          marginTop: 2,
+          marginTop: 8,
+          display: "flex",
+          alignItems: "baseline",
+          gap: 8,
+          flexWrap: "wrap",
+          fontFamily: T.fontUi,
         }}
       >
-        {vsPar >= 0 ? "+" : ""}
-        {vsPar.toFixed(2)}
+        <span
+          style={{
+            fontFamily: T.fontMono,
+            fontSize: 16,
+            fontWeight: 800,
+            color,
+            letterSpacing: -0.01,
+          }}
+        >
+          {vsPar >= 0 ? "+" : ""}
+          {vsPar.toFixed(2)}
+        </span>
+        <span
+          style={{
+            fontSize: 12,
+            color: T.muted,
+            fontWeight: 600,
+          }}
+        >
+          vs par
+        </span>
       </div>
+    </div>
+  );
+}
+
+function BreakdownStat({
+  label,
+  value,
+  format,
+  sub,
+}: {
+  label: string;
+  value: number;
+  format: (v: number) => string;
+  sub?: string;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 10,
+          letterSpacing: 0.8,
+          textTransform: "uppercase",
+          color: T.muted,
+          fontWeight: 800,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontFamily: T.fontMono,
+          fontSize: 15,
+          fontWeight: 800,
+          color: T.ink,
+          letterSpacing: -0.01,
+        }}
+      >
+        {format(value)}
+      </div>
+      {sub && (
+        <div style={{ fontSize: 10, color: T.dim, fontWeight: 500 }}>
+          {sub}
+        </div>
+      )}
     </div>
   );
 }
