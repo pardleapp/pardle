@@ -59,8 +59,10 @@ const KEY_AGGREGATE_COURSE = (courseName: string) =>
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
- *  count). Populated incrementally as we fetch event data. */
-const KEY_COURSE_INDEX = "course-history:course-index:v1";
+ *  count). Populated incrementally as we fetch event data.
+ *  v2 = bumped from v1 which was cached partially-populated due to
+ *  the old 60s warmup timeout being hit before every event landed. */
+const KEY_COURSE_INDEX = "course-history:course-index:v2";
 
 function slugify(s: string): string {
   return s
