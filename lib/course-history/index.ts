@@ -48,8 +48,11 @@ const CACHE_TTL_BASELINE_LIVE = 6 * 60 * 60; // 6h for the current in-progress y
 
 const CURRENT_YEAR = 2026;
 
+// v2 = round records now carry the normalised course_name
+// (aliases + suffix-stripping) so PGA Championship / U.S. Open years
+// at existing venues merge into the same course-index entry.
 const KEY_ROUND = (eventId: number, year: number) =>
-  `course-history:round:${eventId}:${year}`;
+  `course-history:round:v2:${eventId}:${year}`;
 const KEY_EVENT_LIST = "course-history:event-list:pga";
 // v3 = course-based aggregation (was event-based v2). Some events
 // change courses year to year (The Open, various signature events),
@@ -62,7 +65,7 @@ const KEY_YEAR_BASELINE = (year: number) =>
  *  count). Populated incrementally as we fetch event data.
  *  v2 = bumped from v1 which was cached partially-populated due to
  *  the old 60s warmup timeout being hit before every event landed. */
-const KEY_COURSE_INDEX = "course-history:course-index:v4";
+const KEY_COURSE_INDEX = "course-history:course-index:v5";
 
 function slugify(s: string): string {
   return s
@@ -362,12 +365,11 @@ async function getCachedEventYearRounds(
       .catch(() => null);
     if (cached && Array.isArray(cached)) {
       // Stale-empty-cache guard: if the cached data is empty AND the
-      // year is recent (this-year or last-year), don't trust it —
-      // DataGolf may just not have posted the event's SG data yet
-      // when we fetched. Fall through to refetch so late-season
-      // events (Truist Championship, PGA Championship at Quail
-      // Hollow etc.) update once DG publishes.
-      if (cached.length === 0 && year >= CURRENT_YEAR - 1) {
+      // year is recent, don't trust it — DataGolf may not have posted
+      // the event's SG data yet when we last fetched. The window is
+      // wide (3 years back) to catch late-season events that DG
+      // publishes months after they wrap up.
+      if (cached.length === 0 && year >= CURRENT_YEAR - 3) {
         // Fall through to refetch — don't return the empty cache.
       } else {
         // Non-empty or old year — trust the cache. Even on cache hit
@@ -396,7 +398,7 @@ async function getCachedEventYearRounds(
         records.push({
           dgId: s.dg_id,
           playerName,
-          courseName: String(rd.course_name ?? "").trim(),
+          courseName: normaliseCourseName(String(rd.course_name ?? "")),
           year,
           round: rNum,
           sgOtt,
@@ -429,6 +431,32 @@ function flipName(raw: string): string {
   if (!s.includes(",")) return s;
   const [last, first] = s.split(",").map((x) => x.trim());
   return `${first} ${last}`.trim();
+}
+
+/** DataGolf occasionally embeds an event name into course_name when
+ *  the same venue gets a special-event tag (seen at PGA Championship
+ *  2025 = "Quail Hollow-PGA Championship" instead of the usual
+ *  "Quail Hollow Club"). That splits the aggregate — the same
+ *  physical course ends up as two entries.
+ *
+ *  Normaliser rules:
+ *   - Strip a `-<MAJOR>` suffix so major-hosting years merge with
+ *     regular-tour years at the same venue.
+ *   - Explicit alias map for cases the regex can't handle. */
+const COURSE_NAME_ALIASES: Record<string, string> = {
+  "Quail Hollow-PGA Championship": "Quail Hollow Club",
+};
+
+function normaliseCourseName(raw: string): string {
+  const s = (raw ?? "").trim();
+  if (!s) return s;
+  const alias = COURSE_NAME_ALIASES[s];
+  if (alias) return alias;
+  const m = s.match(
+    /^(.+?)-(PGA Championship|U\.S\. Open|The Open Championship|Ryder Cup|Presidents Cup|Masters Tournament)$/,
+  );
+  if (m) return m[1].trim();
+  return s;
 }
 
 // ── Main aggregation ───────────────────────────────────────────────
