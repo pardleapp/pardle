@@ -715,11 +715,36 @@ export interface CuratedCourse {
 export async function getCuratedCourses(): Promise<CuratedCourse[]> {
   let index = await getCourseIndex();
   if (Object.keys(index).length === 0) {
-    // Cold path — warm all years' data (which triggers the course-index
-    // update as a side effect). This is expensive on very-first hit
-    // but only happens once per Redis cache lifetime.
-    await Promise.all(
-      HISTORICAL_YEARS.map((y) => getYearlyPlayerBaselines(y)),
+    // Cold path — walk the event list directly and trigger a fetch
+    // for each (event, year). Every call hits the per-event Redis
+    // cache first (so already-fetched events cost only a Redis GET),
+    // but each call ALSO updates the course index as a side effect,
+    // which is the whole point of this warm-up. Going through
+    // getYearlyPlayerBaselines here would short-circuit on already-
+    // cached year baselines and never touch the per-event path.
+    const eventList = await getCachedEventList();
+    const pairs: Array<{
+      eventId: number;
+      eventName: string;
+      year: number;
+    }> = [];
+    for (const e of eventList) {
+      if (e.sg_categories !== "yes") continue;
+      if (typeof e.event_id !== "number") continue;
+      if (
+        e.calendar_year < HISTORICAL_YEARS[0] ||
+        e.calendar_year > HISTORICAL_YEARS[HISTORICAL_YEARS.length - 1]
+      ) {
+        continue;
+      }
+      pairs.push({
+        eventId: e.event_id,
+        eventName: e.event_name,
+        year: e.calendar_year,
+      });
+    }
+    await pMapLimit(pairs, FETCH_CONCURRENCY, (p) =>
+      getCachedEventYearRounds(p.eventId, p.year, p.eventName),
     );
     index = await getCourseIndex();
   }
