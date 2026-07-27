@@ -6,6 +6,7 @@ import CoursePinPreview from "./_previews/CoursePinPreview";
 import TeeTimePreview from "./_previews/TeeTimePreview";
 import TeeShotPreview from "./_previews/TeeShotPreview";
 import ScoreForecastPreview from "./_previews/ScoreForecastPreview";
+import CourseHistoryPreview from "./_previews/CourseHistoryPreview";
 
 export const metadata = {
   title: `Tools — ${BRAND.name}`,
@@ -31,6 +32,14 @@ const CARDS: Card[] = [
       "Project field and per-player round scores. HRRR wind, level shift, persistence-weighted form.",
     status: "live",
     Preview: ScoreForecastPreview,
+  },
+  {
+    href: "/analysis/course-history",
+    title: "Course history",
+    blurb:
+      "Ballstriking course fit for every PGA event since 2019. Ranked by outperformance vs each player's season SG:OTT+APP baseline.",
+    status: "live",
+    Preview: CourseHistoryPreview,
   },
   {
     href: "/analysis/course-heatmap",
