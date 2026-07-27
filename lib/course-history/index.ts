@@ -28,7 +28,6 @@ import { Redis } from "@upstash/redis";
 import {
   getHistoricalEventList,
   getHistoricalRounds,
-  getSkillDecompositions,
   type DGHistoricalEvent,
   type DGHistoricalRound,
 } from "@/lib/golf-api/datagolf";
@@ -44,13 +43,43 @@ const redis = (() => {
 const CACHE_TTL_ROUND = 30 * 24 * 60 * 60; // 30 days for historical event data
 const CACHE_TTL_EVENT_LIST = 24 * 60 * 60; // 24h for the event list
 const CACHE_TTL_AGGREGATE = 6 * 60 * 60; // 6h for the per-course aggregation
-const CACHE_TTL_SKILL = 6 * 60 * 60; // 6h for skill decompositions
+const CACHE_TTL_BASELINE_DONE = 30 * 24 * 60 * 60; // 30d for completed-year baselines
+const CACHE_TTL_BASELINE_LIVE = 6 * 60 * 60; // 6h for the current in-progress year
+
+const CURRENT_YEAR = 2026;
 
 const KEY_ROUND = (eventId: number, year: number) =>
   `course-history:round:${eventId}:${year}`;
 const KEY_EVENT_LIST = "course-history:event-list:pga";
 const KEY_AGGREGATE = (eventId: number) => `course-history:agg:${eventId}`;
-const KEY_SKILL_DECOMP = "course-history:skill-decomp";
+const KEY_YEAR_BASELINE = (year: number) =>
+  `course-history:year-baseline:${year}`;
+
+/** Concurrency limit when fanning out getHistoricalRounds calls for
+ *  a cold-cache year baseline. Kept modest to be nice to DataGolf. */
+const FETCH_CONCURRENCY = 20;
+
+async function pMapLimit<T, R>(
+  items: T[],
+  limit: number,
+  worker: (t: T, i: number) => Promise<R>,
+): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let cursor = 0;
+  async function pull() {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      out[i] = await worker(items[i], i);
+    }
+  }
+  const runners = Array.from(
+    { length: Math.min(limit, items.length) },
+    () => pull(),
+  );
+  await Promise.all(runners);
+  return out;
+}
 
 /** Historical years we look back over. 2019 is where DataGolf's
  *  full SG-by-category coverage is reliable across PGA events. */
@@ -122,33 +151,122 @@ export async function getCachedEventList(): Promise<DGHistoricalEvent[]> {
   return list;
 }
 
-/** Fetch (and cache) DataGolf's per-player SG breakdown from the
- *  skill-ratings endpoint. Used as the "expected" baseline against
- *  which we measure at-course outperformance. */
-async function getCachedSkillDecompositions(): Promise<
-  Map<number, { sgOtt: number; sgApp: number }>
-> {
-  const out = new Map<number, { sgOtt: number; sgApp: number }>();
+/** Per-player accumulator for a single year's baseline: total
+ *  SG:OTT + SG:APP across all rounds the player played that year,
+ *  broken out by event so we can leave-one-out at the event level
+ *  when the target event contaminates the baseline. */
+interface YearBaselineRow {
+  /** total sum of SG:OTT across all rounds played this year */
+  sumOtt: number;
+  /** total sum of SG:APP across all rounds played this year */
+  sumApp: number;
+  /** total rounds played this year (all events) */
+  rounds: number;
+  /** contribution of a single event to the total, keyed by eventId,
+   *  so callers doing leave-one-out can subtract it. */
+  byEvent: Record<number, { sumOtt: number; sumApp: number; rounds: number }>;
+}
+
+type YearBaseline = Map<number, YearBaselineRow>;
+
+/**
+ * Compute (and cache) every PGA player's SG:OTT + SG:APP for one
+ * calendar year — used as the "expected" baseline against which
+ * we measure at-course outperformance.
+ *
+ * This is where Tom's per-tournament-recalibration ask lives:
+ * a player's baseline changes year to year (rookies improve,
+ * veterans decline, swings get rebuilt), so we compute a fresh
+ * per-year baseline instead of using a single career average.
+ *
+ * The row we cache exposes per-event contributions too so the
+ * caller can leave-one-out at the target event — that keeps the
+ * baseline from being contaminated by the very rounds we're
+ * comparing against.
+ *
+ * First cold hit for a year is expensive (~40 events × ~400ms
+ * each ≈ 8-15s with our concurrency cap). Redis caches for 30d
+ * once the year is completed, 6h during the in-progress year.
+ */
+async function getYearlyPlayerBaselines(
+  year: number,
+): Promise<YearBaseline> {
+  // Redis first
   if (redis) {
     const cached = await redis
-      .get<Array<[number, number, number]>>(KEY_SKILL_DECOMP)
+      .get<Array<[number, number, number, number, Array<[number, number, number, number]>]>>(
+        KEY_YEAR_BASELINE(year),
+      )
       .catch(() => null);
     if (cached && Array.isArray(cached)) {
-      for (const [dgId, sgOtt, sgApp] of cached) out.set(dgId, { sgOtt, sgApp });
+      const out: YearBaseline = new Map();
+      for (const [dgId, sumOtt, sumApp, rounds, packedEvents] of cached) {
+        const byEvent: YearBaselineRow["byEvent"] = {};
+        for (const [eventId, eOtt, eApp, eRounds] of packedEvents) {
+          byEvent[eventId] = { sumOtt: eOtt, sumApp: eApp, rounds: eRounds };
+        }
+        out.set(dgId, { sumOtt, sumApp, rounds, byEvent });
+      }
       return out;
     }
   }
-  const decomps = await getSkillDecompositions();
-  const packed: Array<[number, number, number]> = [];
-  for (const d of decomps) {
-    const dgIdNum = Number(d.dgId);
-    if (!Number.isFinite(dgIdNum)) continue;
-    out.set(dgIdNum, { sgOtt: d.sgOtt, sgApp: d.sgApp });
-    packed.push([dgIdNum, d.sgOtt, d.sgApp]);
+
+  // Cold path — fetch all sg-categorised events for that year and
+  // aggregate per player. Uses the same Redis-cached per-event data
+  // that getCourseHistory uses, so any prior lookups are reused.
+  const eventList = await getCachedEventList();
+  const yearEvents = eventList.filter(
+    (e) =>
+      e.calendar_year === year &&
+      e.sg_categories === "yes" &&
+      typeof e.event_id === "number",
+  );
+  const perEventRounds = await pMapLimit(
+    yearEvents,
+    FETCH_CONCURRENCY,
+    (ev) => getCachedEventYearRounds(ev.event_id, year),
+  );
+
+  const out: YearBaseline = new Map();
+  for (let i = 0; i < yearEvents.length; i++) {
+    const eventId = yearEvents[i].event_id;
+    for (const r of perEventRounds[i]) {
+      const row =
+        out.get(r.dgId) ??
+        ({
+          sumOtt: 0,
+          sumApp: 0,
+          rounds: 0,
+          byEvent: {},
+        } as YearBaselineRow);
+      row.sumOtt += r.sgOtt;
+      row.sumApp += r.sgApp;
+      row.rounds += 1;
+      const ev = row.byEvent[eventId] ??
+        ({ sumOtt: 0, sumApp: 0, rounds: 0 });
+      ev.sumOtt += r.sgOtt;
+      ev.sumApp += r.sgApp;
+      ev.rounds += 1;
+      row.byEvent[eventId] = ev;
+      out.set(r.dgId, row);
+    }
   }
+
+  // Persist compact-packed to Redis. Layout:
+  //   [dgId, sumOtt, sumApp, rounds, [[eventId, eOtt, eApp, eRounds], …]]
   if (redis) {
+    const packed: Array<[number, number, number, number, Array<[number, number, number, number]>]> = [];
+    for (const [dgId, row] of out) {
+      const evs: Array<[number, number, number, number]> = [];
+      for (const [eIdStr, ev] of Object.entries(row.byEvent)) {
+        evs.push([Number(eIdStr), ev.sumOtt, ev.sumApp, ev.rounds]);
+      }
+      packed.push([dgId, row.sumOtt, row.sumApp, row.rounds, evs]);
+    }
+    const ttl =
+      year < CURRENT_YEAR ? CACHE_TTL_BASELINE_DONE : CACHE_TTL_BASELINE_LIVE;
     await redis
-      .set(KEY_SKILL_DECOMP, packed, { ex: CACHE_TTL_SKILL })
+      .set(KEY_YEAR_BASELINE(year), packed, { ex: ttl })
       .catch(() => null);
   }
   return out;
@@ -230,16 +348,34 @@ export async function getCourseHistory(
     if (cached && cached.players) return cached;
   }
 
-  const [rounds, baselines, eventList] = await Promise.all([
+  const [targetRounds, eventList] = await Promise.all([
     Promise.all(
       HISTORICAL_YEARS.map((y) => getCachedEventYearRounds(eventId, y)),
     ),
-    getCachedSkillDecompositions(),
     getCachedEventList(),
   ]);
 
-  const allRounds = rounds.flat();
+  const allRounds = targetRounds.flat();
   if (allRounds.length === 0) return null;
+
+  // Which years does the target event actually have data for? Only
+  // fetch per-year baselines for those years — the others aren't
+  // needed and we don't want to spend the fetch budget on empty
+  // years.
+  const yearsWithData = Array.from(
+    new Set(allRounds.map((r) => r.year)),
+  ).sort();
+
+  // Kick off per-year baseline fetches in parallel. Each one may
+  // itself fan out ~40 event fetches on cold cache, so the whole
+  // block is the expensive part.
+  const yearBaselineArr = await Promise.all(
+    yearsWithData.map((y) => getYearlyPlayerBaselines(y)),
+  );
+  const baselinesByYear = new Map<number, YearBaseline>();
+  for (let i = 0; i < yearsWithData.length; i++) {
+    baselinesByYear.set(yearsWithData[i], yearBaselineArr[i]);
+  }
 
   // Event metadata: prefer the most recent event-list entry that
   // matches this eventId (name is stable year to year).
@@ -248,13 +384,49 @@ export async function getCourseHistory(
     .sort((a, b) => b.calendar_year - a.calendar_year)[0];
   const eventName = eventMeta?.event_name ?? `Event ${eventId}`;
 
-  // Group by player, aggregate.
+  /** Look up a player's leave-one-out baseline SG:OTT + SG:APP for a
+   *  specific year. Removes the target event's contribution from the
+   *  year total so the baseline reflects "how did they play OTHER
+   *  events this year" rather than being contaminated by the rounds
+   *  we're grading. Returns null if the player has no rounds outside
+   *  the target event that year — in which case the caller should
+   *  skip this round rather than use zero. */
+  function leaveOneOutBaseline(
+    dgId: number,
+    year: number,
+  ): { sgOtt: number; sgApp: number } | null {
+    const yearBaseline = baselinesByYear.get(year);
+    if (!yearBaseline) return null;
+    const row = yearBaseline.get(dgId);
+    if (!row) return null;
+    const evContrib = row.byEvent[eventId] ?? {
+      sumOtt: 0,
+      sumApp: 0,
+      rounds: 0,
+    };
+    const otherOtt = row.sumOtt - evContrib.sumOtt;
+    const otherApp = row.sumApp - evContrib.sumApp;
+    const otherRounds = row.rounds - evContrib.rounds;
+    if (otherRounds <= 0) return null;
+    return {
+      sgOtt: otherOtt / otherRounds,
+      sgApp: otherApp / otherRounds,
+    };
+  }
+
+  // Group target-event rounds by player and aggregate.
   interface Bucket {
     dgId: number;
     name: string;
-    sumSgOtt: number;
-    sumSgApp: number;
+    sumAtOtt: number;
+    sumAtApp: number;
+    /** Sum of the year-appropriate baseline SG:OTT applied to each
+     *  round — divided by rounds later to yield the player's average
+     *  baseline across the years they played at this event. */
+    sumBaselineOtt: number;
+    sumBaselineApp: number;
     rounds: number;
+    baselineRounds: number; // rounds where we had a per-year baseline
     years: Set<number>;
     courses: Map<string, number>;
   }
@@ -265,20 +437,33 @@ export async function getCourseHistory(
       b = {
         dgId: r.dgId,
         name: r.playerName,
-        sumSgOtt: 0,
-        sumSgApp: 0,
+        sumAtOtt: 0,
+        sumAtApp: 0,
+        sumBaselineOtt: 0,
+        sumBaselineApp: 0,
         rounds: 0,
+        baselineRounds: 0,
         years: new Set(),
         courses: new Map(),
       };
       byPlayer.set(r.dgId, b);
     }
-    b.sumSgOtt += r.sgOtt;
-    b.sumSgApp += r.sgApp;
+    b.sumAtOtt += r.sgOtt;
+    b.sumAtApp += r.sgApp;
     b.rounds += 1;
     b.years.add(r.year);
     if (r.courseName) {
       b.courses.set(r.courseName, (b.courses.get(r.courseName) ?? 0) + 1);
+    }
+    // Baseline for this specific round: the player's year-Y
+    // leave-one-out baseline. Applied per round so that a player who
+    // came to the event across multiple years gets an average
+    // baseline weighted correctly across their year-Y baselines.
+    const baseline = leaveOneOutBaseline(r.dgId, r.year);
+    if (baseline) {
+      b.sumBaselineOtt += baseline.sgOtt;
+      b.sumBaselineApp += baseline.sgApp;
+      b.baselineRounds += 1;
     }
   }
 
@@ -302,11 +487,17 @@ export async function getCourseHistory(
 
   const players: PlayerCourseStats[] = [];
   for (const b of byPlayer.values()) {
-    const atOtt = b.sumSgOtt / b.rounds;
-    const atApp = b.sumSgApp / b.rounds;
-    const baseline = baselines.get(b.dgId);
-    const baseOtt = baseline?.sgOtt ?? 0;
-    const baseApp = baseline?.sgApp ?? 0;
+    const atOtt = b.sumAtOtt / b.rounds;
+    const atApp = b.sumAtApp / b.rounds;
+    // Baseline: mean of the player's per-year leave-one-out
+    // baselines, weighted by their rounds at the target event that
+    // year. If they have zero baseline coverage (all their target-
+    // event rounds happened in years they didn't play anywhere else),
+    // fall back to 0 — a very rare case for tour regulars.
+    const baseOtt =
+      b.baselineRounds > 0 ? b.sumBaselineOtt / b.baselineRounds : 0;
+    const baseApp =
+      b.baselineRounds > 0 ? b.sumBaselineApp / b.baselineRounds : 0;
     // Pick the modal course FROM THIS PLAYER's rounds (falls back to
     // the event-wide modal if the player only has one round).
     let courseName = modalCourse;

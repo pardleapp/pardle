@@ -88,10 +88,11 @@ export default function Page() {
           carry the strongest signal about how a course rewards a
           player&apos;s tee-to-green skills. The default ranking is
           <strong> outperformance</strong>: at-course SG minus each
-          player&apos;s season baseline. That separates course fit
-          from raw skill — Scheffler is elite everywhere; what matters
-          for a course-fit lens is whether he&apos;s <em>extra</em>{" "}
-          elite here.
+          player&apos;s baseline{" "}
+          <em>for the year of that round</em>, computed leave-one-out
+          from every other PGA event they played that year. Baselines
+          recalibrate every season, so a rookie who broke out in 2024
+          isn&apos;t judged against his 2019 form.
         </p>
         <CourseHistoryTool />
       </section>

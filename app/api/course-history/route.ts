@@ -20,6 +20,12 @@ import { getCourseHistory } from "@/lib/course-history";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+// Cold-cache computation for a course fans out ~40 DataGolf event
+// fetches per year × 7 years = up to 280 API calls before we can
+// respond. Even at concurrency 20 that can bump against Vercel's
+// default 15s serverless timeout, so allow up to 60s here — after
+// the first hit everything is served out of Redis.
+export const maxDuration = 60;
 
 export async function GET(req: Request) {
   const url = new URL(req.url);

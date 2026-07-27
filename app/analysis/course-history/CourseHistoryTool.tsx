@@ -318,8 +318,8 @@ export default function CourseHistoryTool() {
           }
           subtitle={
             data?.yearsCovered && data.yearsCovered.length > 0
-              ? `${data.yearsCovered[0]}–${data.yearsCovered[data.yearsCovered.length - 1]} · ${data.players?.length ?? 0} players · ballstriking course-fit`
-              : "Ranked by outperformance (at-course SG − season baseline)"
+              ? `${data.yearsCovered[0]}–${data.yearsCovered[data.yearsCovered.length - 1]} · ${data.players?.length ?? 0} players · vs per-year leave-one-out baseline`
+              : "Ranked by outperformance (at-course SG − per-year baseline)"
           }
           accent
         />
