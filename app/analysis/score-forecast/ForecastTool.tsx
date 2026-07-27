@@ -874,35 +874,47 @@ function PlayerCard({
             style={ip()}
           />
         </Field>
-        <button type="button" onClick={onRemove} disabled={onlyRow} style={btn()}>
-          ✕
-        </button>
+        {!onlyRow && (
+          <button
+            type="button"
+            onClick={onRemove}
+            title="Remove this player"
+            aria-label="Remove player"
+            style={{
+              ...btn(),
+              padding: "8px 10px",
+              color: T.muted,
+            }}
+          >
+            ✕
+          </button>
+        )}
       </div>
       {row.weekRounds && <WeekRoundsRow row={row} />}
       <div
         style={{
-          marginTop: 8,
+          marginTop: 10,
           display: "flex",
-          gap: 12,
-          alignItems: "center",
-          fontSize: 12,
-          color: "oklch(0.45 0.02 155)",
+          justifyContent: "flex-end",
         }}
       >
-        <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <input
-            type="checkbox"
-            checked={row.includeForm}
-            onChange={(e) => onChange({ includeForm: e.target.checked })}
-          />
-          Use form adjustment from this week's rounds
-        </label>
         <button
           type="button"
           onClick={() => onChange({ advancedOpen: !row.advancedOpen })}
-          style={{ ...btn(), fontSize: 11 }}
+          style={{
+            background: "none",
+            border: "none",
+            padding: "4px 2px",
+            color: T.emerald,
+            cursor: "pointer",
+            fontSize: 12,
+            fontFamily: T.fontUi,
+            fontWeight: 800,
+            letterSpacing: 0.3,
+            textTransform: "uppercase",
+          }}
         >
-          {row.advancedOpen ? "Hide" : "Show"} advanced
+          {row.advancedOpen ? "Hide advanced −" : "Show advanced +"}
         </button>
       </div>
       {row.advancedOpen && (
@@ -912,11 +924,37 @@ function PlayerCard({
             padding: "14px 14px 12px",
             background: "oklch(0.98 0.005 155)",
             borderRadius: 6,
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: 20,
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
           }}
         >
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 13,
+              color: T.ink,
+              fontFamily: T.fontUi,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={row.includeForm}
+              onChange={(e) => onChange({ includeForm: e.target.checked })}
+            />
+            Use form adjustment from this week&apos;s rounds
+          </label>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 20,
+            }}
+          >
           <Field
             label="Form weight"
             help="How much this week's rounds shift the projection. 0.2 default per Connolly-Rendleman shrinkage. 0 = ignore form, 0.5 = aggressive."
@@ -959,6 +997,7 @@ function PlayerCard({
               onChange={(v) => onChange({ skewAdjustment: v })}
             />
           </Field>
+          </div>
         </div>
       )}
     </div>
