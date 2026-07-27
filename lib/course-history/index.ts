@@ -51,7 +51,9 @@ const CURRENT_YEAR = 2026;
 const KEY_ROUND = (eventId: number, year: number) =>
   `course-history:round:${eventId}:${year}`;
 const KEY_EVENT_LIST = "course-history:event-list:pga";
-const KEY_AGGREGATE = (eventId: number) => `course-history:agg:${eventId}`;
+// v2 = per-year leave-one-out baselines. Bumped from v1 (current-day
+// DG skill snapshot) to invalidate stale aggregates.
+const KEY_AGGREGATE = (eventId: number) => `course-history:agg:v2:${eventId}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 
