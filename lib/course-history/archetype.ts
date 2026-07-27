@@ -49,19 +49,34 @@ const redis = (() => {
 const CACHE_TTL_TOUR_STATS = 24 * 60 * 60;
 const CACHE_TTL_ARCHETYPE = 6 * 60 * 60;
 const KEY_TOUR_STATS = "course-history:tour-stats:v1";
+// v2 = archetype now uses BOTH extremes (top outperformers vs bottom
+// underperformers) with delta signals, not just top-vs-tour. Bumped
+// to invalidate the old v1 aggregates.
 const KEY_ARCHETYPE = (courseName: string) =>
-  `course-history:archetype:v1:${slugify(courseName)}`;
+  `course-history:archetype:v2:${slugify(courseName)}`;
 
 /** Minimum tee shots a player needs before we trust their profile. */
 const MIN_SHOTS_PER_PLAYER = 100;
-/** How many outperformers we include in the group. Big enough to
- *  average out noise, small enough that they're actually top-of-list. */
-const OUTPERFORMER_TOP_N = 20;
-/** Min rounds at the target course for a player to be eligible as an
- *  outperformer — smaller samples are too noisy at this stage. */
+/** Min rounds at the target course for a player to be included in
+ *  the regression pool. Small samples wash out the correlation. */
 const MIN_ROUNDS_AT_COURSE = 8;
-/** z-score threshold for "distinguishing" a dimension. */
-const Z_THRESHOLD = 0.5;
+/** How many top and bottom players we surface as tangible "here's
+ *  who's on each end" context alongside the regression result. */
+const EXTREME_TAIL_N = 10;
+/** Correlation threshold for calling a non-priority dimension
+ *  "distinguishing". Priority dimensions (ball speed, apex, shape)
+ *  are ALWAYS reported regardless of correlation. */
+const CORRELATION_THRESHOLD = 0.15;
+
+/** Priority dimensions per Tom's brief: the three ball-flight
+ *  properties that most obviously index course fit. Always shown in
+ *  the archetype panel even when the correlation is modest, because
+ *  they're the story the user is here for. */
+const PRIORITY_DIMENSIONS: ProfileDimension[] = [
+  "ballSpeed",
+  "apexHeight",
+  "curve",
+];
 
 function slugify(s: string): string {
   return s
@@ -152,33 +167,61 @@ interface ArchetypeDimensionRow {
   label: string;
   /** Human-friendly unit. */
   unit: string;
-  groupMean: number;
+  /** Weighted Pearson r across ALL matched players — correlation of
+   *  outperformanceSgOtt with this dimension's value, weighted by
+   *  rounds played at the course. |r| between 0 (no signal) and 1
+   *  (perfect). Sign carries meaning: positive = higher value tracks
+   *  higher outperformance. */
+  correlation: number;
+  /** N players in the correlation (both course-history & tee-shot
+   *  data available). */
+  n: number;
+  /** Mean and std for the whole player pool used in the correlation
+   *  — helps callers see the working range. */
+  poolMean: number;
+  poolStd: number;
+  /** Tangible context: mean of the TOP N and BOTTOM N players by
+   *  outperformanceSgOtt within the matched pool. Same signal as the
+   *  correlation, easier to read as a headline number. */
+  topTailMean: number;
+  bottomTailMean: number;
+  /** (topTailMean − bottomTailMean) / tourStd — standardised gap
+   *  between the extreme tails. */
+  standardizedTailGap: number;
   tourMean: number;
   tourStd: number;
-  /** z = (group − tour) / tourStd. Positive = the outperformer group
-   *  is HIGHER than tour average on this dimension. */
-  zScore: number;
-  /** Rough English interpretation ("faster ball speed", "flatter
-   *  trajectory", etc.) so the UI can render a sentence without
-   *  hard-coding. */
+  /** English interpretation from the higher-outperformance side. */
   interpretation: string;
+  /** True when this is a Tom-flagged priority dimension (ballSpeed,
+   *  apexHeight, curve) — the UI can render it always, even if
+   *  correlation is modest. */
+  isPriority: boolean;
+}
+
+interface SamplePlayer {
+  name: string;
+  playerId: string;
+  roundsAtCourse: number;
+  outperformanceSgOtt: number;
+  stats: Partial<Record<ProfileDimension, number>>;
 }
 
 export interface CourseArchetypeResponse {
   courseName: string;
-  outperformerSample: number;
-  playersMatched: number;
-  playersUnmatched: string[];
+  /** How many course-history eligible players we had (before
+   *  matching to tee-shot profiles). */
+  eligiblePlayers: number;
+  /** How many made it into the correlation pool. */
+  matchedPlayers: number;
+  unmatchedNames: string[];
+  /** Dimensions sorted by |correlation| — priority dimensions
+   *  first (always present), then non-priority above the threshold. */
   distinguishing: ArchetypeDimensionRow[];
-  /** The top-N outperformers we grouped, with their profile-mean
-   *  values on every dimension. UI can render as a small table. */
-  sample: Array<{
-    name: string;
-    playerId: string;
-    roundsAtCourse: number;
-    outperformanceSgOtt: number;
-    stats: Partial<Record<ProfileDimension, number>>;
-  }>;
+  /** Top N by outperformance for context; bottom N by same. Every
+   *  entry is a matched player with their profile-stat means so the
+   *  UI can eyeball the pattern. */
+  outperformerTail: SamplePlayer[];
+  underperformerTail: SamplePlayer[];
 }
 
 const DIM_META: Record<ProfileDimension, { label: string; unit: string; higherIs: (dir: 1 | -1) => string }> = {
@@ -263,17 +306,25 @@ export async function getCourseArchetype(
     }),
   );
 
-  // Top-N OTT outperformers with enough rounds to matter.
-  const outperformers = [...history.players]
-    .filter((p) => p.roundsPlayed >= MIN_ROUNDS_AT_COURSE)
-    .sort((a, b) => b.outperformanceSgOtt - a.outperformanceSgOtt)
-    .slice(0, OUTPERFORMER_TOP_N);
+  // Every course-history player with enough rounds to be worth
+  // scoring — from this pool we take everyone with a tee-shot profile
+  // and regress outperformance against each ball-flight dimension.
+  const eligible = history.players.filter(
+    (p) => p.roundsPlayed >= MIN_ROUNDS_AT_COURSE,
+  );
 
-  const sample: CourseArchetypeResponse["sample"] = [];
-  const matchedProfiles: PlayerDrivingProfile[] = [];
+  interface MatchedPoint {
+    name: string;
+    playerId: string;
+    roundsAtCourse: number;
+    outperformanceSgOtt: number;
+    stats: Partial<Record<ProfileDimension, number>>;
+  }
+  const matched: MatchedPoint[] = [];
   const unmatchedNames: string[] = [];
+  const seenProfiles: PlayerDrivingProfile[] = [];
 
-  for (const p of outperformers) {
+  for (const p of eligible) {
     const pid = nameToId.get(normaliseName(p.name));
     if (!pid) {
       unmatchedNames.push(p.name);
@@ -285,12 +336,12 @@ export async function getCourseArchetype(
       continue;
     }
     const profile = buildProfile(pid, p.name, records, 0);
-    matchedProfiles.push(profile);
+    seenProfiles.push(profile);
     const stats: Partial<Record<ProfileDimension, number>> = {};
     for (const d of PROFILE_DIMENSIONS) {
       stats[d] = profile.stats[d]?.mean;
     }
-    sample.push({
+    matched.push({
       name: p.name,
       playerId: pid,
       roundsAtCourse: p.roundsPlayed,
@@ -299,44 +350,130 @@ export async function getCourseArchetype(
     });
   }
 
-  if (matchedProfiles.length < 4) return null;
+  // Need enough data points for the regression to be meaningful.
+  if (matched.length < 10) return null;
 
-  // Compute group means per dimension and z-scores.
+  /** Weighted Pearson correlation between two arrays. Weights are
+   *  the players' rounds played at the course — a player with 20
+   *  rounds is a more reliable data point than one with 8. */
+  function weightedPearson(
+    xs: number[],
+    ys: number[],
+    ws: number[],
+  ): { r: number; xMean: number; xStd: number; yMean: number; yStd: number } {
+    const sumW = ws.reduce((a, b) => a + b, 0);
+    const xMean = xs.reduce((a, x, i) => a + x * ws[i], 0) / sumW;
+    const yMean = ys.reduce((a, y, i) => a + y * ws[i], 0) / sumW;
+    let cov = 0;
+    let vx = 0;
+    let vy = 0;
+    for (let i = 0; i < xs.length; i++) {
+      const dx = xs[i] - xMean;
+      const dy = ys[i] - yMean;
+      cov += ws[i] * dx * dy;
+      vx += ws[i] * dx * dx;
+      vy += ws[i] * dy * dy;
+    }
+    const xStd = Math.sqrt(vx / sumW);
+    const yStd = Math.sqrt(vy / sumW);
+    const denom = Math.sqrt(vx) * Math.sqrt(vy);
+    return {
+      r: denom > 0 ? cov / denom : 0,
+      xMean,
+      xStd,
+      yMean,
+      yStd,
+    };
+  }
+
+  // Extreme tails for tangible context alongside the correlation.
+  const sortedDesc = [...matched].sort(
+    (a, b) => b.outperformanceSgOtt - a.outperformanceSgOtt,
+  );
+  const outperformerTail = sortedDesc.slice(0, EXTREME_TAIL_N);
+  const underperformerTail = sortedDesc.slice(-EXTREME_TAIL_N).reverse();
+
+  // Compute the full-pool correlation + tail contrast per dimension.
   const rows: ArchetypeDimensionRow[] = [];
   for (const d of PROFILE_DIMENSIONS) {
-    const vals = matchedProfiles
-      .map((p) => p.stats[d]?.mean)
+    const isPriority = PRIORITY_DIMENSIONS.includes(d);
+    const xs: number[] = [];
+    const ys: number[] = [];
+    const ws: number[] = [];
+    for (const p of matched) {
+      const y = p.stats[d];
+      if (typeof y !== "number") continue;
+      xs.push(p.outperformanceSgOtt);
+      ys.push(y);
+      ws.push(p.roundsAtCourse);
+    }
+    if (xs.length < 8) continue;
+    const { r, yMean, yStd } = weightedPearson(xs, ys, ws);
+
+    const topVals = outperformerTail
+      .map((p) => p.stats[d])
       .filter((v): v is number => Number.isFinite(v));
-    if (vals.length === 0) continue;
-    const groupMean = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const botVals = underperformerTail
+      .map((p) => p.stats[d])
+      .filter((v): v is number => Number.isFinite(v));
+    if (topVals.length === 0 || botVals.length === 0) continue;
+    const topTailMean =
+      topVals.reduce((a, b) => a + b, 0) / topVals.length;
+    const bottomTailMean =
+      botVals.reduce((a, b) => a + b, 0) / botVals.length;
     const t = tourStats[d];
     if (!t || t.tourStd <= 0) continue;
-    const z = (groupMean - t.tourMean) / t.tourStd;
+    const standardizedTailGap = (topTailMean - bottomTailMean) / t.tourStd;
+
     const meta = DIM_META[d];
+    // Interpretation direction from CORRELATION sign (which uses the
+    // full pool), fallback to tail gap when r is essentially zero.
+    const signalSign = Math.abs(r) > 0.01 ? Math.sign(r) : Math.sign(standardizedTailGap);
     rows.push({
       dim: d,
       label: meta.label,
       unit: meta.unit,
-      groupMean,
+      correlation: r,
+      n: xs.length,
+      poolMean: yMean,
+      poolStd: yStd,
+      topTailMean,
+      bottomTailMean,
+      standardizedTailGap,
       tourMean: t.tourMean,
       tourStd: t.tourStd,
-      zScore: z,
-      interpretation: meta.higherIs(z >= 0 ? 1 : -1),
+      interpretation: meta.higherIs((signalSign >= 0 ? 1 : -1) as 1 | -1),
+      isPriority,
     });
   }
-  // Sort by magnitude of z-score descending — the strongest signals
-  // come first — and filter to only the distinguishing traits.
-  const distinguishing = rows
-    .filter((r) => Math.abs(r.zScore) >= Z_THRESHOLD)
-    .sort((a, b) => Math.abs(b.zScore) - Math.abs(a.zScore));
+  // Priority dimensions first (in priority order), then non-priority
+  // that clear the correlation threshold, sorted by |r|.
+  const priority: ArchetypeDimensionRow[] = [];
+  const secondary: ArchetypeDimensionRow[] = [];
+  for (const r of rows) {
+    if (r.isPriority) priority.push(r);
+    else if (Math.abs(r.correlation) >= CORRELATION_THRESHOLD) {
+      secondary.push(r);
+    }
+  }
+  priority.sort(
+    (a, b) =>
+      PRIORITY_DIMENSIONS.indexOf(a.dim) -
+      PRIORITY_DIMENSIONS.indexOf(b.dim),
+  );
+  secondary.sort(
+    (a, b) => Math.abs(b.correlation) - Math.abs(a.correlation),
+  );
+  const distinguishing = [...priority, ...secondary];
 
   const response: CourseArchetypeResponse = {
     courseName: cleanCourse,
-    outperformerSample: outperformers.length,
-    playersMatched: matchedProfiles.length,
-    playersUnmatched: unmatchedNames,
+    eligiblePlayers: eligible.length,
+    matchedPlayers: matched.length,
+    unmatchedNames,
     distinguishing,
-    sample,
+    outperformerTail,
+    underperformerTail,
   };
   if (redis) {
     await redis

@@ -74,27 +74,35 @@ interface ArchetypeDim {
   dim: string;
   label: string;
   unit: string;
-  groupMean: number;
+  correlation: number;
+  n: number;
+  poolMean: number;
+  poolStd: number;
+  topTailMean: number;
+  bottomTailMean: number;
+  standardizedTailGap: number;
   tourMean: number;
   tourStd: number;
-  zScore: number;
   interpretation: string;
+  isPriority: boolean;
+}
+interface ArchetypeSamplePlayer {
+  name: string;
+  playerId: string;
+  roundsAtCourse: number;
+  outperformanceSgOtt: number;
+  stats: Record<string, number | undefined>;
 }
 interface ArchetypeResp {
   ok: boolean;
   error?: string;
   courseName?: string;
-  outperformerSample?: number;
-  playersMatched?: number;
-  playersUnmatched?: string[];
+  eligiblePlayers?: number;
+  matchedPlayers?: number;
+  unmatchedNames?: string[];
   distinguishing?: ArchetypeDim[];
-  sample?: Array<{
-    name: string;
-    playerId: string;
-    roundsAtCourse: number;
-    outperformanceSgOtt: number;
-    stats: Record<string, number | undefined>;
-  }>;
+  outperformerTail?: ArchetypeSamplePlayer[];
+  underperformerTail?: ArchetypeSamplePlayer[];
 }
 
 type SortKey =
@@ -559,13 +567,11 @@ function ArchetypePanel({
     );
   }
   if (!archetype) return null;
-  if (!archetype.ok) {
-    // Silent 404 when we couldn't build one — the ranking table is
-    // still useful without an archetype.
-    return null;
-  }
+  if (!archetype.ok) return null;
+
   const dist = archetype.distinguishing ?? [];
-  const sample = archetype.sample ?? [];
+  const outTail = archetype.outperformerTail ?? [];
+  const underTail = archetype.underperformerTail ?? [];
 
   return (
     <div
@@ -599,7 +605,7 @@ function ArchetypePanel({
           marginBottom: 8,
         }}
       >
-        Who outperforms off-the-tee here
+        What shape of ball flight fits this course
       </h4>
       <p
         style={{
@@ -610,12 +616,15 @@ function ArchetypePanel({
           maxWidth: 780,
         }}
       >
-        Averaged ball-flight profile of the top{" "}
-        <strong>{archetype.playersMatched}</strong> OTT outperformers
-        at this course (out of{" "}
-        <strong>{archetype.outperformerSample}</strong> we ranked),
-        compared to the tour-wide average. z is standard-deviations
-        away from the tour mean.
+        Correlation across{" "}
+        <strong>{archetype.matchedPlayers}</strong> players
+        (matched from{" "}
+        <strong>{archetype.eligiblePlayers}</strong> eligible with 8+
+        rounds at the course) between OTT outperformance and each
+        ball-flight dimension. Positive r means higher values track
+        higher outperformance. Ball speed, apex height and shot curve
+        are always shown; other dimensions appear when the signal is
+        material.
       </p>
 
       {dist.length === 0 ? (
@@ -629,26 +638,23 @@ function ArchetypePanel({
             fontSize: 13,
           }}
         >
-          No strong archetype at this course — the outperformer group
-          doesn&apos;t differ from tour-average ballstrikers by more
-          than half a standard deviation on any dimension. Course fit
-          here may come from short game / green-reading rather than
-          driver profile.
+          Not enough matched players yet to compute a stable
+          archetype at this course.
         </div>
       ) : (
         <div
           style={{
             display: "grid",
             gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(220px, 100%), 1fr))",
+              "repeat(auto-fit, minmax(min(260px, 100%), 1fr))",
             gap: 10,
             marginBottom: 12,
           }}
         >
           {dist.slice(0, 6).map((d) => {
-            const above = d.zScore >= 0;
-            const strong = Math.abs(d.zScore) >= 1;
-            const color = above ? T.emerald : T.tang;
+            const positive = d.correlation >= 0;
+            const strong = Math.abs(d.correlation) >= 0.3;
+            const color = positive ? T.emerald : T.tang;
             return (
               <div
                 key={d.dim}
@@ -656,73 +662,163 @@ function ArchetypePanel({
                   padding: "12px 14px",
                   background: "white",
                   border: `1px solid ${T.line}`,
-                  borderLeft: `3px solid ${color}`,
+                  borderLeft: `3px solid ${
+                    Math.abs(d.correlation) < 0.05 ? T.line : color
+                  }`,
                   borderRadius: 8,
                 }}
               >
                 <div
                   style={{
-                    fontSize: 10,
-                    letterSpacing: 1,
-                    textTransform: "uppercase",
-                    color: T.muted,
-                    fontWeight: 800,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
                     marginBottom: 4,
                   }}
                 >
-                  {d.label}
+                  <div
+                    style={{
+                      fontSize: 10,
+                      letterSpacing: 1,
+                      textTransform: "uppercase",
+                      color: T.muted,
+                      fontWeight: 800,
+                    }}
+                  >
+                    {d.label}
+                    {d.isPriority && (
+                      <span
+                        style={{
+                          marginLeft: 6,
+                          padding: "1px 6px",
+                          borderRadius: 4,
+                          background: T.emeraldTint,
+                          color: T.emeraldD,
+                          fontSize: 8.5,
+                          letterSpacing: 0.6,
+                        }}
+                      >
+                        KEY
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div
                   style={{
                     fontFamily: T.fontMono,
                     fontSize: 20,
                     fontWeight: 800,
-                    color: T.ink,
+                    color,
                     letterSpacing: -0.01,
                   }}
                 >
-                  {fmtVal(d.groupMean, d.unit)}
-                  <span
-                    style={{
-                      fontSize: 12,
-                      color: T.dim,
-                      fontFamily: T.fontUi,
-                      fontWeight: 700,
-                      marginLeft: 4,
-                    }}
-                  >
-                    {d.unit}
-                  </span>
+                  r {d.correlation >= 0 ? "+" : ""}
+                  {d.correlation.toFixed(2)}
+                  {strong && (
+                    <span
+                      style={{
+                        marginLeft: 8,
+                        fontSize: 11,
+                        color: T.dim,
+                        fontFamily: T.fontUi,
+                        fontWeight: 700,
+                      }}
+                    >
+                      strong
+                    </span>
+                  )}
                 </div>
                 <div
                   style={{
-                    marginTop: 4,
-                    fontSize: 12,
-                    color,
-                    fontWeight: 700,
-                    display: "flex",
-                    alignItems: "baseline",
-                    gap: 6,
+                    marginTop: 6,
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 8,
+                    fontFamily: T.fontUi,
+                    fontSize: 11,
+                    color: T.muted,
                   }}
                 >
-                  <span style={{ fontFamily: T.fontMono, fontWeight: 800 }}>
-                    z {d.zScore >= 0 ? "+" : ""}
-                    {d.zScore.toFixed(2)}
-                  </span>
-                  <span style={{ fontSize: 11, fontWeight: 600 }}>
-                    {strong ? "· strong signal" : ""}
-                  </span>
+                  <div>
+                    <div
+                      style={{
+                        color: T.emerald,
+                        fontWeight: 700,
+                        fontSize: 9.5,
+                        letterSpacing: 0.5,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Top tail
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: T.fontMono,
+                        fontWeight: 700,
+                        color: T.ink,
+                        fontSize: 13,
+                      }}
+                    >
+                      {fmtVal(d.topTailMean, d.unit)}{" "}
+                      <span style={{ color: T.dim, fontWeight: 600 }}>
+                        {d.unit}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <div
+                      style={{
+                        color: T.tang,
+                        fontWeight: 700,
+                        fontSize: 9.5,
+                        letterSpacing: 0.5,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Bottom tail
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: T.fontMono,
+                        fontWeight: 700,
+                        color: T.ink,
+                        fontSize: 13,
+                      }}
+                    >
+                      {fmtVal(d.bottomTailMean, d.unit)}{" "}
+                      <span style={{ color: T.dim, fontWeight: 600 }}>
+                        {d.unit}
+                      </span>
+                    </div>
+                  </div>
                 </div>
                 <div
                   style={{
-                    marginTop: 4,
+                    marginTop: 6,
                     fontSize: 12,
-                    color: T.muted,
+                    color: T.ink,
+                    fontWeight: 600,
                     lineHeight: 1.4,
                   }}
                 >
-                  {d.interpretation} · tour avg{" "}
-                  <span style={{ fontFamily: T.fontMono, fontWeight: 700 }}>
+                  Course-fit players show{" "}
+                  <span style={{ color, fontWeight: 800 }}>
+                    {d.interpretation}
+                  </span>
+                  .
+                </div>
+                <div
+                  style={{
+                    marginTop: 3,
+                    fontSize: 11,
+                    color: T.dim,
+                    fontFamily: T.fontUi,
+                  }}
+                >
+                  n={d.n} · tour avg{" "}
+                  <span
+                    style={{ fontFamily: T.fontMono, fontWeight: 700 }}
+                  >
                     {fmtVal(d.tourMean, d.unit)}
                   </span>
                 </div>
@@ -732,7 +828,7 @@ function ArchetypePanel({
         </div>
       )}
 
-      {sample.length > 0 && (
+      {(outTail.length > 0 || underTail.length > 0) && (
         <details style={{ marginTop: 6 }}>
           <summary
             style={{
@@ -745,58 +841,113 @@ function ArchetypePanel({
               userSelect: "none",
             }}
           >
-            Who&apos;s in the group? ({sample.length} matched of{" "}
-            {archetype.outperformerSample})
+            Who&apos;s at each extreme?
           </summary>
           <div
             style={{
               marginTop: 10,
-              padding: 12,
-              background: "white",
-              border: `1px solid ${T.line}`,
-              borderRadius: 8,
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 6,
-              fontSize: 12,
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(min(240px, 100%), 1fr))",
+              gap: 10,
             }}
           >
-            {sample.map((p) => (
-              <span
-                key={p.playerId}
-                title={`Rounds at course: ${p.roundsAtCourse} · Δ SG:OTT ${
-                  p.outperformanceSgOtt >= 0 ? "+" : ""
-                }${p.outperformanceSgOtt.toFixed(2)}`}
+            <ExtremeList
+              label="Top OTT outperformers"
+              color={T.emerald}
+              players={outTail}
+            />
+            <ExtremeList
+              label="Bottom OTT underperformers"
+              color={T.tang}
+              players={underTail}
+            />
+          </div>
+          {archetype.unmatchedNames &&
+            archetype.unmatchedNames.length > 0 && (
+              <div
                 style={{
-                  padding: "4px 10px",
-                  background: T.soft,
-                  border: `1px solid ${T.line}`,
-                  borderRadius: 999,
-                  color: T.ink,
-                  fontWeight: 700,
-                  fontFamily: T.fontUi,
+                  marginTop: 10,
+                  fontSize: 11,
+                  color: T.dim,
                 }}
               >
-                {p.name}
-              </span>
-            ))}
-            {archetype.playersUnmatched &&
-              archetype.playersUnmatched.length > 0 && (
-                <div
-                  style={{
-                    width: "100%",
-                    fontSize: 11,
-                    color: T.dim,
-                    marginTop: 6,
-                  }}
-                >
-                  Skipped (no tee-shot profile):{" "}
-                  {archetype.playersUnmatched.join(", ")}
-                </div>
-              )}
-          </div>
+                Skipped ({archetype.unmatchedNames.length}, no tee-shot
+                profile): {archetype.unmatchedNames.slice(0, 10).join(", ")}
+                {archetype.unmatchedNames.length > 10 ? "…" : ""}
+              </div>
+            )}
         </details>
       )}
+    </div>
+  );
+}
+
+function ExtremeList({
+  label,
+  color,
+  players,
+}: {
+  label: string;
+  color: string;
+  players: ArchetypeSamplePlayer[];
+}) {
+  return (
+    <div
+      style={{
+        padding: 12,
+        background: "white",
+        border: `1px solid ${T.line}`,
+        borderLeft: `3px solid ${color}`,
+        borderRadius: 8,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 10,
+          letterSpacing: 0.8,
+          textTransform: "uppercase",
+          color,
+          fontWeight: 800,
+          marginBottom: 6,
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {players.map((p) => (
+          <div
+            key={p.playerId}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              gap: 8,
+              fontSize: 12.5,
+            }}
+          >
+            <span
+              style={{
+                fontFamily: T.fontUi,
+                color: T.ink,
+                fontWeight: 700,
+              }}
+            >
+              {p.name}
+            </span>
+            <span
+              style={{
+                fontFamily: T.fontMono,
+                color,
+                fontWeight: 700,
+              }}
+            >
+              {p.outperformanceSgOtt >= 0 ? "+" : ""}
+              {p.outperformanceSgOtt.toFixed(2)}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
