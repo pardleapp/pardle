@@ -66,6 +66,7 @@ interface ExplainerCard {
 // of the app, not a bolted-on lightbox.
 const EMERALD = "oklch(0.50 0.13 155)";
 const EMERALD_D = "oklch(0.40 0.12 156)";
+const EMERALD_TINT = "oklch(0.96 0.04 155)";
 const TANG = "oklch(0.66 0.18 45)";
 // Third intent uses a blue accent so the three choice cards are
 // visually distinguishable at a glance.
@@ -202,12 +203,18 @@ export function OnboardingModal() {
 
   useEffect(() => {
     try {
-      if (window.localStorage.getItem(SEEN_KEY) !== "1") {
-        setOpen(true);
-      }
+      if (window.localStorage.getItem(SEEN_KEY) === "1") return;
     } catch {
-      setOpen(true);
+      // localStorage blocked — proceed with the delay anyway; if
+      // localStorage is unavailable at write-time we'll just show
+      // again next session.
     }
+    // Let the user actually see the site before we interrupt.
+    // Anything under ~3s feels like a hijack; anything over ~8s
+    // and half the audience has already navigated on.
+    const OPEN_DELAY_MS = 5000;
+    const t = window.setTimeout(() => setOpen(true), OPEN_DELAY_MS);
+    return () => window.clearTimeout(t);
   }, []);
 
   // Snappy in-transition: one frame after mount, flip `entered` so
@@ -392,6 +399,33 @@ export function OnboardingModal() {
           color: oklch(0.32 0.03 155) !important;
           outline: none;
         }
+        /* Step-1 intent cards — bigger hover state so they read as
+           obviously clickable. Chevron slides + card lifts. */
+        .pardle-onboard-choice:hover,
+        .pardle-onboard-choice:focus-visible {
+          transform: translateY(-2px);
+          border-color: oklch(0.78 0.02 150) !important;
+          outline: none;
+        }
+        .pardle-onboard-choice:hover .pardle-onboard-choice-chevron,
+        .pardle-onboard-choice:focus-visible .pardle-onboard-choice-chevron {
+          transform: translateX(3px);
+          transition: transform 160ms cubic-bezier(.2,.9,.3,1);
+        }
+        .pardle-onboard-choice-chevron {
+          transition: transform 160ms cubic-bezier(.2,.9,.3,1);
+        }
+        .pardle-onboard-choice:active {
+          transform: translateY(0);
+        }
+        /* Step-1 hero title — a touch larger on desktop where we
+           have the real estate for it. */
+        @media (min-width: 640px) {
+          .pardle-onboard-hero {
+            font-size: 42px !important;
+            letter-spacing: -1.2px !important;
+          }
+        }
         /* Respect reduced-motion — kill entrance stagger + hover
            translations so nothing moves for users who ask. */
         @media (prefers-reduced-motion: reduce) {
@@ -402,7 +436,11 @@ export function OnboardingModal() {
             animation: none !important;
           }
           .pardle-onboard-cta:hover,
-          .pardle-onboard-secondary:hover .pardle-onboard-chevron {
+          .pardle-onboard-secondary:hover .pardle-onboard-chevron,
+          .pardle-onboard-choice:hover,
+          .pardle-onboard-choice:focus-visible,
+          .pardle-onboard-choice:hover .pardle-onboard-choice-chevron,
+          .pardle-onboard-choice:focus-visible .pardle-onboard-choice-chevron {
             transform: none !important;
           }
         }
@@ -414,15 +452,51 @@ export function OnboardingModal() {
 function IntentStep({ onPick }: { onPick: (i: Intent) => void }) {
   return (
     <>
-      <div style={eyebrowStyle()}>Welcome to Pardle</div>
-      <h2 id="onboarding-title" style={titleStyle()}>
+      <div style={{
+        ...eyebrowStyle(),
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "5px 10px 5px 8px",
+        borderRadius: 999,
+        background: EMERALD_TINT,
+        color: EMERALD_D,
+        marginBottom: 12,
+      }}>
+        <span style={{
+          width: 6,
+          height: 6,
+          borderRadius: 999,
+          background: EMERALD,
+        }} />
+        Welcome to Pardle
+      </div>
+      <h2
+        id="onboarding-title"
+        className="pardle-onboard-hero"
+        style={{
+          margin: 0,
+          fontSize: 34,
+          lineHeight: 1.02,
+          letterSpacing: -0.9,
+          fontWeight: 900,
+          color: INK,
+          textWrap: "balance" as React.CSSProperties["textWrap"],
+        }}
+      >
         What brings you here?
       </h2>
-      <p style={ledeStyle()}>
-        One tap and we&apos;ll point you at the pages built for your
-        thing.
+      <p style={{
+        margin: "12px 0 22px",
+        fontSize: 17,
+        lineHeight: 1.45,
+        color: INK,
+        fontWeight: 500,
+        maxWidth: 540,
+      }}>
+        Pick one — we&apos;ll show you exactly what Pardle does for you.
       </p>
-      <div style={{ display: "grid", gap: 10, marginTop: 6 }}>
+      <div style={{ display: "grid", gap: 10, marginTop: 4 }}>
         {INTENTS.map((intent) => (
           <button
             key={intent.id}
@@ -435,12 +509,17 @@ function IntentStep({ onPick }: { onPick: (i: Intent) => void }) {
               style={{
                 display: "grid",
                 placeItems: "center",
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                background: SOFT,
+                width: 54,
+                height: 54,
+                borderRadius: 14,
+                background: intent.accent === EMERALD
+                  ? EMERALD_TINT
+                  : intent.accent === TANG
+                    ? "oklch(0.965 0.045 60)"
+                    : "oklch(0.965 0.04 240)",
                 color: intent.accent,
                 flexShrink: 0,
+                boxShadow: `inset 0 0 0 1px ${intent.accent}`,
               }}
               aria-hidden
             >
@@ -449,37 +528,42 @@ function IntentStep({ onPick }: { onPick: (i: Intent) => void }) {
             <span style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
               <span style={{
                 display: "block",
-                fontSize: 15.5,
-                fontWeight: 800,
+                fontSize: 18,
+                fontWeight: 900,
                 color: INK,
-                letterSpacing: -0.1,
+                letterSpacing: -0.3,
+                lineHeight: 1.15,
               }}>
                 {intent.label}
               </span>
               <span style={{
                 display: "block",
-                fontSize: 12.5,
-                color: MUTED,
-                marginTop: 2,
+                fontSize: 13.5,
+                color: INK,
+                marginTop: 3,
                 lineHeight: 1.4,
+                fontWeight: 500,
+                opacity: 0.72,
               }}>
                 {intent.blurb}
               </span>
             </span>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
-              stroke={DIM} strokeWidth="2"
-              strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+              stroke={intent.accent} strokeWidth="2.4"
+              strokeLinecap="round" strokeLinejoin="round" aria-hidden
+              className="pardle-onboard-choice-chevron">
               <path d="M9 6l6 6-6 6" />
             </svg>
           </button>
         ))}
       </div>
       <p style={{
-        marginTop: 18,
-        fontSize: 11,
+        marginTop: 20,
+        fontSize: 11.5,
         color: DIM,
         textAlign: "center",
-        letterSpacing: 0.2,
+        letterSpacing: 0.3,
+        fontWeight: 700,
       }}>
         Pardle is a bet tracker, not a bookmaker. 18+.
       </p>
@@ -723,19 +807,24 @@ function intentBtnStyle(accent: string): React.CSSProperties {
   return {
     display: "flex",
     alignItems: "center",
-    gap: 14,
+    gap: 16,
     width: "100%",
-    padding: "14px 14px",
+    padding: "16px 16px",
     background: CARD,
     border: `1px solid ${LINE}`,
-    borderRadius: 14,
+    borderRadius: 16,
     cursor: "pointer",
     fontFamily: "inherit",
-    minHeight: 72,
-    // Layered box-shadow: subtle depth + accent underline that
-    // brightens on hover/focus.
-    boxShadow: `0 1px 0 ${LINE}, inset 0 -2px 0 ${accent}`,
-    transition: "transform 140ms ease, box-shadow 140ms ease",
+    minHeight: 86,
+    // Layered depth: subtle drop shadow + prominent accent bottom
+    // stroke that reads as a colour-coded intent tab.
+    boxShadow: `
+      0 1px 0 ${LINE},
+      inset 0 -3px 0 ${accent},
+      0 6px 16px oklch(0.15 0.02 150 / 0.05)
+    `,
+    transition:
+      "transform 160ms cubic-bezier(.2,.9,.3,1), box-shadow 160ms ease, border-color 160ms ease",
     textAlign: "left",
   };
 }
