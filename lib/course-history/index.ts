@@ -494,6 +494,12 @@ function normaliseCourseName(raw: string): string {
   return s;
 }
 
+/** Temporary — used by /api/course-history/debug-normalise to verify
+ *  alias deployment in prod. Remove me once the debug is done. */
+export function normaliseCourseNameForDebug(raw: string): string {
+  return normaliseCourseName(raw);
+}
+
 // ── Main aggregation ───────────────────────────────────────────────
 
 /** Aggregate all rounds played at a SPECIFIC course (across any event
