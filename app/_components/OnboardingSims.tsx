@@ -23,21 +23,38 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-// ── Shared tokens (mirror OnboardingModal's palette) ───────────────
+// ── Palette ────────────────────────────────────────────────────────
+//
+// Sim cards use a dark "mission control" theme — deep near-black
+// panel with saturated neon accents. The rest of the modal stays
+// light warm-paper per CLAUDE.md's design-handoff rule; the dark
+// panel is scoped to the sim itself so the app's main theme is
+// untouched.
+//
+// Dark tokens (inside the sim card only):
+const D_BG = "oklch(0.19 0.02 155)";
+const D_BG_LO = "oklch(0.14 0.015 155)";
+const D_PANEL = "oklch(0.22 0.02 155)";
+const D_INK = "oklch(0.96 0.008 150)";
+const D_MUTED = "oklch(0.72 0.02 150)";
+const D_DIM = "oklch(0.55 0.02 150)";
+const D_LINE = "oklch(0.36 0.02 150)";
 
-const INK = "oklch(0.26 0.04 155)";
-const MUTED = "oklch(0.50 0.02 150)";
-const DIM = "oklch(0.62 0.018 150)";
-const LINE = "oklch(0.90 0.013 95)";
-const CARD = "oklch(0.995 0.004 95)";
-const SOFT = "oklch(0.945 0.012 95)";
-const EMERALD = "oklch(0.50 0.13 155)";
-const EMERALD_TINT = "oklch(0.96 0.04 155)";
-const TANG = "oklch(0.66 0.18 45)";
-const TANG_TINT = "oklch(0.965 0.045 60)";
-const BLUE = "oklch(0.55 0.14 245)";
-const BLUE_TINT = "oklch(0.965 0.04 240)";
-const DOWN = "oklch(0.60 0.19 30)";
+// Accents — kept saturated so they bloom against the dark panel.
+const EMERALD = "oklch(0.72 0.19 155)";
+const EMERALD_D = "oklch(0.50 0.14 155)";
+const EMERALD_TINT = "oklch(0.30 0.10 155)";
+const EMERALD_GLOW = "oklch(0.72 0.19 155 / 0.55)";
+const TANG = "oklch(0.75 0.20 45)";
+const TANG_D = "oklch(0.60 0.18 45)";
+const TANG_TINT = "oklch(0.32 0.12 45)";
+const TANG_GLOW = "oklch(0.75 0.20 45 / 0.55)";
+const BLUE = "oklch(0.72 0.16 235)";
+const BLUE_D = "oklch(0.55 0.14 245)";
+const BLUE_TINT = "oklch(0.30 0.10 240)";
+const BLUE_GLOW = "oklch(0.72 0.16 235 / 0.55)";
+const DOWN = "oklch(0.74 0.20 25)";
+const DOWN_TINT = "oklch(0.30 0.12 25)";
 
 // ── BET TRACKER SIMULATION ────────────────────────────────────────
 
@@ -191,28 +208,30 @@ export function BetSimulation() {
         gap: 10,
         marginBottom: 12,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
           <span style={liveBadgeStyle()}>
             <span style={livePulseStyle()} />
             LIVE
           </span>
           <div style={{ minWidth: 0 }}>
             <div style={{
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 800,
-              color: INK,
+              color: D_INK,
               lineHeight: 1.2,
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
+              letterSpacing: -0.1,
             }}>
               Scheffler · Top 10
             </div>
             <div style={{
               fontSize: 11,
-              color: MUTED,
+              color: D_MUTED,
               fontFamily: "var(--font-mono), monospace",
-              marginTop: 1,
+              marginTop: 2,
+              letterSpacing: 0.4,
             }}>
               £{BET_STAKE} @ {BET_ODDS.toFixed(1)}
             </div>
@@ -221,33 +240,43 @@ export function BetSimulation() {
         <div style={{ textAlign: "right" }}>
           <div style={{
             fontSize: 10,
-            letterSpacing: 0.8,
+            letterSpacing: 1,
             textTransform: "uppercase",
-            color: DIM,
+            color: D_DIM,
             fontWeight: 800,
           }}>
             Win prob
           </div>
           <div style={{
-            fontSize: 22,
+            fontSize: 26,
             fontWeight: 800,
             color: EMERALD,
             fontFamily: "var(--font-mono), monospace",
             lineHeight: 1,
-            marginTop: 2,
+            marginTop: 3,
+            textShadow: `0 0 12px ${EMERALD_GLOW}`,
+            letterSpacing: -0.5,
           }}>
             {currentProb}%
           </div>
         </div>
       </div>
 
-      {/* Chart */}
+      {/* Chart — data-terminal readout */}
       <div style={{
         position: "relative",
-        borderRadius: 10,
-        background: SOFT,
-        padding: "10px 8px 6px",
-        marginBottom: 10,
+        borderRadius: 12,
+        background: D_PANEL,
+        backgroundImage: `
+          linear-gradient(180deg, oklch(0.24 0.02 155) 0%, ${D_PANEL} 100%),
+          repeating-linear-gradient(0deg, transparent 0, transparent 15px, oklch(0.96 0.008 150 / 0.03) 15px, oklch(0.96 0.008 150 / 0.03) 16px),
+          repeating-linear-gradient(90deg, transparent 0, transparent 23px, oklch(0.96 0.008 150 / 0.03) 23px, oklch(0.96 0.008 150 / 0.03) 24px)
+        `,
+        backgroundBlendMode: "normal, screen, screen",
+        border: `1px solid ${D_LINE}`,
+        padding: "12px 10px 8px",
+        marginBottom: 12,
+        boxShadow: `inset 0 0 24px oklch(0.10 0.01 155 / 0.6)`,
       }}>
         <svg
           viewBox={`0 0 ${svgW} ${svgH}`}
@@ -256,9 +285,16 @@ export function BetSimulation() {
             display: "block",
             width: "100%",
             height: svgH,
+            filter: `drop-shadow(0 0 6px ${EMERALD_GLOW})`,
           }}
           aria-hidden
         >
+          <defs>
+            <linearGradient id="onboardAreaGrad" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor={EMERALD} stopOpacity={0.55} />
+              <stop offset="100%" stopColor={EMERALD} stopOpacity={0} />
+            </linearGradient>
+          </defs>
           {/* Gridlines at 25 / 50 / 75 */}
           {[25, 50, 75].map((v) => {
             const y = padY + (1 - v / 100) * (svgH - padY * 2);
@@ -269,39 +305,45 @@ export function BetSimulation() {
                 x2={svgW - padX}
                 y1={y}
                 y2={y}
-                stroke={LINE}
-                strokeDasharray="2 3"
+                stroke={D_LINE}
+                strokeDasharray="2 4"
+                opacity={0.9}
               />
             );
           })}
-          {/* Area fill */}
-          <path d={areaPath} fill={EMERALD_TINT} opacity={0.9} />
-          {/* Line */}
+          {/* Area fill (glowing gradient) */}
+          <path d={areaPath} fill="url(#onboardAreaGrad)" />
+          {/* Line — bright emerald with drop-shadow glow */}
           <path
             d={chartPath}
             fill="none"
             stroke={EMERALD}
-            strokeWidth={2}
+            strokeWidth={2.4}
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-          {/* Current point marker */}
+          {/* Current point marker — bloom halo + solid dot */}
           {currentPoint && (
             <>
               <circle
                 cx={currentPoint.x}
                 cy={currentPoint.y}
-                r={6}
+                r={10}
                 fill={EMERALD}
-                opacity={0.15}
+                opacity={0.18}
               />
               <circle
                 cx={currentPoint.x}
                 cy={currentPoint.y}
-                r={3}
-                fill="white"
-                stroke={EMERALD}
-                strokeWidth={2}
+                r={5}
+                fill={EMERALD}
+                opacity={0.4}
+              />
+              <circle
+                cx={currentPoint.x}
+                cy={currentPoint.y}
+                r={2.6}
+                fill={D_INK}
               />
             </>
           )}
@@ -310,12 +352,13 @@ export function BetSimulation() {
         <div style={{
           display: "grid",
           gridTemplateColumns: "repeat(4, 1fr)",
-          fontSize: 10,
-          letterSpacing: 0.5,
+          fontSize: 9.5,
+          letterSpacing: 1.2,
           textTransform: "uppercase",
-          color: DIM,
+          color: D_DIM,
           fontWeight: 800,
-          marginTop: 2,
+          marginTop: 4,
+          fontFamily: "var(--font-mono), monospace",
         }}>
           <span style={{ textAlign: "left" }}>R1</span>
           <span style={{ textAlign: "left" }}>R2</span>
@@ -328,41 +371,67 @@ export function BetSimulation() {
       <div style={{
         display: "flex",
         alignItems: "center",
-        gap: 8,
-        padding: "8px 12px",
-        borderRadius: 8,
+        gap: 10,
+        padding: "10px 12px",
+        borderRadius: 10,
         background: eventTick?.delta && eventTick.delta > 0
           ? EMERALD_TINT
           : eventTick?.delta && eventTick.delta < 0
-            ? "oklch(0.96 0.04 30)"
-            : SOFT,
-        marginBottom: 10,
-        minHeight: 36,
-        transition: "background 220ms ease",
+            ? DOWN_TINT
+            : D_PANEL,
+        border: `1px solid ${
+          eventTick?.delta && eventTick.delta > 0
+            ? EMERALD_D
+            : eventTick?.delta && eventTick.delta < 0
+              ? "oklch(0.44 0.14 25)"
+              : D_LINE
+        }`,
+        marginBottom: 12,
+        minHeight: 40,
+        transition: "background 220ms ease, border-color 220ms ease",
       }}>
-        <span style={{ fontSize: 14 }} aria-hidden>🏌️</span>
+        <span
+          style={{
+            fontSize: 14,
+            filter:
+              eventTick?.delta && eventTick.delta > 0
+                ? `drop-shadow(0 0 6px ${EMERALD_GLOW})`
+                : undefined,
+          }}
+          aria-hidden
+        >
+          {eventTick?.delta && eventTick.delta > 0
+            ? "▲"
+            : eventTick?.delta && eventTick.delta < 0
+              ? "▼"
+              : "•"}
+        </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontSize: 12.5,
             fontWeight: 700,
-            color: INK,
+            color: D_INK,
             lineHeight: 1.25,
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
+            fontFamily: "var(--font-mono), monospace",
+            letterSpacing: 0.1,
           }}>
             {eventTick?.event ?? "Live-tracking every shot on course…"}
           </div>
         </div>
         {typeof eventTick?.delta === "number" && eventTick.delta !== 0 && (
           <span style={{
-            fontSize: 12.5,
+            fontSize: 13,
             fontWeight: 800,
             fontFamily: "var(--font-mono), monospace",
             color: eventTick.delta > 0 ? EMERALD : DOWN,
-            padding: "2px 6px",
+            padding: "3px 8px",
             borderRadius: 6,
-            background: "white",
+            background: "oklch(0.10 0.01 155 / 0.65)",
+            border: `1px solid ${eventTick.delta > 0 ? EMERALD_D : "oklch(0.50 0.16 25)"}`,
+            textShadow: `0 0 8px ${eventTick.delta > 0 ? EMERALD_GLOW : "oklch(0.74 0.20 25 / 0.5)"}`,
           }}>
             {eventTick.delta > 0 ? "+" : ""}{eventTick.delta}%
           </span>
@@ -373,13 +442,14 @@ export function BetSimulation() {
       <div style={{
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
-        gap: 8,
+        gap: 10,
       }}>
         <div style={statTileStyle()}>
           <div style={statLabelStyle()}>Expected return</div>
           <div style={{
             ...statValueStyle(),
             color: expectedReturn > 0 ? EMERALD : DOWN,
+            textShadow: `0 0 10px ${expectedReturn > 0 ? EMERALD_GLOW : "oklch(0.74 0.20 25 / 0.4)"}`,
           }}>
             {expectedReturn > 0 ? "+" : ""}£{expectedReturn.toFixed(2)}
           </div>
@@ -487,7 +557,7 @@ export function LiveFeedSimulation() {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        marginBottom: 12,
+        marginBottom: 14,
       }}>
         <span style={liveBadgeStyle(TANG)}>
           <span style={livePulseStyle(TANG)} />
@@ -495,96 +565,110 @@ export function LiveFeedSimulation() {
         </span>
         <div style={{
           fontSize: 10,
-          letterSpacing: 0.8,
+          letterSpacing: 1.2,
           textTransform: "uppercase",
-          color: DIM,
+          color: D_DIM,
           fontWeight: 800,
+          fontFamily: "var(--font-mono), monospace",
         }}>
           Shot-by-shot feed
         </div>
       </div>
 
       <div style={{ display: "grid", gap: 8 }}>
-        {FEED_SCRIPT.slice(0, count).map((item, i) => (
-          <div
-            key={`${pulse}-${item.id}`}
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 10,
-              padding: "10px 12px",
-              background: i === count - 1 && count < FEED_SCRIPT.length
-                ? TANG_TINT
-                : CARD,
-              border: `1px solid ${LINE}`,
-              borderRadius: 10,
-              animation:
-                i === count - 1
+        {FEED_SCRIPT.slice(0, count).map((item, i) => {
+          const isNewest = i === count - 1;
+          const accentC = item.accent === "emerald" ? EMERALD
+            : item.accent === "tang" ? TANG : BLUE;
+          const accentTint = item.accent === "emerald" ? EMERALD_TINT
+            : item.accent === "tang" ? TANG_TINT : BLUE_TINT;
+          const accentGlow = item.accent === "emerald" ? EMERALD_GLOW
+            : item.accent === "tang" ? TANG_GLOW : BLUE_GLOW;
+          return (
+            <div
+              key={`${pulse}-${item.id}`}
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 12,
+                padding: "11px 12px",
+                background: D_PANEL,
+                border: `1px solid ${isNewest ? accentC : D_LINE}`,
+                borderRadius: 10,
+                boxShadow: isNewest ? `0 0 24px ${accentGlow}` : undefined,
+                animation: isNewest
                   ? "onboardSlideIn 260ms cubic-bezier(.2,.9,.3,1)"
                   : undefined,
-            }}
-          >
-            <span style={{
-              width: 28,
-              height: 28,
-              borderRadius: 999,
-              background: item.accent === "emerald" ? EMERALD_TINT : item.accent === "tang" ? TANG_TINT : BLUE_TINT,
-              color: item.accent === "emerald" ? EMERALD : item.accent === "tang" ? TANG : BLUE,
-              display: "grid",
-              placeItems: "center",
-              fontSize: 13,
-              fontWeight: 800,
-              flexShrink: 0,
-              fontFamily: "var(--font-mono), monospace",
-            }} aria-hidden>
-              {item.player.split(" ").map(w => w[0]).join("")}
-            </span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontSize: 12,
+                transition: "border-color 220ms ease, box-shadow 220ms ease",
+              }}
+            >
+              <span style={{
+                width: 30,
+                height: 30,
+                borderRadius: 999,
+                background: accentTint,
+                color: accentC,
+                display: "grid",
+                placeItems: "center",
+                fontSize: 13,
                 fontWeight: 800,
-                color: INK,
-                display: "flex",
-                gap: 6,
-                alignItems: "baseline",
-              }}>
-                <span>{item.player}</span>
-                <span style={{
-                  fontSize: 10,
-                  color: DIM,
-                  fontWeight: 600,
+                flexShrink: 0,
+                fontFamily: "var(--font-mono), monospace",
+                letterSpacing: -0.3,
+                border: `1px solid ${accentC}`,
+                boxShadow: isNewest ? `0 0 10px ${accentGlow}` : undefined,
+              }} aria-hidden>
+                {item.player.split(" ").map(w => w[0]).join("")}
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontSize: 12.5,
+                  fontWeight: 800,
+                  color: D_INK,
+                  display: "flex",
+                  gap: 6,
+                  alignItems: "baseline",
+                  letterSpacing: -0.1,
+                }}>
+                  <span>{item.player}</span>
+                  <span style={{
+                    fontSize: 10,
+                    color: D_DIM,
+                    fontWeight: 600,
+                    fontFamily: "var(--font-mono), monospace",
+                    letterSpacing: 0.3,
+                  }}>
+                    · {item.timeAgo}
+                  </span>
+                </div>
+                <div style={{
+                  fontSize: 12.5,
+                  color: D_MUTED,
+                  marginTop: 2,
+                  lineHeight: 1.35,
+                }}>
+                  {item.line}
+                </div>
+                <div style={{
+                  display: "flex",
+                  gap: 12,
+                  marginTop: 6,
+                  fontSize: 11,
+                  color: D_DIM,
+                  fontWeight: 700,
                   fontFamily: "var(--font-mono), monospace",
                 }}>
-                  · {item.timeAgo}
-                </span>
-              </div>
-              <div style={{
-                fontSize: 12.5,
-                color: MUTED,
-                marginTop: 1,
-                lineHeight: 1.35,
-              }}>
-                {item.line}
-              </div>
-              <div style={{
-                display: "flex",
-                gap: 10,
-                marginTop: 6,
-                fontSize: 11,
-                color: DIM,
-                fontWeight: 700,
-                fontFamily: "var(--font-mono), monospace",
-              }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                  <span aria-hidden>🔥</span>{item.reactions.fire}
-                </span>
-                <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                  <span aria-hidden>💬</span>{item.reactions.comment}
-                </span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                    <span aria-hidden>🔥</span>{item.reactions.fire}
+                  </span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                    <span aria-hidden>💬</span>{item.reactions.comment}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <style>{`
@@ -654,27 +738,29 @@ export function ToolsSimulation() {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        marginBottom: 12,
-        gap: 10,
+        marginBottom: 14,
+        gap: 12,
       }}>
         <div style={{ minWidth: 0 }}>
           <div style={{
             fontSize: 10,
-            letterSpacing: 0.8,
+            letterSpacing: 1.2,
             textTransform: "uppercase",
-            color: DIM,
+            color: D_DIM,
             fontWeight: 800,
+            fontFamily: "var(--font-mono), monospace",
           }}>
             Course-fit forecast
           </div>
           <div style={{
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: 800,
-            color: INK,
-            marginTop: 2,
+            color: D_INK,
+            marginTop: 3,
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
+            letterSpacing: -0.1,
           }}>
             Torrey Pines · this week
           </div>
@@ -682,20 +768,23 @@ export function ToolsSimulation() {
         <div style={{ textAlign: "right" }}>
           <div style={{
             fontSize: 10,
-            letterSpacing: 0.8,
+            letterSpacing: 1.2,
             textTransform: "uppercase",
-            color: DIM,
+            color: D_DIM,
             fontWeight: 800,
+            fontFamily: "var(--font-mono), monospace",
           }}>
             Model fit
           </div>
           <div style={{
-            fontSize: 20,
+            fontSize: 24,
             fontWeight: 800,
             color: BLUE,
             fontFamily: "var(--font-mono), monospace",
             lineHeight: 1,
-            marginTop: 2,
+            marginTop: 3,
+            textShadow: `0 0 12px ${BLUE_GLOW}`,
+            letterSpacing: -0.5,
           }}>
             {confidence}%
           </div>
@@ -704,28 +793,31 @@ export function ToolsSimulation() {
 
       {/* Confidence bar */}
       <div style={{
-        height: 5,
-        background: SOFT,
+        height: 6,
+        background: D_PANEL,
+        border: `1px solid ${D_LINE}`,
         borderRadius: 999,
         overflow: "hidden",
-        marginBottom: 14,
+        marginBottom: 16,
       }}>
         <div style={{
           width: `${confidence}%`,
           height: "100%",
-          background: BLUE,
+          background: `linear-gradient(90deg, ${BLUE_D} 0%, ${BLUE} 100%)`,
           borderRadius: 999,
+          boxShadow: `0 0 12px ${BLUE_GLOW}`,
           transition: "width 40ms linear",
         }} />
       </div>
 
       <div style={{
         fontSize: 10,
-        letterSpacing: 0.8,
+        letterSpacing: 1.2,
         textTransform: "uppercase",
-        color: DIM,
+        color: D_DIM,
         fontWeight: 800,
-        marginBottom: 6,
+        marginBottom: 8,
+        fontFamily: "var(--font-mono), monospace",
       }}>
         Predicted Event Δ (SG:OTT / 4 rds)
       </div>
@@ -733,18 +825,21 @@ export function ToolsSimulation() {
         {RANK_TARGET.map((row, i) => {
           const visible = i < step;
           const c = row.colour === "up" ? EMERALD
-            : row.colour === "down" ? DOWN : MUTED;
+            : row.colour === "down" ? DOWN : D_MUTED;
+          const glow = row.colour === "up" ? EMERALD_GLOW
+            : row.colour === "down" ? "oklch(0.74 0.20 25 / 0.5)"
+              : "transparent";
           return (
             <div
               key={row.name}
               style={{
                 display: "grid",
-                gridTemplateColumns: "18px 1fr auto 60px",
-                gap: 10,
+                gridTemplateColumns: "18px 1fr auto 72px",
+                gap: 12,
                 alignItems: "center",
-                padding: "8px 10px",
-                background: CARD,
-                border: `1px solid ${LINE}`,
+                padding: "10px 12px",
+                background: D_PANEL,
+                border: `1px solid ${D_LINE}`,
                 borderRadius: 8,
                 opacity: visible ? 1 : 0,
                 transform: visible ? "translateY(0)" : "translateY(6px)",
@@ -754,27 +849,30 @@ export function ToolsSimulation() {
             >
               <span style={{
                 fontSize: 10,
-                color: DIM,
+                color: D_DIM,
                 fontWeight: 800,
                 fontFamily: "var(--font-mono), monospace",
+                letterSpacing: 0.5,
               }}>
-                {i + 1}
+                {String(i + 1).padStart(2, "0")}
               </span>
               <span style={{
-                fontSize: 12.5,
+                fontSize: 13,
                 fontWeight: 800,
-                color: INK,
+                color: D_INK,
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
+                letterSpacing: -0.1,
               }}>
                 {row.name}
               </span>
-              {/* Bar */}
+              {/* Signed bar */}
               <div style={{
-                width: 60,
-                height: 6,
-                background: SOFT,
+                width: 72,
+                height: 7,
+                background: D_BG_LO,
+                border: `1px solid ${D_LINE}`,
                 borderRadius: 999,
                 position: "relative",
                 overflow: "hidden",
@@ -787,6 +885,7 @@ export function ToolsSimulation() {
                   width: `${Math.abs(row.edge) * 25}%`,
                   background: c,
                   borderRadius: 999,
+                  boxShadow: `0 0 8px ${glow}`,
                   transition: "width 320ms ease, left 320ms ease",
                 }} />
                 {/* Zero marker */}
@@ -796,17 +895,19 @@ export function ToolsSimulation() {
                   left: "50%",
                   transform: "translateX(-50%)",
                   width: 1,
-                  height: 8,
-                  background: DIM,
-                  opacity: 0.5,
+                  height: 9,
+                  background: D_MUTED,
+                  opacity: 0.7,
                 }} />
               </div>
               <span style={{
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: 800,
                 color: c,
                 fontFamily: "var(--font-mono), monospace",
                 textAlign: "right",
+                textShadow: glow !== "transparent" ? `0 0 8px ${glow}` : undefined,
+                letterSpacing: -0.3,
               }}>
                 {row.edge > 0 ? "+" : ""}{row.edge.toFixed(2)}
               </span>
@@ -821,51 +922,87 @@ export function ToolsSimulation() {
 // ── Shared styles ─────────────────────────────────────────────────
 
 function simCardStyle(accent: string): React.CSSProperties {
+  const glow =
+    accent === EMERALD
+      ? EMERALD_GLOW
+      : accent === TANG
+        ? TANG_GLOW
+        : BLUE_GLOW;
   return {
     marginTop: 4,
     marginBottom: 18,
-    padding: "14px 14px 12px",
-    borderRadius: 14,
-    background: CARD,
-    border: `1px solid ${LINE}`,
-    boxShadow: `inset 0 -3px 0 ${accent}, 0 2px 12px oklch(0.15 0.02 150 / 0.06)`,
+    padding: "18px 18px 16px",
+    borderRadius: 16,
+    background: `linear-gradient(155deg, ${D_BG} 0%, ${D_BG_LO} 100%)`,
+    // Faint dot-grid so the panel reads like a data terminal.
+    backgroundImage: `
+      linear-gradient(155deg, ${D_BG} 0%, ${D_BG_LO} 100%),
+      radial-gradient(oklch(0.96 0.008 150 / 0.045) 1px, transparent 1px)
+    `,
+    backgroundSize: "auto, 20px 20px",
+    backgroundBlendMode: "normal, screen",
+    border: `1px solid ${D_LINE}`,
+    boxShadow: `
+      inset 0 0 0 1px oklch(0.96 0.008 150 / 0.04),
+      inset 0 -2px 0 ${accent},
+      0 12px 32px ${glow.replace("/ 0.55", "/ 0.20")},
+      0 0 0 1px oklch(0.15 0.02 150 / 0.04)
+    `,
     fontFamily: "var(--font-archivo), var(--font-sans), sans-serif",
+    color: D_INK,
+    position: "relative",
+    overflow: "hidden",
   };
 }
 
 function liveBadgeStyle(colour = EMERALD): React.CSSProperties {
+  const tint =
+    colour === EMERALD
+      ? EMERALD_TINT
+      : colour === TANG
+        ? TANG_TINT
+        : BLUE_TINT;
+  const glow =
+    colour === EMERALD
+      ? EMERALD_GLOW
+      : colour === TANG
+        ? TANG_GLOW
+        : BLUE_GLOW;
   return {
     display: "inline-flex",
     alignItems: "center",
-    gap: 5,
-    padding: "3px 8px 3px 6px",
+    gap: 6,
+    padding: "3px 9px 3px 7px",
     borderRadius: 999,
-    background: colour === EMERALD ? EMERALD_TINT : TANG_TINT,
-    color: colour === EMERALD ? EMERALD : TANG,
+    background: tint,
+    color: colour,
     fontSize: 9.5,
     fontWeight: 800,
-    letterSpacing: 1.2,
+    letterSpacing: 1.4,
     textTransform: "uppercase",
     fontFamily: "var(--font-archivo), var(--font-sans), sans-serif",
+    boxShadow: `inset 0 0 0 1px ${colour}, 0 0 12px ${glow}`,
   };
 }
 
 function livePulseStyle(colour = EMERALD): React.CSSProperties {
   return {
-    width: 7,
-    height: 7,
+    width: 8,
+    height: 8,
     borderRadius: 999,
     background: colour,
-    boxShadow: `0 0 0 0 ${colour}`,
+    color: colour,
+    boxShadow: `0 0 0 0 ${colour}, 0 0 8px ${colour}`,
     animation: "onboardPulse 1.6s ease-out infinite",
   };
 }
 
 function statTileStyle(): React.CSSProperties {
   return {
-    padding: "8px 10px",
-    background: SOFT,
-    borderRadius: 8,
+    padding: "10px 12px",
+    background: D_PANEL,
+    border: `1px solid ${D_LINE}`,
+    borderRadius: 10,
     textAlign: "left",
   };
 }
@@ -873,21 +1010,22 @@ function statTileStyle(): React.CSSProperties {
 function statLabelStyle(): React.CSSProperties {
   return {
     fontSize: 9.5,
-    letterSpacing: 0.6,
+    letterSpacing: 1,
     textTransform: "uppercase",
-    color: DIM,
+    color: D_DIM,
     fontWeight: 800,
   };
 }
 
 function statValueStyle(): React.CSSProperties {
   return {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: 800,
-    color: INK,
+    color: D_INK,
     fontFamily: "var(--font-mono), monospace",
-    marginTop: 2,
+    marginTop: 3,
     lineHeight: 1,
+    letterSpacing: -0.2,
   };
 }
 
@@ -896,15 +1034,15 @@ function replayBtnStyle(): React.CSSProperties {
     display: "inline-flex",
     alignItems: "center",
     gap: 5,
-    marginTop: 10,
+    marginTop: 12,
     padding: "5px 10px",
     fontSize: 10.5,
     fontWeight: 800,
-    letterSpacing: 0.7,
+    letterSpacing: 0.9,
     textTransform: "uppercase",
-    color: MUTED,
+    color: D_MUTED,
     background: "transparent",
-    border: `1px solid ${LINE}`,
+    border: `1px solid ${D_LINE}`,
     borderRadius: 6,
     cursor: "pointer",
     fontFamily: "inherit",

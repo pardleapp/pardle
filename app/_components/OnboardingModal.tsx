@@ -264,16 +264,18 @@ export function OnboardingModal() {
         style={{
           position: "relative",
           width: "100%",
-          maxWidth: 520,
+          maxWidth: 560,
           background: CARD,
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
-          padding: "24px 22px 28px",
+          backgroundImage: "radial-gradient(120% 80% at 50% 0%, oklch(0.99 0.02 155) 0%, transparent 60%)",
+          borderTopLeftRadius: 22,
+          borderTopRightRadius: 22,
+          padding: "26px 22px 30px",
           transform: entered ? "translateY(0)" : "translateY(24px)",
           opacity: entered ? 1 : 0,
           transition:
             "transform 220ms cubic-bezier(.2,.9,.3,1), opacity 200ms ease",
-          boxShadow: "0 -12px 40px oklch(0.15 0.02 150 / 0.18)",
+          boxShadow:
+            "0 -12px 40px oklch(0.15 0.02 150 / 0.18), 0 0 0 1px oklch(0.15 0.02 150 / 0.06)",
           maxHeight: "92vh",
           overflowY: "auto",
         }}
@@ -306,20 +308,36 @@ export function OnboardingModal() {
       {/* Desktop shift: centered card instead of bottom-sheet on
           screens ≥ 640px. Kept in one file with @media in a
           <style> tag so the component ships without touching
-          globals.css. */}
+          globals.css. Modal grows to ~75% viewport on desktop —
+          the sim panels earn the real estate. */}
       <style>{`
         @media (min-width: 640px) {
           .pardle-onboard-card {
-            border-radius: 18px !important;
+            border-radius: 20px !important;
             margin-bottom: auto !important;
             margin-top: auto !important;
-            max-width: 480px !important;
+            width: 75vw !important;
+            max-width: 900px !important;
+            padding: 32px 40px 34px !important;
+          }
+        }
+        @media (min-width: 1080px) {
+          .pardle-onboard-card {
+            max-width: 1000px !important;
           }
         }
         @keyframes onboardPulse {
-          0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
-          70% { box-shadow: 0 0 0 8px transparent; opacity: 0.55; }
+          0%   { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+          70%  { box-shadow: 0 0 0 8px transparent; opacity: 0.55; }
           100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+        }
+        @keyframes onboardGridDrift {
+          0%   { background-position: 0 0; }
+          100% { background-position: 0 32px; }
+        }
+        @keyframes onboardBloom {
+          0%, 100% { filter: drop-shadow(0 0 3px currentColor); }
+          50%      { filter: drop-shadow(0 0 8px currentColor); }
         }
       `}</style>
     </div>
