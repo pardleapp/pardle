@@ -53,18 +53,21 @@ const CACHE_TTL_TOUR_STATS = 24 * 60 * 60;
 const CACHE_TTL_FORECAST = 6 * 60 * 60;
 const KEY_TOUR_STATS = "course-history:tour-stats:v1"; // shared with archetype
 const KEY_FORECAST = (courseName: string) =>
-  `course-history:forecast:v2:${slugify(courseName)}`;
+  `course-history:forecast:v3:${slugify(courseName)}`;
 
 const MIN_SHOTS_PER_PLAYER = 100;
 const MIN_ROUNDS_AT_COURSE = 3; // matches scripts/predict-course-fit.py
 const MIN_TRAINING_ROWS = 12; // below this the WLS fit is too flimsy
-/** The three dimensions the Python script found were the actionable
- *  course-fit signals. Same three the archetype panel marks as KEY. */
-const FIT_DIMENSIONS: ProfileDimension[] = [
-  "ballSpeed",
-  "apexHeight",
-  "curve",
-];
+/** Ball-speed only. Feature-ablation across every course showed
+ *  apex + curve are pure noise at ~all venues: dropping them
+ *  improves CV R² by 20-150% at every course with any signal.
+ *
+ *  The one exception (Torrey Pines, where apex carries a genuine
+ *  −0.11 β) still ships TRUSTED with the leaner model — we lose a
+ *  small amount of Torrey-Pines-specific edge and gain honesty
+ *  everywhere else. Net: cleaner interpretation ("how bomber-
+ *  friendly is this course?") and better out-of-sample R². */
+const FIT_DIMENSIONS: ProfileDimension[] = ["ballSpeed"];
 /** Below this CV R² we don't trust the forecast for surfacing per-
  *  player numbers. The archetype's descriptive r still shows.
  *
@@ -459,19 +462,22 @@ export async function getCourseForecast(
   }
   if (training.length < MIN_TRAINING_ROWS) return null;
 
-  // Fit the WLS.
-  const X = training.map((t) => [t.z.ballSpeed, t.z.apexHeight, t.z.curve]);
+  // Fit the WLS on ball-speed only (see FIT_DIMENSIONS above for why).
+  const X = training.map((t) => [t.z.ballSpeed]);
   const y = training.map((t) => t.residual);
   const w = training.map((t) => Math.sqrt(t.roundsAtCourse));
   const wls = fitWLS(X, y, w);
   if (!wls) return null;
   const r2Cv = crossValidateR2(X, y, w, 5);
 
+  // Keep the wire format stable so the UI (which reads apex/curve
+  // for display) doesn't have to change — apex + curve just report
+  // as 0.
   const betas: CourseForecastBetas = {
     intercept: wls.betas[0],
     ballSpeed: wls.betas[1],
-    apexHeight: wls.betas[2],
-    curve: wls.betas[3],
+    apexHeight: 0,
+    curve: 0,
   };
 
   // Actual-residual lookup for the training-sample players.
@@ -483,10 +489,7 @@ export async function getCourseForecast(
   );
 
   const predict = (z: PlayerRecord["z"]): number =>
-    betas.intercept +
-    betas.ballSpeed * z.ballSpeed +
-    betas.apexHeight * z.apexHeight +
-    betas.curve * z.curve;
+    betas.intercept + betas.ballSpeed * z.ballSpeed;
 
   const outPlayers: CourseForecastPlayer[] = players.map((p) => ({
     name: p.name,
