@@ -24,7 +24,7 @@ import { getCourseForecast } from "@/lib/course-history/forecast";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export async function GET(req: Request) {
   const url = new URL(req.url);

@@ -96,6 +96,29 @@ interface TourStatsRow {
 }
 type TourStats = Record<ProfileDimension, TourStatsRow>;
 
+/** Concurrency cap for player-profile fetches. Upstash tolerates a
+ *  few dozen concurrent HTTP round-trips; ~20 keeps latency low
+ *  without tripping their rate limiter. */
+const PROFILE_FETCH_CONCURRENCY = 24;
+
+async function mapWithConcurrency<T, U>(
+  items: T[],
+  limit: number,
+  fn: (item: T, i: number) => Promise<U>,
+): Promise<U[]> {
+  const out: U[] = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
 async function getTourStats(): Promise<TourStats | null> {
   if (redis) {
     const cached = await redis
@@ -112,11 +135,20 @@ async function getTourStats(): Promise<TourStats | null> {
   const perDim: Record<ProfileDimension, number[]> = Object.fromEntries(
     PROFILE_DIMENSIONS.map((d) => [d, [] as number[]]),
   ) as Record<ProfileDimension, number[]>;
-  for (const p of eligible) {
-    const records = await getTeeShots(p.playerId);
-    if (!records || records.length === 0) continue;
-    const name = (await getPlayerName(p.playerId)) ?? p.playerId;
-    const prof = buildProfile(p.playerId, name, records, 0);
+  const perPlayer = await mapWithConcurrency(
+    eligible,
+    PROFILE_FETCH_CONCURRENCY,
+    async (p) => {
+      const [records, name] = await Promise.all([
+        getTeeShots(p.playerId),
+        getPlayerName(p.playerId),
+      ]);
+      if (!records || records.length === 0) return null;
+      return buildProfile(p.playerId, name ?? p.playerId, records, 0);
+    },
+  );
+  for (const prof of perPlayer) {
+    if (!prof) continue;
     for (const d of PROFILE_DIMENSIONS) {
       const v = prof.stats[d]?.mean;
       if (Number.isFinite(v)) perDim[d].push(v);
@@ -335,51 +367,63 @@ export async function getCourseForecast(
   ]);
   if (!history || !tourStats) return null;
 
-  // Build a name → playerId lookup from the tee-shot store.
-  const nameToId = new Map<string, string>();
-  await Promise.all(
-    ranked.map(async (r) => {
-      const name = await getPlayerName(r.playerId);
-      if (!name) return;
-      nameToId.set(normaliseName(name), r.playerId);
-    }),
-  );
-
   // Assemble the profile pool once — everyone with ≥MIN_SHOTS is a
   // prediction candidate even if they've never played the course.
+  // Parallelised: one round-trip pair (shots + name) per player,
+  // capped concurrency. Sequential was pushing cold-path past 60s
+  // once the profile pool grew past ~400 players.
   interface PlayerRecord {
     name: string;
     playerId: string;
     profile: PlayerDrivingProfile;
     z: { ballSpeed: number; apexHeight: number; curve: number };
   }
+  const eligibleRanked = ranked.filter(
+    (r) => r.shotCount >= MIN_SHOTS_PER_PLAYER,
+  );
+  const zOf = (
+    profile: PlayerDrivingProfile,
+    d: ProfileDimension,
+  ): number => {
+    const t = tourStats[d];
+    if (!t || t.tourStd <= 0) return 0;
+    const v = profile.stats[d]?.mean;
+    if (!Number.isFinite(v)) return 0;
+    return (v - t.tourMean) / t.tourStd;
+  };
+  const perPlayerRecs = await mapWithConcurrency(
+    eligibleRanked,
+    PROFILE_FETCH_CONCURRENCY,
+    async (r): Promise<PlayerRecord | null> => {
+      const [records, name] = await Promise.all([
+        getTeeShots(r.playerId),
+        getPlayerName(r.playerId),
+      ]);
+      if (!records || records.length < MIN_SHOTS_PER_PLAYER) return null;
+      const profile = buildProfile(
+        r.playerId,
+        name ?? r.playerId,
+        records,
+        0,
+      );
+      return {
+        name: name ?? r.playerId,
+        playerId: r.playerId,
+        profile,
+        z: {
+          ballSpeed: zOf(profile, "ballSpeed"),
+          apexHeight: zOf(profile, "apexHeight"),
+          curve: zOf(profile, "curve"),
+        },
+      };
+    },
+  );
   const players: PlayerRecord[] = [];
   const playerByNormName = new Map<string, PlayerRecord>();
-  for (const r of ranked) {
-    if (r.shotCount < MIN_SHOTS_PER_PLAYER) continue;
-    const records = await getTeeShots(r.playerId);
-    if (!records || records.length < MIN_SHOTS_PER_PLAYER) continue;
-    const name = (await getPlayerName(r.playerId)) ?? r.playerId;
-    const profile = buildProfile(r.playerId, name, records, 0);
-    const zOf = (d: ProfileDimension) => {
-      const t = tourStats[d];
-      if (!t || t.tourStd <= 0) return 0;
-      const v = profile.stats[d]?.mean;
-      if (!Number.isFinite(v)) return 0;
-      return (v - t.tourMean) / t.tourStd;
-    };
-    const rec: PlayerRecord = {
-      name,
-      playerId: r.playerId,
-      profile,
-      z: {
-        ballSpeed: zOf("ballSpeed"),
-        apexHeight: zOf("apexHeight"),
-        curve: zOf("curve"),
-      },
-    };
+  for (const rec of perPlayerRecs) {
+    if (!rec) continue;
     players.push(rec);
-    playerByNormName.set(normaliseName(name), rec);
+    playerByNormName.set(normaliseName(rec.name), rec);
   }
   if (players.length === 0) return null;
 
