@@ -20,6 +20,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import {
+  BetSimulation,
+  LiveFeedSimulation,
+  ToolsSimulation,
+} from "./OnboardingSims";
 
 const SEEN_KEY = "pardle.onboarding.v1";
 
@@ -41,12 +46,18 @@ interface Recommendation {
 
 interface ExplainerCard {
   title: string;
+  /** One-line pitch shown above the interactive sim. */
   lede: string;
+  /** Short paragraph shown BELOW the sim, explaining what the
+   *  simulation just demonstrated. Keeps the demo the visual
+   *  centrepiece rather than burying it under body copy. */
+  bodyAfterSim: string;
   primaryHref: string;
   primaryLabel: string;
   primaryHint: string;
   secondaries: Recommendation[];
   accent: string;
+  simulation: "bets" | "live" | "tools";
 }
 
 // Palette lifted from social-v2 tokens so the modal reads as part
@@ -112,12 +123,15 @@ const INTENTS: IntentOption[] = [
 
 const EXPLAINERS: Record<Intent, ExplainerCard> = {
   bets: {
-    title: "Your bet tracker",
-    lede: "Log the bets you placed with your bookmaker and Pardle keeps them alive — PnL, win probability and settlement all update as shots land.",
+    title: "Your bet, live on every shot",
+    lede: "Watch the demo — this is exactly how your own bet slip moves on Pardle.",
+    bodyAfterSim:
+      "Log a bet from your bookmaker and every shot on course re-prices it. Win probability, expected return and settlement all update in real time — no refresh, no waiting for scoreboards.",
     primaryHref: "/bets",
-    primaryLabel: "Go to My bets",
-    primaryHint: "Add your first bet — takes 20 seconds",
+    primaryLabel: "Add my first bet",
+    primaryHint: "20 seconds — no bookmaker link required",
     accent: EMERALD,
+    simulation: "bets",
     secondaries: [
       {
         href: "/groups",
@@ -132,12 +146,15 @@ const EXPLAINERS: Record<Intent, ExplainerCard> = {
     ],
   },
   live: {
-    title: "Live shot tracker",
-    lede: "The tournament as it happens — every notable shot, hole-out, birdie and bogey lands in your feed the moment it happens.",
+    title: "The tournament, live",
+    lede: "Watch the demo — every notable shot lands in your feed as it happens.",
+    bodyAfterSim:
+      "Birdies, hole-outs, chip-ins, playoff putts — the moment a shot matters, it's on Pardle. React, comment, share, and see what the rest of the room is saying while it plays out.",
     primaryHref: "/live",
     primaryLabel: "Open the shot tracker",
     primaryHint: "See the current tournament right now",
     accent: TANG,
+    simulation: "live",
     secondaries: [
       {
         href: "/",
@@ -152,12 +169,15 @@ const EXPLAINERS: Record<Intent, ExplainerCard> = {
     ],
   },
   tools: {
-    title: "Prediction tools",
-    lede: "Data-driven research tools for pre-tournament reads and in-play adjustments — same model layer that our forecast articles run on.",
+    title: "Predictions you can trust",
+    lede: "Watch the demo — models fit on years of course data, ranking who's built for this week's venue.",
+    bodyAfterSim:
+      "Every model is cross-validated on hold-out data so you can see the honest confidence, not the polished sales version. Course-fit forecasts, round-score distributions, and ballstriking archetypes — the same layer our articles run on.",
     primaryHref: "/analysis",
     primaryLabel: "Browse the tools",
     primaryHint: "Course-fit, round forecast, tee-shot profiles",
     accent: BLUE,
+    simulation: "tools",
     secondaries: [
       {
         href: "/analysis/course-history",
@@ -296,6 +316,11 @@ export function OnboardingModal() {
             max-width: 480px !important;
           }
         }
+        @keyframes onboardPulse {
+          0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+          70% { box-shadow: 0 0 0 8px transparent; opacity: 0.55; }
+          100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+        }
       `}</style>
     </div>
   );
@@ -402,12 +427,28 @@ function ExplainerStep({
         Something else
       </button>
       <div style={{ ...eyebrowStyle(), color: explainer.accent }}>
-        Your starter kit
+        How it works
       </div>
       <h2 id="onboarding-title" style={titleStyle()}>
         {explainer.title}
       </h2>
-      <p style={ledeStyle()}>{explainer.lede}</p>
+      <p style={{ ...ledeStyle(), margin: "6px 0 12px" }}>
+        {explainer.lede}
+      </p>
+
+      {/* Interactive simulation — the star of the second step. */}
+      {explainer.simulation === "bets" && <BetSimulation />}
+      {explainer.simulation === "live" && <LiveFeedSimulation />}
+      {explainer.simulation === "tools" && <ToolsSimulation />}
+
+      <p style={{
+        margin: "2px 0 16px",
+        fontSize: 13,
+        lineHeight: 1.5,
+        color: MUTED,
+      }}>
+        {explainer.bodyAfterSim}
+      </p>
 
       <Link
         href={explainer.primaryHref}
