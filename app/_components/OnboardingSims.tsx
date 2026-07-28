@@ -698,153 +698,181 @@ const RANK_TARGET: RankRow[] = [
 ];
 
 export function ToolsSimulation() {
-  const [step, setStep] = useState(0);
-  const [confidence, setConfidence] = useState(0);
+  const [pass, setPass] = useState(0); // bumped to restart the animation
+  const [counter, setCounter] = useState(0);
+  const [revealed, setRevealed] = useState(false);
+  const reducedMotion = usePrefersReducedMotion();
 
-  // Two-phase: (1) count up confidence 0 → 100 over ~2s
-  //             (2) reveal ranking rows one at a time, ~600ms each
+  // Restart the demo periodically so a lingering user sees it twice.
   useEffect(() => {
-    const rafs: number[] = [];
-    let start = performance.now();
-    function tick(now: number) {
-      const t = Math.min((now - start) / 2000, 1);
-      setConfidence(Math.round(t * 100));
-      if (t < 1) rafs.push(requestAnimationFrame(tick));
-    }
-    rafs.push(requestAnimationFrame(tick));
-    const revealId = window.setInterval(() => {
-      setStep((s) => {
-        if (s >= RANK_TARGET.length) {
-          window.setTimeout(() => {
-            setStep(0);
-            setConfidence(0);
-            start = performance.now();
-            rafs.push(requestAnimationFrame(tick));
-          }, 3000);
-          return s;
-        }
-        return s + 1;
-      });
-    }, 700);
-    return () => {
-      rafs.forEach((r) => cancelAnimationFrame(r));
-      window.clearInterval(revealId);
-    };
+    const id = window.setInterval(() => setPass((n) => n + 1), 7000);
+    return () => window.clearInterval(id);
   }, []);
+
+  // Reset + animate on every pass.
+  useEffect(() => {
+    if (reducedMotion) {
+      setCounter(100);
+      setRevealed(true);
+      return;
+    }
+    setCounter(0);
+    setRevealed(false);
+    const revealRaf = requestAnimationFrame(() => setRevealed(true));
+    const start = performance.now();
+    let rafId = 0;
+    function tick(now: number) {
+      const t = Math.min((now - start) / 1200, 1);
+      // Ease-out cubic — snaps in fast, settles gently.
+      const eased = 1 - Math.pow(1 - t, 3);
+      setCounter(Math.round(eased * 100));
+      if (t < 1) rafId = requestAnimationFrame(tick);
+    }
+    rafId = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(rafId);
+      cancelAnimationFrame(revealRaf);
+    };
+  }, [pass, reducedMotion]);
+
+  // Scale bars to fill nicely: |maxEdge| maps to ~48% of the bar
+  // slot (so ±48% around the zero midpoint).
+  const maxAbs = Math.max(
+    ...RANK_TARGET.map((r) => Math.abs(r.edge)),
+  );
+  const scale = 48 / maxAbs;
 
   return (
     <div style={simCardStyle(BLUE)}>
+      {/* Header row — small, everything meaningful is in the hero */}
       <div style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        marginBottom: 14,
+        marginBottom: 4,
         gap: 12,
       }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{
-            fontSize: 10,
-            letterSpacing: 1.2,
-            textTransform: "uppercase",
-            color: D_DIM,
-            fontWeight: 800,
-            fontFamily: "var(--font-mono), monospace",
-          }}>
-            Course-fit forecast
-          </div>
-          <div style={{
-            fontSize: 14,
-            fontWeight: 800,
-            color: D_INK,
-            marginTop: 3,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            letterSpacing: -0.1,
-          }}>
-            Torrey Pines · this week
-          </div>
+        <div style={monoEyebrowStyle()}>
+          Course-fit forecast · Torrey Pines
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{
-            fontSize: 10,
-            letterSpacing: 1.2,
-            textTransform: "uppercase",
-            color: D_DIM,
-            fontWeight: 800,
-            fontFamily: "var(--font-mono), monospace",
-          }}>
-            Model fit
-          </div>
-          <div style={{
-            fontSize: 24,
-            fontWeight: 800,
-            color: BLUE,
-            fontFamily: "var(--font-mono), monospace",
-            lineHeight: 1,
-            marginTop: 3,
-            textShadow: `0 0 12px ${BLUE_GLOW}`,
-            letterSpacing: -0.5,
-          }}>
-            {confidence}%
-          </div>
-        </div>
-      </div>
-
-      {/* Confidence bar */}
-      <div style={{
-        height: 6,
-        background: D_PANEL,
-        border: `1px solid ${D_LINE}`,
-        borderRadius: 999,
-        overflow: "hidden",
-        marginBottom: 16,
-      }}>
         <div style={{
-          width: `${confidence}%`,
-          height: "100%",
-          background: `linear-gradient(90deg, ${BLUE_D} 0%, ${BLUE} 100%)`,
-          borderRadius: 999,
-          boxShadow: `0 0 12px ${BLUE_GLOW}`,
-          transition: "width 40ms linear",
-        }} />
+          ...monoEyebrowStyle(),
+          color: BLUE,
+          opacity: 0.75,
+        }}>
+          Live model
+        </div>
       </div>
 
+      {/* HERO — count-up, glowing */}
       <div style={{
-        fontSize: 10,
-        letterSpacing: 1.2,
-        textTransform: "uppercase",
-        color: D_DIM,
-        fontWeight: 800,
-        marginBottom: 8,
-        fontFamily: "var(--font-mono), monospace",
+        position: "relative",
+        padding: "24px 16px 22px",
+        margin: "10px 0 20px",
+        background: `radial-gradient(120% 90% at 50% 40%, oklch(0.34 0.13 240 / 0.28) 0%, transparent 60%), ${D_PANEL}`,
+        border: `1px solid ${D_LINE}`,
+        borderRadius: 14,
+        textAlign: "center",
+        overflow: "hidden",
+      }}>
+        {/* Faint horizontal scan line for the mission-control feel */}
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          backgroundImage:
+            "repeating-linear-gradient(0deg, transparent 0, transparent 8px, oklch(0.96 0.008 150 / 0.03) 8px, oklch(0.96 0.008 150 / 0.03) 9px)",
+          pointerEvents: "none",
+        }} />
+        <div style={{ ...monoEyebrowStyle(), color: D_MUTED, position: "relative" }}>
+          Model confidence
+        </div>
+        <div
+          style={{
+            position: "relative",
+            marginTop: 8,
+            fontFamily: "var(--font-mono), monospace",
+            fontWeight: 800,
+            fontSize: 68,
+            lineHeight: 1,
+            color: BLUE,
+            textShadow: `0 0 22px ${BLUE_GLOW}, 0 0 40px ${BLUE_GLOW}`,
+            letterSpacing: -2,
+            fontVariantNumeric: "tabular-nums",
+          }}
+          aria-label={`Model confidence ${counter} percent`}
+        >
+          {counter}
+          <span style={{
+            fontSize: 32,
+            marginLeft: 4,
+            opacity: 0.7,
+            letterSpacing: -1,
+          }}>%</span>
+        </div>
+        <div style={{
+          position: "relative",
+          marginTop: 8,
+          fontSize: 11.5,
+          color: D_MUTED,
+          fontWeight: 700,
+          lineHeight: 1.4,
+        }}>
+          Cross-validated on 176 hold-out players · trusted signal
+        </div>
+        {/* Progress ring under the number */}
+        <div style={{
+          position: "relative",
+          marginTop: 14,
+          height: 4,
+          background: D_BG_LO,
+          borderRadius: 999,
+          overflow: "hidden",
+        }}>
+          <div style={{
+            width: `${counter}%`,
+            height: "100%",
+            background: `linear-gradient(90deg, ${BLUE_D} 0%, ${BLUE} 100%)`,
+            borderRadius: 999,
+            boxShadow: `0 0 10px ${BLUE_GLOW}`,
+            transition: reducedMotion ? undefined : "width 60ms linear",
+          }} />
+        </div>
+      </div>
+
+      {/* Bar race */}
+      <div style={{
+        ...monoEyebrowStyle(),
+        marginBottom: 10,
       }}>
         Predicted Event Δ (SG:OTT / 4 rds)
       </div>
-      <div style={{ display: "grid", gap: 6 }}>
+      <div style={{ display: "grid", gap: 7 }}>
         {RANK_TARGET.map((row, i) => {
-          const visible = i < step;
           const c = row.colour === "up" ? EMERALD
             : row.colour === "down" ? DOWN : D_MUTED;
           const glow = row.colour === "up" ? EMERALD_GLOW
             : row.colour === "down" ? "oklch(0.74 0.20 25 / 0.5)"
               : "transparent";
+          const barPct = Math.abs(row.edge) * scale;
+          const leftPct = row.edge >= 0 ? 50 : 50 - barPct;
+          const delay = reducedMotion ? 0 : 350 + i * 140;
           return (
             <div
-              key={row.name}
+              key={`${pass}-${row.name}`}
               style={{
                 display: "grid",
-                gridTemplateColumns: "18px 1fr auto 72px",
-                gap: 12,
+                gridTemplateColumns: "22px 1fr 1fr 62px",
+                gap: 10,
                 alignItems: "center",
-                padding: "10px 12px",
+                padding: "9px 12px",
                 background: D_PANEL,
                 border: `1px solid ${D_LINE}`,
-                borderRadius: 8,
-                opacity: visible ? 1 : 0,
-                transform: visible ? "translateY(0)" : "translateY(6px)",
-                transition:
-                  "opacity 220ms ease, transform 220ms cubic-bezier(.2,.9,.3,1)",
+                borderRadius: 9,
+                opacity: revealed ? 1 : 0,
+                transform: revealed ? "translateY(0)" : "translateY(6px)",
+                transition: reducedMotion
+                  ? undefined
+                  : `opacity 320ms ease ${delay}ms, transform 320ms cubic-bezier(.2,.9,.3,1) ${delay}ms`,
               }}
             >
               <span style={{
@@ -867,37 +895,41 @@ export function ToolsSimulation() {
               }}>
                 {row.name}
               </span>
-              {/* Signed bar */}
+              {/* Bar */}
               <div style={{
-                width: 72,
-                height: 7,
+                position: "relative",
+                height: 9,
                 background: D_BG_LO,
                 border: `1px solid ${D_LINE}`,
                 borderRadius: 999,
-                position: "relative",
                 overflow: "hidden",
               }}>
-                <div style={{
-                  position: "absolute",
-                  top: 0,
-                  left: row.edge >= 0 ? "50%" : `${50 + row.edge * 25}%`,
-                  height: "100%",
-                  width: `${Math.abs(row.edge) * 25}%`,
-                  background: c,
-                  borderRadius: 999,
-                  boxShadow: `0 0 8px ${glow}`,
-                  transition: "width 320ms ease, left 320ms ease",
-                }} />
                 {/* Zero marker */}
                 <div style={{
                   position: "absolute",
-                  top: -1,
+                  top: -2,
                   left: "50%",
                   transform: "translateX(-50%)",
                   width: 1,
-                  height: 9,
+                  height: 13,
                   background: D_MUTED,
-                  opacity: 0.7,
+                  opacity: 0.6,
+                  zIndex: 2,
+                }} />
+                {/* Bar fill — CSS-transitioned width, guaranteed to
+                     land at its target even if animation misses. */}
+                <div style={{
+                  position: "absolute",
+                  top: 0,
+                  left: `${leftPct}%`,
+                  height: "100%",
+                  width: revealed ? `${barPct}%` : "0%",
+                  background: `linear-gradient(90deg, ${c} 0%, ${c} 100%)`,
+                  borderRadius: 999,
+                  boxShadow: `0 0 8px ${glow}`,
+                  transition: reducedMotion
+                    ? undefined
+                    : `width 620ms cubic-bezier(.2,.9,.3,1) ${delay + 120}ms`,
                 }} />
               </div>
               <span style={{
@@ -908,6 +940,7 @@ export function ToolsSimulation() {
                 textAlign: "right",
                 textShadow: glow !== "transparent" ? `0 0 8px ${glow}` : undefined,
                 letterSpacing: -0.3,
+                fontVariantNumeric: "tabular-nums",
               }}>
                 {row.edge > 0 ? "+" : ""}{row.edge.toFixed(2)}
               </span>
@@ -917,6 +950,34 @@ export function ToolsSimulation() {
       </div>
     </div>
   );
+}
+
+/** Mono uppercase eyebrow — shared inside dark sim panels. */
+function monoEyebrowStyle(): React.CSSProperties {
+  return {
+    fontSize: 10,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    color: D_DIM,
+    fontWeight: 800,
+    fontFamily: "var(--font-mono), monospace",
+  };
+}
+
+/** Detects `prefers-reduced-motion: reduce`. Returns false during
+ *  SSR / initial paint so we don't over-eagerly disable animation
+ *  before we know the user's preference. */
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const listener = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mq.addEventListener?.("change", listener);
+    return () => mq.removeEventListener?.("change", listener);
+  }, []);
+  return reduced;
 }
 
 // ── Shared styles ─────────────────────────────────────────────────

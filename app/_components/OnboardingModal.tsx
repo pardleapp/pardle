@@ -42,16 +42,18 @@ interface Recommendation {
   href: string;
   label: string;
   blurb: string;
+  /** Simple emoji glyph shown in a small tile at the left of the row.
+   *  Keeps the visual weight of the recommendation cards up without
+   *  pulling in SVG icons per link. */
+  icon: string;
 }
 
 interface ExplainerCard {
   title: string;
-  /** One-line pitch shown above the interactive sim. */
+  /** One-line promise shown above the interactive sim. Kept short
+   *  and high-contrast — this is the reader's whole reason to
+   *  read on. */
   lede: string;
-  /** Short paragraph shown BELOW the sim, explaining what the
-   *  simulation just demonstrated. Keeps the demo the visual
-   *  centrepiece rather than burying it under body copy. */
-  bodyAfterSim: string;
   primaryHref: string;
   primaryLabel: string;
   primaryHint: string;
@@ -124,9 +126,7 @@ const INTENTS: IntentOption[] = [
 const EXPLAINERS: Record<Intent, ExplainerCard> = {
   bets: {
     title: "Your bet, live on every shot",
-    lede: "Watch the demo — this is exactly how your own bet slip moves on Pardle.",
-    bodyAfterSim:
-      "Log a bet from your bookmaker and every shot on course re-prices it. Win probability, expected return and settlement all update in real time — no refresh, no waiting for scoreboards.",
+    lede: "Log a bet and watch it move — win probability, expected return, and settlement all reprice on every shot on course.",
     primaryHref: "/bets",
     primaryLabel: "Add my first bet",
     primaryHint: "20 seconds — no bookmaker link required",
@@ -137,42 +137,42 @@ const EXPLAINERS: Record<Intent, ExplainerCard> = {
         href: "/groups",
         label: "Groups",
         blurb: "Race a P&L leaderboard against your mates.",
+        icon: "🏆",
       },
       {
         href: "/",
         label: "The feed",
-        blurb: "Reactions and running commentary on every notable bet in play.",
+        blurb: "Reactions and commentary on every notable bet in play.",
+        icon: "💬",
       },
     ],
   },
   live: {
     title: "The tournament, live",
-    lede: "Watch the demo — every notable shot lands in your feed as it happens.",
-    bodyAfterSim:
-      "Birdies, hole-outs, chip-ins, playoff putts — the moment a shot matters, it's on Pardle. React, comment, share, and see what the rest of the room is saying while it plays out.",
+    lede: "Every birdie, hole-out and playoff putt lands in your feed the moment it happens — react, comment, share.",
     primaryHref: "/live",
     primaryLabel: "Open the shot tracker",
-    primaryHint: "See the current tournament right now",
+    primaryHint: "Watch the current tournament right now",
     accent: TANG,
     simulation: "live",
     secondaries: [
       {
         href: "/",
         label: "Insights",
-        blurb: "Editorial reads, quick takes and pre-tournament briefings.",
+        blurb: "Editorial reads, quick takes, pre-tournament briefings.",
+        icon: "📰",
       },
       {
         href: "/analysis/tee-time-scoring",
         label: "Tee-time scoring",
-        blurb: "See how the field is scoring wave-by-wave through the day.",
+        blurb: "How the field is scoring wave-by-wave through the day.",
+        icon: "⏱️",
       },
     ],
   },
   tools: {
     title: "Predictions you can trust",
-    lede: "Watch the demo — models fit on years of course data, ranking who's built for this week's venue.",
-    bodyAfterSim:
-      "Every model is cross-validated on hold-out data so you can see the honest confidence, not the polished sales version. Course-fit forecasts, round-score distributions, and ballstriking archetypes — the same layer our articles run on.",
+    lede: "Cross-validated course-fit models ranking who's built for this week's venue.",
     primaryHref: "/analysis",
     primaryLabel: "Browse the tools",
     primaryHint: "Course-fit, round forecast, tee-shot profiles",
@@ -182,12 +182,14 @@ const EXPLAINERS: Record<Intent, ExplainerCard> = {
       {
         href: "/analysis/course-history",
         label: "Course-fit forecast",
-        blurb: "Which players are built for this course, ranked by predicted OTT edge.",
+        blurb: "Ranked list of who's built for the course — with honest CV R².",
+        icon: "🎯",
       },
       {
         href: "/analysis/score-forecast",
         label: "Round-score forecast",
-        blurb: "Predicted round distribution for any player at any course.",
+        blurb: "Full round-score distribution for any player, any course.",
+        icon: "📊",
       },
     ],
   },
@@ -270,10 +272,13 @@ export function OnboardingModal() {
           borderTopLeftRadius: 22,
           borderTopRightRadius: 22,
           padding: "26px 22px 30px",
-          transform: entered ? "translateY(0)" : "translateY(24px)",
+          transform: entered
+            ? "translateY(0) scale(1)"
+            : "translateY(24px) scale(0.985)",
+          transformOrigin: "50% 100%",
           opacity: entered ? 1 : 0,
           transition:
-            "transform 220ms cubic-bezier(.2,.9,.3,1), opacity 200ms ease",
+            "transform 260ms cubic-bezier(.22,.9,.3,1.05), opacity 200ms ease",
           boxShadow:
             "0 -12px 40px oklch(0.15 0.02 150 / 0.18), 0 0 0 1px oklch(0.15 0.02 150 / 0.06)",
           maxHeight: "92vh",
@@ -305,9 +310,8 @@ export function OnboardingModal() {
         )}
       </div>
 
-      {/* Desktop shift: centered card instead of bottom-sheet on
-          screens ≥ 640px. Kept in one file with @media in a
-          <style> tag so the component ships without touching
+      {/* Desktop shift + motion + hover states. Kept in one file
+          via inline <style> so the modal ships without touching
           globals.css. Modal grows to ~75% viewport on desktop —
           the sim panels earn the real estate. */}
       <style>{`
@@ -331,13 +335,76 @@ export function OnboardingModal() {
           70%  { box-shadow: 0 0 0 8px transparent; opacity: 0.55; }
           100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
         }
-        @keyframes onboardGridDrift {
-          0%   { background-position: 0 0; }
-          100% { background-position: 0 32px; }
+        @keyframes onboardStagger {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
-        @keyframes onboardBloom {
-          0%, 100% { filter: drop-shadow(0 0 3px currentColor); }
-          50%      { filter: drop-shadow(0 0 8px currentColor); }
+        /* Staggered entrance for the second step's content.
+           Elements each set their own animation-delay inline. */
+        .pardle-onboard-title,
+        .pardle-onboard-lede,
+        .pardle-onboard-sim,
+        .pardle-onboard-secondary {
+          animation: onboardStagger 380ms cubic-bezier(.2,.9,.3,1) both;
+        }
+        /* Primary CTA — hover lift + brighter shadow. */
+        .pardle-onboard-cta {
+          transition: transform 160ms cubic-bezier(.2,.9,.3,1),
+                      box-shadow 160ms ease,
+                      filter 160ms ease;
+        }
+        .pardle-onboard-cta:hover,
+        .pardle-onboard-cta:focus-visible {
+          transform: translateY(-1px);
+          filter: brightness(1.03);
+          outline: none;
+        }
+        .pardle-onboard-cta:active {
+          transform: translateY(0);
+        }
+        /* Secondary link rows — background + border shift + chevron
+           advance on hover so they feel tappable. */
+        .pardle-onboard-secondary {
+          transition: background 160ms ease, border-color 160ms ease,
+                      transform 160ms ease;
+        }
+        .pardle-onboard-secondary:hover,
+        .pardle-onboard-secondary:focus-visible {
+          background: oklch(0.985 0.014 95) !important;
+          border-color: oklch(0.82 0.02 150) !important;
+          outline: none;
+        }
+        .pardle-onboard-secondary:hover .pardle-onboard-chevron,
+        .pardle-onboard-secondary:focus-visible .pardle-onboard-chevron {
+          transform: translateX(2px);
+          transition: transform 160ms cubic-bezier(.2,.9,.3,1);
+        }
+        .pardle-onboard-chevron {
+          transition: transform 160ms cubic-bezier(.2,.9,.3,1);
+        }
+        /* Back button — subtle hover swatch. */
+        .pardle-onboard-back {
+          transition: background 140ms ease, color 140ms ease;
+        }
+        .pardle-onboard-back:hover,
+        .pardle-onboard-back:focus-visible {
+          background: oklch(0.955 0.012 95) !important;
+          color: oklch(0.32 0.03 155) !important;
+          outline: none;
+        }
+        /* Respect reduced-motion — kill entrance stagger + hover
+           translations so nothing moves for users who ask. */
+        @media (prefers-reduced-motion: reduce) {
+          .pardle-onboard-title,
+          .pardle-onboard-lede,
+          .pardle-onboard-sim,
+          .pardle-onboard-secondary {
+            animation: none !important;
+          }
+          .pardle-onboard-cta:hover,
+          .pardle-onboard-secondary:hover .pardle-onboard-chevron {
+            transform: none !important;
+          }
         }
       `}</style>
     </div>
@@ -435,38 +502,56 @@ function ExplainerStep({
         type="button"
         onClick={onBack}
         style={backBtnStyle()}
-        aria-label="Back to interest picker"
+        aria-label="Change interest"
+        className="pardle-onboard-back"
       >
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
-          stroke="currentColor" strokeWidth="2.2"
+          stroke="currentColor" strokeWidth="2.4"
           strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M15 6l-6 6 6 6" />
         </svg>
-        Something else
+        Change interest
       </button>
       <div style={{ ...eyebrowStyle(), color: explainer.accent }}>
         How it works
       </div>
-      <h2 id="onboarding-title" style={titleStyle()}>
+      <h2
+        id="onboarding-title"
+        className="pardle-onboard-title"
+        style={{
+          ...titleStyle(),
+          fontSize: 28,
+          letterSpacing: -0.5,
+          marginTop: 4,
+          animationDelay: "40ms",
+        }}
+      >
         {explainer.title}
       </h2>
-      <p style={{ ...ledeStyle(), margin: "6px 0 12px" }}>
+      <p
+        className="pardle-onboard-lede"
+        style={{
+          margin: "10px 0 16px",
+          fontSize: 15,
+          lineHeight: 1.5,
+          color: INK,
+          maxWidth: 560,
+          fontWeight: 500,
+          animationDelay: "120ms",
+        }}
+      >
         {explainer.lede}
       </p>
 
       {/* Interactive simulation — the star of the second step. */}
-      {explainer.simulation === "bets" && <BetSimulation />}
-      {explainer.simulation === "live" && <LiveFeedSimulation />}
-      {explainer.simulation === "tools" && <ToolsSimulation />}
-
-      <p style={{
-        margin: "2px 0 16px",
-        fontSize: 13,
-        lineHeight: 1.5,
-        color: MUTED,
-      }}>
-        {explainer.bodyAfterSim}
-      </p>
+      <div
+        className="pardle-onboard-sim"
+        style={{ animationDelay: "200ms" }}
+      >
+        {explainer.simulation === "bets" && <BetSimulation />}
+        {explainer.simulation === "live" && <LiveFeedSimulation />}
+        {explainer.simulation === "tools" && <ToolsSimulation />}
+      </div>
 
       <Link
         href={explainer.primaryHref}
@@ -474,60 +559,83 @@ function ExplainerStep({
         style={primaryCtaStyle(explainer.accent)}
         className="pardle-onboard-cta"
       >
-        <span style={{ display: "block" }}>{explainer.primaryLabel}</span>
+        <span style={{ display: "block", fontSize: 16 }}>
+          {explainer.primaryLabel}
+        </span>
         <span style={{
           display: "block",
           fontSize: 11.5,
           fontWeight: 600,
-          marginTop: 2,
-          opacity: 0.85,
-          letterSpacing: 0.1,
+          marginTop: 3,
+          opacity: 0.88,
+          letterSpacing: 0.15,
         }}>
           {explainer.primaryHint}
         </span>
       </Link>
 
       <div style={{
-        marginTop: 18,
+        marginTop: 20,
         fontSize: 10.5,
-        letterSpacing: 1.2,
+        letterSpacing: 1.4,
         textTransform: "uppercase",
         color: DIM,
         fontWeight: 800,
       }}>
         Also useful
       </div>
-      <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
-        {explainer.secondaries.map((sec) => (
+      <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+        {explainer.secondaries.map((sec, i) => (
           <Link
             key={sec.href}
             href={sec.href}
             onClick={onGo}
-            style={secondaryLinkStyle()}
+            style={{
+              ...secondaryLinkStyle(),
+              animationDelay: `${320 + i * 90}ms`,
+            }}
             className="pardle-onboard-secondary"
           >
+            <span
+              aria-hidden
+              style={{
+                display: "grid",
+                placeItems: "center",
+                width: 38,
+                height: 38,
+                borderRadius: 10,
+                background: "white",
+                border: `1px solid ${LINE}`,
+                fontSize: 18,
+                flexShrink: 0,
+              }}
+            >
+              {sec.icon}
+            </span>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span style={{
                 display: "block",
-                fontSize: 13.5,
+                fontSize: 14,
                 fontWeight: 800,
                 color: INK,
+                letterSpacing: -0.1,
               }}>
                 {sec.label}
               </span>
               <span style={{
                 display: "block",
-                fontSize: 12,
+                fontSize: 12.5,
                 color: MUTED,
-                marginTop: 1,
+                marginTop: 2,
                 lineHeight: 1.4,
               }}>
                 {sec.blurb}
               </span>
             </span>
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
-              stroke={DIM} strokeWidth="2"
-              strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              stroke={DIM} strokeWidth="2.2"
+              strokeLinecap="round" strokeLinejoin="round" aria-hidden
+              className="pardle-onboard-chevron">
               <path d="M9 6l6 6-6 6" />
             </svg>
           </Link>
