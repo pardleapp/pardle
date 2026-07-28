@@ -55,19 +55,19 @@ const CURRENT_YEAR = 2026;
 const KEY_ROUND = (eventId: number, year: number) =>
   `course-history:round:${eventId}:${year}`;
 const KEY_EVENT_LIST = "course-history:event-list:pga";
-// v7 = drops v6 aggregates so the PGA National row rebuilds off the
-// updated index.
+// v8 = second-round split-personality fixes (Bay Hill, Torrey Pines,
+// Country Club of Jackson, Dunes, Riviera). Drop v7 aggregates.
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v7:${slugify(courseName)}`;
+  `course-history:agg-course:v8:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
  *  count). Populated incrementally as we fetch event data.
- *  v9 = added the "PGA National (Champion)" alias missed by the
- *  initial split-personality scan; rebuild index one more time so
- *  that early-years label merges into the canonical PGA National
- *  Resort row. */
-const KEY_COURSE_INDEX = "course-history:course-index:v9";
+ *  v10 = added second-round aliases for Bay Hill, Torrey Pines,
+ *  Country Club of Jackson, Dunes, Riviera. Rebuild once more so
+ *  those pairs merge in the index and become queryable under
+ *  their canonical names. */
+const KEY_COURSE_INDEX = "course-history:course-index:v10";
 
 function slugify(s: string): string {
   return s
@@ -480,6 +480,15 @@ const COURSE_NAME_ALIASES: Record<string, string> = {
   // (the resort's other course, Chatham, doesn't host PGA events).
   "Keene Trace Golf Club (Champions Course)": "Keene Trace Golf Club",
   "Keene Trace Golf Club (Champion Trace)": "Keene Trace Golf Club",
+  // Second-round scan turned up five more where DataGolf switches
+  // between two labels for the same physical venue mid-history.
+  // Merge each pair onto the more-recent (usually more-detailed)
+  // canonical label:
+  "Bay Hill Club & Lodge": "Arnold Palmer's Bay Hill Club & Lodge",
+  "Torrey Pines (South)": "Torrey Pines Golf Course (South Course)",
+  "Country Club of Jackson": "The Country Club of Jackson",
+  "Dunes Golf and Beach Club": "The Dunes Golf and Beach Club",
+  "Riviera Country Club": "The Riviera Country Club",
 };
 
 function normaliseCourseName(raw: string): string {
@@ -494,11 +503,6 @@ function normaliseCourseName(raw: string): string {
   return s;
 }
 
-/** Temporary — used by /api/course-history/debug-normalise to verify
- *  alias deployment in prod. Remove me once the debug is done. */
-export function normaliseCourseNameForDebug(raw: string): string {
-  return normaliseCourseName(raw);
-}
 
 // ── Main aggregation ───────────────────────────────────────────────
 
