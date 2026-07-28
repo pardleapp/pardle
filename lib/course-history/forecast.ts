@@ -66,8 +66,16 @@ const FIT_DIMENSIONS: ProfileDimension[] = [
   "curve",
 ];
 /** Below this CV R² we don't trust the forecast for surfacing per-
- *  player numbers. The archetype's descriptive r still shows. */
-export const FORECAST_RELIABLE_R2 = 0.05;
+ *  player numbers. The archetype's descriptive r still shows.
+ *
+ *  Calibration: with the full 4-season tee-shot backfill in place,
+ *  the 3-feature radar model tops out at CV R² ≈ 0.05-0.08 even at
+ *  courses where the ballSpeed β is unambiguously strong (Quail
+ *  Hollow +0.120, Augusta +0.116). Setting the gate at 0.03 lets
+ *  those defensible fits through while still excluding the
+ *  courses whose CV R² is genuinely negative (Muirfield, Pebble,
+ *  Scottsdale) where the radar features carry no signal. */
+export const FORECAST_RELIABLE_R2 = 0.03;
 
 function slugify(s: string): string {
   return s
