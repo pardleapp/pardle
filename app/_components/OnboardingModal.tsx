@@ -125,7 +125,7 @@ const EXPLAINERS: Record<Intent, ExplainerCard> = {
   },
   live: {
     title: "The tournament, live",
-    lede: "Every notable shot the moment it happens — feed, scorecards, editorial takes.",
+    lede: "Bet-impact alerts, filters you set, real-time shot-by-shot — the tracker built for bettors.",
     primaryHref: "/live",
     primaryLabel: "Open the shot tracker",
     primaryHint: "Watch the current tournament right now",

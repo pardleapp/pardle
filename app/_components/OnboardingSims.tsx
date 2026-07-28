@@ -606,62 +606,392 @@ function GroupsPreview() {
 
 // ── LIVE PATH — walkthrough steps ─────────────────────────────────
 
-function ShotFeedPreview() {
-  const shots = [
+/** Step 1 — the tracker's headline differentiator: shot alerts that
+ *  only fire when the shot actually moves one of your bets, with the
+ *  size of the impact quantified inline. */
+function BetImpactPreview() {
+  return (
+    <PreviewShell
+      eyebrow="Bet-impact alert"
+      title="Scheffler · birdie on 14"
+      pill={{ label: "+6% win prob", tone: "emerald" }}
+      openLabel="Open shot tracker"
+      accent={TANG}
+    >
+      {/* Shot line + monogram */}
+      <div style={{
+        marginTop: 12,
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 10,
+        padding: "10px 12px",
+        background: SOFT,
+        border: `1px solid ${LINE}`,
+        borderRadius: 8,
+      }}>
+        <span style={{
+          width: 28,
+          height: 28,
+          borderRadius: 999,
+          background: CARD,
+          color: TANG,
+          border: `1px solid ${TANG}`,
+          display: "grid",
+          placeItems: "center",
+          fontSize: 11,
+          fontWeight: 800,
+          flexShrink: 0,
+          fontFamily: "var(--font-mono), monospace",
+          letterSpacing: -0.2,
+        }} aria-hidden>
+          SS
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: 12.5,
+            fontWeight: 800,
+            color: INK,
+            letterSpacing: -0.1,
+          }}>
+            Scottie Scheffler <span style={{
+              fontSize: 10,
+              color: DIM,
+              fontWeight: 600,
+              fontFamily: "var(--font-mono), monospace",
+            }}>· just now</span>
+          </div>
+          <div style={{
+            fontSize: 12,
+            color: MUTED,
+            marginTop: 1,
+            lineHeight: 1.35,
+          }}>
+            Rolls in a 22-foot birdie on 14
+          </div>
+        </div>
+      </div>
+
+      {/* Bet-impact panel — the differentiator */}
+      <div style={{
+        marginTop: 8,
+        padding: "10px 12px",
+        background: UP_TINT,
+        border: `1px solid ${UP}`,
+        borderRadius: 8,
+      }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+        }}>
+          <span style={{
+            fontSize: 9.5,
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            color: UP_D,
+            fontWeight: 800,
+          }}>
+            Your bet · £10 @ 3.5
+          </span>
+          <span style={{
+            fontSize: 10.5,
+            fontWeight: 800,
+            color: UP_D,
+            fontFamily: "var(--font-mono), monospace",
+            padding: "2px 7px",
+            background: CARD,
+            border: `1px solid ${UP}`,
+            borderRadius: 999,
+          }}>
+            ↑ +6%
+          </span>
+        </div>
+        <div style={{
+          marginTop: 4,
+          fontSize: 13,
+          fontWeight: 800,
+          color: INK,
+          letterSpacing: -0.1,
+        }}>
+          Scheffler top 10 finish
+        </div>
+        <div style={{
+          marginTop: 8,
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 8,
+        }}>
+          {[
+            { label: "Win prob", was: "68%", now: "74%" },
+            { label: "Expected", was: "+£15.20", now: "+£18.40" },
+          ].map((r) => (
+            <div key={r.label} style={{
+              padding: "6px 10px",
+              background: CARD,
+              border: `1px solid ${LINE}`,
+              borderRadius: 6,
+            }}>
+              <div style={{
+                fontSize: 9.5,
+                letterSpacing: 0.9,
+                textTransform: "uppercase",
+                color: DIM,
+                fontWeight: 800,
+              }}>
+                {r.label}
+              </div>
+              <div style={{
+                marginTop: 2,
+                display: "flex",
+                alignItems: "baseline",
+                gap: 6,
+              }}>
+                <span style={{
+                  fontSize: 11,
+                  color: DIM,
+                  fontFamily: "var(--font-mono), monospace",
+                  textDecoration: "line-through",
+                }}>
+                  {r.was}
+                </span>
+                <span style={{
+                  fontSize: 13,
+                  color: UP,
+                  fontFamily: "var(--font-mono), monospace",
+                  fontWeight: 800,
+                  letterSpacing: -0.2,
+                }}>
+                  {r.now}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </PreviewShell>
+  );
+}
+
+/** Step 2 — customisable filters. The tracker only surfaces the
+ *  shots the user has told it to care about. */
+function CustomFiltersPreview() {
+  const filters = [
     {
-      name: "Rory McIlroy",
-      initials: "RM",
-      timeAgo: "just now",
-      line: "Rolls in a 22-foot birdie on 14",
-      fire: 61,
-      comment: 12,
+      label: "My players",
+      value: "12 followed",
+      body: "Scheffler · McIlroy · Åberg · Rahm · Clark · Schauffele +6",
+      on: true,
     },
     {
-      name: "Scheffler",
-      initials: "SS",
-      timeAgo: "8s",
-      line: "Approach on 12 to 6 feet — birdie look",
-      fire: 24,
-      comment: 3,
+      label: "Bet-relevant only",
+      value: "3 active bets",
+      body: "Only alerts on shots that move a bet you've logged.",
+      on: true,
     },
     {
-      name: "Ludvig Åberg",
-      initials: "LA",
-      timeAgo: "42s",
-      line: "Holes out from the greenside bunker on 11",
-      fire: 94,
-      comment: 21,
+      label: "Birdies & better",
+      value: "Skip pars, bogeys",
+      body: "Cut the noise — the shot tracker keeps only the moments that matter.",
+      on: true,
+    },
+    {
+      label: "Every shot",
+      value: "Off",
+      body: "Firehose mode — everything the field hits, wave by wave.",
+      on: false,
     },
   ];
   return (
     <PreviewShell
-      eyebrow="Live shot feed"
+      eyebrow="Custom shot filters"
+      title="Only what matters to you"
+      pill={{ label: "3 on", tone: "tang" }}
+      openLabel="Open shot tracker"
+      accent={TANG}
+    >
+      <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+        {filters.map((f) => (
+          <div key={f.label} style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 12,
+            padding: "9px 11px",
+            background: f.on ? TANG_TINT : SOFT,
+            border: `1px solid ${f.on ? TANG : LINE}`,
+            borderRadius: 8,
+          }}>
+            {/* Toggle */}
+            <span style={{
+              flexShrink: 0,
+              width: 28,
+              height: 16,
+              borderRadius: 999,
+              background: f.on ? TANG : "oklch(0.85 0.01 150)",
+              position: "relative",
+              marginTop: 2,
+            }} aria-hidden>
+              <span style={{
+                position: "absolute",
+                top: 2,
+                left: f.on ? 14 : 2,
+                width: 12,
+                height: 12,
+                borderRadius: 999,
+                background: CARD,
+              }} />
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 8,
+                justifyContent: "space-between",
+              }}>
+                <span style={{
+                  fontSize: 12.5,
+                  fontWeight: 800,
+                  color: INK,
+                  letterSpacing: -0.1,
+                }}>
+                  {f.label}
+                </span>
+                <span style={{
+                  fontSize: 10,
+                  color: f.on ? TANG : DIM,
+                  fontWeight: 800,
+                  fontFamily: "var(--font-mono), monospace",
+                  letterSpacing: 0.4,
+                  textTransform: "uppercase",
+                }}>
+                  {f.value}
+                </span>
+              </div>
+              <div style={{
+                fontSize: 11.5,
+                color: MUTED,
+                marginTop: 1,
+                lineHeight: 1.35,
+              }}>
+                {f.body}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </PreviewShell>
+  );
+}
+
+/** Step 3 — speed. Big pulsing LIVE indicator, a shot that JUST
+ *  landed on top, then two more in the shot stream underneath.
+ *  No latency numbers, per the copy guardrail — "Live" and "Real-
+ *  time" only. */
+function LiveStreamPreview() {
+  const older = [
+    { name: "Ludvig Åberg", initials: "LA", line: "Holes out from the greenside bunker on 11" },
+    { name: "Rory McIlroy", initials: "RM", line: "Approach on 12 to 6 feet — birdie look" },
+  ];
+  return (
+    <PreviewShell
+      eyebrow="Live shot-by-shot"
       title="Torrey Pines · Round 4"
       pill={{ label: "Live", tone: "tang" }}
       openLabel="Open shot tracker"
       accent={TANG}
     >
-      <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
-        {shots.map((s, i) => (
+      {/* Hero: just-landed shot with a pulsing live indicator */}
+      <div style={{
+        marginTop: 12,
+        padding: "12px 14px",
+        background: TANG_TINT,
+        border: `2px solid ${TANG}`,
+        borderRadius: 10,
+        position: "relative",
+      }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 4,
+        }}>
+          <span style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "3px 9px 3px 7px",
+            borderRadius: 999,
+            background: CARD,
+            color: TANG,
+            fontSize: 9.5,
+            fontWeight: 800,
+            letterSpacing: 1.3,
+            textTransform: "uppercase",
+            boxShadow: `inset 0 0 0 1px ${TANG}`,
+          }}>
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 999,
+                background: TANG,
+                animation: "liveDotPulse 1.4s ease-out infinite",
+              }}
+              aria-hidden
+            />
+            Just landed
+          </span>
+          <span style={{
+            fontSize: 10,
+            color: TANG,
+            fontWeight: 800,
+            fontFamily: "var(--font-mono), monospace",
+            letterSpacing: 0.5,
+          }}>
+            REAL-TIME
+          </span>
+        </div>
+        <div style={{
+          fontSize: 15,
+          fontWeight: 800,
+          color: INK,
+          letterSpacing: -0.2,
+        }}>
+          Scottie Scheffler
+        </div>
+        <div style={{
+          fontSize: 13,
+          color: INK,
+          marginTop: 2,
+          lineHeight: 1.35,
+          fontWeight: 500,
+        }}>
+          Rolls in a 22-foot birdie on 14
+        </div>
+      </div>
+
+      {/* Older shots */}
+      <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
+        {older.map((s) => (
           <div key={s.name} style={{
             display: "flex",
             alignItems: "flex-start",
             gap: 10,
-            padding: "9px 10px",
-            background: i === 0 ? TANG_TINT : SOFT,
-            border: `1px solid ${i === 0 ? TANG : LINE}`,
+            padding: "8px 10px",
+            background: SOFT,
+            border: `1px solid ${LINE}`,
             borderRadius: 8,
           }}>
             <span style={{
-              width: 28,
-              height: 28,
+              width: 24,
+              height: 24,
               borderRadius: 999,
               background: CARD,
               color: TANG,
               border: `1px solid ${TANG}`,
               display: "grid",
               placeItems: "center",
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: 800,
               flexShrink: 0,
               fontFamily: "var(--font-mono), monospace",
@@ -671,228 +1001,32 @@ function ShotFeedPreview() {
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
-                fontSize: 12.5,
+                fontSize: 12,
                 fontWeight: 800,
                 color: INK,
-                display: "flex",
-                gap: 5,
-                alignItems: "baseline",
                 letterSpacing: -0.1,
               }}>
-                <span>{s.name}</span>
-                <span style={{
-                  fontSize: 10,
-                  color: DIM,
-                  fontWeight: 600,
-                  fontFamily: "var(--font-mono), monospace",
-                }}>
-                  · {s.timeAgo}
-                </span>
+                {s.name}
               </div>
               <div style={{
-                fontSize: 12,
+                fontSize: 11.5,
                 color: MUTED,
                 marginTop: 1,
-                lineHeight: 1.35,
+                lineHeight: 1.3,
               }}>
                 {s.line}
               </div>
-              <div style={{
-                display: "flex",
-                gap: 10,
-                marginTop: 4,
-                fontSize: 10.5,
-                color: DIM,
-                fontWeight: 700,
-                fontFamily: "var(--font-mono), monospace",
-              }}>
-                <span>🔥 {s.fire}</span>
-                <span>💬 {s.comment}</span>
-              </div>
             </div>
           </div>
         ))}
       </div>
-    </PreviewShell>
-  );
-}
 
-function ScorecardPreview() {
-  const holes = [
-    { hole: 10, par: 4, score: 3 },
-    { hole: 11, par: 3, score: 3 },
-    { hole: 12, par: 4, score: 4 },
-    { hole: 13, par: 5, score: 4 },
-    { hole: 14, par: 4, score: 3 },
-    { hole: 15, par: 4, score: 4 },
-    { hole: 16, par: 3, score: 4 },
-    { hole: 17, par: 5, score: 4 },
-    { hole: 18, par: 4, score: 3 },
-  ];
-  return (
-    <PreviewShell
-      eyebrow="Player scorecard"
-      title="Rory McIlroy · R4 back 9"
-      pill={{ label: "-4 today", tone: "tang" }}
-      openLabel="Open shot tracker"
-      accent={TANG}
-    >
-      <div style={{
-        marginTop: 12,
-        padding: "8px 6px",
-        background: SOFT,
-        border: `1px solid ${LINE}`,
-        borderRadius: 8,
-      }}>
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${holes.length}, 1fr)`,
-          gap: 3,
-        }}>
-          {holes.map((h) => {
-            const diff = h.score - h.par;
-            const color = diff < 0 ? UP : diff > 0 ? DOWN : INK;
-            const bg = diff === -1 ? UP_TINT
-              : diff <= -2 ? UP_TINT
-                : diff > 0 ? "oklch(0.965 0.045 30)" : CARD;
-            return (
-              <div key={h.hole} style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                padding: "6px 2px",
-                background: bg,
-                border: `1px solid ${LINE}`,
-                borderRadius: 6,
-              }}>
-                <span style={{
-                  fontSize: 9.5,
-                  color: DIM,
-                  fontWeight: 700,
-                  fontFamily: "var(--font-mono), monospace",
-                }}>
-                  {h.hole}
-                </span>
-                <span style={{
-                  fontSize: 13,
-                  fontWeight: 800,
-                  color,
-                  fontFamily: "var(--font-mono), monospace",
-                  marginTop: 2,
-                  lineHeight: 1,
-                }}>
-                  {h.score}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <div style={{
-        marginTop: 10,
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gap: 8,
-      }}>
-        {[
-          { label: "Today", value: "-4", tone: "tang" },
-          { label: "Total", value: "-11", tone: "tang" },
-          { label: "Position", value: "T3", tone: "ink" },
-        ].map((t) => (
-          <div key={t.label} style={{
-            padding: "8px 10px",
-            background: SOFT,
-            border: `1px solid ${LINE}`,
-            borderRadius: 8,
-          }}>
-            <div style={{
-              fontSize: 9.5,
-              letterSpacing: 0.9,
-              textTransform: "uppercase",
-              color: DIM,
-              fontWeight: 800,
-            }}>
-              {t.label}
-            </div>
-            <div style={{
-              marginTop: 2,
-              fontSize: 15,
-              fontWeight: 800,
-              color: t.tone === "tang" ? TANG : INK,
-              fontFamily: "var(--font-mono), monospace",
-              letterSpacing: -0.3,
-              lineHeight: 1,
-            }}>
-              {t.value}
-            </div>
-          </div>
-        ))}
-      </div>
-    </PreviewShell>
-  );
-}
-
-function InsightsPreview() {
-  const posts = [
-    {
-      badge: "R4 Bet",
-      badgeColor: UP,
-      title: "Why we bet £1,149 on Scheffler top 10",
-      body: "Market has him at 60%. Our model has him at 75%. That's the biggest edge we've seen this week.",
-    },
-    {
-      badge: "Field brief",
-      badgeColor: BLUE,
-      title: "Torrey Pines rewards bomber tee shots",
-      body: "CV R² 0.083 with ball speed β +0.245 — the strongest single-feature course-fit signal on tour.",
-    },
-  ];
-  return (
-    <PreviewShell
-      eyebrow="Editorial takes"
-      title="Insights · this week"
-      pill={{ label: "Fresh", tone: "blue" }}
-      openLabel="Open insights"
-      accent={TANG}
-    >
-      <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
-        {posts.map((p, i) => (
-          <div key={i} style={{
-            padding: "10px 12px",
-            background: SOFT,
-            border: `1px solid ${LINE}`,
-            borderRadius: 8,
-          }}>
-            <div style={{
-              fontSize: 9.5,
-              letterSpacing: 0.9,
-              textTransform: "uppercase",
-              color: p.badgeColor,
-              fontWeight: 800,
-            }}>
-              {p.badge}
-            </div>
-            <div style={{
-              marginTop: 3,
-              fontSize: 13.5,
-              fontWeight: 800,
-              color: INK,
-              letterSpacing: -0.2,
-              lineHeight: 1.25,
-            }}>
-              {p.title}
-            </div>
-            <div style={{
-              marginTop: 3,
-              fontSize: 12,
-              color: MUTED,
-              lineHeight: 1.4,
-            }}>
-              {p.body}
-            </div>
-          </div>
-        ))}
-      </div>
+      <style>{`
+        @keyframes liveDotPulse {
+          0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+          70%      { box-shadow: 0 0 0 5px transparent; opacity: 0.6; }
+        }
+      `}</style>
     </PreviewShell>
   );
 }
@@ -1212,25 +1346,28 @@ const BET_STEPS: WalkthroughStep[] = [
 
 const LIVE_STEPS: WalkthroughStep[] = [
   {
-    key: "feed",
-    tabLabel: "Live shots",
+    key: "bet-impact",
+    tabLabel: "Bet-impact alerts",
     href: "/live",
-    caption: "Every notable shot, birdie and hole-out streams in the instant it lands.",
-    render: () => <ShotFeedPreview />,
+    caption:
+      "Every shot that measurably moves one of your bets — the swing quantified inline, no hunting for the ripple.",
+    render: () => <BetImpactPreview />,
   },
   {
-    key: "scorecard",
-    tabLabel: "Scorecards",
+    key: "custom",
+    tabLabel: "Customisable",
     href: "/live",
-    caption: "Drill into any player's live scorecard — hole-by-hole score, current position and today's swing.",
-    render: () => <ScorecardPreview />,
+    caption:
+      "You set the filters — players you follow, bet-relevant only, birdies and better. The tracker keeps the noise out.",
+    render: () => <CustomFiltersPreview />,
   },
   {
-    key: "insights",
-    tabLabel: "Insights",
-    href: "/",
-    caption: "Editorial reads and running commentary — why the numbers moved and who's about to matter.",
-    render: () => <InsightsPreview />,
+    key: "fast",
+    tabLabel: "Real-time",
+    href: "/live",
+    caption:
+      "Live shot-by-shot — every shot appears the moment it lands, no reload, no waiting on the broadcast.",
+    render: () => <LiveStreamPreview />,
   },
 ];
 
