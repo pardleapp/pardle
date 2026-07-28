@@ -55,19 +55,19 @@ const CURRENT_YEAR = 2026;
 const KEY_ROUND = (eventId: number, year: number) =>
   `course-history:round:${eventId}:${year}`;
 const KEY_EVENT_LIST = "course-history:event-list:pga";
-// v6 = post-alias rebuild. Previous v5 populated during a deploy
-// transition and captured unnormalised names; v6 forces a clean
-// rebuild on fresh code.
+// v7 = drops v6 aggregates so the PGA National row rebuilds off the
+// updated index.
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v6:${slugify(courseName)}`;
+  `course-history:agg-course:v7:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
  *  count). Populated incrementally as we fetch event data.
- *  v8 = post-alias rebuild. v7 populated during a deploy transition
- *  with the OLD unnormalised names; v8 forces a fresh rebuild on
- *  guaranteed-new code so Sawgrass/Scottsdale/etc merge correctly. */
-const KEY_COURSE_INDEX = "course-history:course-index:v8";
+ *  v9 = added the "PGA National (Champion)" alias missed by the
+ *  initial split-personality scan; rebuild index one more time so
+ *  that early-years label merges into the canonical PGA National
+ *  Resort row. */
+const KEY_COURSE_INDEX = "course-history:course-index:v9";
 
 function slugify(s: string): string {
   return s
@@ -466,6 +466,13 @@ const COURSE_NAME_ALIASES: Record<string, string> = {
   "TPC Scottsdale (Stadium Course)": "TPC Scottsdale",
   "PGA National Resort (The Champion Course)":
     "PGA National Resort (The Champion)",
+  // "PGA National (Champion)" = early-years DataGolf label for the
+  // same physical course as "PGA National Resort (The Champion)".
+  // My initial split-personality scan missed this because the stem
+  // differs (National vs National Resort); confirmed a real merge
+  // by hosting event (Honda Classic / Cognizant Classic — same tour
+  // event, just renamed by sponsor).
+  "PGA National (Champion)": "PGA National Resort (The Champion)",
   "Innisbrook Resort (Copperhead Course)": "Innisbrook Resort (Copperhead)",
   // Keene Trace resort variants — Barbasol used to be labelled just
   // "Keene Trace Golf Club" then switched to "(Champions Course)".
