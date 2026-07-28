@@ -1399,6 +1399,13 @@ function RankingTable({
         }}
       >
         <thead>
+          {showForecast && (
+            <tr style={{ background: T.soft }}>
+              <GroupTh span={2} label="" />
+              <GroupTh span={7} label="Historical" />
+              <GroupTh span={3} label="Model forecast" accent />
+            </tr>
+          )}
           <tr style={{ background: T.soft }}>
             <Th sortable label="Player" k="name" sortKey={sortKey} sortDir={sortDir} onSort={onSort} align="left" />
             <Th sortable label="Rds" k="roundsPlayed" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
@@ -1407,15 +1414,15 @@ function RankingTable({
             <Th sortable label="At course sum" k="atCourseCombined" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             <Th sortable label="Baseline sum" k="baselineCombined" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             <Th sortable label="Δ OTT" k="outperformanceSgOtt" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            <Th sortable label="Δ APP" k="outperformanceSgApp" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            <Th sortable label="Outperf." k="outperformanceCombined" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent />
             {showForecast && (
               <>
-                <Th sortable label="Pred OTT/rd" k="predictedOtt" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent />
+                <Th sortable label="Pred OTT/rd" k="predictedOtt" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent divider />
                 <Th sortable label="Event Δ" k="eventEdge" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent />
                 <Th sortable label="Gap" k="modelGap" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
               </>
             )}
-            <Th sortable label="Δ APP" k="outperformanceSgApp" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-            <Th sortable label="Outperf." k="outperformanceCombined" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent />
           </tr>
         </thead>
         <tbody>
@@ -1443,12 +1450,22 @@ function RankingTable({
                 <SgCell value={p.atCourseCombined} strong />
                 <SgCell value={p.baselineCombined} muted />
                 <SgCell value={p.outperformanceSgOtt} sign />
+                <SgCell value={p.outperformanceSgApp} sign />
+                <SgCell value={p.outperformanceCombined} sign accent />
                 {showForecast && (
                   <>
                     {typeof pred === "number" ? (
-                      <SgCell value={pred} sign accent />
+                      <SgCell value={pred} sign accent divider />
                     ) : (
-                      <td style={{ ...td(), color: T.dim }}>—</td>
+                      <td
+                        style={{
+                          ...td(),
+                          color: T.dim,
+                          borderLeft: `2px solid ${T.line}`,
+                        }}
+                      >
+                        —
+                      </td>
                     )}
                     {typeof pred === "number" ? (
                       <SgCell value={pred * 4} sign accent />
@@ -1462,8 +1479,6 @@ function RankingTable({
                     )}
                   </>
                 )}
-                <SgCell value={p.outperformanceSgApp} sign />
-                <SgCell value={p.outperformanceCombined} sign accent />
               </tr>
             );
           })}
@@ -1482,6 +1497,7 @@ function Th({
   sortable = false,
   align = "right",
   accent = false,
+  divider = false,
 }: {
   label: string;
   k: SortKey;
@@ -1491,6 +1507,7 @@ function Th({
   sortable?: boolean;
   align?: "left" | "right";
   accent?: boolean;
+  divider?: boolean;
 }) {
   const isActive = sortKey === k;
   return (
@@ -1500,6 +1517,7 @@ function Th({
         textAlign: align,
         padding: "10px 10px",
         borderBottom: `1px solid ${T.line}`,
+        borderLeft: divider ? `2px solid ${T.line}` : undefined,
         fontSize: 11,
         fontWeight: 800,
         letterSpacing: 0.5,
@@ -1534,12 +1552,14 @@ function SgCell({
   accent = false,
   muted = false,
   strong = false,
+  divider = false,
 }: {
   value: number;
   sign?: boolean;
   accent?: boolean;
   muted?: boolean;
   strong?: boolean;
+  divider?: boolean;
 }) {
   const color = sign
     ? value > 0.02
@@ -1560,10 +1580,46 @@ function SgCell({
         color,
         background: bg,
         fontWeight: accent || strong ? 800 : 600,
+        borderLeft: divider ? `2px solid ${T.line}` : undefined,
       }}
     >
       {display}
     </td>
+  );
+}
+
+/** Column-group header cell — spans multiple data columns to make
+ *  the split between historical stats and model-forecast columns
+ *  obvious at a glance. Small, muted, uppercase — not a data
+ *  header, just a grouping label. */
+function GroupTh({
+  label,
+  span,
+  accent = false,
+}: {
+  label: string;
+  span: number;
+  accent?: boolean;
+}) {
+  return (
+    <th
+      colSpan={span}
+      style={{
+        textAlign: label ? "center" : "left",
+        padding: label ? "8px 10px 4px" : 0,
+        fontSize: 10,
+        fontWeight: 800,
+        letterSpacing: 1,
+        textTransform: "uppercase",
+        color: accent ? T.emeraldD : T.dim,
+        fontFamily: T.fontUi,
+        background: accent ? T.emeraldTint : undefined,
+        borderLeft: accent ? `2px solid ${T.line}` : undefined,
+        borderBottom: label ? `1px solid ${T.line}` : undefined,
+      }}
+    >
+      {label}
+    </th>
   );
 }
 
