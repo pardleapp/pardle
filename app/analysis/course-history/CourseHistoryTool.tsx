@@ -634,7 +634,13 @@ function ArchetypePanel({
   if (!archetype) return null;
   if (!archetype.ok) return null;
 
-  const dist = archetype.distinguishing ?? [];
+  // Model is ball-speed only, so the archetype panel only shows the
+  // ball-speed correlation card. Other dimensions are still
+  // computed server-side but hidden here to avoid implying they
+  // feed the forecast.
+  const dist = (archetype.distinguishing ?? []).filter(
+    (d) => d.dim === "ballSpeed",
+  );
   const outTail = archetype.outperformerTail ?? [];
   const underTail = archetype.underperformerTail ?? [];
 
@@ -670,11 +676,11 @@ function ArchetypePanel({
           marginBottom: 8,
         }}
       >
-        What shape of ball flight fits this course
+        How ball speed relates to outperformance here
       </h4>
       <p
         style={{
-          margin: "0 0 8px",
+          margin: "0 0 14px",
           fontSize: 13,
           color: T.muted,
           lineHeight: 1.5,
@@ -685,28 +691,10 @@ function ArchetypePanel({
         <strong>{archetype.matchedPlayers}</strong> players
         (matched from{" "}
         <strong>{archetype.eligiblePlayers}</strong> eligible with 8+
-        rounds at the course) between OTT outperformance and each
-        ball-flight dimension. Ball speed, apex height and shot curve
-        are always shown; other dimensions appear when the signal is
-        material.
-      </p>
-      <div
-        style={{
-          margin: "0 0 14px",
-          padding: "10px 14px",
-          background: "white",
-          border: `1px dashed ${T.line}`,
-          borderRadius: 8,
-          fontSize: 12,
-          color: T.muted,
-          lineHeight: 1.5,
-          maxWidth: 780,
-        }}
-      >
-        <strong style={{ color: T.ink }}>What does r mean?</strong>{" "}
-        Pearson correlation, ranging from −1 to +1. Positive values
-        mean higher stat values track higher outperformance; negative
-        values mean lower stat values do. Rules of thumb:{" "}
+        rounds here) between ball speed and per-round OTT
+        outperformance. Positive r means bombers over-perform their
+        baseline at this venue; negative r means shorter hitters do.
+        {" "}
         <span style={{ color: T.dim }}>|r| &lt; 0.15 weak</span> ·{" "}
         <span style={{ color: T.ink, fontWeight: 700 }}>
           0.15–0.3 moderate
@@ -715,8 +703,10 @@ function ArchetypePanel({
         <span style={{ color: T.emerald, fontWeight: 800 }}>
           ≥ 0.3 strong
         </span>
-        .
-      </div>
+        . Apex and shot-curve panels are gone because the WLS forecast
+        found neither adds out-of-sample predictive value once ball
+        speed is in the model.
+      </p>
 
       {forecast?.ok && forecast.fit && (
         <ForecastFitReadout fit={forecast.fit} />
