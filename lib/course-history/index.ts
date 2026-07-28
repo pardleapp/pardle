@@ -55,18 +55,19 @@ const CURRENT_YEAR = 2026;
 const KEY_ROUND = (eventId: number, year: number) =>
   `course-history:round:${eventId}:${year}`;
 const KEY_EVENT_LIST = "course-history:event-list:pga";
-// v4 = course names now normalised on read (aliases + suffix
-// stripping) so pre-normaliser cached aggregates get invalidated
-// and rebuilt on top of the correct venue groupings.
+// v5 = added split-personality aliases (TPC Sawgrass, TPC Scottsdale,
+// PGA National, Innisbrook, Keene Trace) so cached aggregates rebuild
+// on top of the merged venue groupings.
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v4:${slugify(courseName)}`;
+  `course-history:agg-course:v5:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
  *  count). Populated incrementally as we fetch event data.
- *  v2 = bumped from v1 which was cached partially-populated due to
- *  the old 60s warmup timeout being hit before every event landed. */
-const KEY_COURSE_INDEX = "course-history:course-index:v6";
+ *  v7 = bumped after the split-personality alias expansion so the
+ *  index rebuilds with merged entries (Sawgrass 2019-25 in one row
+ *  instead of two, likewise Scottsdale/PGA National/Innisbrook). */
+const KEY_COURSE_INDEX = "course-history:course-index:v7";
 
 function slugify(s: string): string {
   return s
@@ -455,6 +456,23 @@ function flipName(raw: string): string {
  *   - Explicit alias map for cases the regex can't handle. */
 const COURSE_NAME_ALIASES: Record<string, string> = {
   "Quail Hollow-PGA Championship": "Quail Hollow Club",
+  // DataGolf sometimes appends a course-descriptor in parens for the
+  // same physical layout in later years, which splits a venue's
+  // history into two separate index entries (e.g. Sawgrass 2019-20
+  // vs Sawgrass 2021-25). Explicit aliases fold each back to the
+  // canonical short name so the forecast + aggregate include the
+  // full history.
+  "TPC Sawgrass (THE PLAYERS Stadium Course)": "TPC Sawgrass",
+  "TPC Scottsdale (Stadium Course)": "TPC Scottsdale",
+  "PGA National Resort (The Champion Course)":
+    "PGA National Resort (The Champion)",
+  "Innisbrook Resort (Copperhead Course)": "Innisbrook Resort (Copperhead)",
+  // Keene Trace resort variants — Barbasol used to be labelled just
+  // "Keene Trace Golf Club" then switched to "(Champions Course)".
+  // ISCO's "(Champion Trace)" is the same physical Champion course
+  // (the resort's other course, Chatham, doesn't host PGA events).
+  "Keene Trace Golf Club (Champions Course)": "Keene Trace Golf Club",
+  "Keene Trace Golf Club (Champion Trace)": "Keene Trace Golf Club",
 };
 
 function normaliseCourseName(raw: string): string {
