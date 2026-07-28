@@ -1,745 +1,71 @@
 "use client";
 
 /**
- * Interactive simulations for the onboarding modal's second step.
- * Each intent gets a bespoke animation that shows — not tells —
- * what the corresponding surface actually does.
+ * Interactive walkthroughs for the onboarding modal's second step.
+ * All three intent paths (bets / live / tools) render the same
+ * Walkthrough shell — a tabbed step-by-step tour whose preview
+ * panels mirror the actual Pardle UI so a first-time user
+ * recognises what they're being shown when they later land on
+ * the real page.
  *
- *   BetSimulation      — a live-drawing win-probability chart
- *                        driven by a scripted shot-by-shot script,
- *                        with a rolling event ticker and PnL that
- *                        updates on every shot.
- *   LiveFeedSimulation — a mini feed with shot cards streaming in
- *                        top-down and reaction counters ticking up.
- *   ToolsSimulation    — a mini ranking that fills in one row at
- *                        a time, showing predicted Event Δ
- *                        counting up for each player.
+ * Every preview is clickable → navigates to the linked page and
+ * dismisses the modal (via the onNavigate callback). Tabs switch
+ * the preview in place and pause the 4.2s auto-advance so a user
+ * can dwell on one panel.
  *
- * All three run on the same animation timer so they don't drift.
- * Kept in one file (not one-per-sim) because the modal only ever
- * shows one at a time; splitting further would just add import
- * ceremony without buying anything.
+ * All three sims share the light warm-paper aesthetic. No dark
+ * "mission control" panels — the modal chrome is light and the
+ * previews match the app.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
 // ── Palette ────────────────────────────────────────────────────────
-//
-// Sim cards use a dark "mission control" theme — deep near-black
-// panel with saturated neon accents. The rest of the modal stays
-// light warm-paper per CLAUDE.md's design-handoff rule; the dark
-// panel is scoped to the sim itself so the app's main theme is
-// untouched.
-//
-// Dark tokens (inside the bet + live sim panels):
-const D_BG = "oklch(0.19 0.02 155)";
-const D_BG_LO = "oklch(0.14 0.015 155)";
-const D_PANEL = "oklch(0.22 0.02 155)";
-const D_INK = "oklch(0.96 0.008 150)";
-const D_MUTED = "oklch(0.72 0.02 150)";
-const D_DIM = "oklch(0.55 0.02 150)";
-const D_LINE = "oklch(0.36 0.02 150)";
 
-// Light tokens (used inside the tools walkthrough, which mirrors
-// the real Pardle UI rather than the mission-control aesthetic):
-const L_CARD = "oklch(0.995 0.004 95)";
-const L_SOFT = "oklch(0.945 0.012 95)";
-const L_LINE = "oklch(0.90 0.013 95)";
-const L_INK = "oklch(0.26 0.04 155)";
-const L_MUTED = "oklch(0.50 0.02 150)";
-const L_DIM = "oklch(0.62 0.018 150)";
-const L_UP = "oklch(0.50 0.13 155)";
-const L_DOWN = "oklch(0.60 0.19 30)";
-const L_EMERALD_TINT = "oklch(0.96 0.04 155)";
-const L_BLUE = "oklch(0.55 0.14 245)";
-const L_BLUE_TINT = "oklch(0.965 0.04 240)";
+const CARD = "oklch(0.995 0.004 95)";
+const SOFT = "oklch(0.945 0.012 95)";
+const LINE = "oklch(0.90 0.013 95)";
+const INK = "oklch(0.26 0.04 155)";
+const MUTED = "oklch(0.50 0.02 150)";
+const DIM = "oklch(0.62 0.018 150)";
+const UP = "oklch(0.50 0.13 155)";
+const UP_D = "oklch(0.40 0.12 156)";
+const UP_TINT = "oklch(0.96 0.04 155)";
+const DOWN = "oklch(0.60 0.19 30)";
+const TANG = "oklch(0.66 0.18 45)";
+const TANG_TINT = "oklch(0.965 0.045 60)";
+const BLUE = "oklch(0.55 0.14 245)";
+const BLUE_TINT = "oklch(0.965 0.04 240)";
 
-// Accents — kept saturated so they bloom against the dark panel.
-const EMERALD = "oklch(0.72 0.19 155)";
-const EMERALD_D = "oklch(0.50 0.14 155)";
-const EMERALD_TINT = "oklch(0.30 0.10 155)";
-const EMERALD_GLOW = "oklch(0.72 0.19 155 / 0.55)";
-const TANG = "oklch(0.75 0.20 45)";
-const TANG_D = "oklch(0.60 0.18 45)";
-const TANG_TINT = "oklch(0.32 0.12 45)";
-const TANG_GLOW = "oklch(0.75 0.20 45 / 0.55)";
-const BLUE = "oklch(0.72 0.16 235)";
-const BLUE_D = "oklch(0.55 0.14 245)";
-const BLUE_TINT = "oklch(0.30 0.10 240)";
-const BLUE_GLOW = "oklch(0.72 0.16 235 / 0.55)";
-const DOWN = "oklch(0.74 0.20 25)";
-const DOWN_TINT = "oklch(0.30 0.12 25)";
+const STEP_MS = 4200;
 
-// ── BET TRACKER SIMULATION ────────────────────────────────────────
+// ── Shared walkthrough shell ──────────────────────────────────────
 
-/**
- * Scripted 4-round arc for a Top-10 outright bet.
- * `p` = win probability (%), one value per animation tick (400 ms).
- * Every ~4-6 ticks a scripted shot event fires with a delta annotation.
- *
- * Total: 40 ticks × 400 ms = 16 s per full pass, then a 2 s pause
- * and the whole thing rewinds.
- */
-interface Tick {
-  p: number;
-  round: 1 | 2 | 3 | 4;
-  /** Text that flashes in the ticker when this tick lands.
-   *  Undefined = no ticker event this tick (probability just drifted). */
-  event?: string;
-  /** Delta annotation shown in the ticker; tint follows sign. */
-  delta?: number;
-}
-
-const BET_SCRIPT: Tick[] = [
-  { p: 45, round: 1, event: "R1 tee off · Scheffler off #10", delta: 0 },
-  { p: 47, round: 1 },
-  { p: 48, round: 1, event: "Birdie · #14", delta: 3 },
-  { p: 46, round: 1, event: "Bogey · #17", delta: -2 },
-  { p: 48, round: 1 },
-  { p: 51, round: 1, event: "Birdie · #4", delta: 3 },
-  { p: 50, round: 1 },
-  { p: 52, round: 1 },
-  { p: 55, round: 1, event: "Birdie · #8 (–3 R1)", delta: 3 },
-  { p: 54, round: 1 },
-  { p: 54, round: 2 },
-  { p: 57, round: 2, event: "R2: birdie #2", delta: 3 },
-  { p: 55, round: 2 },
-  { p: 58, round: 2, event: "Birdie · #7", delta: 3 },
-  { p: 61, round: 2, event: "Eagle · #15", delta: 7 },
-  { p: 60, round: 2 },
-  { p: 63, round: 2, event: "Birdie · #17 (T6, –8)", delta: 3 },
-  { p: 62, round: 2 },
-  { p: 65, round: 2 },
-  { p: 64, round: 2 },
-  { p: 64, round: 3 },
-  { p: 61, round: 3, event: "R3: bogey #2", delta: -3 },
-  { p: 62, round: 3 },
-  { p: 65, round: 3, event: "Birdie · #6", delta: 3 },
-  { p: 66, round: 3 },
-  { p: 68, round: 3, event: "Birdie · #11 (T5)", delta: 2 },
-  { p: 70, round: 3 },
-  { p: 68, round: 3 },
-  { p: 71, round: 3, event: "Birdie · #17", delta: 3 },
-  { p: 68, round: 3 },
-  { p: 68, round: 4 },
-  { p: 74, round: 4, event: "R4: hot start, –2 thru 4", delta: 6 },
-  { p: 72, round: 4 },
-  { p: 76, round: 4, event: "Birdie · #12", delta: 4 },
-  { p: 74, round: 4 },
-  { p: 80, round: 4, event: "Birdie · #14 (T7)", delta: 6 },
-  { p: 78, round: 4 },
-  { p: 86, round: 4, event: "Birdie · #16 → T10 clinched", delta: 8 },
-  { p: 89, round: 4 },
-  { p: 92, round: 4, event: "Signs card · finishes T9 · +£25 win", delta: 3 },
-];
-
-const BET_STAKE = 10;
-const BET_ODDS = 3.5;
-
-export function BetSimulation() {
-  const [tick, setTick] = useState(0);
-  const [running, setRunning] = useState(true);
-
-  useEffect(() => {
-    if (!running) return;
-    const id = window.setInterval(() => {
-      setTick((t) => {
-        if (t >= BET_SCRIPT.length - 1) {
-          // Hold at the end for 2s, then rewind.
-          window.setTimeout(() => setTick(0), 2000);
-          return t;
-        }
-        return t + 1;
-      });
-    }, 400);
-    return () => window.clearInterval(id);
-  }, [running]);
-
-  const currentProb = BET_SCRIPT[tick]?.p ?? BET_SCRIPT[0].p;
-  // Derive the latest event synchronously from the current tick.
-  // Previous impl used a ref that got out of sync with tick after a
-  // loop reset — the ticker would show the FINAL event while tick
-  // was already back at 0. Deriving inline via a memo guarantees the
-  // event, prob, and round always agree.
-  const eventTick = useMemo(() => {
-    for (let i = tick; i >= 0; i--) {
-      if (BET_SCRIPT[i]?.event) return BET_SCRIPT[i];
-    }
-    return BET_SCRIPT[0];
-  }, [tick]);
-
-  // Path built from the played portion of the script.
-  const svgW = 320;
-  const svgH = 108;
-  const padX = 8;
-  const padY = 10;
-
-  const chartPoints = useMemo(() => {
-    const pts: Array<{ x: number; y: number }> = [];
-    const played = BET_SCRIPT.slice(0, tick + 1);
-    for (let i = 0; i < played.length; i++) {
-      const x =
-        padX +
-        (i / (BET_SCRIPT.length - 1)) * (svgW - padX * 2);
-      const y =
-        padY +
-        (1 - played[i].p / 100) * (svgH - padY * 2);
-      pts.push({ x, y });
-    }
-    return pts;
-  }, [tick]);
-
-  const chartPath = useMemo(() => {
-    if (chartPoints.length === 0) return "";
-    return chartPoints
-      .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
-      .join(" ");
-  }, [chartPoints]);
-
-  const areaPath = useMemo(() => {
-    if (chartPoints.length === 0) return "";
-    const first = chartPoints[0];
-    const last = chartPoints[chartPoints.length - 1];
-    return (
-      `M ${first.x} ${svgH - padY} ` +
-      chartPoints.map((p) => `L ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") +
-      ` L ${last.x} ${svgH - padY} Z`
-    );
-  }, [chartPoints]);
-
-  const currentPoint = chartPoints[chartPoints.length - 1];
-
-  // Expected return calc — approximate PnL from win prob.
-  const expectedReturn = (
-    (currentProb / 100) * BET_STAKE * (BET_ODDS - 1) -
-    (1 - currentProb / 100) * BET_STAKE
-  );
-
-  return (
-    <div style={simCardStyle(EMERALD)}>
-      {/* Bet header */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 10,
-        marginBottom: 12,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-          <span style={liveBadgeStyle()}>
-            <span style={livePulseStyle()} />
-            LIVE
-          </span>
-          <div style={{ minWidth: 0 }}>
-            <div style={{
-              fontSize: 14,
-              fontWeight: 800,
-              color: D_INK,
-              lineHeight: 1.2,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              letterSpacing: -0.1,
-            }}>
-              Scheffler · Top 10
-            </div>
-            <div style={{
-              fontSize: 11,
-              color: D_MUTED,
-              fontFamily: "var(--font-mono), monospace",
-              marginTop: 2,
-              letterSpacing: 0.4,
-            }}>
-              £{BET_STAKE} @ {BET_ODDS.toFixed(1)}
-            </div>
-          </div>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{
-            fontSize: 10,
-            letterSpacing: 1,
-            textTransform: "uppercase",
-            color: D_DIM,
-            fontWeight: 800,
-          }}>
-            Win prob
-          </div>
-          <div style={{
-            fontSize: 26,
-            fontWeight: 800,
-            color: EMERALD,
-            fontFamily: "var(--font-mono), monospace",
-            lineHeight: 1,
-            marginTop: 3,
-            textShadow: `0 0 12px ${EMERALD_GLOW}`,
-            letterSpacing: -0.5,
-          }}>
-            {currentProb}%
-          </div>
-        </div>
-      </div>
-
-      {/* Chart — data-terminal readout */}
-      <div style={{
-        position: "relative",
-        borderRadius: 12,
-        background: D_PANEL,
-        backgroundImage: `
-          linear-gradient(180deg, oklch(0.24 0.02 155) 0%, ${D_PANEL} 100%),
-          repeating-linear-gradient(0deg, transparent 0, transparent 15px, oklch(0.96 0.008 150 / 0.03) 15px, oklch(0.96 0.008 150 / 0.03) 16px),
-          repeating-linear-gradient(90deg, transparent 0, transparent 23px, oklch(0.96 0.008 150 / 0.03) 23px, oklch(0.96 0.008 150 / 0.03) 24px)
-        `,
-        backgroundBlendMode: "normal, screen, screen",
-        border: `1px solid ${D_LINE}`,
-        padding: "12px 10px 8px",
-        marginBottom: 12,
-        boxShadow: `inset 0 0 24px oklch(0.10 0.01 155 / 0.6)`,
-      }}>
-        <svg
-          viewBox={`0 0 ${svgW} ${svgH}`}
-          preserveAspectRatio="none"
-          style={{
-            display: "block",
-            width: "100%",
-            height: svgH,
-            filter: `drop-shadow(0 0 6px ${EMERALD_GLOW})`,
-          }}
-          aria-hidden
-        >
-          <defs>
-            <linearGradient id="onboardAreaGrad" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor={EMERALD} stopOpacity={0.55} />
-              <stop offset="100%" stopColor={EMERALD} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          {/* Gridlines at 25 / 50 / 75 */}
-          {[25, 50, 75].map((v) => {
-            const y = padY + (1 - v / 100) * (svgH - padY * 2);
-            return (
-              <line
-                key={v}
-                x1={padX}
-                x2={svgW - padX}
-                y1={y}
-                y2={y}
-                stroke={D_LINE}
-                strokeDasharray="2 4"
-                opacity={0.9}
-              />
-            );
-          })}
-          {/* Area fill (glowing gradient) */}
-          <path d={areaPath} fill="url(#onboardAreaGrad)" />
-          {/* Line — bright emerald with drop-shadow glow */}
-          <path
-            d={chartPath}
-            fill="none"
-            stroke={EMERALD}
-            strokeWidth={2.4}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          {/* Current point marker — bloom halo + solid dot */}
-          {currentPoint && (
-            <>
-              <circle
-                cx={currentPoint.x}
-                cy={currentPoint.y}
-                r={10}
-                fill={EMERALD}
-                opacity={0.18}
-              />
-              <circle
-                cx={currentPoint.x}
-                cy={currentPoint.y}
-                r={5}
-                fill={EMERALD}
-                opacity={0.4}
-              />
-              <circle
-                cx={currentPoint.x}
-                cy={currentPoint.y}
-                r={2.6}
-                fill={D_INK}
-              />
-            </>
-          )}
-        </svg>
-        {/* Round labels */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          fontSize: 9.5,
-          letterSpacing: 1.2,
-          textTransform: "uppercase",
-          color: D_DIM,
-          fontWeight: 800,
-          marginTop: 4,
-          fontFamily: "var(--font-mono), monospace",
-        }}>
-          <span style={{ textAlign: "left" }}>R1</span>
-          <span style={{ textAlign: "left" }}>R2</span>
-          <span style={{ textAlign: "left" }}>R3</span>
-          <span style={{ textAlign: "left" }}>R4</span>
-        </div>
-      </div>
-
-      {/* Event ticker */}
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "10px 12px",
-        borderRadius: 10,
-        background: eventTick?.delta && eventTick.delta > 0
-          ? EMERALD_TINT
-          : eventTick?.delta && eventTick.delta < 0
-            ? DOWN_TINT
-            : D_PANEL,
-        border: `1px solid ${
-          eventTick?.delta && eventTick.delta > 0
-            ? EMERALD_D
-            : eventTick?.delta && eventTick.delta < 0
-              ? "oklch(0.44 0.14 25)"
-              : D_LINE
-        }`,
-        marginBottom: 12,
-        minHeight: 40,
-        transition: "background 220ms ease, border-color 220ms ease",
-      }}>
-        <span
-          style={{
-            fontSize: 14,
-            filter:
-              eventTick?.delta && eventTick.delta > 0
-                ? `drop-shadow(0 0 6px ${EMERALD_GLOW})`
-                : undefined,
-          }}
-          aria-hidden
-        >
-          {eventTick?.delta && eventTick.delta > 0
-            ? "▲"
-            : eventTick?.delta && eventTick.delta < 0
-              ? "▼"
-              : "•"}
-        </span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: 12.5,
-            fontWeight: 700,
-            color: D_INK,
-            lineHeight: 1.25,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            fontFamily: "var(--font-mono), monospace",
-            letterSpacing: 0.1,
-          }}>
-            {eventTick?.event ?? "Live-tracking every shot on course…"}
-          </div>
-        </div>
-        {typeof eventTick?.delta === "number" && eventTick.delta !== 0 && (
-          <span style={{
-            fontSize: 13,
-            fontWeight: 800,
-            fontFamily: "var(--font-mono), monospace",
-            color: eventTick.delta > 0 ? EMERALD : DOWN,
-            padding: "3px 8px",
-            borderRadius: 6,
-            background: "oklch(0.10 0.01 155 / 0.65)",
-            border: `1px solid ${eventTick.delta > 0 ? EMERALD_D : "oklch(0.50 0.16 25)"}`,
-            textShadow: `0 0 8px ${eventTick.delta > 0 ? EMERALD_GLOW : "oklch(0.74 0.20 25 / 0.5)"}`,
-          }}>
-            {eventTick.delta > 0 ? "+" : ""}{eventTick.delta}%
-          </span>
-        )}
-      </div>
-
-      {/* Expected return */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr",
-        gap: 10,
-      }}>
-        <div style={statTileStyle()}>
-          <div style={statLabelStyle()}>Expected return</div>
-          <div style={{
-            ...statValueStyle(),
-            color: expectedReturn > 0 ? EMERALD : DOWN,
-            textShadow: `0 0 10px ${expectedReturn > 0 ? EMERALD_GLOW : "oklch(0.74 0.20 25 / 0.4)"}`,
-          }}>
-            {expectedReturn > 0 ? "+" : ""}£{expectedReturn.toFixed(2)}
-          </div>
-        </div>
-        <div style={statTileStyle()}>
-          <div style={statLabelStyle()}>Round</div>
-          <div style={statValueStyle()}>
-            R{BET_SCRIPT[tick]?.round ?? 1}
-          </div>
-        </div>
-      </div>
-
-      {/* Replay control */}
-      <button
-        type="button"
-        onClick={() => {
-          setTick(0);
-          setRunning(true);
-        }}
-        style={replayBtnStyle()}
-      >
-        <svg viewBox="0 0 24 24" width="12" height="12" fill="none"
-          stroke="currentColor" strokeWidth="2.2"
-          strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M3 4v6h6" />
-          <path d="M3.5 15a9 9 0 1 0 2.6-8.4L3 10" />
-        </svg>
-        Replay
-      </button>
-    </div>
-  );
-}
-
-// ── LIVE SHOT FEED SIMULATION ─────────────────────────────────────
-
-interface FeedItem {
-  id: number;
-  timeAgo: string;
-  player: string;
-  line: string;
-  reactions: { fire: number; comment: number };
-  accent: "emerald" | "tang" | "blue";
-}
-
-const FEED_SCRIPT: FeedItem[] = [
-  {
-    id: 1,
-    timeAgo: "just now",
-    player: "Rory McIlroy",
-    line: "Drives 342 yds down the fairway on 18",
-    reactions: { fire: 24, comment: 3 },
-    accent: "tang",
-  },
-  {
-    id: 2,
-    timeAgo: "8s",
-    player: "Scottie Scheffler",
-    line: "Rolls in a 22-foot birdie putt on 14",
-    reactions: { fire: 61, comment: 12 },
-    accent: "emerald",
-  },
-  {
-    id: 3,
-    timeAgo: "42s",
-    player: "Xander Schauffele",
-    line: "Approach on 12 to 6 feet — birdie look",
-    reactions: { fire: 18, comment: 2 },
-    accent: "blue",
-  },
-  {
-    id: 4,
-    timeAgo: "1m",
-    player: "Ludvig Åberg",
-    line: "Holes out from the greenside bunker on 11",
-    reactions: { fire: 94, comment: 21 },
-    accent: "tang",
-  },
-];
-
-export function LiveFeedSimulation() {
-  const [count, setCount] = useState(1);
-  const [pulse, setPulse] = useState(0);
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setCount((c) => {
-        if (c >= FEED_SCRIPT.length) {
-          window.setTimeout(() => {
-            setCount(1);
-            setPulse((n) => n + 1);
-          }, 2400);
-          return c;
-        }
-        return c + 1;
-      });
-      setPulse((n) => n + 1);
-    }, 1600);
-    return () => window.clearInterval(id);
-  }, []);
-
-  return (
-    <div style={simCardStyle(TANG)}>
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        marginBottom: 14,
-      }}>
-        <span style={liveBadgeStyle(TANG)}>
-          <span style={livePulseStyle(TANG)} />
-          LIVE
-        </span>
-        <div style={{
-          fontSize: 10,
-          letterSpacing: 1.2,
-          textTransform: "uppercase",
-          color: D_DIM,
-          fontWeight: 800,
-          fontFamily: "var(--font-mono), monospace",
-        }}>
-          Shot tracker
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gap: 8 }}>
-        {FEED_SCRIPT.slice(0, count).map((item, i) => {
-          const isNewest = i === count - 1;
-          const accentC = item.accent === "emerald" ? EMERALD
-            : item.accent === "tang" ? TANG : BLUE;
-          const accentTint = item.accent === "emerald" ? EMERALD_TINT
-            : item.accent === "tang" ? TANG_TINT : BLUE_TINT;
-          const accentGlow = item.accent === "emerald" ? EMERALD_GLOW
-            : item.accent === "tang" ? TANG_GLOW : BLUE_GLOW;
-          return (
-            <div
-              key={`${pulse}-${item.id}`}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 12,
-                padding: "11px 12px",
-                background: D_PANEL,
-                border: `1px solid ${isNewest ? accentC : D_LINE}`,
-                borderRadius: 10,
-                boxShadow: isNewest ? `0 0 24px ${accentGlow}` : undefined,
-                animation: isNewest
-                  ? "onboardSlideIn 260ms cubic-bezier(.2,.9,.3,1)"
-                  : undefined,
-                transition: "border-color 220ms ease, box-shadow 220ms ease",
-              }}
-            >
-              <span style={{
-                width: 30,
-                height: 30,
-                borderRadius: 999,
-                background: accentTint,
-                color: accentC,
-                display: "grid",
-                placeItems: "center",
-                fontSize: 13,
-                fontWeight: 800,
-                flexShrink: 0,
-                fontFamily: "var(--font-mono), monospace",
-                letterSpacing: -0.3,
-                border: `1px solid ${accentC}`,
-                boxShadow: isNewest ? `0 0 10px ${accentGlow}` : undefined,
-              }} aria-hidden>
-                {item.player.split(" ").map(w => w[0]).join("")}
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontSize: 12.5,
-                  fontWeight: 800,
-                  color: D_INK,
-                  display: "flex",
-                  gap: 6,
-                  alignItems: "baseline",
-                  letterSpacing: -0.1,
-                }}>
-                  <span>{item.player}</span>
-                  <span style={{
-                    fontSize: 10,
-                    color: D_DIM,
-                    fontWeight: 600,
-                    fontFamily: "var(--font-mono), monospace",
-                    letterSpacing: 0.3,
-                  }}>
-                    · {item.timeAgo}
-                  </span>
-                </div>
-                <div style={{
-                  fontSize: 12.5,
-                  color: D_MUTED,
-                  marginTop: 2,
-                  lineHeight: 1.35,
-                }}>
-                  {item.line}
-                </div>
-                <div style={{
-                  display: "flex",
-                  gap: 12,
-                  marginTop: 6,
-                  fontSize: 11,
-                  color: D_DIM,
-                  fontWeight: 700,
-                  fontFamily: "var(--font-mono), monospace",
-                }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                    <span aria-hidden>🔥</span>{item.reactions.fire}
-                  </span>
-                  <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                    <span aria-hidden>💬</span>{item.reactions.comment}
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <style>{`
-        @keyframes onboardSlideIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-    </div>
-  );
-}
-
-// ── PREDICTION TOOLS SIMULATION ───────────────────────────────────
-//
-// Step-by-step walkthrough of the three main prediction tools. The
-// visual language matches the real Pardle UI (light warm-paper,
-// emerald accents, Archivo type) so the reader recognises what
-// they're being shown when they later land on the actual page —
-// no mission-control aesthetic here, that's for the live-data
-// sims only.
-
-interface TourStep {
-  key: "course-fit" | "round-forecast" | "tee-shots";
+interface WalkthroughStep {
+  key: string;
   tabLabel: string;
+  href: string;
+  /** One-line explainer under the preview. */
   caption: string;
   render: () => React.ReactNode;
 }
 
-const TOUR_STEPS: TourStep[] = [
-  {
-    key: "course-fit",
-    tabLabel: "Course fit",
-    caption:
-      "Rank the field by predicted OTT edge vs each player's own baseline — cross-validated so the confidence is honest.",
-    render: () => <CourseFitPreview />,
-  },
-  {
-    key: "round-forecast",
-    tabLabel: "Round score",
-    caption:
-      "Full round-score distribution — median, upside, downside — for any player at any course.",
-    render: () => <RoundForecastPreview />,
-  },
-  {
-    key: "tee-shots",
-    tabLabel: "Ballstriking",
-    caption:
-      "Radar-tracked ball speed, apex and shot curve — the ingredients the course-fit model reads.",
-    render: () => <TeeShotPreview />,
-  },
-];
+interface WalkthroughProps {
+  badgeLabel: string;
+  accent: string;
+  accentTint: string;
+  steps: WalkthroughStep[];
+  onNavigate: () => void;
+}
 
-const TOUR_STEP_MS = 4200;
-
-export function ToolsSimulation() {
+function Walkthrough({
+  badgeLabel,
+  accent,
+  accentTint,
+  steps,
+  onNavigate,
+}: WalkthroughProps) {
   const [step, setStep] = useState(0);
   const [paused, setPaused] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
@@ -747,68 +73,103 @@ export function ToolsSimulation() {
   useEffect(() => {
     if (reducedMotion || paused) return;
     const id = window.setInterval(
-      () => setStep((s) => (s + 1) % TOUR_STEPS.length),
-      TOUR_STEP_MS,
+      () => setStep((s) => (s + 1) % steps.length),
+      STEP_MS,
     );
     return () => window.clearInterval(id);
-  }, [reducedMotion, paused]);
+  }, [reducedMotion, paused, steps.length]);
 
-  const current = TOUR_STEPS[step];
+  const current = steps[step];
 
   return (
-    <div style={walkthroughOuterStyle()}>
-      {/* Header — small badge + step counter */}
+    <div style={{
+      marginTop: 4,
+      marginBottom: 18,
+      padding: "16px 16px 18px",
+      borderRadius: 16,
+      background: CARD,
+      border: `1px solid ${LINE}`,
+      boxShadow: `inset 0 -3px 0 ${accent}, 0 6px 18px oklch(0.15 0.02 150 / 0.05)`,
+      fontFamily: "var(--font-archivo), var(--font-sans), sans-serif",
+    }}>
+      {/* Header: badge + step counter */}
       <div style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         marginBottom: 12,
       }}>
-        <span style={walkthroughBadgeStyle()}>
+        <span style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 7,
+          padding: "4px 10px 4px 8px",
+          borderRadius: 999,
+          background: accentTint,
+          color: accent,
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: 1.3,
+          textTransform: "uppercase",
+          boxShadow: `inset 0 0 0 1px ${accent}`,
+        }}>
           <span style={{
             width: 6,
             height: 6,
             borderRadius: 999,
-            background: L_BLUE,
+            background: accent,
           }} />
-          Tools tour
+          {badgeLabel}
         </span>
         <span style={{
           fontSize: 10,
           letterSpacing: 1.2,
           textTransform: "uppercase",
-          color: L_DIM,
+          color: DIM,
           fontWeight: 800,
           fontFamily: "var(--font-mono), monospace",
         }}>
-          Step {step + 1} of {TOUR_STEPS.length}
+          Step {step + 1} of {steps.length}
         </span>
       </div>
 
       {/* Tab strip */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: `repeat(${TOUR_STEPS.length}, 1fr)`,
+        gridTemplateColumns: `repeat(${steps.length}, 1fr)`,
         gap: 6,
         marginBottom: 12,
       }}>
-        {TOUR_STEPS.map((t, i) => {
+        {steps.map((s, i) => {
           const active = i === step;
           return (
             <button
-              key={t.key}
+              key={s.key}
               type="button"
               onClick={() => {
                 setStep(i);
                 setPaused(true);
               }}
-              style={tabStyle(active)}
+              style={{
+                position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                padding: "8px 10px 10px",
+                background: active ? accentTint : SOFT,
+                border: `1px solid ${active ? accent : LINE}`,
+                borderRadius: 8,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                textAlign: "left",
+                transition: "background 160ms ease, border-color 160ms ease",
+              }}
               aria-current={active ? "step" : undefined}
             >
               <span style={{
                 fontSize: 9.5,
                 letterSpacing: 0.7,
-                color: active ? L_BLUE : L_DIM,
+                color: active ? accent : DIM,
                 fontFamily: "var(--font-mono), monospace",
                 fontWeight: 800,
               }}>
@@ -817,54 +178,55 @@ export function ToolsSimulation() {
               <span style={{
                 fontSize: 12.5,
                 fontWeight: 800,
-                color: active ? L_INK : L_MUTED,
+                color: active ? INK : MUTED,
                 letterSpacing: -0.1,
                 marginTop: 2,
               }}>
-                {t.tabLabel}
+                {s.tabLabel}
               </span>
-              {/* Progress underline — animates while auto-advancing */}
-              <span
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  bottom: -1,
-                  height: 2,
-                  background: L_BLUE,
-                  borderRadius: 999,
-                  width: active ? "100%" : "0%",
-                  transition: reducedMotion
-                    ? undefined
-                    : active && !paused
-                      ? `width ${TOUR_STEP_MS - 100}ms linear`
-                      : "width 200ms ease",
-                }}
-              />
+              <span style={{
+                position: "absolute",
+                left: 0,
+                bottom: -1,
+                height: 2,
+                background: accent,
+                borderRadius: 999,
+                width: active ? "100%" : "0%",
+                transition: reducedMotion
+                  ? undefined
+                  : active && !paused
+                    ? `width ${STEP_MS - 100}ms linear`
+                    : "width 200ms ease",
+              }} />
             </button>
           );
         })}
       </div>
 
-      {/* Preview slot — remount on step change so the inner CSS
-          transitions replay for the new panel. */}
-      <div
+      {/* Clickable preview slot */}
+      <Link
         key={step}
-        className="pardle-tools-preview"
+        href={current.href}
+        onClick={onNavigate}
+        className="pardle-tools-preview-link"
         style={{
+          display: "block",
+          textDecoration: "none",
+          color: "inherit",
           animation: reducedMotion
             ? undefined
             : "toolsPreviewIn 320ms cubic-bezier(.2,.9,.3,1) both",
         }}
       >
         {current.render()}
-      </div>
+      </Link>
 
       {/* Caption */}
       <p style={{
         margin: "12px 0 0",
         fontSize: 13,
         lineHeight: 1.45,
-        color: L_MUTED,
+        color: MUTED,
         fontWeight: 500,
       }}>
         {current.caption}
@@ -875,12 +237,667 @@ export function ToolsSimulation() {
           from { opacity: 0; transform: translateY(6px); }
           to   { opacity: 1; transform: translateY(0); }
         }
+        .pardle-tools-preview-link {
+          transition: transform 160ms cubic-bezier(.2,.9,.3,1),
+                      filter 160ms ease;
+        }
+        .pardle-tools-preview-link:hover,
+        .pardle-tools-preview-link:focus-visible {
+          transform: translateY(-2px);
+          filter: brightness(1.02);
+          outline: none;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .pardle-tools-preview-link:hover,
+          .pardle-tools-preview-link:focus-visible {
+            transform: none !important;
+          }
+        }
       `}</style>
     </div>
   );
 }
 
-// ── Tools walkthrough — individual tool previews ──────────────────
+// ── Preview building blocks ───────────────────────────────────────
+
+interface PreviewShellProps {
+  eyebrow: string;
+  title: string;
+  pill?: { label: string; tone: "emerald" | "blue" | "tang" };
+  openLabel: string;
+  accent: string;
+  children: React.ReactNode;
+}
+
+function PreviewShell({
+  eyebrow,
+  title,
+  pill,
+  openLabel,
+  accent,
+  children,
+}: PreviewShellProps) {
+  const pillBg = pill?.tone === "blue" ? BLUE_TINT
+    : pill?.tone === "tang" ? TANG_TINT : UP_TINT;
+  const pillColor = pill?.tone === "blue" ? BLUE
+    : pill?.tone === "tang" ? TANG : UP;
+  return (
+    <div style={{
+      padding: "14px 14px 12px",
+      background: CARD,
+      border: `1px solid ${LINE}`,
+      borderRadius: 12,
+      boxShadow: "0 2px 8px oklch(0.15 0.02 150 / 0.03)",
+    }}>
+      <div style={{
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 10,
+      }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontSize: 9.5,
+            letterSpacing: 1.1,
+            textTransform: "uppercase",
+            color: DIM,
+            fontWeight: 800,
+          }}>
+            {eyebrow}
+          </div>
+          <div style={{
+            marginTop: 2,
+            fontSize: 14,
+            fontWeight: 800,
+            color: INK,
+            letterSpacing: -0.2,
+          }}>
+            {title}
+          </div>
+        </div>
+        {pill && (
+          <span style={{
+            fontSize: 9.5,
+            letterSpacing: 0.8,
+            textTransform: "uppercase",
+            color: pillColor,
+            fontWeight: 800,
+            padding: "3px 8px",
+            background: pillBg,
+            borderRadius: 999,
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}>
+            {pill.label}
+          </span>
+        )}
+      </div>
+      {children}
+      {/* Open affordance — matches on hover from Walkthrough */}
+      <div style={{
+        marginTop: 12,
+        display: "flex",
+        justifyContent: "flex-end",
+        alignItems: "center",
+        gap: 4,
+        fontSize: 10.5,
+        letterSpacing: 0.9,
+        textTransform: "uppercase",
+        color: accent,
+        fontWeight: 800,
+      }}>
+        {openLabel}
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none"
+          stroke={accent} strokeWidth="2.4"
+          strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+// ── BETS PATH — walkthrough steps ─────────────────────────────────
+
+function BetSlipPreview() {
+  return (
+    <PreviewShell
+      eyebrow="Add a bet"
+      title="Scheffler · Top 10"
+      pill={{ label: "Live tracked", tone: "emerald" }}
+      openLabel="Open my bets"
+      accent={UP}
+    >
+      <div style={{
+        marginTop: 12,
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 8,
+      }}>
+        {[
+          { label: "Player", value: "Scottie Scheffler" },
+          { label: "Market", value: "Top 10 finish" },
+          { label: "Stake", value: "£10.00" },
+          { label: "Odds", value: "3.5" },
+        ].map((f) => (
+          <div key={f.label} style={{
+            padding: "8px 10px",
+            background: SOFT,
+            border: `1px solid ${LINE}`,
+            borderRadius: 8,
+          }}>
+            <div style={{
+              fontSize: 9.5,
+              letterSpacing: 0.9,
+              textTransform: "uppercase",
+              color: DIM,
+              fontWeight: 800,
+            }}>
+              {f.label}
+            </div>
+            <div style={{
+              marginTop: 2,
+              fontSize: 13,
+              fontWeight: 800,
+              color: INK,
+              fontFamily: f.label === "Stake" || f.label === "Odds"
+                ? "var(--font-mono), monospace"
+                : undefined,
+              letterSpacing: -0.1,
+            }}>
+              {f.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </PreviewShell>
+  );
+}
+
+function BetLivePreview() {
+  // Simple SVG chart of a rising win-probability trajectory.
+  const points = [
+    45, 48, 47, 52, 55, 54, 58, 62, 60, 66, 68, 65, 72, 74, 78,
+  ];
+  const w = 320;
+  const h = 88;
+  const padX = 6;
+  const padY = 8;
+  const pts = points.map((p, i) => ({
+    x: padX + (i / (points.length - 1)) * (w - padX * 2),
+    y: padY + (1 - p / 100) * (h - padY * 2),
+  }));
+  const path = pts.map((p, i) =>
+    `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`
+  ).join(" ");
+  const areaPath =
+    `M ${pts[0].x} ${h - padY} ` +
+    pts.map(p => `L ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ") +
+    ` L ${pts[pts.length - 1].x} ${h - padY} Z`;
+  const last = pts[pts.length - 1];
+
+  return (
+    <PreviewShell
+      eyebrow="Live win probability"
+      title="Scheffler · Top 10 · R4 thru 15"
+      pill={{ label: "78% win", tone: "emerald" }}
+      openLabel="Open my bets"
+      accent={UP}
+    >
+      <div style={{
+        marginTop: 12,
+        padding: "10px 8px 6px",
+        background: SOFT,
+        border: `1px solid ${LINE}`,
+        borderRadius: 8,
+      }}>
+        <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none"
+          style={{ display: "block", width: "100%", height: h }}
+          aria-hidden>
+          <defs>
+            <linearGradient id="betAreaGrad" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor={UP} stopOpacity={0.28} />
+              <stop offset="100%" stopColor={UP} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          {[25, 50, 75].map((v) => {
+            const y = padY + (1 - v / 100) * (h - padY * 2);
+            return (
+              <line key={v}
+                x1={padX} x2={w - padX} y1={y} y2={y}
+                stroke={LINE} strokeDasharray="2 3" />
+            );
+          })}
+          <path d={areaPath} fill="url(#betAreaGrad)" />
+          <path d={path} fill="none" stroke={UP} strokeWidth={2.2}
+            strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx={last.x} cy={last.y} r={7} fill={UP} opacity={0.2} />
+          <circle cx={last.x} cy={last.y} r={3} fill="white"
+            stroke={UP} strokeWidth={2} />
+        </svg>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          fontSize: 9.5,
+          letterSpacing: 0.8,
+          textTransform: "uppercase",
+          color: DIM,
+          fontWeight: 800,
+          marginTop: 4,
+          fontFamily: "var(--font-mono), monospace",
+        }}>
+          <span>R1</span><span>R2</span><span>R3</span><span>R4</span>
+        </div>
+      </div>
+      <div style={{
+        marginTop: 10,
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 8,
+      }}>
+        {[
+          { label: "Expected return", value: "+£18.20", tone: "emerald" },
+          { label: "PnL if wins", value: "+£25.00", tone: "ink" },
+        ].map((t) => (
+          <div key={t.label} style={{
+            padding: "8px 10px",
+            background: SOFT,
+            border: `1px solid ${LINE}`,
+            borderRadius: 8,
+          }}>
+            <div style={{
+              fontSize: 9.5,
+              letterSpacing: 0.9,
+              textTransform: "uppercase",
+              color: DIM,
+              fontWeight: 800,
+            }}>
+              {t.label}
+            </div>
+            <div style={{
+              marginTop: 2,
+              fontSize: 15,
+              fontWeight: 800,
+              color: t.tone === "emerald" ? UP : INK,
+              fontFamily: "var(--font-mono), monospace",
+              letterSpacing: -0.3,
+              lineHeight: 1,
+            }}>
+              {t.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </PreviewShell>
+  );
+}
+
+function GroupsPreview() {
+  const rows = [
+    { rank: 1, name: "Alex", pnl: 145.20, you: false },
+    { rank: 2, name: "You", pnl: 82.50, you: true },
+    { rank: 3, name: "Ben", pnl: 41.10, you: false },
+    { rank: 4, name: "Chris", pnl: -28.75, you: false },
+  ];
+  return (
+    <PreviewShell
+      eyebrow="Group P&L race"
+      title="The Wolves · this week"
+      pill={{ label: "4 members", tone: "emerald" }}
+      openLabel="Open groups"
+      accent={UP}
+    >
+      <div style={{
+        marginTop: 12,
+        display: "grid",
+        gap: 6,
+      }}>
+        {rows.map((r) => (
+          <div key={r.name} style={{
+            display: "grid",
+            gridTemplateColumns: "22px 1fr auto",
+            gap: 12,
+            alignItems: "center",
+            padding: "9px 12px",
+            background: r.you ? UP_TINT : SOFT,
+            border: `1px solid ${r.you ? UP : LINE}`,
+            borderRadius: 8,
+          }}>
+            <span style={{
+              fontSize: 10.5,
+              color: r.you ? UP_D : DIM,
+              fontWeight: 800,
+              fontFamily: "var(--font-mono), monospace",
+            }}>
+              {String(r.rank).padStart(2, "0")}
+            </span>
+            <span style={{
+              fontSize: 13,
+              fontWeight: 800,
+              color: INK,
+              letterSpacing: -0.1,
+            }}>
+              {r.name}
+              {r.you && <span style={{
+                marginLeft: 6,
+                fontSize: 10,
+                letterSpacing: 0.8,
+                textTransform: "uppercase",
+                color: UP,
+                fontWeight: 800,
+              }}>You</span>}
+            </span>
+            <span style={{
+              fontSize: 14,
+              fontWeight: 800,
+              color: r.pnl >= 0 ? UP : DOWN,
+              fontFamily: "var(--font-mono), monospace",
+              letterSpacing: -0.3,
+              fontVariantNumeric: "tabular-nums",
+            }}>
+              {r.pnl >= 0 ? "+" : ""}£{r.pnl.toFixed(2)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </PreviewShell>
+  );
+}
+
+// ── LIVE PATH — walkthrough steps ─────────────────────────────────
+
+function ShotFeedPreview() {
+  const shots = [
+    {
+      name: "Rory McIlroy",
+      initials: "RM",
+      timeAgo: "just now",
+      line: "Rolls in a 22-foot birdie on 14",
+      fire: 61,
+      comment: 12,
+    },
+    {
+      name: "Scheffler",
+      initials: "SS",
+      timeAgo: "8s",
+      line: "Approach on 12 to 6 feet — birdie look",
+      fire: 24,
+      comment: 3,
+    },
+    {
+      name: "Ludvig Åberg",
+      initials: "LA",
+      timeAgo: "42s",
+      line: "Holes out from the greenside bunker on 11",
+      fire: 94,
+      comment: 21,
+    },
+  ];
+  return (
+    <PreviewShell
+      eyebrow="Live shot feed"
+      title="Torrey Pines · Round 4"
+      pill={{ label: "Live", tone: "tang" }}
+      openLabel="Open shot tracker"
+      accent={TANG}
+    >
+      <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+        {shots.map((s, i) => (
+          <div key={s.name} style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 10,
+            padding: "9px 10px",
+            background: i === 0 ? TANG_TINT : SOFT,
+            border: `1px solid ${i === 0 ? TANG : LINE}`,
+            borderRadius: 8,
+          }}>
+            <span style={{
+              width: 28,
+              height: 28,
+              borderRadius: 999,
+              background: CARD,
+              color: TANG,
+              border: `1px solid ${TANG}`,
+              display: "grid",
+              placeItems: "center",
+              fontSize: 11,
+              fontWeight: 800,
+              flexShrink: 0,
+              fontFamily: "var(--font-mono), monospace",
+              letterSpacing: -0.2,
+            }} aria-hidden>
+              {s.initials}
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: 12.5,
+                fontWeight: 800,
+                color: INK,
+                display: "flex",
+                gap: 5,
+                alignItems: "baseline",
+                letterSpacing: -0.1,
+              }}>
+                <span>{s.name}</span>
+                <span style={{
+                  fontSize: 10,
+                  color: DIM,
+                  fontWeight: 600,
+                  fontFamily: "var(--font-mono), monospace",
+                }}>
+                  · {s.timeAgo}
+                </span>
+              </div>
+              <div style={{
+                fontSize: 12,
+                color: MUTED,
+                marginTop: 1,
+                lineHeight: 1.35,
+              }}>
+                {s.line}
+              </div>
+              <div style={{
+                display: "flex",
+                gap: 10,
+                marginTop: 4,
+                fontSize: 10.5,
+                color: DIM,
+                fontWeight: 700,
+                fontFamily: "var(--font-mono), monospace",
+              }}>
+                <span>🔥 {s.fire}</span>
+                <span>💬 {s.comment}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </PreviewShell>
+  );
+}
+
+function ScorecardPreview() {
+  const holes = [
+    { hole: 10, par: 4, score: 3 },
+    { hole: 11, par: 3, score: 3 },
+    { hole: 12, par: 4, score: 4 },
+    { hole: 13, par: 5, score: 4 },
+    { hole: 14, par: 4, score: 3 },
+    { hole: 15, par: 4, score: 4 },
+    { hole: 16, par: 3, score: 4 },
+    { hole: 17, par: 5, score: 4 },
+    { hole: 18, par: 4, score: 3 },
+  ];
+  return (
+    <PreviewShell
+      eyebrow="Player scorecard"
+      title="Rory McIlroy · R4 back 9"
+      pill={{ label: "-4 today", tone: "tang" }}
+      openLabel="Open shot tracker"
+      accent={TANG}
+    >
+      <div style={{
+        marginTop: 12,
+        padding: "8px 6px",
+        background: SOFT,
+        border: `1px solid ${LINE}`,
+        borderRadius: 8,
+      }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${holes.length}, 1fr)`,
+          gap: 3,
+        }}>
+          {holes.map((h) => {
+            const diff = h.score - h.par;
+            const color = diff < 0 ? UP : diff > 0 ? DOWN : INK;
+            const bg = diff === -1 ? UP_TINT
+              : diff <= -2 ? UP_TINT
+                : diff > 0 ? "oklch(0.965 0.045 30)" : CARD;
+            return (
+              <div key={h.hole} style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                padding: "6px 2px",
+                background: bg,
+                border: `1px solid ${LINE}`,
+                borderRadius: 6,
+              }}>
+                <span style={{
+                  fontSize: 9.5,
+                  color: DIM,
+                  fontWeight: 700,
+                  fontFamily: "var(--font-mono), monospace",
+                }}>
+                  {h.hole}
+                </span>
+                <span style={{
+                  fontSize: 13,
+                  fontWeight: 800,
+                  color,
+                  fontFamily: "var(--font-mono), monospace",
+                  marginTop: 2,
+                  lineHeight: 1,
+                }}>
+                  {h.score}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{
+        marginTop: 10,
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)",
+        gap: 8,
+      }}>
+        {[
+          { label: "Today", value: "-4", tone: "tang" },
+          { label: "Total", value: "-11", tone: "tang" },
+          { label: "Position", value: "T3", tone: "ink" },
+        ].map((t) => (
+          <div key={t.label} style={{
+            padding: "8px 10px",
+            background: SOFT,
+            border: `1px solid ${LINE}`,
+            borderRadius: 8,
+          }}>
+            <div style={{
+              fontSize: 9.5,
+              letterSpacing: 0.9,
+              textTransform: "uppercase",
+              color: DIM,
+              fontWeight: 800,
+            }}>
+              {t.label}
+            </div>
+            <div style={{
+              marginTop: 2,
+              fontSize: 15,
+              fontWeight: 800,
+              color: t.tone === "tang" ? TANG : INK,
+              fontFamily: "var(--font-mono), monospace",
+              letterSpacing: -0.3,
+              lineHeight: 1,
+            }}>
+              {t.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </PreviewShell>
+  );
+}
+
+function InsightsPreview() {
+  const posts = [
+    {
+      badge: "R4 Bet",
+      badgeColor: UP,
+      title: "Why we bet £1,149 on Scheffler top 10",
+      body: "Market has him at 60%. Our model has him at 75%. That's the biggest edge we've seen this week.",
+    },
+    {
+      badge: "Field brief",
+      badgeColor: BLUE,
+      title: "Torrey Pines rewards bomber tee shots",
+      body: "CV R² 0.083 with ball speed β +0.245 — the strongest single-feature course-fit signal on tour.",
+    },
+  ];
+  return (
+    <PreviewShell
+      eyebrow="Editorial takes"
+      title="Insights · this week"
+      pill={{ label: "Fresh", tone: "blue" }}
+      openLabel="Open insights"
+      accent={TANG}
+    >
+      <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+        {posts.map((p, i) => (
+          <div key={i} style={{
+            padding: "10px 12px",
+            background: SOFT,
+            border: `1px solid ${LINE}`,
+            borderRadius: 8,
+          }}>
+            <div style={{
+              fontSize: 9.5,
+              letterSpacing: 0.9,
+              textTransform: "uppercase",
+              color: p.badgeColor,
+              fontWeight: 800,
+            }}>
+              {p.badge}
+            </div>
+            <div style={{
+              marginTop: 3,
+              fontSize: 13.5,
+              fontWeight: 800,
+              color: INK,
+              letterSpacing: -0.2,
+              lineHeight: 1.25,
+            }}>
+              {p.title}
+            </div>
+            <div style={{
+              marginTop: 3,
+              fontSize: 12,
+              color: MUTED,
+              lineHeight: 1.4,
+            }}>
+              {p.body}
+            </div>
+          </div>
+        ))}
+      </div>
+    </PreviewShell>
+  );
+}
+
+// ── TOOLS PATH — walkthrough steps ────────────────────────────────
 
 function CourseFitPreview() {
   const rows = [
@@ -891,39 +908,31 @@ function CourseFitPreview() {
   ];
   const maxAbs = Math.max(...rows.map((r) => Math.abs(r.edge)));
   return (
-    <div style={previewCardStyle()}>
-      <div style={previewHeaderStyle()}>
-        <div>
-          <div style={previewEyebrowStyle()}>Course-fit forecast</div>
-          <div style={previewTitleStyle()}>Torrey Pines · this week</div>
-        </div>
-        <span style={trustedPillStyle()}>Trusted · CV R² 0.083</span>
-      </div>
-      <div style={{
-        display: "grid",
-        gap: 6,
-        marginTop: 10,
-      }}>
+    <PreviewShell
+      eyebrow="Course-fit forecast"
+      title="Torrey Pines · this week"
+      pill={{ label: "Trusted · CV R² 0.083", tone: "emerald" }}
+      openLabel="Open course fit"
+      accent={BLUE}
+    >
+      <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
         {rows.map((row) => {
           const barPct = (Math.abs(row.edge) / maxAbs) * 42;
-          const c = row.dir === "up" ? L_UP : L_DOWN;
+          const c = row.dir === "up" ? UP : DOWN;
           return (
-            <div
-              key={row.rank}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "18px 1fr 1fr 52px",
-                gap: 10,
-                alignItems: "center",
-                padding: "7px 10px",
-                background: L_SOFT,
-                border: `1px solid ${L_LINE}`,
-                borderRadius: 8,
-              }}
-            >
+            <div key={row.rank} style={{
+              display: "grid",
+              gridTemplateColumns: "18px 1fr 1fr 52px",
+              gap: 10,
+              alignItems: "center",
+              padding: "7px 10px",
+              background: SOFT,
+              border: `1px solid ${LINE}`,
+              borderRadius: 8,
+            }}>
               <span style={{
                 fontSize: 10,
-                color: L_DIM,
+                color: DIM,
                 fontWeight: 800,
                 fontFamily: "var(--font-mono), monospace",
               }}>
@@ -932,7 +941,7 @@ function CourseFitPreview() {
               <span style={{
                 fontSize: 12.5,
                 fontWeight: 800,
-                color: L_INK,
+                color: INK,
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -943,8 +952,8 @@ function CourseFitPreview() {
               <div style={{
                 position: "relative",
                 height: 8,
-                background: L_CARD,
-                border: `1px solid ${L_LINE}`,
+                background: CARD,
+                border: `1px solid ${LINE}`,
                 borderRadius: 999,
                 overflow: "hidden",
               }}>
@@ -955,7 +964,7 @@ function CourseFitPreview() {
                   transform: "translateX(-50%)",
                   width: 1,
                   height: 12,
-                  background: L_DIM,
+                  background: DIM,
                   opacity: 0.55,
                   zIndex: 2,
                 }} />
@@ -983,7 +992,7 @@ function CourseFitPreview() {
           );
         })}
       </div>
-    </div>
+    </PreviewShell>
   );
 }
 
@@ -1002,21 +1011,13 @@ function RoundForecastPreview() {
   const modeScore = 68;
   const chartH = 88;
   return (
-    <div style={previewCardStyle()}>
-      <div style={previewHeaderStyle()}>
-        <div>
-          <div style={previewEyebrowStyle()}>Round-score forecast</div>
-          <div style={previewTitleStyle()}>Scheffler · Sunday R4</div>
-        </div>
-        <span style={{
-          ...trustedPillStyle(),
-          background: L_BLUE_TINT,
-          color: L_BLUE,
-        }}>
-          Model
-        </span>
-      </div>
-
+    <PreviewShell
+      eyebrow="Round-score forecast"
+      title="Scheffler · Sunday R4"
+      pill={{ label: "Model", tone: "blue" }}
+      openLabel="Open round forecast"
+      accent={BLUE}
+    >
       <div style={{
         marginTop: 14,
         display: "grid",
@@ -1039,8 +1040,8 @@ function RoundForecastPreview() {
               <div style={{
                 width: "100%",
                 height: `${h}px`,
-                background: isMode ? L_UP : L_SOFT,
-                border: isMode ? `1px solid ${L_UP}` : `1px solid ${L_LINE}`,
+                background: isMode ? UP : SOFT,
+                border: isMode ? `1px solid ${UP}` : `1px solid ${LINE}`,
                 borderRadius: 4,
               }} />
             </div>
@@ -1056,7 +1057,7 @@ function RoundForecastPreview() {
         {bars.map((b) => (
           <div key={b.score} style={{
             fontSize: 9.5,
-            color: b.score === modeScore ? L_INK : L_DIM,
+            color: b.score === modeScore ? INK : DIM,
             fontFamily: "var(--font-mono), monospace",
             fontWeight: b.score === modeScore ? 800 : 600,
             textAlign: "center",
@@ -1065,18 +1066,46 @@ function RoundForecastPreview() {
           </div>
         ))}
       </div>
-
       <div style={{
         display: "grid",
         gridTemplateColumns: "repeat(3, 1fr)",
         gap: 8,
         marginTop: 12,
       }}>
-        <StatTile label="Median" value="68" tone="ink" />
-        <StatTile label="Best 5%" value="65" tone="emerald" />
-        <StatTile label="Worst 5%" value="71" tone="ink" />
+        {[
+          { label: "Median", value: "68", tone: "ink" as const },
+          { label: "Best 5%", value: "65", tone: "emerald" as const },
+          { label: "Worst 5%", value: "71", tone: "ink" as const },
+        ].map((t) => (
+          <div key={t.label} style={{
+            padding: "8px 10px",
+            background: SOFT,
+            border: `1px solid ${LINE}`,
+            borderRadius: 8,
+          }}>
+            <div style={{
+              fontSize: 9.5,
+              letterSpacing: 0.9,
+              textTransform: "uppercase",
+              color: DIM,
+              fontWeight: 800,
+            }}>
+              {t.label}
+            </div>
+            <div style={{
+              marginTop: 2,
+              fontSize: 16,
+              fontWeight: 800,
+              color: t.tone === "emerald" ? UP : INK,
+              fontFamily: "var(--font-mono), monospace",
+              letterSpacing: -0.3,
+            }}>
+              {t.value}
+            </div>
+          </div>
+        ))}
       </div>
-    </div>
+    </PreviewShell>
   );
 }
 
@@ -1087,30 +1116,19 @@ function TeeShotPreview() {
     { label: "Curve", value: "3.4° draw", pct: 58 },
   ];
   return (
-    <div style={previewCardStyle()}>
-      <div style={previewHeaderStyle()}>
-        <div>
-          <div style={previewEyebrowStyle()}>Tee-shot profile</div>
-          <div style={previewTitleStyle()}>Rory McIlroy · Driver</div>
-        </div>
-        <span style={{
-          ...trustedPillStyle(),
-          background: L_BLUE_TINT,
-          color: L_BLUE,
-        }}>
-          Radar · 3 seasons
-        </span>
-      </div>
-      <div style={{
-        display: "grid",
-        gap: 10,
-        marginTop: 12,
-      }}>
+    <PreviewShell
+      eyebrow="Tee-shot profile"
+      title="Rory McIlroy · Driver"
+      pill={{ label: "Radar · 3 seasons", tone: "blue" }}
+      openLabel="Open tee-shots"
+      accent={BLUE}
+    >
+      <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
         {stats.map((s) => (
           <div key={s.label} style={{
             padding: "10px 12px",
-            background: L_SOFT,
-            border: `1px solid ${L_LINE}`,
+            background: SOFT,
+            border: `1px solid ${LINE}`,
             borderRadius: 8,
           }}>
             <div style={{
@@ -1121,7 +1139,7 @@ function TeeShotPreview() {
               <span style={{
                 fontSize: 12.5,
                 fontWeight: 800,
-                color: L_INK,
+                color: INK,
                 letterSpacing: -0.1,
               }}>
                 {s.label}
@@ -1129,7 +1147,7 @@ function TeeShotPreview() {
               <span style={{
                 fontSize: 13,
                 fontWeight: 800,
-                color: L_INK,
+                color: INK,
                 fontFamily: "var(--font-mono), monospace",
                 fontVariantNumeric: "tabular-nums",
               }}>
@@ -1139,179 +1157,153 @@ function TeeShotPreview() {
             <div style={{
               marginTop: 6,
               height: 5,
-              background: L_CARD,
-              border: `1px solid ${L_LINE}`,
+              background: CARD,
+              border: `1px solid ${LINE}`,
               borderRadius: 999,
               overflow: "hidden",
             }}>
               <div style={{
                 width: `${s.pct}%`,
                 height: "100%",
-                background: L_UP,
+                background: UP,
                 borderRadius: 999,
               }} />
             </div>
             <div style={{
               marginTop: 4,
               fontSize: 10.5,
-              color: L_MUTED,
+              color: MUTED,
               fontWeight: 700,
-              letterSpacing: 0.1,
             }}>
               {s.pct}th percentile · tour field
             </div>
           </div>
         ))}
       </div>
-    </div>
+    </PreviewShell>
   );
 }
 
-function StatTile({
-  label,
-  value,
-  tone,
+// ── Exported sims ─────────────────────────────────────────────────
+
+const BET_STEPS: WalkthroughStep[] = [
+  {
+    key: "log",
+    tabLabel: "Log a bet",
+    href: "/bets",
+    caption: "Punch in the player, market, stake and odds. Takes 20 seconds — no bookmaker link required.",
+    render: () => <BetSlipPreview />,
+  },
+  {
+    key: "live",
+    tabLabel: "Live tracking",
+    href: "/bets",
+    caption: "Every shot on course repricess win probability, expected return and settlement in real time.",
+    render: () => <BetLivePreview />,
+  },
+  {
+    key: "groups",
+    tabLabel: "Groups",
+    href: "/groups",
+    caption: "Race a P&L leaderboard against your mates — every bet everyone lands, side-by-side.",
+    render: () => <GroupsPreview />,
+  },
+];
+
+const LIVE_STEPS: WalkthroughStep[] = [
+  {
+    key: "feed",
+    tabLabel: "Live shots",
+    href: "/live",
+    caption: "Every notable shot, birdie and hole-out streams in the instant it lands.",
+    render: () => <ShotFeedPreview />,
+  },
+  {
+    key: "scorecard",
+    tabLabel: "Scorecards",
+    href: "/live",
+    caption: "Drill into any player's live scorecard — hole-by-hole score, current position and today's swing.",
+    render: () => <ScorecardPreview />,
+  },
+  {
+    key: "insights",
+    tabLabel: "Insights",
+    href: "/",
+    caption: "Editorial reads and running commentary — why the numbers moved and who's about to matter.",
+    render: () => <InsightsPreview />,
+  },
+];
+
+const TOOL_STEPS: WalkthroughStep[] = [
+  {
+    key: "course-fit",
+    tabLabel: "Course fit",
+    href: "/analysis/course-history",
+    caption: "Rank the field by predicted OTT edge vs each player's own baseline — cross-validated so the confidence is honest.",
+    render: () => <CourseFitPreview />,
+  },
+  {
+    key: "round-forecast",
+    tabLabel: "Round score",
+    href: "/analysis/score-forecast",
+    caption: "Full round-score distribution — median, upside, downside — for any player at any course.",
+    render: () => <RoundForecastPreview />,
+  },
+  {
+    key: "tee-shots",
+    tabLabel: "Ballstriking",
+    href: "/analysis/tee-shots",
+    caption: "Radar-tracked ball speed, apex and shot curve — the ingredients the course-fit model reads.",
+    render: () => <TeeShotPreview />,
+  },
+];
+
+export function BetSimulation({ onNavigate }: { onNavigate: () => void }) {
+  return (
+    <Walkthrough
+      badgeLabel="Bets tour"
+      accent={UP}
+      accentTint={UP_TINT}
+      steps={BET_STEPS}
+      onNavigate={onNavigate}
+    />
+  );
+}
+
+export function LiveFeedSimulation({
+  onNavigate,
 }: {
-  label: string;
-  value: string;
-  tone: "ink" | "emerald";
+  onNavigate: () => void;
 }) {
   return (
-    <div style={{
-      padding: "8px 10px",
-      background: L_SOFT,
-      border: `1px solid ${L_LINE}`,
-      borderRadius: 8,
-    }}>
-      <div style={{
-        fontSize: 9.5,
-        letterSpacing: 0.9,
-        textTransform: "uppercase",
-        color: L_DIM,
-        fontWeight: 800,
-      }}>
-        {label}
-      </div>
-      <div style={{
-        marginTop: 2,
-        fontSize: 16,
-        fontWeight: 800,
-        color: tone === "emerald" ? L_UP : L_INK,
-        fontFamily: "var(--font-mono), monospace",
-        letterSpacing: -0.3,
-      }}>
-        {value}
-      </div>
-    </div>
+    <Walkthrough
+      badgeLabel="Live tour"
+      accent={TANG}
+      accentTint={TANG_TINT}
+      steps={LIVE_STEPS}
+      onNavigate={onNavigate}
+    />
   );
 }
 
-// ── Styles for the walkthrough shell ──────────────────────────────
-
-function walkthroughOuterStyle(): React.CSSProperties {
-  return {
-    marginTop: 4,
-    marginBottom: 18,
-    padding: "16px 16px 18px",
-    borderRadius: 16,
-    background: L_CARD,
-    border: `1px solid ${L_LINE}`,
-    boxShadow: `inset 0 -3px 0 ${L_BLUE}, 0 6px 18px oklch(0.15 0.02 150 / 0.05)`,
-    fontFamily: "var(--font-archivo), var(--font-sans), sans-serif",
-  };
+export function ToolsSimulation({
+  onNavigate,
+}: {
+  onNavigate: () => void;
+}) {
+  return (
+    <Walkthrough
+      badgeLabel="Tools tour"
+      accent={BLUE}
+      accentTint={BLUE_TINT}
+      steps={TOOL_STEPS}
+      onNavigate={onNavigate}
+    />
+  );
 }
 
-function walkthroughBadgeStyle(): React.CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 7,
-    padding: "4px 10px 4px 8px",
-    borderRadius: 999,
-    background: L_BLUE_TINT,
-    color: L_BLUE,
-    fontSize: 10,
-    fontWeight: 800,
-    letterSpacing: 1.3,
-    textTransform: "uppercase",
-    boxShadow: `inset 0 0 0 1px ${L_BLUE}`,
-  };
-}
+// ── Reduced-motion detection ──────────────────────────────────────
 
-function tabStyle(active: boolean): React.CSSProperties {
-  return {
-    position: "relative",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "flex-start",
-    padding: "8px 10px 10px",
-    background: active ? L_BLUE_TINT : L_SOFT,
-    border: `1px solid ${active ? L_BLUE : L_LINE}`,
-    borderRadius: 8,
-    cursor: "pointer",
-    fontFamily: "inherit",
-    textAlign: "left",
-    transition: "background 160ms ease, border-color 160ms ease",
-  };
-}
-
-function previewCardStyle(): React.CSSProperties {
-  return {
-    padding: "14px 14px 12px",
-    background: L_CARD,
-    border: `1px solid ${L_LINE}`,
-    borderRadius: 12,
-    boxShadow: "0 2px 8px oklch(0.15 0.02 150 / 0.03)",
-  };
-}
-
-function previewHeaderStyle(): React.CSSProperties {
-  return {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 10,
-  };
-}
-
-function previewEyebrowStyle(): React.CSSProperties {
-  return {
-    fontSize: 9.5,
-    letterSpacing: 1.1,
-    textTransform: "uppercase",
-    color: L_DIM,
-    fontWeight: 800,
-  };
-}
-
-function previewTitleStyle(): React.CSSProperties {
-  return {
-    marginTop: 2,
-    fontSize: 14,
-    fontWeight: 800,
-    color: L_INK,
-    letterSpacing: -0.2,
-  };
-}
-
-function trustedPillStyle(): React.CSSProperties {
-  return {
-    fontSize: 9.5,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-    color: L_UP,
-    fontWeight: 800,
-    padding: "3px 8px",
-    background: L_EMERALD_TINT,
-    borderRadius: 999,
-    whiteSpace: "nowrap",
-  };
-}
-
-
-/** Detects `prefers-reduced-motion: reduce`. Returns false during
- *  SSR / initial paint so we don't over-eagerly disable animation
- *  before we know the user's preference. */
 function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
@@ -1323,134 +1315,4 @@ function usePrefersReducedMotion(): boolean {
     return () => mq.removeEventListener?.("change", listener);
   }, []);
   return reduced;
-}
-
-// ── Shared styles ─────────────────────────────────────────────────
-
-function simCardStyle(accent: string): React.CSSProperties {
-  const glow =
-    accent === EMERALD
-      ? EMERALD_GLOW
-      : accent === TANG
-        ? TANG_GLOW
-        : BLUE_GLOW;
-  return {
-    marginTop: 4,
-    marginBottom: 18,
-    padding: "18px 18px 16px",
-    borderRadius: 16,
-    background: `linear-gradient(155deg, ${D_BG} 0%, ${D_BG_LO} 100%)`,
-    // Faint dot-grid so the panel reads like a data terminal.
-    backgroundImage: `
-      linear-gradient(155deg, ${D_BG} 0%, ${D_BG_LO} 100%),
-      radial-gradient(oklch(0.96 0.008 150 / 0.045) 1px, transparent 1px)
-    `,
-    backgroundSize: "auto, 20px 20px",
-    backgroundBlendMode: "normal, screen",
-    border: `1px solid ${D_LINE}`,
-    boxShadow: `
-      inset 0 0 0 1px oklch(0.96 0.008 150 / 0.04),
-      inset 0 -2px 0 ${accent},
-      0 12px 32px ${glow.replace("/ 0.55", "/ 0.20")},
-      0 0 0 1px oklch(0.15 0.02 150 / 0.04)
-    `,
-    fontFamily: "var(--font-archivo), var(--font-sans), sans-serif",
-    color: D_INK,
-    position: "relative",
-    overflow: "hidden",
-  };
-}
-
-function liveBadgeStyle(colour = EMERALD): React.CSSProperties {
-  const tint =
-    colour === EMERALD
-      ? EMERALD_TINT
-      : colour === TANG
-        ? TANG_TINT
-        : BLUE_TINT;
-  const glow =
-    colour === EMERALD
-      ? EMERALD_GLOW
-      : colour === TANG
-        ? TANG_GLOW
-        : BLUE_GLOW;
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    padding: "3px 9px 3px 7px",
-    borderRadius: 999,
-    background: tint,
-    color: colour,
-    fontSize: 9.5,
-    fontWeight: 800,
-    letterSpacing: 1.4,
-    textTransform: "uppercase",
-    fontFamily: "var(--font-archivo), var(--font-sans), sans-serif",
-    boxShadow: `inset 0 0 0 1px ${colour}, 0 0 12px ${glow}`,
-  };
-}
-
-function livePulseStyle(colour = EMERALD): React.CSSProperties {
-  return {
-    width: 8,
-    height: 8,
-    borderRadius: 999,
-    background: colour,
-    color: colour,
-    boxShadow: `0 0 0 0 ${colour}, 0 0 8px ${colour}`,
-    animation: "onboardPulse 1.6s ease-out infinite",
-  };
-}
-
-function statTileStyle(): React.CSSProperties {
-  return {
-    padding: "10px 12px",
-    background: D_PANEL,
-    border: `1px solid ${D_LINE}`,
-    borderRadius: 10,
-    textAlign: "left",
-  };
-}
-
-function statLabelStyle(): React.CSSProperties {
-  return {
-    fontSize: 9.5,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    color: D_DIM,
-    fontWeight: 800,
-  };
-}
-
-function statValueStyle(): React.CSSProperties {
-  return {
-    fontSize: 16,
-    fontWeight: 800,
-    color: D_INK,
-    fontFamily: "var(--font-mono), monospace",
-    marginTop: 3,
-    lineHeight: 1,
-    letterSpacing: -0.2,
-  };
-}
-
-function replayBtnStyle(): React.CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 5,
-    marginTop: 12,
-    padding: "5px 10px",
-    fontSize: 10.5,
-    fontWeight: 800,
-    letterSpacing: 0.9,
-    textTransform: "uppercase",
-    color: D_MUTED,
-    background: "transparent",
-    border: `1px solid ${D_LINE}`,
-    borderRadius: 6,
-    cursor: "pointer",
-    fontFamily: "inherit",
-  };
 }

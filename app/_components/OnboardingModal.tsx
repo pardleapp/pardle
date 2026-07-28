@@ -38,16 +38,6 @@ interface IntentOption {
   accent: string;
 }
 
-interface Recommendation {
-  href: string;
-  label: string;
-  blurb: string;
-  /** Simple emoji glyph shown in a small tile at the left of the row.
-   *  Keeps the visual weight of the recommendation cards up without
-   *  pulling in SVG icons per link. */
-  icon: string;
-}
-
 interface ExplainerCard {
   title: string;
   /** One-line promise shown above the interactive sim. Kept short
@@ -57,7 +47,6 @@ interface ExplainerCard {
   primaryHref: string;
   primaryLabel: string;
   primaryHint: string;
-  secondaries: Recommendation[];
   accent: string;
   simulation: "bets" | "live" | "tools";
 }
@@ -127,49 +116,21 @@ const INTENTS: IntentOption[] = [
 const EXPLAINERS: Record<Intent, ExplainerCard> = {
   bets: {
     title: "Your bet, live on every shot",
-    lede: "Log a bet and watch it move — win probability, expected return, and settlement all reprice on every shot on course.",
+    lede: "Log any bet, watch it reprice live, race your mates on P&L.",
     primaryHref: "/bets",
     primaryLabel: "Add my first bet",
     primaryHint: "20 seconds — no bookmaker link required",
     accent: EMERALD,
     simulation: "bets",
-    secondaries: [
-      {
-        href: "/groups",
-        label: "Groups",
-        blurb: "Race a P&L leaderboard against your mates.",
-        icon: "🏆",
-      },
-      {
-        href: "/",
-        label: "Insights",
-        blurb: "Editorial reads and running commentary on every notable bet in play.",
-        icon: "💬",
-      },
-    ],
   },
   live: {
     title: "The tournament, live",
-    lede: "Every birdie, hole-out and playoff putt lands on the shot tracker the moment it happens — react, comment, share.",
+    lede: "Every notable shot the moment it happens — feed, scorecards, editorial takes.",
     primaryHref: "/live",
     primaryLabel: "Open the shot tracker",
     primaryHint: "Watch the current tournament right now",
     accent: TANG,
     simulation: "live",
-    secondaries: [
-      {
-        href: "/",
-        label: "Insights",
-        blurb: "Editorial reads, quick takes, pre-tournament briefings.",
-        icon: "📰",
-      },
-      {
-        href: "/analysis/tee-time-scoring",
-        label: "Tee-time scoring",
-        blurb: "How the field is scoring wave-by-wave through the day.",
-        icon: "⏱️",
-      },
-    ],
   },
   tools: {
     title: "Predictions you can trust",
@@ -179,20 +140,6 @@ const EXPLAINERS: Record<Intent, ExplainerCard> = {
     primaryHint: "Course-fit, round forecast, tee-shot profiles",
     accent: BLUE,
     simulation: "tools",
-    secondaries: [
-      {
-        href: "/analysis/course-history",
-        label: "Course-fit forecast",
-        blurb: "Ranked list of who's built for the course — with honest CV R².",
-        icon: "🎯",
-      },
-      {
-        href: "/analysis/score-forecast",
-        label: "Round-score forecast",
-        blurb: "Full round-score distribution for any player, any course.",
-        icon: "📊",
-      },
-    ],
   },
 };
 
@@ -350,8 +297,7 @@ export function OnboardingModal() {
            Elements each set their own animation-delay inline. */
         .pardle-onboard-title,
         .pardle-onboard-lede,
-        .pardle-onboard-sim,
-        .pardle-onboard-secondary {
+        .pardle-onboard-sim {
           animation: onboardStagger 380ms cubic-bezier(.2,.9,.3,1) both;
         }
         /* Primary CTA — hover lift + brighter shadow. */
@@ -368,26 +314,6 @@ export function OnboardingModal() {
         }
         .pardle-onboard-cta:active {
           transform: translateY(0);
-        }
-        /* Secondary link rows — background + border shift + chevron
-           advance on hover so they feel tappable. */
-        .pardle-onboard-secondary {
-          transition: background 160ms ease, border-color 160ms ease,
-                      transform 160ms ease;
-        }
-        .pardle-onboard-secondary:hover,
-        .pardle-onboard-secondary:focus-visible {
-          background: oklch(0.985 0.014 95) !important;
-          border-color: oklch(0.82 0.02 150) !important;
-          outline: none;
-        }
-        .pardle-onboard-secondary:hover .pardle-onboard-chevron,
-        .pardle-onboard-secondary:focus-visible .pardle-onboard-chevron {
-          transform: translateX(2px);
-          transition: transform 160ms cubic-bezier(.2,.9,.3,1);
-        }
-        .pardle-onboard-chevron {
-          transition: transform 160ms cubic-bezier(.2,.9,.3,1);
         }
         /* Back button — subtle hover swatch. */
         .pardle-onboard-back {
@@ -431,12 +357,10 @@ export function OnboardingModal() {
         @media (prefers-reduced-motion: reduce) {
           .pardle-onboard-title,
           .pardle-onboard-lede,
-          .pardle-onboard-sim,
-          .pardle-onboard-secondary {
+          .pardle-onboard-sim {
             animation: none !important;
           }
           .pardle-onboard-cta:hover,
-          .pardle-onboard-secondary:hover .pardle-onboard-chevron,
           .pardle-onboard-choice:hover,
           .pardle-onboard-choice:focus-visible,
           .pardle-onboard-choice:hover .pardle-onboard-choice-chevron,
@@ -632,9 +556,9 @@ function ExplainerStep({
         className="pardle-onboard-sim"
         style={{ animationDelay: "200ms" }}
       >
-        {explainer.simulation === "bets" && <BetSimulation />}
-        {explainer.simulation === "live" && <LiveFeedSimulation />}
-        {explainer.simulation === "tools" && <ToolsSimulation />}
+        {explainer.simulation === "bets" && <BetSimulation onNavigate={onGo} />}
+        {explainer.simulation === "live" && <LiveFeedSimulation onNavigate={onGo} />}
+        {explainer.simulation === "tools" && <ToolsSimulation onNavigate={onGo} />}
       </div>
 
       <Link
@@ -658,73 +582,6 @@ function ExplainerStep({
         </span>
       </Link>
 
-      <div style={{
-        marginTop: 20,
-        fontSize: 10.5,
-        letterSpacing: 1.4,
-        textTransform: "uppercase",
-        color: DIM,
-        fontWeight: 800,
-      }}>
-        Also useful
-      </div>
-      <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-        {explainer.secondaries.map((sec, i) => (
-          <Link
-            key={sec.href}
-            href={sec.href}
-            onClick={onGo}
-            style={{
-              ...secondaryLinkStyle(),
-              animationDelay: `${320 + i * 90}ms`,
-            }}
-            className="pardle-onboard-secondary"
-          >
-            <span
-              aria-hidden
-              style={{
-                display: "grid",
-                placeItems: "center",
-                width: 38,
-                height: 38,
-                borderRadius: 10,
-                background: "white",
-                border: `1px solid ${LINE}`,
-                fontSize: 18,
-                flexShrink: 0,
-              }}
-            >
-              {sec.icon}
-            </span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{
-                display: "block",
-                fontSize: 14,
-                fontWeight: 800,
-                color: INK,
-                letterSpacing: -0.1,
-              }}>
-                {sec.label}
-              </span>
-              <span style={{
-                display: "block",
-                fontSize: 12.5,
-                color: MUTED,
-                marginTop: 2,
-                lineHeight: 1.4,
-              }}>
-                {sec.blurb}
-              </span>
-            </span>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
-              stroke={DIM} strokeWidth="2.2"
-              strokeLinecap="round" strokeLinejoin="round" aria-hidden
-              className="pardle-onboard-chevron">
-              <path d="M9 6l6 6-6 6" />
-            </svg>
-          </Link>
-        ))}
-      </div>
     </>
   );
 }
@@ -849,16 +706,3 @@ function primaryCtaStyle(accent: string): React.CSSProperties {
   };
 }
 
-function secondaryLinkStyle(): React.CSSProperties {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    padding: "12px 14px",
-    background: SOFT,
-    border: `1px solid ${LINE}`,
-    borderRadius: 10,
-    textDecoration: "none",
-    transition: "background 140ms ease, border-color 140ms ease",
-  };
-}
