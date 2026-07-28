@@ -333,7 +333,12 @@ async function updateCourseIndex(
   const perCourse = new Map<string, number>();
   for (const r of records) {
     if (!r.courseName) continue;
-    perCourse.set(r.courseName, (perCourse.get(r.courseName) ?? 0) + 1);
+    // Belt-and-suspenders: canonicalise on write so even if callers
+    // pass in un-normalised records (a race during a deploy
+    // transition, or a caller that skipped read-time normalisation)
+    // the index only ever grows canonical keys.
+    const cn = normaliseCourseName(r.courseName);
+    perCourse.set(cn, (perCourse.get(cn) ?? 0) + 1);
   }
   if (perCourse.size === 0) return;
   const index = (await getCourseIndex()) ?? {};
@@ -521,7 +526,10 @@ function normaliseCourseName(raw: string): string {
 export async function getCourseHistoryByCourse(
   courseName: string,
 ): Promise<CourseHistoryResponse | null> {
-  const cleanCourse = courseName.trim();
+  // Canonicalise the query so a caller that passes an aliased name
+  // (e.g. "TPC Sawgrass (THE PLAYERS Stadium Course)") still lands
+  // on the merged canonical row rather than a split entry.
+  const cleanCourse = normaliseCourseName(courseName.trim());
   if (!cleanCourse) return null;
 
   if (redis) {
@@ -535,10 +543,18 @@ export async function getCourseHistoryByCourse(
   // course-index is empty (nothing cached yet) we can't discover
   // occurrences without fetching every PGA event — the caller
   // should have hit /api/course-history/courses first, which warms
-  // the index.
+  // the index. Also merge any split-personality keys that
+  // canonicalise to the same cleanCourse — a defensive read-time
+  // fold that lets pre-fix cached index blobs still resolve
+  // correctly.
   const index = await getCourseIndex();
-  const occurrences = index[cleanCourse];
-  if (!occurrences || occurrences.length === 0) return null;
+  const occurrences: CourseOccurrence[] = [];
+  for (const [key, occs] of Object.entries(index)) {
+    if (normaliseCourseName(key) === cleanCourse) {
+      occurrences.push(...occs);
+    }
+  }
+  if (occurrences.length === 0) return null;
 
   // Fetch each occurrence's cached rounds and filter to this course.
   const roundBatches = await Promise.all(
@@ -838,10 +854,13 @@ export async function getCuratedCourses(): Promise<CuratedCourse[]> {
       const perCourse = new Map<string, number>();
       for (const r of b.records) {
         if (!r.courseName) continue;
-        perCourse.set(
-          r.courseName,
-          (perCourse.get(r.courseName) ?? 0) + 1,
-        );
+        // Same belt-and-suspenders as updateCourseIndex — the
+        // records SHOULD already carry canonical names, but a
+        // second normalise here is idempotent and guarantees a
+        // clean rebuild even if a transient serves un-normalised
+        // records.
+        const cn = normaliseCourseName(r.courseName);
+        perCourse.set(cn, (perCourse.get(cn) ?? 0) + 1);
       }
       for (const [courseName, rounds] of perCourse) {
         const existing = fresh[courseName] ?? [];
@@ -866,8 +885,20 @@ export async function getCuratedCourses(): Promise<CuratedCourse[]> {
     }
     index = fresh;
   }
-  const out: CuratedCourse[] = [];
+  // Read-time fold: if the stored index still holds split-personality
+  // keys (any legacy blob predating the alias table), merge them
+  // together in the output so the UI sees one row per physical
+  // venue.
+  const merged = new Map<string, CourseOccurrence[]>();
   for (const [courseName, occs] of Object.entries(index)) {
+    const cn = normaliseCourseName(courseName);
+    const bucket = merged.get(cn) ?? [];
+    bucket.push(...occs);
+    merged.set(cn, bucket);
+  }
+  const out: CuratedCourse[] = [];
+  for (const [courseName, occs] of merged) {
+    if (occs.length === 0) continue;
     const totalRounds = occs.reduce((a, b) => a + b.rounds, 0);
     const yearsPresent = new Set(occs.map((o) => o.year)).size;
     const hostingEvents = Array.from(
