@@ -9,6 +9,7 @@ import BottomNav from "./BottomNav";
 import DesktopRail from "./_components/DesktopRail";
 import EngagementBeacon from "./_components/EngagementBeacon";
 import SubscribeCTA from "./_components/SubscribeCTA";
+import { OnboardingModal } from "./_components/OnboardingModal";
 
 // Inter variable: covers all weights we use (400/600/700/800/900) in
 // one woff2 file. Display-swap so the page paints with the system
@@ -101,6 +102,10 @@ export default function RootLayout({
               triggered the engagement — not just when the user
               navigates back to Insights. */}
           <SubscribeCTA />
+          {/* First-visit interest picker → tailored explainer. Fires
+              once, localStorage-gated. Sits at the end so it layers
+              on top of any other transient chrome. */}
+          <OnboardingModal />
         </ToastProvider>
         <Analytics />
       </body>
