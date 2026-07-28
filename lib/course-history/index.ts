@@ -55,19 +55,19 @@ const CURRENT_YEAR = 2026;
 const KEY_ROUND = (eventId: number, year: number) =>
   `course-history:round:${eventId}:${year}`;
 const KEY_EVENT_LIST = "course-history:event-list:pga";
-// v5 = added split-personality aliases (TPC Sawgrass, TPC Scottsdale,
-// PGA National, Innisbrook, Keene Trace) so cached aggregates rebuild
-// on top of the merged venue groupings.
+// v6 = post-alias rebuild. Previous v5 populated during a deploy
+// transition and captured unnormalised names; v6 forces a clean
+// rebuild on fresh code.
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v5:${slugify(courseName)}`;
+  `course-history:agg-course:v6:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
  *  count). Populated incrementally as we fetch event data.
- *  v7 = bumped after the split-personality alias expansion so the
- *  index rebuilds with merged entries (Sawgrass 2019-25 in one row
- *  instead of two, likewise Scottsdale/PGA National/Innisbrook). */
-const KEY_COURSE_INDEX = "course-history:course-index:v7";
+ *  v8 = post-alias rebuild. v7 populated during a deploy transition
+ *  with the OLD unnormalised names; v8 forces a fresh rebuild on
+ *  guaranteed-new code so Sawgrass/Scottsdale/etc merge correctly. */
+const KEY_COURSE_INDEX = "course-history:course-index:v8";
 
 function slugify(s: string): string {
   return s

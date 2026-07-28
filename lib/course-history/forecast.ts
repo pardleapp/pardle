@@ -53,7 +53,7 @@ const CACHE_TTL_TOUR_STATS = 24 * 60 * 60;
 const CACHE_TTL_FORECAST = 6 * 60 * 60;
 const KEY_TOUR_STATS = "course-history:tour-stats:v1"; // shared with archetype
 const KEY_FORECAST = (courseName: string) =>
-  `course-history:forecast:v1:${slugify(courseName)}`;
+  `course-history:forecast:v2:${slugify(courseName)}`;
 
 const MIN_SHOTS_PER_PLAYER = 100;
 const MIN_ROUNDS_AT_COURSE = 3; // matches scripts/predict-course-fit.py
