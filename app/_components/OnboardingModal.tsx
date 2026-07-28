@@ -141,15 +141,15 @@ const EXPLAINERS: Record<Intent, ExplainerCard> = {
       },
       {
         href: "/",
-        label: "The feed",
-        blurb: "Reactions and commentary on every notable bet in play.",
+        label: "Insights",
+        blurb: "Editorial reads and running commentary on every notable bet in play.",
         icon: "💬",
       },
     ],
   },
   live: {
     title: "The tournament, live",
-    lede: "Every birdie, hole-out and playoff putt lands in your feed the moment it happens — react, comment, share.",
+    lede: "Every birdie, hole-out and playoff putt lands on the shot tracker the moment it happens — react, comment, share.",
     primaryHref: "/live",
     primaryLabel: "Open the shot tracker",
     primaryHint: "Watch the current tournament right now",

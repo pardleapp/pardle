@@ -21,7 +21,7 @@
  * ceremony without buying anything.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 // ── Palette ────────────────────────────────────────────────────────
 //
@@ -125,7 +125,6 @@ const BET_ODDS = 3.5;
 export function BetSimulation() {
   const [tick, setTick] = useState(0);
   const [running, setRunning] = useState(true);
-  const lastEventIdxRef = useRef(0);
 
   useEffect(() => {
     if (!running) return;
@@ -142,14 +141,18 @@ export function BetSimulation() {
     return () => window.clearInterval(id);
   }, [running]);
 
-  // Latest event to display in the ticker — either this tick's, or
-  // the most recent prior one if this tick has no event.
-  useEffect(() => {
-    if (BET_SCRIPT[tick]?.event) lastEventIdxRef.current = tick;
-  }, [tick]);
-
   const currentProb = BET_SCRIPT[tick]?.p ?? BET_SCRIPT[0].p;
-  const eventTick = BET_SCRIPT[lastEventIdxRef.current];
+  // Derive the latest event synchronously from the current tick.
+  // Previous impl used a ref that got out of sync with tick after a
+  // loop reset — the ticker would show the FINAL event while tick
+  // was already back at 0. Deriving inline via a memo guarantees the
+  // event, prob, and round always agree.
+  const eventTick = useMemo(() => {
+    for (let i = tick; i >= 0; i--) {
+      if (BET_SCRIPT[i]?.event) return BET_SCRIPT[i];
+    }
+    return BET_SCRIPT[0];
+  }, [tick]);
 
   // Path built from the played portion of the script.
   const svgW = 320;
@@ -466,7 +469,6 @@ export function BetSimulation() {
       <button
         type="button"
         onClick={() => {
-          lastEventIdxRef.current = 0;
           setTick(0);
           setRunning(true);
         }}
@@ -571,7 +573,7 @@ export function LiveFeedSimulation() {
           fontWeight: 800,
           fontFamily: "var(--font-mono), monospace",
         }}>
-          Shot-by-shot feed
+          Shot tracker
         </div>
       </div>
 
