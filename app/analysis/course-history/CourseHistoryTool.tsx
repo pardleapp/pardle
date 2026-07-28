@@ -1420,7 +1420,7 @@ function RankingTable({
               <>
                 <Th sortable label="Pred OTT/rd" k="predictedOtt" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent divider />
                 <Th sortable label="Event Δ" k="eventEdge" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent />
-                <Th sortable label="Gap" k="modelGap" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                <Th sortable label="Perf. delta" k="modelGap" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
               </>
             )}
           </tr>
