@@ -31,7 +31,7 @@ import { useEffect, useMemo, useState } from "react";
 // panel is scoped to the sim itself so the app's main theme is
 // untouched.
 //
-// Dark tokens (inside the sim card only):
+// Dark tokens (inside the bet + live sim panels):
 const D_BG = "oklch(0.19 0.02 155)";
 const D_BG_LO = "oklch(0.14 0.015 155)";
 const D_PANEL = "oklch(0.22 0.02 155)";
@@ -39,6 +39,20 @@ const D_INK = "oklch(0.96 0.008 150)";
 const D_MUTED = "oklch(0.72 0.02 150)";
 const D_DIM = "oklch(0.55 0.02 150)";
 const D_LINE = "oklch(0.36 0.02 150)";
+
+// Light tokens (used inside the tools walkthrough, which mirrors
+// the real Pardle UI rather than the mission-control aesthetic):
+const L_CARD = "oklch(0.995 0.004 95)";
+const L_SOFT = "oklch(0.945 0.012 95)";
+const L_LINE = "oklch(0.90 0.013 95)";
+const L_INK = "oklch(0.26 0.04 155)";
+const L_MUTED = "oklch(0.50 0.02 150)";
+const L_DIM = "oklch(0.62 0.018 150)";
+const L_UP = "oklch(0.50 0.13 155)";
+const L_DOWN = "oklch(0.60 0.19 30)";
+const L_EMERALD_TINT = "oklch(0.96 0.04 155)";
+const L_BLUE = "oklch(0.55 0.14 245)";
+const L_BLUE_TINT = "oklch(0.965 0.04 240)";
 
 // Accents — kept saturated so they bloom against the dark panel.
 const EMERALD = "oklch(0.72 0.19 155)";
@@ -684,212 +698,241 @@ export function LiveFeedSimulation() {
 }
 
 // ── PREDICTION TOOLS SIMULATION ───────────────────────────────────
+//
+// Step-by-step walkthrough of the three main prediction tools. The
+// visual language matches the real Pardle UI (light warm-paper,
+// emerald accents, Archivo type) so the reader recognises what
+// they're being shown when they later land on the actual page —
+// no mission-control aesthetic here, that's for the live-data
+// sims only.
 
-interface RankRow {
-  name: string;
-  edge: number; // Event Δ, tenths of a stroke
-  colour: "up" | "down" | "flat";
+interface TourStep {
+  key: "course-fit" | "round-forecast" | "tee-shots";
+  tabLabel: string;
+  caption: string;
+  render: () => React.ReactNode;
 }
 
-const RANK_TARGET: RankRow[] = [
-  { name: "Scottie Scheffler", edge: 1.46, colour: "up" },
-  { name: "Rory McIlroy", edge: 1.28, colour: "up" },
-  { name: "Xander Schauffele", edge: 0.62, colour: "up" },
-  { name: "Ludvig Åberg", edge: 0.14, colour: "flat" },
-  { name: "Wyndham Clark", edge: -0.72, colour: "down" },
+const TOUR_STEPS: TourStep[] = [
+  {
+    key: "course-fit",
+    tabLabel: "Course fit",
+    caption:
+      "Rank the field by predicted OTT edge vs each player's own baseline — cross-validated so the confidence is honest.",
+    render: () => <CourseFitPreview />,
+  },
+  {
+    key: "round-forecast",
+    tabLabel: "Round score",
+    caption:
+      "Full round-score distribution — median, upside, downside — for any player at any course.",
+    render: () => <RoundForecastPreview />,
+  },
+  {
+    key: "tee-shots",
+    tabLabel: "Ballstriking",
+    caption:
+      "Radar-tracked ball speed, apex and shot curve — the ingredients the course-fit model reads.",
+    render: () => <TeeShotPreview />,
+  },
 ];
 
+const TOUR_STEP_MS = 4200;
+
 export function ToolsSimulation() {
-  const [pass, setPass] = useState(0); // bumped to restart the animation
-  const [counter, setCounter] = useState(0);
-  const [revealed, setRevealed] = useState(false);
+  const [step, setStep] = useState(0);
+  const [paused, setPaused] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
 
-  // Restart the demo periodically so a lingering user sees it twice.
   useEffect(() => {
-    const id = window.setInterval(() => setPass((n) => n + 1), 7000);
+    if (reducedMotion || paused) return;
+    const id = window.setInterval(
+      () => setStep((s) => (s + 1) % TOUR_STEPS.length),
+      TOUR_STEP_MS,
+    );
     return () => window.clearInterval(id);
-  }, []);
+  }, [reducedMotion, paused]);
 
-  // Reset + animate on every pass.
-  useEffect(() => {
-    if (reducedMotion) {
-      setCounter(100);
-      setRevealed(true);
-      return;
-    }
-    setCounter(0);
-    setRevealed(false);
-    const revealRaf = requestAnimationFrame(() => setRevealed(true));
-    const start = performance.now();
-    let rafId = 0;
-    function tick(now: number) {
-      const t = Math.min((now - start) / 1200, 1);
-      // Ease-out cubic — snaps in fast, settles gently.
-      const eased = 1 - Math.pow(1 - t, 3);
-      setCounter(Math.round(eased * 100));
-      if (t < 1) rafId = requestAnimationFrame(tick);
-    }
-    rafId = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(rafId);
-      cancelAnimationFrame(revealRaf);
-    };
-  }, [pass, reducedMotion]);
-
-  // Scale bars to fill nicely: |maxEdge| maps to ~48% of the bar
-  // slot (so ±48% around the zero midpoint).
-  const maxAbs = Math.max(
-    ...RANK_TARGET.map((r) => Math.abs(r.edge)),
-  );
-  const scale = 48 / maxAbs;
+  const current = TOUR_STEPS[step];
 
   return (
-    <div style={simCardStyle(BLUE)}>
-      {/* Header row — small, everything meaningful is in the hero */}
+    <div style={walkthroughOuterStyle()}>
+      {/* Header — small badge + step counter */}
       <div style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        marginBottom: 4,
-        gap: 12,
+        marginBottom: 12,
       }}>
-        <div style={monoEyebrowStyle()}>
-          Course-fit forecast · Torrey Pines
-        </div>
-        <div style={{
-          ...monoEyebrowStyle(),
-          color: BLUE,
-          opacity: 0.75,
-        }}>
-          Live model
-        </div>
-      </div>
-
-      {/* HERO — count-up, glowing */}
-      <div style={{
-        position: "relative",
-        padding: "24px 16px 22px",
-        margin: "10px 0 20px",
-        background: `radial-gradient(120% 90% at 50% 40%, oklch(0.34 0.13 240 / 0.28) 0%, transparent 60%), ${D_PANEL}`,
-        border: `1px solid ${D_LINE}`,
-        borderRadius: 14,
-        textAlign: "center",
-        overflow: "hidden",
-      }}>
-        {/* Faint horizontal scan line for the mission-control feel */}
-        <div style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage:
-            "repeating-linear-gradient(0deg, transparent 0, transparent 8px, oklch(0.96 0.008 150 / 0.03) 8px, oklch(0.96 0.008 150 / 0.03) 9px)",
-          pointerEvents: "none",
-        }} />
-        <div style={{ ...monoEyebrowStyle(), color: D_MUTED, position: "relative" }}>
-          Model confidence
-        </div>
-        <div
-          style={{
-            position: "relative",
-            marginTop: 8,
-            fontFamily: "var(--font-mono), monospace",
-            fontWeight: 800,
-            fontSize: 68,
-            lineHeight: 1,
-            color: BLUE,
-            textShadow: `0 0 22px ${BLUE_GLOW}, 0 0 40px ${BLUE_GLOW}`,
-            letterSpacing: -2,
-            fontVariantNumeric: "tabular-nums",
-          }}
-          aria-label={`Model confidence ${counter} percent`}
-        >
-          {counter}
+        <span style={walkthroughBadgeStyle()}>
           <span style={{
-            fontSize: 32,
-            marginLeft: 4,
-            opacity: 0.7,
-            letterSpacing: -1,
-          }}>%</span>
-        </div>
-        <div style={{
-          position: "relative",
-          marginTop: 8,
-          fontSize: 11.5,
-          color: D_MUTED,
-          fontWeight: 700,
-          lineHeight: 1.4,
-        }}>
-          Cross-validated on 176 hold-out players · trusted signal
-        </div>
-        {/* Progress ring under the number */}
-        <div style={{
-          position: "relative",
-          marginTop: 14,
-          height: 4,
-          background: D_BG_LO,
-          borderRadius: 999,
-          overflow: "hidden",
-        }}>
-          <div style={{
-            width: `${counter}%`,
-            height: "100%",
-            background: `linear-gradient(90deg, ${BLUE_D} 0%, ${BLUE} 100%)`,
+            width: 6,
+            height: 6,
             borderRadius: 999,
-            boxShadow: `0 0 10px ${BLUE_GLOW}`,
-            transition: reducedMotion ? undefined : "width 60ms linear",
+            background: L_BLUE,
           }} />
-        </div>
+          Tools tour
+        </span>
+        <span style={{
+          fontSize: 10,
+          letterSpacing: 1.2,
+          textTransform: "uppercase",
+          color: L_DIM,
+          fontWeight: 800,
+          fontFamily: "var(--font-mono), monospace",
+        }}>
+          Step {step + 1} of {TOUR_STEPS.length}
+        </span>
       </div>
 
-      {/* Bar race */}
+      {/* Tab strip */}
       <div style={{
-        ...monoEyebrowStyle(),
-        marginBottom: 10,
+        display: "grid",
+        gridTemplateColumns: `repeat(${TOUR_STEPS.length}, 1fr)`,
+        gap: 6,
+        marginBottom: 12,
       }}>
-        Predicted Event Δ (SG:OTT / 4 rds)
-      </div>
-      <div style={{ display: "grid", gap: 7 }}>
-        {RANK_TARGET.map((row, i) => {
-          const c = row.colour === "up" ? EMERALD
-            : row.colour === "down" ? DOWN : D_MUTED;
-          const glow = row.colour === "up" ? EMERALD_GLOW
-            : row.colour === "down" ? "oklch(0.74 0.20 25 / 0.5)"
-              : "transparent";
-          const barPct = Math.abs(row.edge) * scale;
-          const leftPct = row.edge >= 0 ? 50 : 50 - barPct;
-          const delay = reducedMotion ? 0 : 350 + i * 140;
+        {TOUR_STEPS.map((t, i) => {
+          const active = i === step;
           return (
-            <div
-              key={`${pass}-${row.name}`}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "22px 1fr 1fr 62px",
-                gap: 10,
-                alignItems: "center",
-                padding: "9px 12px",
-                background: D_PANEL,
-                border: `1px solid ${D_LINE}`,
-                borderRadius: 9,
-                opacity: revealed ? 1 : 0,
-                transform: revealed ? "translateY(0)" : "translateY(6px)",
-                transition: reducedMotion
-                  ? undefined
-                  : `opacity 320ms ease ${delay}ms, transform 320ms cubic-bezier(.2,.9,.3,1) ${delay}ms`,
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => {
+                setStep(i);
+                setPaused(true);
               }}
+              style={tabStyle(active)}
+              aria-current={active ? "step" : undefined}
             >
               <span style={{
-                fontSize: 10,
-                color: D_DIM,
-                fontWeight: 800,
+                fontSize: 9.5,
+                letterSpacing: 0.7,
+                color: active ? L_BLUE : L_DIM,
                 fontFamily: "var(--font-mono), monospace",
-                letterSpacing: 0.5,
+                fontWeight: 800,
               }}>
                 {String(i + 1).padStart(2, "0")}
               </span>
               <span style={{
-                fontSize: 13,
+                fontSize: 12.5,
                 fontWeight: 800,
-                color: D_INK,
+                color: active ? L_INK : L_MUTED,
+                letterSpacing: -0.1,
+                marginTop: 2,
+              }}>
+                {t.tabLabel}
+              </span>
+              {/* Progress underline — animates while auto-advancing */}
+              <span
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  bottom: -1,
+                  height: 2,
+                  background: L_BLUE,
+                  borderRadius: 999,
+                  width: active ? "100%" : "0%",
+                  transition: reducedMotion
+                    ? undefined
+                    : active && !paused
+                      ? `width ${TOUR_STEP_MS - 100}ms linear`
+                      : "width 200ms ease",
+                }}
+              />
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Preview slot — remount on step change so the inner CSS
+          transitions replay for the new panel. */}
+      <div
+        key={step}
+        className="pardle-tools-preview"
+        style={{
+          animation: reducedMotion
+            ? undefined
+            : "toolsPreviewIn 320ms cubic-bezier(.2,.9,.3,1) both",
+        }}
+      >
+        {current.render()}
+      </div>
+
+      {/* Caption */}
+      <p style={{
+        margin: "12px 0 0",
+        fontSize: 13,
+        lineHeight: 1.45,
+        color: L_MUTED,
+        fontWeight: 500,
+      }}>
+        {current.caption}
+      </p>
+
+      <style>{`
+        @keyframes toolsPreviewIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ── Tools walkthrough — individual tool previews ──────────────────
+
+function CourseFitPreview() {
+  const rows = [
+    { rank: 1, name: "Scottie Scheffler", edge: 1.46, dir: "up" as const },
+    { rank: 2, name: "Rory McIlroy", edge: 1.28, dir: "up" as const },
+    { rank: 3, name: "Xander Schauffele", edge: 0.62, dir: "up" as const },
+    { rank: 4, name: "Wyndham Clark", edge: -0.72, dir: "down" as const },
+  ];
+  const maxAbs = Math.max(...rows.map((r) => Math.abs(r.edge)));
+  return (
+    <div style={previewCardStyle()}>
+      <div style={previewHeaderStyle()}>
+        <div>
+          <div style={previewEyebrowStyle()}>Course-fit forecast</div>
+          <div style={previewTitleStyle()}>Torrey Pines · this week</div>
+        </div>
+        <span style={trustedPillStyle()}>Trusted · CV R² 0.083</span>
+      </div>
+      <div style={{
+        display: "grid",
+        gap: 6,
+        marginTop: 10,
+      }}>
+        {rows.map((row) => {
+          const barPct = (Math.abs(row.edge) / maxAbs) * 42;
+          const c = row.dir === "up" ? L_UP : L_DOWN;
+          return (
+            <div
+              key={row.rank}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "18px 1fr 1fr 52px",
+                gap: 10,
+                alignItems: "center",
+                padding: "7px 10px",
+                background: L_SOFT,
+                border: `1px solid ${L_LINE}`,
+                borderRadius: 8,
+              }}
+            >
+              <span style={{
+                fontSize: 10,
+                color: L_DIM,
+                fontWeight: 800,
+                fontFamily: "var(--font-mono), monospace",
+              }}>
+                {String(row.rank).padStart(2, "0")}
+              </span>
+              <span style={{
+                fontSize: 12.5,
+                fontWeight: 800,
+                color: L_INK,
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -897,51 +940,41 @@ export function ToolsSimulation() {
               }}>
                 {row.name}
               </span>
-              {/* Bar */}
               <div style={{
                 position: "relative",
-                height: 9,
-                background: D_BG_LO,
-                border: `1px solid ${D_LINE}`,
+                height: 8,
+                background: L_CARD,
+                border: `1px solid ${L_LINE}`,
                 borderRadius: 999,
                 overflow: "hidden",
               }}>
-                {/* Zero marker */}
                 <div style={{
                   position: "absolute",
-                  top: -2,
+                  top: -1,
                   left: "50%",
                   transform: "translateX(-50%)",
                   width: 1,
-                  height: 13,
-                  background: D_MUTED,
-                  opacity: 0.6,
+                  height: 12,
+                  background: L_DIM,
+                  opacity: 0.55,
                   zIndex: 2,
                 }} />
-                {/* Bar fill — CSS-transitioned width, guaranteed to
-                     land at its target even if animation misses. */}
                 <div style={{
                   position: "absolute",
                   top: 0,
-                  left: `${leftPct}%`,
+                  left: row.edge >= 0 ? "50%" : `${50 - barPct}%`,
                   height: "100%",
-                  width: revealed ? `${barPct}%` : "0%",
-                  background: `linear-gradient(90deg, ${c} 0%, ${c} 100%)`,
+                  width: `${barPct}%`,
+                  background: c,
                   borderRadius: 999,
-                  boxShadow: `0 0 8px ${glow}`,
-                  transition: reducedMotion
-                    ? undefined
-                    : `width 620ms cubic-bezier(.2,.9,.3,1) ${delay + 120}ms`,
                 }} />
               </div>
               <span style={{
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: 800,
                 color: c,
                 fontFamily: "var(--font-mono), monospace",
                 textAlign: "right",
-                textShadow: glow !== "transparent" ? `0 0 8px ${glow}` : undefined,
-                letterSpacing: -0.3,
                 fontVariantNumeric: "tabular-nums",
               }}>
                 {row.edge > 0 ? "+" : ""}{row.edge.toFixed(2)}
@@ -954,17 +987,327 @@ export function ToolsSimulation() {
   );
 }
 
-/** Mono uppercase eyebrow — shared inside dark sim panels. */
-function monoEyebrowStyle(): React.CSSProperties {
+function RoundForecastPreview() {
+  const bars = [
+    { score: 65, pct: 6 },
+    { score: 66, pct: 12 },
+    { score: 67, pct: 22 },
+    { score: 68, pct: 28 },
+    { score: 69, pct: 18 },
+    { score: 70, pct: 9 },
+    { score: 71, pct: 4 },
+    { score: 72, pct: 1 },
+  ];
+  const max = Math.max(...bars.map((b) => b.pct));
+  const modeScore = 68;
+  const chartH = 88;
+  return (
+    <div style={previewCardStyle()}>
+      <div style={previewHeaderStyle()}>
+        <div>
+          <div style={previewEyebrowStyle()}>Round-score forecast</div>
+          <div style={previewTitleStyle()}>Scheffler · Sunday R4</div>
+        </div>
+        <span style={{
+          ...trustedPillStyle(),
+          background: L_BLUE_TINT,
+          color: L_BLUE,
+        }}>
+          Model
+        </span>
+      </div>
+
+      <div style={{
+        marginTop: 14,
+        display: "grid",
+        gridTemplateColumns: `repeat(${bars.length}, 1fr)`,
+        gap: 4,
+        alignItems: "end",
+        height: chartH,
+      }}>
+        {bars.map((b) => {
+          const isMode = b.score === modeScore;
+          const h = (b.pct / max) * chartH;
+          return (
+            <div key={b.score} style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              height: "100%",
+            }}>
+              <div style={{
+                width: "100%",
+                height: `${h}px`,
+                background: isMode ? L_UP : L_SOFT,
+                border: isMode ? `1px solid ${L_UP}` : `1px solid ${L_LINE}`,
+                borderRadius: 4,
+              }} />
+            </div>
+          );
+        })}
+      </div>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${bars.length}, 1fr)`,
+        gap: 4,
+        marginTop: 4,
+      }}>
+        {bars.map((b) => (
+          <div key={b.score} style={{
+            fontSize: 9.5,
+            color: b.score === modeScore ? L_INK : L_DIM,
+            fontFamily: "var(--font-mono), monospace",
+            fontWeight: b.score === modeScore ? 800 : 600,
+            textAlign: "center",
+          }}>
+            {b.score}
+          </div>
+        ))}
+      </div>
+
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)",
+        gap: 8,
+        marginTop: 12,
+      }}>
+        <StatTile label="Median" value="68" tone="ink" />
+        <StatTile label="Best 5%" value="65" tone="emerald" />
+        <StatTile label="Worst 5%" value="71" tone="ink" />
+      </div>
+    </div>
+  );
+}
+
+function TeeShotPreview() {
+  const stats = [
+    { label: "Ball speed", value: "183 mph", pct: 96 },
+    { label: "Apex height", value: "122 ft", pct: 82 },
+    { label: "Curve", value: "3.4° draw", pct: 58 },
+  ];
+  return (
+    <div style={previewCardStyle()}>
+      <div style={previewHeaderStyle()}>
+        <div>
+          <div style={previewEyebrowStyle()}>Tee-shot profile</div>
+          <div style={previewTitleStyle()}>Rory McIlroy · Driver</div>
+        </div>
+        <span style={{
+          ...trustedPillStyle(),
+          background: L_BLUE_TINT,
+          color: L_BLUE,
+        }}>
+          Radar · 3 seasons
+        </span>
+      </div>
+      <div style={{
+        display: "grid",
+        gap: 10,
+        marginTop: 12,
+      }}>
+        {stats.map((s) => (
+          <div key={s.label} style={{
+            padding: "10px 12px",
+            background: L_SOFT,
+            border: `1px solid ${L_LINE}`,
+            borderRadius: 8,
+          }}>
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+            }}>
+              <span style={{
+                fontSize: 12.5,
+                fontWeight: 800,
+                color: L_INK,
+                letterSpacing: -0.1,
+              }}>
+                {s.label}
+              </span>
+              <span style={{
+                fontSize: 13,
+                fontWeight: 800,
+                color: L_INK,
+                fontFamily: "var(--font-mono), monospace",
+                fontVariantNumeric: "tabular-nums",
+              }}>
+                {s.value}
+              </span>
+            </div>
+            <div style={{
+              marginTop: 6,
+              height: 5,
+              background: L_CARD,
+              border: `1px solid ${L_LINE}`,
+              borderRadius: 999,
+              overflow: "hidden",
+            }}>
+              <div style={{
+                width: `${s.pct}%`,
+                height: "100%",
+                background: L_UP,
+                borderRadius: 999,
+              }} />
+            </div>
+            <div style={{
+              marginTop: 4,
+              fontSize: 10.5,
+              color: L_MUTED,
+              fontWeight: 700,
+              letterSpacing: 0.1,
+            }}>
+              {s.pct}th percentile · tour field
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "ink" | "emerald";
+}) {
+  return (
+    <div style={{
+      padding: "8px 10px",
+      background: L_SOFT,
+      border: `1px solid ${L_LINE}`,
+      borderRadius: 8,
+    }}>
+      <div style={{
+        fontSize: 9.5,
+        letterSpacing: 0.9,
+        textTransform: "uppercase",
+        color: L_DIM,
+        fontWeight: 800,
+      }}>
+        {label}
+      </div>
+      <div style={{
+        marginTop: 2,
+        fontSize: 16,
+        fontWeight: 800,
+        color: tone === "emerald" ? L_UP : L_INK,
+        fontFamily: "var(--font-mono), monospace",
+        letterSpacing: -0.3,
+      }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+// ── Styles for the walkthrough shell ──────────────────────────────
+
+function walkthroughOuterStyle(): React.CSSProperties {
   return {
-    fontSize: 10,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    color: D_DIM,
-    fontWeight: 800,
-    fontFamily: "var(--font-mono), monospace",
+    marginTop: 4,
+    marginBottom: 18,
+    padding: "16px 16px 18px",
+    borderRadius: 16,
+    background: L_CARD,
+    border: `1px solid ${L_LINE}`,
+    boxShadow: `inset 0 -3px 0 ${L_BLUE}, 0 6px 18px oklch(0.15 0.02 150 / 0.05)`,
+    fontFamily: "var(--font-archivo), var(--font-sans), sans-serif",
   };
 }
+
+function walkthroughBadgeStyle(): React.CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 7,
+    padding: "4px 10px 4px 8px",
+    borderRadius: 999,
+    background: L_BLUE_TINT,
+    color: L_BLUE,
+    fontSize: 10,
+    fontWeight: 800,
+    letterSpacing: 1.3,
+    textTransform: "uppercase",
+    boxShadow: `inset 0 0 0 1px ${L_BLUE}`,
+  };
+}
+
+function tabStyle(active: boolean): React.CSSProperties {
+  return {
+    position: "relative",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    padding: "8px 10px 10px",
+    background: active ? L_BLUE_TINT : L_SOFT,
+    border: `1px solid ${active ? L_BLUE : L_LINE}`,
+    borderRadius: 8,
+    cursor: "pointer",
+    fontFamily: "inherit",
+    textAlign: "left",
+    transition: "background 160ms ease, border-color 160ms ease",
+  };
+}
+
+function previewCardStyle(): React.CSSProperties {
+  return {
+    padding: "14px 14px 12px",
+    background: L_CARD,
+    border: `1px solid ${L_LINE}`,
+    borderRadius: 12,
+    boxShadow: "0 2px 8px oklch(0.15 0.02 150 / 0.03)",
+  };
+}
+
+function previewHeaderStyle(): React.CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  };
+}
+
+function previewEyebrowStyle(): React.CSSProperties {
+  return {
+    fontSize: 9.5,
+    letterSpacing: 1.1,
+    textTransform: "uppercase",
+    color: L_DIM,
+    fontWeight: 800,
+  };
+}
+
+function previewTitleStyle(): React.CSSProperties {
+  return {
+    marginTop: 2,
+    fontSize: 14,
+    fontWeight: 800,
+    color: L_INK,
+    letterSpacing: -0.2,
+  };
+}
+
+function trustedPillStyle(): React.CSSProperties {
+  return {
+    fontSize: 9.5,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: L_UP,
+    fontWeight: 800,
+    padding: "3px 8px",
+    background: L_EMERALD_TINT,
+    borderRadius: 999,
+    whiteSpace: "nowrap",
+  };
+}
+
 
 /** Detects `prefers-reduced-motion: reduce`. Returns false during
  *  SSR / initial paint so we don't over-eagerly disable animation

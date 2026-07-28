@@ -173,7 +173,7 @@ const EXPLAINERS: Record<Intent, ExplainerCard> = {
   },
   tools: {
     title: "Predictions you can trust",
-    lede: "Cross-validated course-fit models ranking who's built for this week's venue.",
+    lede: "Tap through the three tools — course fit, round-score forecasts, ballstriking — all cross-validated.",
     primaryHref: "/analysis",
     primaryLabel: "Browse the tools",
     primaryHint: "Course-fit, round forecast, tee-shot profiles",
