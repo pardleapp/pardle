@@ -144,6 +144,7 @@ type SortKey =
   | "roundsPlayed"
   | "name"
   | "predictedOtt"
+  | "eventEdge"
   | "modelGap";
 
 // ── Main component ─────────────────────────────────────────────────
@@ -850,7 +851,7 @@ function ForecastFitReadout({ fit }: { fit: ForecastFit }) {
             marginTop: 2,
           }}
         >
-          Ball speed · apex · curve → predicted SG:OTT residual
+          Ball speed → predicted SG:OTT (per round)
         </div>
       </div>
       <div>
@@ -1354,12 +1355,24 @@ function RankingTable({
   // If sorting by predicted or gap, re-sort in memory since the parent
   // sorter only knows about the base course-history columns.
   const orderedRows = useMemo(() => {
-    if (sortKey !== "predictedOtt" && sortKey !== "modelGap") return rows;
+    if (
+      sortKey !== "predictedOtt" &&
+      sortKey !== "modelGap" &&
+      sortKey !== "eventEdge"
+    ) {
+      return rows;
+    }
     const dir = sortDir === "desc" ? -1 : 1;
     return [...rows].sort((a, b) => {
       const pa = predByName.get(normalisePlayerName(a.name)) ?? -Infinity;
       const pb = predByName.get(normalisePlayerName(b.name)) ?? -Infinity;
-      if (sortKey === "predictedOtt") return dir * (pa - pb);
+      // Event edge = pred × 4; monotonic in pred, so it sorts the
+      // same order as predictedOtt but we keep it as a separate key
+      // so the column header shows the sort chevron in the right
+      // place.
+      if (sortKey === "predictedOtt" || sortKey === "eventEdge") {
+        return dir * (pa - pb);
+      }
       // modelGap = actual − predicted (positive = over-shot our model)
       const ga = a.outperformanceSgOtt - pa;
       const gb = b.outperformanceSgOtt - pb;
@@ -1382,7 +1395,7 @@ function RankingTable({
           width: "100%",
           borderCollapse: "collapse",
           fontFamily: T.fontUi,
-          minWidth: showForecast ? 950 : 800,
+          minWidth: showForecast ? 1050 : 800,
         }}
       >
         <thead>
@@ -1396,7 +1409,8 @@ function RankingTable({
             <Th sortable label="Δ OTT" k="outperformanceSgOtt" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             {showForecast && (
               <>
-                <Th sortable label="Pred OTT" k="predictedOtt" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent />
+                <Th sortable label="Pred OTT/rd" k="predictedOtt" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent />
+                <Th sortable label="Event Δ" k="eventEdge" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent />
                 <Th sortable label="Gap" k="modelGap" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
               </>
             )}
@@ -1433,6 +1447,11 @@ function RankingTable({
                   <>
                     {typeof pred === "number" ? (
                       <SgCell value={pred} sign accent />
+                    ) : (
+                      <td style={{ ...td(), color: T.dim }}>—</td>
+                    )}
+                    {typeof pred === "number" ? (
+                      <SgCell value={pred * 4} sign accent />
                     ) : (
                       <td style={{ ...td(), color: T.dim }}>—</td>
                     )}
