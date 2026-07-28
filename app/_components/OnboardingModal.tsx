@@ -117,7 +117,11 @@ const EXPLAINERS: Record<Intent, ExplainerCard> = {
   bets: {
     title: "Your bet, live on every shot",
     lede: "Log any bet, watch it reprice live, race your mates on P&L.",
-    primaryHref: "/bets",
+    // /bets already listens for ?addBet=1 via AddBetTrigger and opens
+    // the Track-a-bet sheet on mount, then strips the param. Sending
+    // the user straight there means the CTA lands them on the form
+    // itself, not on the /bets homepage.
+    primaryHref: "/bets?addBet=1",
     primaryLabel: "Add my first bet",
     primaryHint: "20 seconds — no bookmaker link required",
     accent: EMERALD,

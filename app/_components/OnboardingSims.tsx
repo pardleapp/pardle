@@ -1324,7 +1324,10 @@ const BET_STEPS: WalkthroughStep[] = [
   {
     key: "log",
     tabLabel: "Log a bet",
-    href: "/bets",
+    // Deep-links straight into the Track-a-bet sheet on /bets — matches
+    // what the preview visually implies (a bet form pre-filled with the
+    // fields). See AddBetTrigger for the ?addBet=1 handshake.
+    href: "/bets?addBet=1",
     caption: "Punch in the player, market, stake and odds. Takes 20 seconds — no bookmaker link required.",
     render: () => <BetSlipPreview />,
   },
