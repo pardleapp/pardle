@@ -40,6 +40,7 @@ import {
   type PerHoleRoundCounts,
 } from "@/lib/analysis/course-birdies";
 import { augmentYardsFromHistorical } from "@/lib/pin-sheet-augment";
+import { listTournamentConfigs } from "@/lib/scoring-model/tournament-config";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -184,59 +185,66 @@ function countsFromScorecards(
 
 interface FamilyDef {
   slug: string;
-  familyNames: string[]; // lowercased tournament names that map here
+  familyNames: string[]; // lowercased event names that map here
   historical: Array<{ year: number; tournamentId: string }>;
   /** Extra tournamentIds (typically the current-season id) that
    *  aren't in the historical list but still belong to this family. */
   otherIds: string[];
 }
 
-const TOURNAMENT_FAMILIES: FamilyDef[] = [
-  {
-    slug: "3m-open",
-    familyNames: ["3m open"],
-    historical: [
-      // First 3M Open at TPC Twin Cities was 2019 — every year on
-      // file since. 2019-2022 orchestrator payloads only carry a
-      // roundless pin per hole (parser replicates it across R1-R4);
-      // 2023 carries per-round pins in raw coords only (enhanced
-      // fields are the -1 sentinel); 2024/2025 have full per-round
-      // enhanced coords. See pgatour.ts pickPinCoord for the coord
-      // priority — all four seasons contribute birdie counts either
-      // way.
-      { year: 2019, tournamentId: "R2019525" },
-      { year: 2020, tournamentId: "R2020525" },
-      { year: 2021, tournamentId: "R2021525" },
-      { year: 2022, tournamentId: "R2022525" },
-      { year: 2023, tournamentId: "R2023525" },
-      { year: 2024, tournamentId: "R2024525" },
-      { year: 2025, tournamentId: "R2025525" },
-    ],
-    otherIds: ["R2026525"],
-  },
-];
-
-/** Find the family a tournamentId belongs to.
- *  Try the hardcoded id lists first (works for any historical id
- *  without hitting the network); fall back to a name lookup against
- *  the current-year schedule so brand-new live ids still resolve
- *  before we've had a chance to hardcode them. */
+/** Look up the family (slug + historical/live ids) for a given
+ *  tournamentId. Fully dynamic — derives from whatever historical
+ *  JSONs the fetch script has produced. If nothing matches, returns
+ *  null and the caller reports "no family for this tournament" so
+ *  the caller reports the new-venue state upstream. */
 async function familyFor(tournamentId: string): Promise<FamilyDef | null> {
-  const hardcoded = TOURNAMENT_FAMILIES.find(
-    (f) =>
-      f.otherIds.includes(tournamentId) ||
-      f.historical.some((h) => h.tournamentId === tournamentId),
-  );
-  if (hardcoded) return hardcoded;
+  const configs = await listTournamentConfigs();
+  for (const cfg of configs) {
+    const historical = Object.entries(cfg.historicalTournamentIds)
+      .map(([y, id]) => ({ year: Number(y), tournamentId: id }))
+      .sort((a, b) => a.year - b.year);
+    const historicalIds = historical.map((h) => h.tournamentId);
+    const inHistorical = historicalIds.includes(tournamentId);
+    const isDerivedLive =
+      cfg.tournamentIdSuffix &&
+      tournamentId ===
+        `R${new Date().getUTCFullYear()}${cfg.tournamentIdSuffix}`;
+    if (inHistorical || isDerivedLive) {
+      return {
+        slug: cfg.slug,
+        familyNames: [cfg.eventName.toLowerCase().trim()],
+        historical,
+        otherIds: isDerivedLive ? [tournamentId] : [],
+      };
+    }
+  }
 
+  // Fallback: match by live schedule name against known slugs.
   const year = String(new Date().getUTCFullYear());
-  const sched = await getSchedule(year);
-  const match = [...sched.completed, ...sched.upcoming].find(
-    (t) => t.id === tournamentId,
-  );
-  if (!match) return null;
-  const name = match.name.toLowerCase().trim();
-  return TOURNAMENT_FAMILIES.find((f) => f.familyNames.includes(name)) ?? null;
+  try {
+    const sched = await getSchedule(year);
+    const match = [...sched.completed, ...sched.upcoming].find(
+      (t) => t.id === tournamentId,
+    );
+    if (!match) return null;
+    const name = match.name.toLowerCase().trim();
+    for (const cfg of configs) {
+      if (cfg.eventName.toLowerCase().trim() === name) {
+        const historical = Object.entries(cfg.historicalTournamentIds)
+          .map(([y, id]) => ({ year: Number(y), tournamentId: id }))
+          .sort((a, b) => a.year - b.year);
+        return {
+          slug: cfg.slug,
+          familyNames: [name],
+          historical,
+          otherIds: [tournamentId],
+        };
+      }
+    }
+  } catch {
+    // schedule fetch failed — nothing to do
+  }
+  return null;
 }
 
 // ── Endpoint ────────────────────────────────────────────────────────

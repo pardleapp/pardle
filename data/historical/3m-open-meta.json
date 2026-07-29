@@ -1,0 +1,14 @@
+{
+  "slug": "3m-open",
+  "notes": "Per-slug metadata for the round-score scoring model. tournament-config reads this file to override auto-derived values (bearings are impossible to derive from pin coords alone — they must come from OSM tee-to-green geometry).",
+  "coursePar": 71,
+  "courseHolePars": {
+    "1": 4, "2": 4, "3": 4, "4": 3, "5": 4, "6": 5, "7": 4, "8": 3, "9": 4,
+    "10": 4, "11": 4, "12": 5, "13": 3, "14": 4, "15": 4, "16": 4, "17": 3, "18": 5
+  },
+  "holeBearings": {
+    "1": 283, "2": 354, "3": 114, "4": 73, "5": 74, "6": 289, "7": 214, "8": 310,
+    "9": 149, "10": 167, "11": 175, "12": 336, "13": 140, "14": 54, "15": 14,
+    "16": 204, "17": 261, "18": 318
+  }
+}

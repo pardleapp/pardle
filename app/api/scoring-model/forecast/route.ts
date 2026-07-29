@@ -144,7 +144,11 @@ export async function POST(req: Request) {
   });
 
   if (!("ok" in result) || !result.ok) {
-    return NextResponse.json(result, { status: 500 });
+    // A "new venue" result is not a server error — the model just
+    // hasn't been trained on this course yet. Surface as 200 so the
+    // UI can render a friendly state without an error banner.
+    const status = "newVenue" in result && result.newVenue ? 200 : 500;
+    return NextResponse.json(result, { status });
   }
   return NextResponse.json(result);
 }

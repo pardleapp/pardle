@@ -15,7 +15,7 @@ import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { assembleHoleFit } from "./coefficients";
-import { getHoleBearings } from "./hole-bearings";
+import { getTournamentConfig } from "./tournament-config";
 import type {
   FitRow,
   HoleFit,
@@ -76,6 +76,7 @@ interface RoundContext {
 
 function buildHistoricalContext(
   events: HistoricalEvent[],
+  bearings: Record<number, number>,
 ): {
   ctx: Record<string, RoundContext>;
   yardsMeanByHole: Record<number, number>;
@@ -84,7 +85,6 @@ function buildHistoricalContext(
   const ctx: Record<string, RoundContext> = {};
   const yardsAccum: Record<number, number[]> = {};
   const headAccum: Record<number, number[]> = {};
-  const bearings = getHoleBearings("R2026525") ?? {};
 
   for (const ev of events) {
     const y = ev.year;
@@ -186,17 +186,10 @@ async function fetchBirdies(
   }
 }
 
-/** Mapping of tournament id → event-code prefix for historical files. */
-const EVENT_CODE_BY_TOURNAMENT: Record<string, { code: string; years: number[] }> = {
-  R2023525: { code: "3m-open", years: [2019, 2020, 2021, 2022, 2023, 2024, 2025] },
-  R2024525: { code: "3m-open", years: [2019, 2020, 2021, 2022, 2023, 2024, 2025] },
-  R2025525: { code: "3m-open", years: [2019, 2020, 2021, 2022, 2023, 2024, 2025] },
-  R2026525: { code: "3m-open", years: [2019, 2020, 2021, 2022, 2023, 2024, 2025] },
-};
-
 /** Load + fit + cache scoring-model coefficients for a tournament.
- *  Returns null when we can't get the birdies data or don't have a
- *  hole-bearing table for the venue. */
+ *  Returns null when we don't have historical data for the venue.
+ *  Callers should treat null as a "new venue" signal — the
+ *  forecast API surfaces this to the UI with a specific error. */
 export async function getScoringModel(
   tournamentId: string,
   originUrl: string,
@@ -204,22 +197,25 @@ export async function getScoringModel(
   const cached = cache.get(tournamentId);
   if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.data;
 
-  const bearings = getHoleBearings(tournamentId);
-  if (!bearings) return null;
+  // Dynamic config: scans data/historical/ for JSONs matching this
+  // tournament's venue. Returns null for brand-new courses that
+  // haven't been onboarded via the fetch script yet.
+  const cfg = await getTournamentConfig(tournamentId);
+  if (!cfg) return null;
 
-  const eventCfg = EVENT_CODE_BY_TOURNAMENT[tournamentId];
-  if (!eventCfg) return null;
+  const bearings = cfg.holeBearings;
+  if (!bearings || Object.keys(bearings).length === 0) return null;
 
   // Load historical events in parallel.
   const events = (
     await Promise.all(
-      eventCfg.years.map((y) => loadHistorical(eventCfg.code, y)),
+      cfg.historicalYears.map((y) => loadHistorical(cfg.slug, y)),
     )
   ).filter((e): e is HistoricalEvent => e != null);
 
   if (events.length === 0) return null;
 
-  const { ctx } = buildHistoricalContext(events);
+  const { ctx } = buildHistoricalContext(events, bearings);
 
   // Fetch birdies aggregate — the per-pin, per-cluster data we fit against.
   const birdies = await fetchBirdies(tournamentId, originUrl);
@@ -290,11 +286,13 @@ export async function getScoringModel(
   return coeffs;
 }
 
-/** Read the per-hole bearings table for a tournament — surfaces the
- *  hole-bearings module through the loader so callers only need one
- *  import. */
-export function getBearingsForTournament(
+/** Read the per-hole bearings table for a tournament — resolves via
+ *  the dynamic tournament-config lookup. */
+export async function getBearingsForTournament(
   tournamentId: string,
-): Record<number, number> | null {
-  return getHoleBearings(tournamentId);
+): Promise<Record<number, number> | null> {
+  const cfg = await getTournamentConfig(tournamentId);
+  if (!cfg) return null;
+  const b = cfg.holeBearings;
+  return b && Object.keys(b).length > 0 ? b : null;
 }

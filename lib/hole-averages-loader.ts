@@ -20,7 +20,7 @@ import {
 } from "./hole-averages";
 import { getScoringModel } from "./scoring-model/loader";
 import { projectHoleAvgToPar } from "./scoring-model/project";
-import { getHoleBearings } from "./scoring-model/hole-bearings";
+import { getTournamentConfig } from "./scoring-model/tournament-config";
 import type { TodayConditions } from "./scoring-model/types";
 
 /** Extract per-hole raw strokes samples from a Pardle snapshot for a
@@ -277,8 +277,9 @@ export async function loadHoleAveragesForRound(input: {
   // place as the fallback for any hole the model can't fit.
   if (!todaySetup || !originUrl) return legacy;
 
-  const bearings = getHoleBearings(tournamentId);
-  if (!bearings) return legacy;
+  const cfg = await getTournamentConfig(tournamentId);
+  const bearings = cfg?.holeBearings;
+  if (!bearings || Object.keys(bearings).length === 0) return legacy;
 
   let coeffs;
   try {

@@ -40,6 +40,10 @@ interface PlayerForecastResp {
 interface ForecastResp {
   ok: boolean;
   error?: string;
+  /** Set when the current tour stop is a course the scoring model
+   *  hasn't been trained on yet. Rendered as a friendly "we need
+   *  history at this venue first" panel, not an error banner. */
+  newVenue?: boolean;
   targetRound?: Round;
   par?: number;
   wind?: { windMph: number; windDirDeg: number; source: string };
@@ -669,7 +673,65 @@ export default function ForecastTool() {
       </div>
 
       {result && result.ok && <ResultsPanel r={result} />}
-      {result && !result.ok && (
+      {result && !result.ok && result.newVenue && (
+        <div
+          style={{
+            padding: "20px 22px",
+            border: "1px solid oklch(0.90 0.013 95)",
+            background: "oklch(0.995 0.004 95)",
+            borderRadius: 12,
+            display: "grid",
+            gap: 8,
+            maxWidth: 640,
+          }}
+        >
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "4px 10px 4px 8px",
+              borderRadius: 999,
+              background: "oklch(0.965 0.04 240)",
+              color: "oklch(0.55 0.14 245)",
+              fontSize: 10.5,
+              fontWeight: 800,
+              letterSpacing: 1.2,
+              textTransform: "uppercase",
+              width: "fit-content",
+              boxShadow: "inset 0 0 0 1px oklch(0.55 0.14 245)",
+            }}
+          >
+            New venue this week
+          </div>
+          <div
+            style={{
+              fontSize: 18,
+              fontWeight: 800,
+              color: "oklch(0.26 0.04 155)",
+              letterSpacing: -0.2,
+              lineHeight: 1.2,
+            }}
+          >
+            No round-score predictions for this course yet
+          </div>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 14,
+              lineHeight: 1.5,
+              color: "oklch(0.50 0.02 150)",
+              fontWeight: 500,
+            }}
+          >
+            The round-score model fits from a full season of per-hole
+            historical data at the venue. We&apos;ll have this course
+            once we&apos;ve collected that history — try the course
+            fit or ballstriking tools in the meantime.
+          </p>
+        </div>
+      )}
+      {result && !result.ok && !result.newVenue && (
         <div
           style={{
             padding: 12,

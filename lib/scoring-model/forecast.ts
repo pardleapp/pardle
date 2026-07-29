@@ -13,7 +13,7 @@
 import "server-only";
 import { projectHoleAvgToPar, pinSpecificResidual } from "./project";
 import { getScoringModel } from "./loader";
-import { getHoleBearings } from "./hole-bearings";
+import { getTournamentConfig } from "./tournament-config";
 import {
   getHrrrHourlyWind,
   summariseHrrrDay,
@@ -29,40 +29,10 @@ import type {
 } from "./types";
 import type { LevelShiftMode } from "@/lib/hole-averages-loader";
 
-/** Historical round-mean baselines per tournament. Used when the
- *  target round has enough per-round fit rows to be trustworthy; the
- *  fit itself carries HoleFit.histMeanAvgVsParByRound[round]. These
- *  event-level totals are what UI callers see as "typical R3 avg". */
-const HISTORICAL_ROUND_MEANS: Record<
-  string,
-  Partial<Record<1 | 2 | 3 | 4, number>>
-> = {
-  R2026525: { 1: 70.51, 2: 71.22, 3: 69.18, 4: 69.5 },
-};
-
-/** Hard-coded round dates per tournament. Same table as the
- *  tee-time-scoring API uses — real dates for each round so the
- *  wind fetch targets the correct day rather than the server's
- *  system clock (which may be off from the tournament's dates). */
-const ROUND_DATES: Record<string, Record<1 | 2 | 3 | 4, string>> = {
-  R2026525: {
-    1: "2026-07-23",
-    2: "2026-07-24",
-    3: "2026-07-25",
-    4: "2026-07-26",
-  },
-};
-
-/** Per-round hole pars for the fitted courses — needed to convert
- *  the model's avg-vs-par output into an absolute score. */
-const COURSE_HOLE_PARS: Record<string, Record<number, number>> = {
-  R2026525: {
-    1: 4, 2: 4, 3: 4, 4: 3, 5: 4, 6: 5, 7: 4, 8: 3, 9: 4,
-    10: 4, 11: 4, 12: 5, 13: 3, 14: 4, 15: 4, 16: 4, 17: 3, 18: 5,
-  },
-};
-
-const COURSE_PAR: Record<string, number> = { R2026525: 71 };
+// Historical round means, round dates, hole pars and course par
+// are now all sourced dynamically from lib/scoring-model/
+// tournament-config.ts — which reads whatever the fetch script has
+// produced in data/historical/. See getForecastForRound below.
 
 /** Per-hole override supplied by the user — everything is optional so
  *  callers can override only what they know. */
@@ -477,7 +447,10 @@ function bayesianFormBump(
 
 export async function runForecast(
   input: ForecastInputs,
-): Promise<ForecastResponse | { ok: false; error: string }> {
+): Promise<
+  | ForecastResponse
+  | { ok: false; error: string; newVenue?: boolean }
+> {
   const {
     tournamentId,
     targetRound,
@@ -562,28 +535,40 @@ export async function runForecast(
   }
 
   const warnings: string[] = [];
-  const par = COURSE_PAR[tournamentId] ?? 72;
-  const pars = COURSE_HOLE_PARS[tournamentId] ?? {};
-  const bearings = getHoleBearings(tournamentId);
+  const cfg = await getTournamentConfig(tournamentId);
+  if (!cfg) {
+    // No historicals on disk for this venue — surface as a specific
+    // "new venue" state so the UI can show a helpful message
+    // instead of the generic "coefficients unavailable" error.
+    return {
+      ok: false,
+      error:
+        "This course is new on the PGA Tour schedule for us — round-score predictions will be available once we've collected a season of history.",
+      newVenue: true,
+    };
+  }
+  const par = cfg.coursePar;
+  const pars = cfg.courseHolePars;
+  const bearings = cfg.holeBearings;
   const coords = coordsForTournamentId(tournamentId);
 
   const coeffs = await getScoringModel(tournamentId, originUrl);
   if (!coeffs) {
     return { ok: false, error: "Scoring model coefficients unavailable" };
   }
-  if (!bearings) {
+  if (!bearings || Object.keys(bearings).length === 0) {
     return { ok: false, error: "No hole bearings for this course" };
   }
-  const histMean =
-    HISTORICAL_ROUND_MEANS[tournamentId]?.[targetRound] ?? null;
+  const histMean = cfg.historicalRoundMeansByRound[targetRound] ?? null;
 
   // ── Wind resolution ─────────────────────────────────────────────
-  // Target-round date: prefer the hard-coded per-tournament table
-  // (real tournament dates), else fall back to today's UTC. The
-  // fallback is a rough approximation when a tournament hasn't been
-  // added to the table.
+  // Target-round date: prefer the config's live round dates if
+  // present (the fetch script writes these alongside the historical
+  // JSONs); otherwise today's UTC. The fallback is a rough
+  // approximation only used when the current tour week hasn't been
+  // fully onboarded yet.
   const targetDate =
-    ROUND_DATES[tournamentId]?.[targetRound] ??
+    cfg.liveRoundDates?.[String(targetRound)] ??
     new Date().toISOString().slice(0, 10);
 
   let wind: { windMph: number; windDirDeg: number };
@@ -1229,21 +1214,22 @@ export async function fetchPriorRoundObservations(
     const holes = j?.pins?.holes ?? [];
     const out: Partial<Record<1 | 2 | 3 | 4, PriorRoundObservation>> = {};
     // Also need wind per round. Reuse Open-Meteo daily — same
-    // history the tee-time-scoring API already pulls.
+    // history the tee-time-scoring API already pulls. Round dates
+    // come from the dynamic tournament-config (populated by the
+    // fetch script per tour week).
     const coords = coordsForTournamentId(tournamentId);
     const dailyByRound: Partial<
       Record<1 | 2 | 3 | 4, { windMph: number; windDirDeg: number }>
     > = {};
+    const cfgForDates = await getTournamentConfig(tournamentId);
     if (coords) {
       const dates: Record<1 | 2 | 3 | 4, string> = {
         1: "", 2: "", 3: "", 4: "",
       };
-      // Hard-coded round dates for 3M Open 2026 — same as tee-time-scoring
-      if (tournamentId === "R2026525") {
-        dates[1] = "2026-07-23";
-        dates[2] = "2026-07-24";
-        dates[3] = "2026-07-25";
-        dates[4] = "2026-07-26";
+      if (cfgForDates?.liveRoundDates) {
+        for (const r of [1, 2, 3, 4] as const) {
+          dates[r] = cfgForDates.liveRoundDates[String(r)] ?? "";
+        }
       }
       const daily = await getDailyWeather(
         coords.lat,
