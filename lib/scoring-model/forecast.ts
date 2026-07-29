@@ -556,8 +556,11 @@ export async function runForecast(
   if (!coeffs) {
     return { ok: false, error: "Scoring model coefficients unavailable" };
   }
-  if (!bearings || Object.keys(bearings).length === 0) {
-    return { ok: false, error: "No hole bearings for this course" };
+  const bearingsAvailable = bearings && Object.keys(bearings).length > 0;
+  if (!bearingsAvailable) {
+    warnings.push(
+      "Wind adjustment is off — this course's hole bearings haven't been added yet. Forecast is otherwise valid.",
+    );
   }
   const histMean = cfg.historicalRoundMeansByRound[targetRound] ?? null;
 

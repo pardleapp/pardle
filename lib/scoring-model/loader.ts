@@ -116,14 +116,19 @@ function buildHistoricalContext(
         windDirDeg: wr.windDirDeg,
         yardsByHole: perHole,
       };
-      // Contribute to per-hole running means
+      // Contribute to per-hole running means. When the bearing for
+      // a hole is unknown (a freshly-onboarded venue whose meta
+      // file hasn't had bearings filled in yet), treat headwind as
+      // 0 so the fit still runs — the model just won't reflect
+      // that day's wind for that hole.
       for (const [h, yv] of Object.entries(perHole)) {
         const hole = Number(h);
         const bearing = bearings[hole];
-        if (typeof bearing !== "number") continue;
         const head =
-          wr.windAvgMph *
-          Math.cos(((wr.windDirDeg - bearing) * Math.PI) / 180);
+          typeof bearing === "number"
+            ? wr.windAvgMph *
+              Math.cos(((wr.windDirDeg - bearing) * Math.PI) / 180)
+            : 0;
         (yardsAccum[hole] ??= []).push(yv);
         (headAccum[hole] ??= []).push(head);
       }
@@ -203,8 +208,10 @@ export async function getScoringModel(
   const cfg = await getTournamentConfig(tournamentId);
   if (!cfg) return null;
 
-  const bearings = cfg.holeBearings;
-  if (!bearings || Object.keys(bearings).length === 0) return null;
+  // Missing bearings is not fatal — the fit runs with no wind
+  // adjustment when the venue's meta file hasn't had bearings
+  // filled in yet.
+  const bearings = cfg.holeBearings ?? {};
 
   // Load historical events in parallel.
   const events = (
@@ -229,11 +236,11 @@ export async function getScoringModel(
       perHoleFit[h] = null;
       continue;
     }
-    const bearing = bearings[h];
-    if (typeof bearing !== "number") {
-      perHoleFit[h] = null;
-      continue;
-    }
+    // Unknown bearing → treat headwind as 0 for every row on this
+    // hole. Keeps the per-pin fit alive when a freshly-onboarded
+    // venue has no OSM bearings yet.
+    const bearing =
+      typeof bearings[h] === "number" ? (bearings[h] as number) : null;
     const rows: FitRow[] = [];
     const centroidAccum: Record<string, { x: number; y: number; n: number }> = {};
     for (let ci = 0; ci < (hData.clusters ?? []).length; ci++) {
@@ -256,8 +263,10 @@ export async function getScoringModel(
         const yards = context.yardsByHole[h];
         if (typeof yards !== "number") continue;
         const head =
-          context.wind *
-          Math.cos(((context.windDirDeg - bearing) * Math.PI) / 180);
+          bearing != null
+            ? context.wind *
+              Math.cos(((context.windDirDeg - bearing) * Math.PI) / 180)
+            : 0;
         rows.push({
           clusterIdx: ci,
           round: pin.round,
