@@ -407,10 +407,14 @@ function normalCdf(z: number): number {
 
 /** Given a player's expected median score and one-σ round-score
  *  spread, build the P(round ≤ threshold) map for a band of
- *  absolute stroke thresholds centred on the median. Uses a normal
- *  approximation anchored at the median — the mean-median gap is
- *  already baked into `expectedMedian`, so we don't need to skew the
- *  distribution any further here. */
+ *  bookmaker-style .5 thresholds centred on the median. Bookmakers
+ *  set round-score over/unders on .5 lines (68.5, 69.5, ...) so
+ *  the "under" event is unambiguous — this returns exactly those.
+ *
+ *  Keys are the .5 threshold string ("68.5"); values are P(round
+ *  ≤ that threshold) via a normal approximation anchored at the
+ *  median. The mean-median gap is already baked into
+ *  `expectedMedian`, so no additional skew is applied here. */
 function buildProbScoreUnder(
   expectedMedian: number,
   sigma: number,
@@ -419,12 +423,14 @@ function buildProbScoreUnder(
   if (!Number.isFinite(expectedMedian) || !Number.isFinite(sigma) || sigma <= 0) {
     return out;
   }
-  // Cover ±6 strokes around the median in whole-stroke buckets — the
-  // range a bettor is most likely to eyeball against a book line.
+  // Cover ±6 half-stroke steps around the median in .5-stroke
+  // buckets — the range a bettor is most likely to eyeball against
+  // an actual book O/U line.
   const centre = Math.round(expectedMedian);
   for (let k = centre - 6; k <= centre + 6; k++) {
-    const z = (k + 0.5 - expectedMedian) / sigma; // continuity correction
-    out[String(k)] = Number(normalCdf(z).toFixed(4));
+    const threshold = k + 0.5;
+    const z = (threshold - expectedMedian) / sigma;
+    out[threshold.toFixed(1)] = Number(normalCdf(z).toFixed(4));
   }
   return out;
 }
