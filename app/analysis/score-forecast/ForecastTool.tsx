@@ -1785,6 +1785,229 @@ function PlayerHeroCard({
           }
         />
       </div>
+
+      <PlayerProbabilityStrip player={player} />
+      <PlayerDgProbs player={player} />
+    </div>
+  );
+}
+
+/** P(round ≤ threshold) — five picked probability chips centred on
+ *  the player's expected median. Same distribution as the response
+ *  carries (Gaussian, sigma from either player-history or course
+ *  baseline). Useful next to a book's over/under line. */
+function PlayerProbabilityStrip({
+  player,
+}: {
+  player: NonNullable<ForecastResp["players"]>[number];
+}) {
+  const probs = player.probScoreUnder ?? {};
+  const sigma = player.roundScoreSigma;
+  const source = player.roundScoreSigmaSource;
+  const median = player.expectedMedian;
+  if (!probs || Object.keys(probs).length === 0) return null;
+  // Show median ±3 in whole strokes → five chips.
+  const centre = Math.round(median);
+  const shown = [centre - 3, centre - 2, centre - 1, centre, centre + 1, centre + 2];
+  return (
+    <div
+      style={{
+        padding: "14px 16px",
+        background: T.card,
+        borderRadius: 8,
+        border: `1px solid ${T.line}`,
+        fontFamily: T.fontUi,
+        display: "grid",
+        gap: 10,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            letterSpacing: 1.4,
+            textTransform: "uppercase",
+            color: T.muted,
+            fontWeight: 800,
+          }}
+        >
+          Probability of shooting ≤ score
+        </div>
+        <div
+          style={{
+            fontSize: 10.5,
+            color: T.dim,
+            fontWeight: 700,
+            letterSpacing: 0.3,
+          }}
+          title={
+            source === "player-history"
+              ? "σ from this player's actual rounds at this venue"
+              : "σ falls back to the venue's course-average — no venue history for this player"
+          }
+        >
+          σ {sigma?.toFixed(2)} ·{" "}
+          {source === "player-history" ? "player history" : "course baseline"}
+        </div>
+      </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${shown.length}, 1fr)`,
+          gap: 8,
+        }}
+      >
+        {shown.map((k) => {
+          const p = probs[String(k)];
+          if (typeof p !== "number") return <div key={k} />;
+          const isMedian = k === centre;
+          return (
+            <div
+              key={k}
+              style={{
+                textAlign: "center",
+                padding: "10px 6px",
+                borderRadius: 6,
+                background: isMedian ? T.emeraldTint : T.soft,
+                border: `1px solid ${isMedian ? T.emerald : T.line}`,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 10,
+                  letterSpacing: 0.6,
+                  textTransform: "uppercase",
+                  color: isMedian ? T.emeraldD : T.muted,
+                  fontWeight: 800,
+                }}
+              >
+                ≤ {k}
+              </div>
+              <div
+                style={{
+                  fontFamily: T.fontMono,
+                  fontWeight: 800,
+                  fontSize: 20,
+                  color: T.heroInk,
+                  lineHeight: 1,
+                  marginTop: 6,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {(p * 100).toFixed(1)}%
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** DataGolf's own pre-tournament tail probabilities — passed through
+ *  unchanged from their /preds/pre-tournament endpoint. Shown as a
+ *  cross-check next to our own probScoreUnder so bettors can spot
+ *  divergences before backing a line. */
+function PlayerDgProbs({
+  player,
+}: {
+  player: NonNullable<ForecastResp["players"]>[number];
+}) {
+  const dg = player.dgProbs;
+  if (!dg) return null;
+  const cells: Array<{ label: string; value: number }> = [];
+  const push = (label: string, value: number | undefined) => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      cells.push({ label, value });
+    }
+  };
+  push("Win", dg.win);
+  push("Top 5", dg.top5);
+  push("Top 10", dg.top10);
+  push("Top 20", dg.top20);
+  push("Make cut", dg.makeCut);
+  push("R1 lead", dg.firstRoundLead);
+  if (cells.length === 0) return null;
+  return (
+    <div
+      style={{
+        padding: "12px 14px",
+        background: T.card,
+        borderRadius: 8,
+        border: `1px solid ${T.line}`,
+        fontFamily: T.fontUi,
+        display: "grid",
+        gap: 8,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          letterSpacing: 1.4,
+          textTransform: "uppercase",
+          color: T.muted,
+          fontWeight: 800,
+        }}
+        title="DataGolf's own pre-tournament tail probabilities — for cross-check"
+      >
+        DataGolf tail probabilities
+      </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${cells.length}, 1fr)`,
+          gap: 8,
+        }}
+      >
+        {cells.map((c) => {
+          const v = c.value;
+          return (
+            <div
+              key={c.label}
+              style={{
+                textAlign: "center",
+                padding: "8px 6px",
+                borderRadius: 6,
+                background: T.soft,
+                border: `1px solid ${T.line}`,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 9.5,
+                  letterSpacing: 0.6,
+                  textTransform: "uppercase",
+                  color: T.muted,
+                  fontWeight: 800,
+                }}
+              >
+                {c.label}
+              </div>
+              <div
+                style={{
+                  fontFamily: T.fontMono,
+                  fontWeight: 800,
+                  fontSize: 15,
+                  color: T.heroInk,
+                  lineHeight: 1,
+                  marginTop: 4,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {(v * 100).toFixed(v < 0.005 ? 3 : 1)}%
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
