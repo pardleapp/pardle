@@ -48,6 +48,13 @@ interface ForecastResp {
   par?: number;
   wind?: { windMph: number; windDirDeg: number; source: string };
   historicalRoundMean?: number | null;
+  /** Historical median field score for the same round (median-of-
+   *  yearly-medians). Books set round-score O/U lines against the
+   *  median, so bettors want this alongside the mean. */
+  historicalRoundMedian?: number | null;
+  /** Course-level mean-median gap in strokes — how right-skewed the
+   *  venue's field-round distribution is on average. */
+  historicalMeanMedianGap?: number;
   levelShift?: number;
   levelShiftAttenuated?: number;
   levelShiftMode?: LevelShiftMode;
@@ -56,6 +63,9 @@ interface ForecastResp {
   modelDelta?: number;
   fieldForecast?: number;
   fieldForecastVsPar?: number;
+  /** Field median forecast — derived from `fieldForecast` minus the
+   *  venue's typical (mean − median) gap. */
+  fieldForecastMedian?: number;
   /** One-σ spread of the field-round-score distribution today. */
   fieldForecastSigma?: number;
   holes?: HoleForecast[];
@@ -1280,7 +1290,20 @@ function SecondaryStrip({ r }: { r: ForecastResp }) {
     {
       label: "Historical mean",
       value: r.historicalRoundMean?.toFixed(2) ?? "—",
-      sub: "8-yr avg for this round",
+      sub: "avg field score, this round",
+    },
+    {
+      label: "Historical median",
+      value: r.historicalRoundMedian?.toFixed(2) ?? "—",
+      sub:
+        typeof r.historicalMeanMedianGap === "number"
+          ? `gap ${r.historicalMeanMedianGap >= 0 ? "+" : ""}${r.historicalMeanMedianGap.toFixed(2)} strokes`
+          : undefined,
+    },
+    {
+      label: "Field median (today)",
+      value: r.fieldForecastMedian?.toFixed(2) ?? "—",
+      sub: "mean minus venue skew",
     },
     {
       label: "Wind",

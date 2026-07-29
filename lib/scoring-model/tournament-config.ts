@@ -103,6 +103,15 @@ export interface TournamentConfig {
   /** Historical round means (avg strokes per round across all
    *  years). Keys 1-4 as strings for JSON friendliness. */
   historicalRoundMeansByRound: Partial<Record<1 | 2 | 3 | 4, number>>;
+  /** Historical round medians (per-round field median stroke score,
+   *  averaged across all years). Book round-score O/U lines are set
+   *  against the median, so bettors need this alongside the mean. */
+  historicalRoundMediansByRound: Partial<Record<1 | 2 | 3 | 4, number>>;
+  /** Course-level mean-median gap in strokes — how right-skewed the
+   *  venue's field-round distribution is. Averaged across all
+   *  year:round observations. Positive → mean > median → the course
+   *  produces occasional blow-up rounds that pull the mean up. */
+  historicalMeanMedianGap: number;
   /** Live-year round dates keyed by current-year id, when the
    *  ingestion script has recorded them for the upcoming week.
    *  Undefined otherwise → weather resolution falls back to
@@ -119,6 +128,15 @@ let cachedConfigsBySlug: Map<string, TournamentConfig> | null = null;
 let cachedConfigsByTournamentId: Map<string, TournamentConfig> | null = null;
 let cacheLoadedAt = 0;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min — cheap to rebuild if files change
+
+function computeMedian(values: number[]): number {
+  if (values.length === 0) return NaN;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+}
 
 async function loadAll(): Promise<void> {
   if (
@@ -379,11 +397,18 @@ async function loadAll(): Promise<void> {
       void yMean;
     }
 
-    // Historical round means: mean score per round across all
-    // years (equal weight per year, not per player).
+    // Historical round means + medians: per-round field mean and
+    // median stroke score, averaged across all years (equal weight
+    // per year, not per player). Also record the (mean - median)
+    // gap per year:round so we can average it into a course-level
+    // skew metric.
     const roundMeansAccum: Partial<
       Record<1 | 2 | 3 | 4, { sum: number; n: number }>
     > = {};
+    const roundMediansAccum: Partial<
+      Record<1 | 2 | 3 | 4, { sum: number; n: number }>
+    > = {};
+    const gapsAccum: number[] = [];
     for (const l of loaded) {
       const perYear: Partial<Record<1 | 2 | 3 | 4, number[]>> = {};
       for (const p of l.data.players ?? []) {
@@ -397,14 +422,25 @@ async function loadAll(): Promise<void> {
       }
       for (const r of [1, 2, 3, 4] as const) {
         const arr = perYear[r];
-        if (!arr || arr.length === 0) continue;
+        // Require at least 20 finishers so a very-short field
+        // (weather-abandoned round, tiny opposite-field event)
+        // can't drag the mean/median with a handful of scores.
+        if (!arr || arr.length < 20) continue;
         const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+        const median = computeMedian(arr);
         const acc = (roundMeansAccum[r] ??= { sum: 0, n: 0 });
         acc.sum += mean;
         acc.n += 1;
+        const medAcc = (roundMediansAccum[r] ??= { sum: 0, n: 0 });
+        medAcc.sum += median;
+        medAcc.n += 1;
+        gapsAccum.push(mean - median);
       }
     }
     const historicalRoundMeansByRound: Partial<
+      Record<1 | 2 | 3 | 4, number>
+    > = {};
+    const historicalRoundMediansByRound: Partial<
       Record<1 | 2 | 3 | 4, number>
     > = {};
     for (const r of [1, 2, 3, 4] as const) {
@@ -414,7 +450,21 @@ async function loadAll(): Promise<void> {
           (acc.sum / acc.n).toFixed(2),
         );
       }
+      const medAcc = roundMediansAccum[r];
+      if (medAcc && medAcc.n > 0) {
+        historicalRoundMediansByRound[r] = Number(
+          (medAcc.sum / medAcc.n).toFixed(2),
+        );
+      }
     }
+    const historicalMeanMedianGap =
+      gapsAccum.length > 0
+        ? Number(
+            (
+              gapsAccum.reduce((a, b) => a + b, 0) / gapsAccum.length
+            ).toFixed(3),
+          )
+        : 0;
 
     // Bearings + course par + hole pars can be overridden by an
     // on-disk per-slug metadata file — same shape the fetch script
@@ -464,6 +514,8 @@ async function loadAll(): Promise<void> {
       courseHolePars: holeParsOverride ?? rawHolePars,
       holeBearings: holeBearingsOverride ?? holeBearings,
       historicalRoundMeansByRound,
+      historicalRoundMediansByRound,
+      historicalMeanMedianGap,
       liveRoundDates: liveMeta[slug]?.roundDates,
     };
 

@@ -250,6 +250,17 @@ export interface ForecastResponse {
   par: number;
   wind: { windMph: number; windDirDeg: number; source: string };
   historicalRoundMean: number | null;
+  /** Same round's historical median field score. Round-score
+   *  over/unders are typically set against the median, so bettors
+   *  reading the tool alongside a bookmaker's line want this
+   *  alongside the mean. Null when there aren't enough historicals
+   *  on file to compute it. */
+  historicalRoundMedian: number | null;
+  /** Course-level right-skew of the field-round distribution
+   *  (mean − median, averaged across every year:round on file).
+   *  Positive → mean sits above median → the venue produces
+   *  occasional blow-up rounds that pull the mean up. */
+  historicalMeanMedianGap: number;
   levelShift: number;
   levelShiftAttenuated: number;
   levelShiftMode: LevelShiftMode;
@@ -258,6 +269,11 @@ export interface ForecastResponse {
   modelDelta: number;
   fieldForecast: number;
   fieldForecastVsPar: number;
+  /** Field-round median forecast. Derived from the mean forecast
+   *  minus the venue's historical mean-median gap — i.e. we apply
+   *  the same right-skew we've observed at this course over the
+   *  years, on top of today's mean projection. */
+  fieldForecastMedian: number;
   /** One-standard-deviation width of the field-round-score
    *  distribution today. Combines a base historical round-score
    *  spread with an inflation term when small-sample holes are
@@ -323,6 +339,29 @@ function conditionsSkewMultiplier(
   // extreme days don't produce runaway skew values.
   const factor = 1 + Math.max(-0.2, Math.min(0.35, delta * 0.1));
   return factor;
+}
+
+/** Scale the base skew by the course's own empirical right-skew.
+ *  Some venues (water everywhere, forced carries, tight corridors)
+ *  produce persistently right-skewed field-round distributions
+ *  even in benign conditions — those raise every player's mean-
+ *  median gap. Others (open, wide, minimal penalty) sit closer to
+ *  symmetric.
+ *
+ *  The field-level gap on tour typically sits around 0.05-0.15
+ *  strokes (measured across every year in our historicals). We use
+ *  the venue's observed gap as a linear multiplier centred at 1.0:
+ *
+ *    gap  0.00 → 1.00  (no adjustment)
+ *    gap +0.10 → 1.10  (skew 10% wider — typical tough venue)
+ *    gap +0.20 → 1.20  (a genuinely penal course)
+ *    gap −0.05 → 0.95  (unusually forgiving venue)
+ *
+ *  Clamped ±30% so an outlier gap can't drive silly per-player
+ *  distributions. */
+function courseSkewMultiplier(historicalMeanMedianGap: number): number {
+  if (!Number.isFinite(historicalMeanMedianGap)) return 1;
+  return 1 + Math.max(-0.3, Math.min(0.3, historicalMeanMedianGap));
 }
 
 /** SG persistence coefficients — how much of an SG category
@@ -563,6 +602,9 @@ export async function runForecast(
     );
   }
   const histMean = cfg.historicalRoundMeansByRound[targetRound] ?? null;
+  const histMedian =
+    cfg.historicalRoundMediansByRound[targetRound] ?? null;
+  const courseMeanMedianGap = cfg.historicalMeanMedianGap;
 
   // ── Wind resolution ─────────────────────────────────────────────
   // Target-round date: prefer the config's live round dates if
@@ -980,14 +1022,18 @@ export async function runForecast(
       const eff = effectivePersistenceForRound(sg);
       return eff == null ? null : eff / NEUTRAL_PERSISTENCE;
     });
-    // Skew: continuous by SG tier, then scaled by expected round
-    // conditions (harder round → wider mean-median gap for everyone).
+    // Skew: continuous by SG tier, then scaled by (a) expected
+    // round conditions (harder round → wider mean-median gap for
+    // everyone) and (b) the venue's empirical right-skew from
+    // years of historicals (penal courses widen even in benign
+    // conditions).
     const baseSkew = p.skewAdjustment ?? autoSkew(p.sgTotal);
     const skewConditionMult = conditionsSkewMultiplier(
       fieldForecastVsPar,
       histMean != null ? histMean - par : null,
     );
-    const skewGap = baseSkew * skewConditionMult;
+    const skewCourseMult = courseSkewMultiplier(courseMeanMedianGap);
+    const skewGap = baseSkew * skewConditionMult * skewCourseMult;
 
     // Player-specific field baseline. If a tee time is given AND
     // hourly HRRR data is available, walk the hourly wind along
@@ -1057,6 +1103,8 @@ export async function runForecast(
         : windSource,
     },
     historicalRoundMean: histMean,
+    historicalRoundMedian: histMedian,
+    historicalMeanMedianGap: courseMeanMedianGap,
     levelShift: rawLevelShift,
     levelShiftAttenuated,
     levelShiftMode: mode,
@@ -1065,6 +1113,10 @@ export async function runForecast(
     modelDelta: modelDeltaSum,
     fieldForecast,
     fieldForecastVsPar,
+    // Median = mean minus the venue's typical (mean − median) gap.
+    // Applies the empirical right-skew we've observed across every
+    // year at this course on top of today's mean projection.
+    fieldForecastMedian: fieldForecast - courseMeanMedianGap,
     fieldForecastSigma,
     holes: holeForecasts,
     players: playerForecasts,
