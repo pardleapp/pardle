@@ -25,6 +25,22 @@ export function fitPerHole(
   rows: FitRow[],
 ): { bYards: number; bHead: number; intercept: number } | null {
   if (rows.length < 6) return null;
+
+  // Detect degenerate headwind: when the course's meta file hasn't
+  // had hole bearings filled in yet, every row's headwind is 0 by
+  // construction (see loader.ts). The 3-var Gram matrix then has a
+  // zero column and det → 0. Detect that up-front and fall back to
+  // a yards-only fit; wind coefficient is set to 0 explicitly so
+  // the downstream projector treats today's wind as a no-op.
+  let headMin = Infinity;
+  let headMax = -Infinity;
+  for (const r of rows) {
+    if (r.headwind < headMin) headMin = r.headwind;
+    if (r.headwind > headMax) headMax = r.headwind;
+  }
+  const headHasVariance = headMax - headMin > 1e-6;
+  if (!headHasVariance) return fitPerHoleYardsOnly(rows);
+
   const w = rows.map((r) => Math.sqrt(Math.max(1, r.total)));
   let s11 = 0, s12 = 0, s13 = 0;
   let s22 = 0, s23 = 0;
@@ -51,7 +67,12 @@ export function fitPerHole(
     s11 * (s22 * s33 - s23 * s23) -
     s12 * (s12 * s33 - s23 * s13) +
     s13 * (s12 * s23 - s22 * s13);
-  if (!Number.isFinite(det) || Math.abs(det) < 1e-12) return null;
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-12) {
+    // Fallback: solve the reduced 2-var problem instead of returning
+    // null — a rare pathological case (multi-collinear yards + head)
+    // will still land in the yards-only fit.
+    return fitPerHoleYardsOnly(rows);
+  }
   const i11 = (s22 * s33 - s23 * s23) / det;
   const i12 = -(s12 * s33 - s23 * s13) / det;
   const i13 = (s12 * s23 - s22 * s13) / det;
@@ -62,6 +83,37 @@ export function fitPerHole(
     bYards: i11 * bx1 + i12 * bx2 + i13 * bx3,
     bHead: i12 * bx1 + i22 * bx2 + i23 * bx3,
     intercept: i13 * bx1 + i23 * bx2 + i33 * bx3,
+  };
+}
+
+/** Reduced 2-var WLS: `[yards, 1] → avgVsPar`. Used when the
+ *  headwind column is degenerate (all-zero or perfectly collinear
+ *  with yards). Wind coefficient is returned as 0. */
+function fitPerHoleYardsOnly(
+  rows: FitRow[],
+): { bYards: number; bHead: number; intercept: number } | null {
+  if (rows.length < 4) return null;
+  const w = rows.map((r) => Math.sqrt(Math.max(1, r.total)));
+  let s11 = 0, s12 = 0, s22 = 0;
+  let b1 = 0, b2 = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const wi = w[i];
+    const x1 = r.yards * wi;
+    const x2 = wi;
+    const yv = r.avgVsPar * wi;
+    s11 += x1 * x1;
+    s12 += x1 * x2;
+    s22 += x2 * x2;
+    b1 += x1 * yv;
+    b2 += x2 * yv;
+  }
+  const det = s11 * s22 - s12 * s12;
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-12) return null;
+  return {
+    bYards: (s22 * b1 - s12 * b2) / det,
+    bHead: 0,
+    intercept: (-s12 * b1 + s11 * b2) / det,
   };
 }
 
