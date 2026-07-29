@@ -18,7 +18,7 @@ import {
   getScorecards,
   type PGAScorecard,
 } from "@/lib/golf-api/pgatour";
-import { getFullLiveStats } from "@/lib/golf-api/datagolf";
+import { getFullLiveStats, getPreTournamentProbs } from "@/lib/golf-api/datagolf";
 import type { RoundSgBreakdown } from "@/lib/scoring-model/forecast";
 
 const DG_BASE = "https://feeds.datagolf.com";
@@ -249,6 +249,7 @@ export async function GET() {
     pgaToDg,
     dgSkillByDgId,
     dgSgByRound,
+    dgPreProbs,
   ] = await Promise.all([
     getLeaderboard(tournamentId).catch(() => []),
     loadCsvSg(),
@@ -261,7 +262,18 @@ export async function GET() {
         Partial<Record<1 | 2 | 3 | 4, RoundSgBreakdown>>
       >(),
     ),
+    // DataGolf's own pre-tournament probability distribution per
+    // player — these are their fully-baked win/top-N/make-cut/FRL
+    // numbers, integrating volatility + course fit + skill. Ship
+    // them alongside our own scoring-model output so the tool can
+    // render both.
+    getPreTournamentProbs("pga").catch(() => []),
   ]);
+  const dgProbsByDgId = new Map<number, typeof dgPreProbs[number]>();
+  for (const p of dgPreProbs) {
+    const n = Number(p.dgId);
+    if (Number.isFinite(n)) dgProbsByDgId.set(n, p);
+  }
 
   // Build normalised name → SG lookup once
   const sgByNorm = new Map<string, number>();
@@ -278,6 +290,11 @@ export async function GET() {
 
   interface Player {
     id: string;
+    /** DataGolf dg_id — resolved via the pgaId → dgId lookup. Absent
+     *  when we can't match (rare — DG usually covers the tour
+     *  field). Needed by the forecast so it can look up per-player
+     *  round-score sigma from the tournament config. */
+    dgId?: string;
     name: string;
     sgTotal: number | null;
     /** Where sgTotal came from — event-specific means the CSV
@@ -298,6 +315,20 @@ export async function GET() {
     weekRoundsSg: Array<RoundSgBreakdown | null>;
     /** Tee times per round, "HH:MM" local. Empty when unavailable. */
     teeTimes: Partial<Record<1 | 2 | 3 | 4, string>>;
+    /** DataGolf's own pre-tournament probability distribution. All
+     *  values are 0..1. Undefined when DG hasn't published a value
+     *  for this player yet (early week, missing entry, etc). */
+    dgProbs?: {
+      win?: number;
+      top3?: number;
+      top5?: number;
+      top10?: number;
+      top20?: number;
+      top30?: number;
+      makeCut?: number;
+      firstRoundLead?: number;
+      ev?: number;
+    };
   }
 
   const players: Player[] = [];
@@ -355,8 +386,23 @@ export async function GET() {
     const weekRoundsSg: Array<RoundSgBreakdown | null> = completedRoundNums.map(
       (r) => dgSgForPlayer?.[r] ?? null,
     );
+    const dgProbsRow = dgId != null ? dgProbsByDgId.get(dgId) : undefined;
+    const dgProbs = dgProbsRow
+      ? {
+          win: dgProbsRow.win,
+          top3: dgProbsRow.top3,
+          top5: dgProbsRow.top5,
+          top10: dgProbsRow.top10,
+          top20: dgProbsRow.top20,
+          top30: dgProbsRow.top30,
+          makeCut: dgProbsRow.makeCut,
+          firstRoundLead: dgProbsRow.firstRoundLead,
+          ev: dgProbsRow.ev,
+        }
+      : undefined;
     players.push({
       id: lb.playerId,
+      dgId: dgId != null ? String(dgId) : undefined,
       name: lb.displayName,
       sgTotal: sg,
       sgSource,
@@ -367,6 +413,7 @@ export async function GET() {
       weekRounds,
       weekRoundsSg,
       teeTimes,
+      dgProbs,
     });
   }
 

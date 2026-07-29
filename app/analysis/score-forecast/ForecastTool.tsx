@@ -23,10 +23,23 @@ interface HoleForecast {
 }
 interface PlayerForecastResp {
   name: string;
+  dgId?: string;
   sgTotal: number;
   formAdjustment: number;
   expectedMean: number;
   expectedMedian: number;
+  /** One-σ round-score spread. Sourced from either the player's own
+   *  historical rounds at the venue (`player-history`) or the course
+   *  baseline (`course-baseline`). */
+  roundScoreSigma?: number;
+  roundScoreSigmaSource?: "player-history" | "course-baseline";
+  /** P(round ≤ score) map keyed by absolute-score string ("64", "65",
+   *  ..., "76"). Values are 0..1. Computed from expectedMedian +
+   *  roundScoreSigma via a Gaussian approximation. */
+  probScoreUnder?: Record<string, number>;
+  /** DataGolf's own pre-tournament probability distribution for the
+   *  player. Passed through unchanged. */
+  dgProbs?: DgProbsInput;
   breakdown: {
     fieldMean: number;
     compressedEdge: number;
@@ -79,6 +92,17 @@ interface RoundSg {
   sgArg?: number | null;
   sgPutt?: number | null;
 }
+interface DgProbsInput {
+  win?: number;
+  top3?: number;
+  top5?: number;
+  top10?: number;
+  top20?: number;
+  top30?: number;
+  makeCut?: number;
+  firstRoundLead?: number;
+  ev?: number;
+}
 interface FieldPlayer {
   id: string;
   name: string;
@@ -96,6 +120,13 @@ interface FieldPlayer {
    *  persistence-weighted form adjustment on the server. */
   weekRoundsSg: Array<RoundSg | null>;
   teeTimes: Partial<Record<Round, string>>; // "HH:MM"
+  /** DataGolf's own pre-tournament probability distribution for this
+   *  player. Passed through to the forecast request so the tool can
+   *  render our probabilities and theirs side-by-side. */
+  dgProbs?: DgProbsInput;
+  /** DataGolf dg_id — needed for per-player round-score sigma lookup
+   *  in the tournament config. */
+  dgId?: string;
 }
 interface FieldResp {
   ok: boolean;
@@ -126,6 +157,13 @@ const CONDITIONS_LABEL: Record<ConditionsPreset, string> = {
 interface PlayerRow {
   playerId: string; // "" while empty
   name: string;
+  /** DataGolf dg_id — captured when the player is picked from the
+   *  field. Threaded to the forecast API so it can look up per-
+   *  player round-score sigma from the venue historicals. */
+  dgId?: string;
+  /** DataGolf tail probabilities passed through to the forecast API
+   *  so they're echoed alongside our own. */
+  dgProbs?: DgProbsInput;
   sgTotal: string;
   /** Signals whether sgTotal already includes course-fit adjustment
    *  (from CSV) or is a season-generic universal rating. Passed to
@@ -327,6 +365,7 @@ export default function ForecastTool() {
             p.sgSource === "event-specific" ? 1.0 : 0.83;
           return {
             name: p.name.trim(),
+            dgId: p.dgId,
             sgTotal: sg,
             sgSource: p.sgSource ?? undefined,
             weekRounds: wr.length ? wr : undefined,
@@ -337,6 +376,10 @@ export default function ForecastTool() {
             skewAdjustment: Number.isFinite(skew) ? skew : undefined,
             teeHourLocal: teeHour ?? undefined,
             startHole: 1,
+            // Pass through DataGolf's pre-tournament probability
+            // distribution so runForecast can echo them alongside
+            // our own probScoreUnder in the response.
+            dgProbs: p.dgProbs,
           };
         })
         .filter(Boolean);
@@ -805,6 +848,8 @@ function PlayerCard({
     onChange({
       playerId: fp.id,
       name: fp.name,
+      dgId: fp.dgId,
+      dgProbs: fp.dgProbs,
       sgTotal: sg != null ? String(sg) : "",
       sgSource: fp.sgSource,
       weekRounds: fp.weekRounds.join(","),

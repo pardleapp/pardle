@@ -78,7 +78,30 @@ export interface RoundSgBreakdown {
 }
 
 /** Per-player skill + form knobs. */
+/** DataGolf tail probabilities per player — passed through from the
+ *  /api/scoring-model/field endpoint so we can echo them in the
+ *  response alongside our own probability output. */
+export interface DGPlayerProbs {
+  win?: number;
+  top3?: number;
+  top5?: number;
+  top10?: number;
+  top20?: number;
+  top30?: number;
+  makeCut?: number;
+  firstRoundLead?: number;
+  ev?: number;
+}
+
 export interface PlayerInput {
+  /** DataGolf dg_id — used to look up per-player round-score sigma
+   *  from the tournament config (measured from every historical
+   *  round we have on file for this player at this venue). */
+  dgId?: string;
+  /** DataGolf's own pre-tournament tail probabilities passed through
+   *  to the response so bettors can compare our probabilities to
+   *  theirs side-by-side. */
+  dgProbs?: DGPlayerProbs;
   /** Display name — echoed back in the response. */
   name: string;
   /** Season-long SG total vs full field (positive = better than field
@@ -219,11 +242,32 @@ export interface HoleForecast {
 
 export interface PlayerForecast {
   name: string;
+  dgId?: string;
   sgTotal: number;
   sgTotalAdjusted: number; // after compression + form
   formAdjustment: number;  // strokes/round bump from Bayesian shrinkage
   expectedMean: number;
   expectedMedian: number;
+  /** One-sigma round-score spread. Sourced in priority order:
+   *    1. Direct DataGolf sigma (if supplied via PlayerInput.dgProbs
+   *       and we can back-solve — currently 2 & 3 are the only
+   *       operational sources).
+   *    2. Historical sigma at this venue (from every round on file
+   *       for this dg_id).
+   *    3. Course-average sigma (fallback). */
+  roundScoreSigma: number;
+  /** Where roundScoreSigma came from — surfaced so the UI can flag
+   *  when we're falling back to the course baseline. */
+  roundScoreSigmaSource: "player-history" | "course-baseline";
+  /** P(round score ≤ threshold) for a set of absolute stroke
+   *  thresholds around the player's expected median. Keys are
+   *  absolute score strings ("64", "65", ..., "76"); values are
+   *  0..1 probabilities computed from a skew-adjusted Gaussian
+   *  (median shifted, then σ preserved). */
+  probScoreUnder: Record<string, number>;
+  /** DataGolf's own tail probabilities passed through. Undefined if
+   *  no dgProbs were supplied in the PlayerInput. */
+  dgProbs?: DGPlayerProbs;
   breakdown: {
     fieldMean: number;
     compressedEdge: number;
@@ -339,6 +383,50 @@ function conditionsSkewMultiplier(
   // extreme days don't produce runaway skew values.
   const factor = 1 + Math.max(-0.2, Math.min(0.35, delta * 0.1));
   return factor;
+}
+
+/** Standard-normal cumulative distribution function using the
+ *  Abramowitz & Stegun 7.1.26 rational approximation of erf. Fast,
+ *  accurate to ~1e-7 — plenty for probability-of-shooting-X output.
+ *  Consumed by probScoreUnder to build the per-player P(score ≤ k)
+ *  map without pulling in a stats library. */
+function normalCdf(z: number): number {
+  const sign = z >= 0 ? 1 : -1;
+  const x = Math.abs(z) / Math.SQRT2;
+  const t = 1 / (1 + 0.3275911 * x);
+  const y =
+    1 -
+    (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t -
+      0.284496736) *
+      t +
+      0.254829592) *
+      t *
+      Math.exp(-x * x);
+  return 0.5 * (1 + sign * y);
+}
+
+/** Given a player's expected median score and one-σ round-score
+ *  spread, build the P(round ≤ threshold) map for a band of
+ *  absolute stroke thresholds centred on the median. Uses a normal
+ *  approximation anchored at the median — the mean-median gap is
+ *  already baked into `expectedMedian`, so we don't need to skew the
+ *  distribution any further here. */
+function buildProbScoreUnder(
+  expectedMedian: number,
+  sigma: number,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!Number.isFinite(expectedMedian) || !Number.isFinite(sigma) || sigma <= 0) {
+    return out;
+  }
+  // Cover ±6 strokes around the median in whole-stroke buckets — the
+  // range a bettor is most likely to eyeball against a book line.
+  const centre = Math.round(expectedMedian);
+  for (let k = centre - 6; k <= centre + 6; k++) {
+    const z = (k + 0.5 - expectedMedian) / sigma; // continuity correction
+    out[String(k)] = Number(normalCdf(z).toFixed(4));
+  }
+  return out;
 }
 
 /** Scale the base skew by the course's own empirical right-skew.
@@ -1058,13 +1146,38 @@ export async function runForecast(
     // (formBump is negative if he's been out-performing).
     const expectedMean = playerFieldMean - compressedEdge + formBump;
     const expectedMedian = expectedMean - skewGap;
+
+    // Round-score sigma priority: per-player from historicals →
+    // course-baseline. Player-specific always wins when we have
+    // enough rounds on file for them (the config gate is ≥4 rounds).
+    const playerHistorySigma = p.dgId
+      ? cfg.playerRoundScoreSigmaByDgId[p.dgId]
+      : undefined;
+    const roundScoreSigma =
+      typeof playerHistorySigma === "number" && playerHistorySigma > 0
+        ? playerHistorySigma
+        : cfg.fieldRoundScoreSigmaBaseline;
+    const roundScoreSigmaSource: "player-history" | "course-baseline" =
+      typeof playerHistorySigma === "number" && playerHistorySigma > 0
+        ? "player-history"
+        : "course-baseline";
+    const probScoreUnder = buildProbScoreUnder(
+      expectedMedian,
+      roundScoreSigma,
+    );
+
     playerForecasts.push({
       name: p.name,
+      dgId: p.dgId,
       sgTotal: p.sgTotal,
       sgTotalAdjusted: compressedEdge - formBump,
       formAdjustment: formBump,
       expectedMean,
       expectedMedian,
+      roundScoreSigma,
+      roundScoreSigmaSource,
+      probScoreUnder,
+      dgProbs: p.dgProbs,
       breakdown: {
         fieldMean: playerFieldMean,
         compressedEdge,

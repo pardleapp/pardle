@@ -144,15 +144,84 @@ interface DGPreTournamentRow {
   player_name: string; // "Last, First"
   country?: string;
   win?: number;
+  top_3?: number;
   top_5?: number;
   top_10?: number;
   top_20?: number;
+  top_30?: number;
   make_cut?: number;
+  first_round_lead?: number;
+  /** Expected finish position (DataGolf's projected place). Lower =
+   *  higher finish. */
+  ev?: number;
+  /** Baseline strokes-gained total (mean SG total the player is
+   *  expected to gain per round vs field average). Duplicated with
+   *  /preds/skill-ratings but present on the pre-tournament payload
+   *  when we ask for it. */
+  baseline_pred?: number;
 }
 
 interface DGPreTournamentResponse {
   baseline?: DGPreTournamentRow[];
   // DataGolf sometimes nests under baseline_history_fit too; baseline is canonical.
+}
+
+// ── Pre-tournament tail probabilities per player ─────────────────
+
+export interface DGPreTournamentProbs {
+  dgId: string;
+  name: string;
+  /** All values are 0..1 probabilities (odds_format=percent → 0..100
+   *  which we normalise here). Undefined when DataGolf doesn't
+   *  publish the field for this event (e.g. first-round-lead only
+   *  shows up in the pre-R1 window). */
+  win?: number;
+  top3?: number;
+  top5?: number;
+  top10?: number;
+  top20?: number;
+  top30?: number;
+  makeCut?: number;
+  firstRoundLead?: number;
+  /** Expected finish position (lower = better). */
+  ev?: number;
+  /** Baseline SG total from DG's pre-tournament fit. */
+  sgTotal?: number;
+}
+
+/** Fetch DataGolf's pre-tournament tail probabilities for every
+ *  player in the current PGA tour field. These are DG's own
+ *  probability distributions — they've already integrated their
+ *  volatility model + course fit into these values, so bettors want
+ *  them alongside our own scoring-model probabilities. Returns an
+ *  empty array on any failure so the model degrades to its own
+ *  numbers if DG is briefly unreachable. */
+export async function getPreTournamentProbs(
+  tour: string = "pga",
+): Promise<DGPreTournamentProbs[]> {
+  const data = await fetchJson<DGPreTournamentResponse>(
+    `/preds/pre-tournament?tour=${encodeURIComponent(tour)}&odds_format=percent`,
+  );
+  const rows = data.baseline ?? [];
+  const pct = (v: number | undefined): number | undefined =>
+    typeof v === "number" && Number.isFinite(v) ? v / 100 : undefined;
+  return rows.map((r) => ({
+    dgId: String(r.dg_id),
+    name: flipName(r.player_name),
+    win: pct(r.win),
+    top3: pct(r.top_3),
+    top5: pct(r.top_5),
+    top10: pct(r.top_10),
+    top20: pct(r.top_20),
+    top30: pct(r.top_30),
+    makeCut: pct(r.make_cut),
+    firstRoundLead: pct(r.first_round_lead),
+    ev: typeof r.ev === "number" && Number.isFinite(r.ev) ? r.ev : undefined,
+    sgTotal:
+      typeof r.baseline_pred === "number" && Number.isFinite(r.baseline_pred)
+        ? r.baseline_pred
+        : undefined,
+  }));
 }
 
 export interface RankedGolfer {

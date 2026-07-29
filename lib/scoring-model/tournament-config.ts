@@ -59,6 +59,8 @@ interface HistoricalRound {
   holes?: Record<string, HistoricalHole>;
 }
 interface HistoricalPlayer {
+  dgId?: string;
+  name?: string;
   rounds?: Record<string, HistoricalRound>;
 }
 interface HistoricalPin {
@@ -112,6 +114,17 @@ export interface TournamentConfig {
    *  year:round observations. Positive → mean > median → the course
    *  produces occasional blow-up rounds that pull the mean up. */
   historicalMeanMedianGap: number;
+  /** Per-player round-score standard deviation at this venue —
+   *  measured directly from their historical rounds on file. Keyed
+   *  by DataGolf dg_id. Callers should fall back to a skill-tier
+   *  default when a player isn't in this map (e.g. rookies, players
+   *  who missed every past cut at the course). */
+  playerRoundScoreSigmaByDgId: Record<string, number>;
+  /** Course-average round-score sigma across every player-round on
+   *  file. The tour-wide typical value is around 2.6-3.0; venues
+   *  with more penalty features sit at the top of that range. Used
+   *  as the fallback when a specific player has no venue history. */
+  fieldRoundScoreSigmaBaseline: number;
   /** Live-year round dates keyed by current-year id, when the
    *  ingestion script has recorded them for the upcoming week.
    *  Undefined otherwise → weather resolution falls back to
@@ -466,6 +479,51 @@ async function loadAll(): Promise<void> {
           )
         : 0;
 
+    // Per-player round-score sigma: for each dg_id, gather every
+    // scored round across every year of history and compute the
+    // sample standard deviation. Skip players with fewer than 4
+    // rounds — the sigma estimate is too noisy under that.
+    const roundsByDgId: Record<string, number[]> = {};
+    for (const l of loaded) {
+      for (const p of l.data.players ?? []) {
+        const dgId = p.dgId;
+        if (!dgId) continue;
+        for (const rd of Object.values(p.rounds ?? {})) {
+          if (typeof rd.score === "number") {
+            (roundsByDgId[dgId] ??= []).push(rd.score);
+          }
+        }
+      }
+    }
+    const playerRoundScoreSigmaByDgId: Record<string, number> = {};
+    const allRoundsFlat: number[] = [];
+    for (const [dgId, arr] of Object.entries(roundsByDgId)) {
+      if (arr.length < 4) continue;
+      const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+      const variance =
+        arr.reduce((a, v) => a + (v - mean) * (v - mean), 0) /
+        (arr.length - 1);
+      const sigma = Math.sqrt(variance);
+      if (Number.isFinite(sigma) && sigma > 0) {
+        playerRoundScoreSigmaByDgId[dgId] = Number(sigma.toFixed(3));
+      }
+      for (const s of arr) allRoundsFlat.push(s);
+    }
+    // Course-average sigma across every player-round we have. Used
+    // as fallback for players not in the per-player map.
+    let fieldRoundScoreSigmaBaseline = 2.8;
+    if (allRoundsFlat.length >= 100) {
+      const mean =
+        allRoundsFlat.reduce((a, b) => a + b, 0) / allRoundsFlat.length;
+      const variance =
+        allRoundsFlat.reduce((a, v) => a + (v - mean) * (v - mean), 0) /
+        (allRoundsFlat.length - 1);
+      const sigma = Math.sqrt(variance);
+      if (Number.isFinite(sigma) && sigma > 0) {
+        fieldRoundScoreSigmaBaseline = Number(sigma.toFixed(3));
+      }
+    }
+
     // Bearings + course par + hole pars can be overridden by an
     // on-disk per-slug metadata file — same shape the fetch script
     // emits. Look for `data/historical/{slug}-meta.json`. Bearings
@@ -516,6 +574,8 @@ async function loadAll(): Promise<void> {
       historicalRoundMeansByRound,
       historicalRoundMediansByRound,
       historicalMeanMedianGap,
+      playerRoundScoreSigmaByDgId,
+      fieldRoundScoreSigmaBaseline,
       liveRoundDates: liveMeta[slug]?.roundDates,
     };
 
