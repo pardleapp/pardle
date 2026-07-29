@@ -342,25 +342,6 @@ export const SAMPLE_LOW_THRESHOLD = 30;
  *  and inflate when the current model has thinly-sampled holes. */
 const BASE_FIELD_ROUND_SIGMA = 1.4;
 
-/** Continuous skew as a function of season SG total — replaces the
- *  discrete 0.20/0.25/0.30 bands that produced a 25% jump in mean-
- *  median gap at SG = 1.5 and SG = 0. Anchored on the same three
- *  reference points so the tail behaviour still matches empirical
- *  observation (elite 0.20, tour-average 0.25, below-average 0.30):
- *
- *    sgTotal ≤ 0    : 0.30
- *    0 < sg < 1.5   : linear interp 0.30 → 0.20
- *    sgTotal ≥ 1.5  : 0.20
- *
- *  Clamped so extreme SG inputs don't produce silly skew values. */
-function autoSkew(sgTotal: number): number {
-  if (!Number.isFinite(sgTotal)) return 0.25;
-  if (sgTotal >= 1.5) return 0.2;
-  if (sgTotal <= 0) return 0.3;
-  const t = sgTotal / 1.5; // 0 → 1 as SG goes 0 → 1.5
-  return 0.3 - 0.1 * t;
-}
-
 /** Scale the base skew by expected round conditions — harder rounds
  *  produce fatter right tails (more triples, lost balls) and widen
  *  the mean-median gap even for elite players. Anchored at 1.0 when
@@ -433,29 +414,6 @@ function buildProbScoreUnder(
     out[threshold.toFixed(1)] = Number(normalCdf(z).toFixed(4));
   }
   return out;
-}
-
-/** Scale the base skew by the course's own empirical right-skew.
- *  Some venues (water everywhere, forced carries, tight corridors)
- *  produce persistently right-skewed field-round distributions
- *  even in benign conditions — those raise every player's mean-
- *  median gap. Others (open, wide, minimal penalty) sit closer to
- *  symmetric.
- *
- *  The field-level gap on tour typically sits around 0.05-0.15
- *  strokes (measured across every year in our historicals). We use
- *  the venue's observed gap as a linear multiplier centred at 1.0:
- *
- *    gap  0.00 → 1.00  (no adjustment)
- *    gap +0.10 → 1.10  (skew 10% wider — typical tough venue)
- *    gap +0.20 → 1.20  (a genuinely penal course)
- *    gap −0.05 → 0.95  (unusually forgiving venue)
- *
- *  Clamped ±30% so an outlier gap can't drive silly per-player
- *  distributions. */
-function courseSkewMultiplier(historicalMeanMedianGap: number): number {
-  if (!Number.isFinite(historicalMeanMedianGap)) return 1;
-  return 1 + Math.max(-0.3, Math.min(0.3, historicalMeanMedianGap));
 }
 
 /** SG persistence coefficients — how much of an SG category
@@ -1116,18 +1074,22 @@ export async function runForecast(
       const eff = effectivePersistenceForRound(sg);
       return eff == null ? null : eff / NEUTRAL_PERSISTENCE;
     });
-    // Skew: continuous by SG tier, then scaled by (a) expected
-    // round conditions (harder round → wider mean-median gap for
-    // everyone) and (b) the venue's empirical right-skew from
-    // years of historicals (penal courses widen even in benign
-    // conditions).
-    const baseSkew = p.skewAdjustment ?? autoSkew(p.sgTotal);
+    // Skew: default to the venue's empirical (mean − median) gap,
+    // measured directly from every historical year:round on file
+    // (aggregated over ~4400 observations). That's the only
+    // sample-size-honest skew signal we have — per-player gaps at
+    // n≈40 rounds have a standard error of ~0.5 strokes, so any
+    // player-specific fit would be noise. Callers can still supply
+    // an explicit `skewAdjustment` override for a player they have
+    // a strong prior on. Conditions multiplier still widens the
+    // gap on tough days (that's an empirically defensible player-
+    // level effect).
+    const baseSkew = p.skewAdjustment ?? courseMeanMedianGap;
     const skewConditionMult = conditionsSkewMultiplier(
       fieldForecastVsPar,
       histMean != null ? histMean - par : null,
     );
-    const skewCourseMult = courseSkewMultiplier(courseMeanMedianGap);
-    const skewGap = baseSkew * skewConditionMult * skewCourseMult;
+    const skewGap = baseSkew * skewConditionMult;
 
     // Player-specific field baseline. If a tee time is given AND
     // hourly HRRR data is available, walk the hourly wind along

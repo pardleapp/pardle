@@ -223,15 +223,6 @@ function hhmmToHour(hhmm: string): number | null {
   return h + min / 60;
 }
 
-/** Skew adjustment auto-picked by SG tier — mirrors the server's
- *  autoSkew. Elite players show a tighter mean-median gap than
- *  below-average players (bigger blow-up right tail). */
-function autoSkewForSg(sg: number): number {
-  if (!Number.isFinite(sg)) return 0.25;
-  if (sg >= 1.5) return 0.2;
-  if (sg >= 0) return 0.25;
-  return 0.3;
-}
 
 // ── Component ──────────────────────────────────────────────────────
 export default function ForecastTool() {
@@ -857,11 +848,12 @@ function PlayerCard({
       teeTimesByRound: fp.teeTimes,
       teeTime: fp.teeTimes[targetRound] ?? "",
       compressionFactor: defaultCompression,
-      // Auto-populate skew adjustment based on the player's SG tier
-      // so the median column reflects the Pardle-default gap
-      // (0.20 elite / 0.25 mid / 0.30 below-avg). User can still
-      // override in advanced.
-      skewAdjustment: sg != null ? String(autoSkewForSg(sg)) : "",
+      // Leave skewAdjustment blank — the server defaults to the
+      // venue's own empirical (mean − median) gap when the field
+      // is empty. The old skill-tier autoSkew proxy (0.20 / 0.25 /
+      // 0.30) turned out to be wrong for a lot of players; venue
+      // gap is the only signal we have at defensible sample size.
+      skewAdjustment: "",
     });
     setQuery(fp.name);
     setDropdownOpen(false);
@@ -965,16 +957,12 @@ function PlayerCard({
             value={row.sgTotal}
             onChange={(e) => {
               const v = e.target.value;
-              const sg = Number(v);
               onChange({
                 sgTotal: v,
-                // Keep skew auto-tracking the SG tier, but only
-                // when the user hasn't manually overridden skew
-                // (a raw empty means "use auto"; anything else was
-                // their choice and stays put).
-                ...(v.trim() && Number.isFinite(sg)
-                  ? { skewAdjustment: String(autoSkewForSg(sg)) }
-                  : {}),
+                // Don't auto-populate skew from SG tier — venue
+                // gap wins by default (blank skew field). User
+                // can still override in advanced if they want a
+                // player-specific number.
               });
             }}
             style={ip()}
@@ -1100,16 +1088,13 @@ function PlayerCard({
           </Field>
           <Field
             label="Skew adjustment"
-            help="Mean-median gap. Auto by SG tier: elite ~0.20, mid ~0.25, below-avg ~0.30. Higher = more optimistic median vs mean."
+            help="Mean-median gap. Blank = use the venue's empirical gap from historicals (usually 0.05–0.20). Override with a positive value to force a wider right tail, negative to flip it."
           >
             <Slider
-              min={0}
+              min={-0.3}
               max={0.5}
               step={0.01}
-              recommended={(() => {
-                const sg = Number(row.sgTotal);
-                return Number.isFinite(sg) ? autoSkewForSg(sg) : 0.25;
-              })()}
+              recommended={0}
               value={row.skewAdjustment}
               onChange={(v) => onChange({ skewAdjustment: v })}
             />

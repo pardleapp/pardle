@@ -118,7 +118,14 @@ export interface TournamentConfig {
    *  measured directly from their historical rounds on file. Keyed
    *  by DataGolf dg_id. Callers should fall back to a skill-tier
    *  default when a player isn't in this map (e.g. rookies, players
-   *  who missed every past cut at the course). */
+   *  who missed every past cut at the course).
+   *
+   *  Note we deliberately DON'T publish a per-player mean-median
+   *  gap — with n≈40 rounds the SE on that measurement is roughly
+   *  0.5 strokes, so any per-player gap we'd fit is dominated by
+   *  noise. The venue-level gap (aggregated over ~4400
+   *  observations) is the only empirically-grounded skew signal at
+   *  the sample sizes we have. */
   playerRoundScoreSigmaByDgId: Record<string, number>;
   /** Course-average round-score sigma across every player-round on
    *  file. The tour-wide typical value is around 2.6-3.0; venues
