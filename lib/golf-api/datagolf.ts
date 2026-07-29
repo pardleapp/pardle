@@ -203,19 +203,24 @@ export async function getPreTournamentProbs(
     `/preds/pre-tournament?tour=${encodeURIComponent(tour)}&odds_format=percent`,
   );
   const rows = data.baseline ?? [];
-  const pct = (v: number | undefined): number | undefined =>
-    typeof v === "number" && Number.isFinite(v) ? v / 100 : undefined;
+  // NB: despite the odds_format=percent param, DataGolf returns tail
+  // probabilities as decimals (0..1) — a "5%" chance comes back as
+  // 0.05, not 5. We pass them through unchanged; the percent format
+  // controls the win-odds-representation, not the probability
+  // scaling.
+  const num = (v: number | undefined): number | undefined =>
+    typeof v === "number" && Number.isFinite(v) ? v : undefined;
   return rows.map((r) => ({
     dgId: String(r.dg_id),
     name: flipName(r.player_name),
-    win: pct(r.win),
-    top3: pct(r.top_3),
-    top5: pct(r.top_5),
-    top10: pct(r.top_10),
-    top20: pct(r.top_20),
-    top30: pct(r.top_30),
-    makeCut: pct(r.make_cut),
-    firstRoundLead: pct(r.first_round_lead),
+    win: num(r.win),
+    top3: num(r.top_3),
+    top5: num(r.top_5),
+    top10: num(r.top_10),
+    top20: num(r.top_20),
+    top30: num(r.top_30),
+    makeCut: num(r.make_cut),
+    firstRoundLead: num(r.first_round_lead),
     ev: typeof r.ev === "number" && Number.isFinite(r.ev) ? r.ev : undefined,
     sgTotal:
       typeof r.baseline_pred === "number" && Number.isFinite(r.baseline_pred)
