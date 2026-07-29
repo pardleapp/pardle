@@ -682,8 +682,13 @@ export async function runForecast(
 
   for (let h = 1; h <= 18; h++) {
     const fit: HoleFit | null = coeffs.holes[h] ?? null;
-    const bearing = bearings[h];
-    if (!fit || typeof bearing !== "number") continue;
+    if (!fit) continue;
+    // Missing bearing → wind term neutralised for this hole. Rest
+    // of the fit (pin cluster, yards, base per-hole mean) still
+    // applies; the forecast just won't reflect today's wind at
+    // this hole. See the "wind adjustment is off" warning we emit
+    // upstream when the whole course lacks bearings.
+    const bearing = typeof bearings[h] === "number" ? bearings[h] : 0;
 
     const holePar = pars[h] ?? 4;
     const override = effectiveHoles[h] ?? {};
@@ -778,12 +783,11 @@ export async function runForecast(
     let n = 0;
     for (let h = 1; h <= 18; h++) {
       const fit = coeffs.holes[h];
-      const bearing = bearings[h];
+      const bearing = typeof bearings[h] === "number" ? bearings[h] : 0;
       const actualVsPar = obs.vsParByHole[h];
       const yards = obs.setup.yardsByHole[h];
       if (
         !fit ||
-        typeof bearing !== "number" ||
         typeof actualVsPar !== "number" ||
         typeof yards !== "number"
       )
@@ -889,8 +893,9 @@ export async function runForecast(
     for (let step = 0; step < 18; step++) {
       const holeNum = ((startHole - 1 + step) % 18) + 1;
       const fit = coeffs!.holes[holeNum];
-      const bearing = bearings![holeNum];
-      if (!fit || typeof bearing !== "number") continue;
+      if (!fit) continue;
+      const bearing =
+        typeof bearings![holeNum] === "number" ? bearings![holeNum] : 0;
       const holeHour = teeHour + step * 0.25; // 15 min/hole
       const w = windAtHour(hrrrHourly, holeHour);
       if (!w) return null;
