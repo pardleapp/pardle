@@ -47,8 +47,23 @@ interface FetchResp {
  *  at roughly 15 min intervals so refreshing more often is waste. */
 const POLL_MS = 60_000;
 
-type YearTab = "live" | "2025" | "2024" | "2023" | "2022" | "2021" | "2020" | "2019";
-const YEAR_TABS: YearTab[] = ["live", "2025", "2024", "2023", "2022", "2021", "2020", "2019"];
+/** "live" resolves to whatever the orchestrator says is active right
+ *  now; a numeric year loads the corresponding {slug}-{year}.json. */
+type YearTab = "live" | string;
+
+interface TournamentOption {
+  slug: string;
+  eventName: string;
+  historicalYears: number[];
+  isLiveNow: boolean;
+}
+
+interface TournamentsResp {
+  ok: boolean;
+  activeTournamentId: string | null;
+  activeTournamentName: string | null;
+  tournaments: TournamentOption[];
+}
 
 interface HeatmapResp {
   ok: boolean;
@@ -81,6 +96,12 @@ export default function Page() {
   const [data, setData] = useState<FetchResp | null>(null);
   const [heat, setHeat] = useState<HeatmapResp | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tournaments, setTournaments] = useState<TournamentOption[]>([]);
+  // Which tournament's rows we're looking at. Historical fetch uses
+  // ?slug=<slug>&year=<year>; live fetch also passes ?slug so the
+  // server can pick the correct venue snapshot even when the
+  // orchestrator's active event differs.
+  const [slug, setSlug] = useState<string | null>(null);
   // Feeds the PIN Δ + TEE Δ chip columns on the heatmap — same source
   // of truth the course-heatmap page uses. Keyed by tournamentId so a
   // year switch triggers a re-fetch (cached 6h server-side).
@@ -92,7 +113,14 @@ export default function Page() {
 
   const load = useCallback(async () => {
     try {
-      const qs = tab === "live" ? "" : `?year=${tab}`;
+      // Historical needs both slug and year; live ignores slug (the
+      // server picks the active event via the orchestrator).
+      const qs =
+        tab === "live"
+          ? ""
+          : slug
+            ? `?slug=${encodeURIComponent(slug)}&year=${tab}`
+            : `?year=${tab}`;
       if (view === "chart") {
         const res = await fetch(`/api/analysis/tee-time-scoring${qs}`, {
           cache: "no-store",
@@ -110,7 +138,7 @@ export default function Page() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "network error");
     }
-  }, [tab, view]);
+  }, [tab, view, slug]);
 
   useEffect(() => {
     setData(null);
@@ -120,6 +148,56 @@ export default function Page() {
     const id = setInterval(load, POLL_MS);
     return () => clearInterval(id);
   }, [load, tab, view]);
+
+  // Discover which tournaments have onboarded historicals. Called
+  // once on mount — the list is small enough to fetch every time
+  // and the endpoint is fully cached in memory after the first hit.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/analysis/tournaments", { cache: "no-store" });
+        const json = (await res.json()) as TournamentsResp;
+        if (!json.ok) return;
+        setTournaments(json.tournaments);
+        // Default slug: the currently-live tournament if we have one,
+        // else the first tournament in the list. Runs only when slug
+        // has not been touched by the user (initial mount).
+        setSlug((prev) => {
+          if (prev) return prev;
+          const live = json.tournaments.find((t) => t.isLiveNow);
+          return live?.slug ?? json.tournaments[0]?.slug ?? null;
+        });
+      } catch {
+        /* Non-fatal — tournament switcher just won't render. */
+      }
+    })();
+  }, []);
+
+  // When the user picks a tournament that has no data for the current
+  // year tab, snap them to the most recent available year (or Live
+  // when it's the currently-active event). Prevents dead panes after
+  // switching from e.g. 3M Open 2019 → Rocket Classic (which has 2019
+  // too, but not every venue will).
+  useEffect(() => {
+    if (!slug || tab === "live") return;
+    const t = tournaments.find((x) => x.slug === slug);
+    if (!t) return;
+    if (t.historicalYears.includes(Number(tab))) return;
+    const years = [...t.historicalYears].sort((a, b) => b - a);
+    if (years.length > 0) setTab(String(years[0]));
+    else if (t.isLiveNow) setTab("live");
+  }, [slug, tab, tournaments]);
+
+  const activeTournament =
+    tournaments.find((t) => t.slug === slug) ?? null;
+  const yearTabs: YearTab[] = [
+    ...(activeTournament?.isLiveNow ? (["live"] as YearTab[]) : []),
+    ...(activeTournament
+      ? [...activeTournament.historicalYears]
+          .sort((a, b) => b - a)
+          .map((y) => String(y))
+      : []),
+  ];
 
   // Fetch pin sheet + multi-season birdie history whenever the heatmap
   // response resolves a tournamentId. Same pipeline the course-heatmap
@@ -249,6 +327,60 @@ export default function Page() {
             );
           })}
         </div>
+        {tournaments.length > 0 && (
+          <div
+            role="tablist"
+            aria-label="Tournament"
+            style={{
+              display: "flex",
+              gap: 4,
+              marginTop: 12,
+              marginBottom: 4,
+              flexWrap: "wrap",
+            }}
+          >
+            {tournaments.map((t) => {
+              const active = slug === t.slug;
+              return (
+                <button
+                  key={t.slug}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setSlug(t.slug)}
+                  style={{
+                    padding: "5px 14px",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    borderRadius: 6,
+                    border: "1px solid oklch(0.85 0.013 95)",
+                    background: active ? "oklch(0.35 0.03 150)" : "white",
+                    color: active ? "white" : "oklch(0.3 0.02 150)",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  {t.eventName}
+                  {t.isLiveNow && (
+                    <span
+                      aria-label="Live now"
+                      style={{
+                        display: "inline-block",
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: "oklch(0.65 0.20 30)",
+                      }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <div
           role="tablist"
           aria-label="Year"
@@ -260,7 +392,7 @@ export default function Page() {
             flexWrap: "wrap",
           }}
         >
-          {YEAR_TABS.map((t) => {
+          {yearTabs.map((t) => {
             const active = tab === t;
             const label = t === "live" ? "Live" : t;
             return (
@@ -295,7 +427,7 @@ export default function Page() {
               margin: "4px 0 0",
             }}
           >
-            {data?.eventName ?? "3M Open"} {tab} — TPC Twin Cities.
+            {data?.eventName ?? activeTournament?.eventName ?? "Historical"} {tab}.
             Skill baseline is each player&apos;s pre-tournament projection;
             deviation from that is what the y-axis shows.
           </p>

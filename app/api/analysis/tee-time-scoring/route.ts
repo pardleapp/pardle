@@ -355,13 +355,21 @@ interface HistoricalPayload {
   weatherByRound?: Record<string, DailyWeather | null> | null;
 }
 
-async function loadHistorical(year: number): Promise<HistoricalPayload | null> {
+async function loadHistorical(
+  slug: string,
+  year: number,
+): Promise<HistoricalPayload | null> {
+  // Basic guard — slugs come off the querystring so a caller could
+  // in principle try to escape the historical dir. Only allow slugs
+  // that match the fetch-script convention (lowercase + digits +
+  // hyphens).
+  if (!/^[a-z0-9-]+$/.test(slug)) return null;
   try {
     const p = path.join(
       process.cwd(),
       "data",
       "historical",
-      `3m-open-${year}.json`,
+      `${slug}-${year}.json`,
     );
     const text = await fs.readFile(p, "utf8");
     return JSON.parse(text) as HistoricalPayload;
@@ -407,13 +415,17 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const yearParam = url.searchParams.get("year");
     const yearNum = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : null;
+    // Optional tournament switcher. Defaults to 3m-open for
+    // backwards compatibility with clients that only pass ?year=.
+    const slugParam = url.searchParams.get("slug");
+    const slug = slugParam && /^[a-z0-9-]+$/.test(slugParam) ? slugParam : "3m-open";
 
-    // Historical branch — one file per year, no external calls.
+    // Historical branch — one file per (slug, year), no external calls.
     if (yearNum && yearNum !== new Date().getUTCFullYear()) {
-      const hist = await loadHistorical(yearNum);
+      const hist = await loadHistorical(slug, yearNum);
       if (!hist) {
         return NextResponse.json(
-          { ok: false, error: `no historical data for ${yearNum}` },
+          { ok: false, error: `no historical data for ${slug} ${yearNum}` },
           { status: 404 },
         );
       }
@@ -422,6 +434,7 @@ export async function GET(req: Request) {
       return NextResponse.json({
         ok: true,
         source: "historical",
+        slug,
         year: yearNum,
         eventName: hist.dgEventName,
         count: rows.length,
