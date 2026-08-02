@@ -173,16 +173,21 @@ export default function Page() {
     })();
   }, []);
 
-  // When the user picks a tournament that has no data for the current
-  // year tab, snap them to the most recent available year (or Live
-  // when it's the currently-active event). Prevents dead panes after
-  // switching from e.g. 3M Open 2019 → Rocket Classic (which has 2019
-  // too, but not every venue will).
+  // Snap the year tab to something the picked tournament actually
+  // has. Two cases:
+  //   1. user was on "live" then picked a tournament that isn't the
+  //      live one → drop to its most recent historical year;
+  //   2. user was on year N then picked a tournament that lacks that
+  //      year → drop to its most recent historical year.
+  // Without this the year row would show nothing selected and the
+  // fetch would either 404 or keep serving the previous tournament's
+  // data.
   useEffect(() => {
-    if (!slug || tab === "live") return;
+    if (!slug) return;
     const t = tournaments.find((x) => x.slug === slug);
     if (!t) return;
-    if (t.historicalYears.includes(Number(tab))) return;
+    if (tab === "live" && t.isLiveNow) return;
+    if (tab !== "live" && t.historicalYears.includes(Number(tab))) return;
     const years = [...t.historicalYears].sort((a, b) => b - a);
     if (years.length > 0) setTab(String(years[0]));
     else if (t.isLiveNow) setTab("live");
