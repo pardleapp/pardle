@@ -5,8 +5,8 @@
   "pgaTournamentId": "R2025013",
   "venue": {
     "name": "Sedgefield Country Club",
-    "lat": 36.0863,
-    "lon": -79.8311,
+    "lat": 36.0103,
+    "lon": -79.8843,
     "tz": "America/New_York"
   },
   "roundDates": {
@@ -27,8 +27,8 @@
       "precipInches": 0.35,
       "weatherCode": 63,
       "condition": "Rain",
-      "emoji": "🌧",
-      "headline": "🌧 · 90°F · Wind 8mph SW (gusts 20) · 0.35\" rain",
+      "emoji": "\ud83c\udf27",
+      "headline": "\ud83c\udf27 \u00b7 90\u00b0F \u00b7 Wind 8mph SW (gusts 20) \u00b7 0.35\" rain",
       "hourly": [
         {
           "time": "2025-07-31T00:00",
@@ -283,8 +283,8 @@
       "precipInches": 0.421,
       "weatherCode": 63,
       "condition": "Rain",
-      "emoji": "🌧",
-      "headline": "🌧 · 83°F · Wind 12mph NE (gusts 23) · 0.42\" rain",
+      "emoji": "\ud83c\udf27",
+      "headline": "\ud83c\udf27 \u00b7 83\u00b0F \u00b7 Wind 12mph NE (gusts 23) \u00b7 0.42\" rain",
       "hourly": [
         {
           "time": "2025-08-01T00:00",
@@ -539,8 +539,8 @@
       "precipInches": 0.11,
       "weatherCode": 53,
       "condition": "Drizzle",
-      "emoji": "🌦",
-      "headline": "🌦 · 73°F · Wind 12mph NE (gusts 25) · 0.11\" rain",
+      "emoji": "\ud83c\udf26",
+      "headline": "\ud83c\udf26 \u00b7 73\u00b0F \u00b7 Wind 12mph NE (gusts 25) \u00b7 0.11\" rain",
       "hourly": [
         {
           "time": "2025-08-02T00:00",
@@ -795,8 +795,8 @@
       "precipInches": 0,
       "weatherCode": 3,
       "condition": "Overcast",
-      "emoji": "☁️",
-      "headline": "☁️ · 74°F · Wind 9mph NE (gusts 20) · Dry",
+      "emoji": "\u2601\ufe0f",
+      "headline": "\u2601\ufe0f \u00b7 74\u00b0F \u00b7 Wind 9mph NE (gusts 20) \u00b7 Dry",
       "hourly": [
         {
           "time": "2025-08-03T00:00",

@@ -23,15 +23,39 @@ const BY_COURSE: Record<string, CourseCoords> = {
     tz: "America/Chicago",
     displayName: "TPC Twin Cities",
   },
+  "Detroit Golf Club": {
+    lat: 42.4363,
+    lon: -83.1245,
+    tz: "America/Detroit",
+    displayName: "Detroit Golf Club",
+  },
+  "Sedgefield Country Club": {
+    lat: 36.0103,
+    lon: -79.8843,
+    tz: "America/New_York",
+    displayName: "Sedgefield Country Club",
+  },
 };
 
 /** By PGA orchestrator tournament id (e.g. R2026525). Same coords
- *  as the course entry above but keyed for the live path. */
+ *  as the course entry above but keyed for the live path. Suffix
+ *  525 = 3M Open, 524 = Rocket Classic, 013 = Wyndham Championship. */
 const BY_TOURNAMENT_ID: Record<string, CourseCoords> = {
+  // 3M Open — TPC Twin Cities
   R2023525: BY_COURSE["TPC Twin Cities"],
   R2024525: BY_COURSE["TPC Twin Cities"],
   R2025525: BY_COURSE["TPC Twin Cities"],
   R2026525: BY_COURSE["TPC Twin Cities"],
+  // Rocket Classic — Detroit Golf Club
+  R2023524: BY_COURSE["Detroit Golf Club"],
+  R2024524: BY_COURSE["Detroit Golf Club"],
+  R2025524: BY_COURSE["Detroit Golf Club"],
+  R2026524: BY_COURSE["Detroit Golf Club"],
+  // Wyndham Championship — Sedgefield Country Club (Ross Course)
+  R2023013: BY_COURSE["Sedgefield Country Club"],
+  R2024013: BY_COURSE["Sedgefield Country Club"],
+  R2025013: BY_COURSE["Sedgefield Country Club"],
+  R2026013: BY_COURSE["Sedgefield Country Club"],
 };
 
 export function coordsForCourse(name: string | null | undefined): CourseCoords | null {

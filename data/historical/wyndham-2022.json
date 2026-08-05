@@ -5,8 +5,8 @@
   "pgaTournamentId": "R2022013",
   "venue": {
     "name": "Sedgefield Country Club",
-    "lat": 36.0863,
-    "lon": -79.8311,
+    "lat": 36.0103,
+    "lon": -79.8843,
     "tz": "America/New_York"
   },
   "roundDates": {
@@ -27,8 +27,8 @@
       "precipInches": 0.004,
       "weatherCode": 51,
       "condition": "Drizzle",
-      "emoji": "🌦",
-      "headline": "🌦 · 92°F · Wind 9mph SW (gusts 18) · Dry",
+      "emoji": "\ud83c\udf26",
+      "headline": "\ud83c\udf26 \u00b7 92\u00b0F \u00b7 Wind 9mph SW (gusts 18) \u00b7 Dry",
       "hourly": [
         {
           "time": "2022-08-04T00:00",
@@ -283,8 +283,8 @@
       "precipInches": 0.26,
       "weatherCode": 61,
       "condition": "Rain",
-      "emoji": "🌧",
-      "headline": "🌧 · 88°F · Wind 9mph SSW (gusts 16) · 0.26\" rain",
+      "emoji": "\ud83c\udf27",
+      "headline": "\ud83c\udf27 \u00b7 88\u00b0F \u00b7 Wind 9mph SSW (gusts 16) \u00b7 0.26\" rain",
       "hourly": [
         {
           "time": "2022-08-05T00:00",
@@ -539,8 +539,8 @@
       "precipInches": 0.079,
       "weatherCode": 53,
       "condition": "Drizzle",
-      "emoji": "🌦",
-      "headline": "🌦 · 89°F · Wind 8mph S (gusts 15) · 0.08\" rain",
+      "emoji": "\ud83c\udf26",
+      "headline": "\ud83c\udf26 \u00b7 89\u00b0F \u00b7 Wind 8mph S (gusts 15) \u00b7 0.08\" rain",
       "hourly": [
         {
           "time": "2022-08-06T00:00",
@@ -795,8 +795,8 @@
       "precipInches": 0,
       "weatherCode": 3,
       "condition": "Overcast",
-      "emoji": "☁️",
-      "headline": "☁️ · 88°F · Wind 6mph S (gusts 12) · Dry",
+      "emoji": "\u2601\ufe0f",
+      "headline": "\u2601\ufe0f \u00b7 88\u00b0F \u00b7 Wind 6mph S (gusts 12) \u00b7 Dry",
       "hourly": [
         {
           "time": "2022-08-07T00:00",
