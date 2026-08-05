@@ -57,25 +57,24 @@ interface BirdieHistResp {
 }
 
 const POLL_MS = 60_000;
-type YearTab =
-  | "live"
-  | "2025"
-  | "2024"
-  | "2023"
-  | "2022"
-  | "2021"
-  | "2020"
-  | "2019";
-const YEAR_TABS: YearTab[] = [
-  "live",
-  "2025",
-  "2024",
-  "2023",
-  "2022",
-  "2021",
-  "2020",
-  "2019",
-];
+/** "live" resolves to whatever the orchestrator says is active; a
+ *  year string loads that year's historical file for the picked
+ *  tournament. */
+type YearTab = "live" | string;
+
+interface TournamentOption {
+  slug: string;
+  eventName: string;
+  historicalYears: number[];
+  isLiveNow: boolean;
+}
+
+interface TournamentsResp {
+  ok: boolean;
+  activeTournamentId: string | null;
+  activeTournamentName: string | null;
+  tournaments: TournamentOption[];
+}
 
 /** Metric surfaced on the green-cards + modal cluster cards.
  *  "avg" = mean strokes vs par per cluster (default — the base view
@@ -103,10 +102,19 @@ export default function Page() {
     HoleBirdieData
   > | null>(null);
   const [metric, setMetric] = useState<ScoringMetric>("avg");
+  const [tournaments, setTournaments] = useState<TournamentOption[]>([]);
+  const [slug, setSlug] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const qs = tab === "live" ? "" : `?year=${tab}`;
+      // Historical needs slug+year; live ignores slug (the server
+      // picks the active event via the orchestrator).
+      const qs =
+        tab === "live"
+          ? ""
+          : slug
+            ? `?slug=${encodeURIComponent(slug)}&year=${tab}`
+            : `?year=${tab}`;
       const res = await fetch(`/api/analysis/course-heatmap${qs}`, {
         cache: "no-store",
       });
@@ -116,7 +124,7 @@ export default function Page() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "network error");
     }
-  }, [tab]);
+  }, [tab, slug]);
 
   useEffect(() => {
     // Reset the previous tab's data so we don't briefly render stale
@@ -134,6 +142,50 @@ export default function Page() {
     const id = setInterval(load, POLL_MS);
     return () => clearInterval(id);
   }, [load, tab]);
+
+  // Discover onboarded tournaments once on mount. Small payload,
+  // fully cached in memory after first hit.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/analysis/tournaments", { cache: "no-store" });
+        const json = (await res.json()) as TournamentsResp;
+        if (!json.ok) return;
+        setTournaments(json.tournaments);
+        setSlug((prev) => {
+          if (prev) return prev;
+          const live = json.tournaments.find((t) => t.isLiveNow);
+          return live?.slug ?? json.tournaments[0]?.slug ?? null;
+        });
+      } catch {
+        /* switcher just won't render */
+      }
+    })();
+  }, []);
+
+  // Snap year tab to something the selected tournament actually has —
+  // mirrors the tee-time-scoring page's snap logic so switching to a
+  // non-live tournament from "Live" doesn't leave the year row empty.
+  useEffect(() => {
+    if (!slug) return;
+    const t = tournaments.find((x) => x.slug === slug);
+    if (!t) return;
+    if (tab === "live" && t.isLiveNow) return;
+    if (tab !== "live" && t.historicalYears.includes(Number(tab))) return;
+    const years = [...t.historicalYears].sort((a, b) => b - a);
+    if (years.length > 0) setTab(String(years[0]));
+    else if (t.isLiveNow) setTab("live");
+  }, [slug, tab, tournaments]);
+
+  const activeTournament = tournaments.find((t) => t.slug === slug) ?? null;
+  const yearTabs: YearTab[] = [
+    ...(activeTournament?.isLiveNow ? (["live"] as YearTab[]) : []),
+    ...(activeTournament
+      ? [...activeTournament.historicalYears]
+          .sort((a, b) => b - a)
+          .map((y) => String(y))
+      : []),
+  ];
 
   // Fetch pin sheet + putt sheet whenever we get a tournamentId.
   // Cached 6h Redis-side. Pin sheet is small + fast; putt sheet is
@@ -301,6 +353,60 @@ export default function Page() {
           birdie rate; the <b>TEE Δ</b> chip flags holes whose tee
           markers moved &gt;30 yd across the tournament.
         </p>
+        {tournaments.length > 0 && (
+          <div
+            role="tablist"
+            aria-label="Tournament"
+            style={{
+              display: "flex",
+              gap: 4,
+              marginTop: 12,
+              marginBottom: 4,
+              flexWrap: "wrap",
+            }}
+          >
+            {tournaments.map((t) => {
+              const active = slug === t.slug;
+              return (
+                <button
+                  key={t.slug}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setSlug(t.slug)}
+                  style={{
+                    padding: "5px 14px",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    borderRadius: 6,
+                    border: "1px solid oklch(0.85 0.013 95)",
+                    background: active ? "oklch(0.35 0.03 150)" : "white",
+                    color: active ? "white" : "oklch(0.3 0.02 150)",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  {t.eventName}
+                  {t.isLiveNow && (
+                    <span
+                      aria-label="Live now"
+                      style={{
+                        display: "inline-block",
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: "oklch(0.65 0.20 30)",
+                      }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <div
           role="tablist"
           aria-label="Year"
@@ -312,7 +418,7 @@ export default function Page() {
             flexWrap: "wrap",
           }}
         >
-          {YEAR_TABS.map((t) => {
+          {yearTabs.map((t) => {
             const active = tab === t;
             const label = t === "live" ? "Live" : t;
             return (
@@ -347,8 +453,8 @@ export default function Page() {
               margin: "4px 0 0",
             }}
           >
-            {data?.eventName ?? "3M Open"} {tab} — TPC Twin Cities. Historical
-            data; won&apos;t refresh.
+            {data?.eventName ?? activeTournament?.eventName ?? "Historical"} {tab}.
+            Historical data; won&apos;t refresh.
           </p>
         )}
         {error ? (

@@ -28,6 +28,7 @@ import { getActiveTournament } from "@/lib/golf-api/pgatour";
 import { getSnapshot, getCachedTournamentPars } from "@/lib/feed/store";
 import { getDailyWeather, type DailyWeather } from "@/lib/weather/open-meteo";
 import { coordsForTournamentId } from "@/lib/weather/course-coords";
+import { listTournamentConfigs } from "@/lib/scoring-model/tournament-config";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -145,8 +146,10 @@ function historicalTeeToMinutes(t: string | null | undefined): number | null {
   return null;
 }
 
-async function buildHistoricalCells(year: number) {
-  const p = path.join(process.cwd(), "data", "historical", `3m-open-${year}.json`);
+async function buildHistoricalCells(slug: string, year: number) {
+  // Slug comes off the querystring so guard against path escape.
+  if (!/^[a-z0-9-]+$/.test(slug)) return null;
+  const p = path.join(process.cwd(), "data", "historical", `${slug}-${year}.json`);
   let payload: HistoricalPayload;
   try {
     payload = JSON.parse(await fs.readFile(p, "utf8")) as HistoricalPayload;
@@ -257,12 +260,16 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const yearParam = url.searchParams.get("year");
     const yearNum = yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : null;
+    // Optional tournament switcher. Defaults to 3m-open for
+    // backwards compatibility with clients that only pass ?year=.
+    const slugParam = url.searchParams.get("slug");
+    const slug = slugParam && /^[a-z0-9-]+$/.test(slugParam) ? slugParam : "3m-open";
 
     if (yearNum && yearNum !== new Date().getUTCFullYear()) {
-      const hist = await buildHistoricalCells(yearNum);
+      const hist = await buildHistoricalCells(slug, yearNum);
       if (!hist) {
         return NextResponse.json(
-          { ok: false, error: `no historical data for ${yearNum}` },
+          { ok: false, error: `no historical data for ${slug} ${yearNum}` },
           { status: 404 },
         );
       }
@@ -281,16 +288,21 @@ export async function GET(req: Request) {
         r.cellCount += 1;
         roundRanges[c.round] = r;
       }
+      // Resolve the year's pgaTournamentId from the tournament-config
+      // registry (populated from the historical JSONs). Falls back to
+      // null so the client can render the heatmap without the pin
+      // sheet + birdie history overlays for years we don't have a
+      // pgaTourId mapped for.
+      const configs = await listTournamentConfigs();
+      const cfg = configs.find((c) => c.slug === slug);
+      const tournamentId = cfg?.historicalTournamentIds?.[yearNum] ?? null;
       return NextResponse.json({
         ok: true,
         source: "historical",
+        slug,
         year: yearNum,
         eventName: hist.eventName,
-        // Historical is always 3M Open at TPC Twin Cities on the
-        // R{year}525 tournament id (fetched via PGA Tour schedule
-        // in scripts/fetch-3m-historical.mjs). Surfacing it here
-        // lets the client fetch pin sheets for old years too.
-        tournamentId: `R${yearNum}525`,
+        tournamentId,
         generatedAt: null,
         bucketMinutes: BUCKET_MIN,
         cells: hist.cells,

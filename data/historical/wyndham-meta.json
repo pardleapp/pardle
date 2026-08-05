@@ -1,0 +1,33 @@
+{
+  "slug": "wyndham",
+  "eventName": "Sedgefield Country Club",
+  "venue": {
+    "name": "Sedgefield Country Club",
+    "lat": 36.0863,
+    "lon": -79.8311,
+    "tz": "America/New_York"
+  },
+  "coursePar": 70,
+  "courseHolePars": {
+    "1": 4,
+    "2": 4,
+    "3": 3,
+    "4": 4,
+    "5": 5,
+    "6": 4,
+    "7": 3,
+    "8": 4,
+    "9": 4,
+    "10": 4,
+    "11": 4,
+    "12": 3,
+    "13": 4,
+    "14": 4,
+    "15": 5,
+    "16": 3,
+    "17": 4,
+    "18": 4
+  },
+  "holeBearings": {},
+  "holeBearingsHint": "Compass bearings (0-360\u00b0) per hole, tee \u2192 green. Must be filled in by hand from OSM tee-to-green geometry \u2014 pin coords can't determine bearings because the pin frame is per-hole rotated. Runtime falls back to no wind correction until this is populated."
+}
