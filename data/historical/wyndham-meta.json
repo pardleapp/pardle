@@ -28,6 +28,25 @@
     "17": 4,
     "18": 4
   },
-  "holeBearings": {},
+  "holeBearings": {
+    "1": 236,
+    "2": 135,
+    "3": 90,
+    "4": 241,
+    "5": 99,
+    "6": 269,
+    "7": 0,
+    "8": 2,
+    "9": 347,
+    "10": 92,
+    "11": 182,
+    "12": 182,
+    "13": 171,
+    "14": 31,
+    "15": 9,
+    "16": 56,
+    "17": 311,
+    "18": 262
+  },
   "holeBearingsHint": "Compass bearings (0-360\u00b0) per hole, tee \u2192 green. Must be filled in by hand from OSM tee-to-green geometry \u2014 pin coords can't determine bearings because the pin frame is per-hole rotated. Runtime falls back to no wind correction until this is populated."
 }
