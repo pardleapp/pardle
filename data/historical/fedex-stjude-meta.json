@@ -1,0 +1,33 @@
+{
+  "slug": "fedex-stjude",
+  "eventName": "TPC Southwind",
+  "venue": {
+    "name": "TPC Southwind",
+    "lat": 35.0552,
+    "lon": -89.8453,
+    "tz": "America/Chicago"
+  },
+  "coursePar": 70,
+  "courseHolePars": {
+    "1": 4,
+    "2": 4,
+    "3": 5,
+    "4": 3,
+    "5": 4,
+    "6": 4,
+    "7": 4,
+    "8": 3,
+    "9": 4,
+    "10": 4,
+    "11": 3,
+    "12": 4,
+    "13": 4,
+    "14": 3,
+    "15": 4,
+    "16": 5,
+    "17": 4,
+    "18": 4
+  },
+  "holeBearings": {},
+  "holeBearingsHint": "Compass bearings (0-360\u00b0) per hole, tee \u2192 green. Must be filled in by hand from OSM tee-to-green geometry \u2014 pin coords can't determine bearings because the pin frame is per-hole rotated. Runtime falls back to no wind correction until this is populated."
+}

@@ -35,11 +35,18 @@ const BY_COURSE: Record<string, CourseCoords> = {
     tz: "America/New_York",
     displayName: "Sedgefield Country Club",
   },
+  "TPC Southwind": {
+    lat: 35.0552,
+    lon: -89.8453,
+    tz: "America/Chicago",
+    displayName: "TPC Southwind",
+  },
 };
 
 /** By PGA orchestrator tournament id (e.g. R2026525). Same coords
  *  as the course entry above but keyed for the live path. Suffix
- *  525 = 3M Open, 524 = Rocket Classic, 013 = Wyndham Championship. */
+ *  525 = 3M Open, 524 = Rocket Classic, 013 = Wyndham Championship,
+ *  027 = FedEx St. Jude Championship. */
 const BY_TOURNAMENT_ID: Record<string, CourseCoords> = {
   // 3M Open — TPC Twin Cities
   R2023525: BY_COURSE["TPC Twin Cities"],
@@ -56,6 +63,11 @@ const BY_TOURNAMENT_ID: Record<string, CourseCoords> = {
   R2024013: BY_COURSE["Sedgefield Country Club"],
   R2025013: BY_COURSE["Sedgefield Country Club"],
   R2026013: BY_COURSE["Sedgefield Country Club"],
+  // FedEx St. Jude Championship — TPC Southwind (Memphis)
+  R2023027: BY_COURSE["TPC Southwind"],
+  R2024027: BY_COURSE["TPC Southwind"],
+  R2025027: BY_COURSE["TPC Southwind"],
+  R2026027: BY_COURSE["TPC Southwind"],
 };
 
 export function coordsForCourse(name: string | null | undefined): CourseCoords | null {
