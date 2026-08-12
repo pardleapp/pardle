@@ -175,11 +175,14 @@ export default function CourseHistoryTool() {
   const [sortKey, setSortKey] = useState<SortKey>("outperformanceCombined");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [activeField, setActiveField] = useState<ActiveField | null>(null);
+  const [activeFieldChecked, setActiveFieldChecked] = useState(false);
   const [onlyThisWeek, setOnlyThisWeek] = useState(false);
 
   // Load course list. First cold hit can take up to a minute while
   // the server warms the DataGolf/Redis caches, so we show a
-  // "Loading courses…" state until we hear back.
+  // "Loading courses…" state until we hear back. Default-course
+  // selection lives in a separate effect below so it can wait for
+  // the active-field fetch too.
   useEffect(() => {
     (async () => {
       setWarming(true);
@@ -189,19 +192,7 @@ export default function CourseHistoryTool() {
           ok?: boolean;
           courses?: CuratedCourse[];
         };
-        if (j.ok && j.courses) {
-          setCourses(j.courses);
-          // Auto-select TPC Twin Cities if present so the tool has
-          // data on first paint. Otherwise pick the most-rounds
-          // course as a sensible default.
-          const preferred =
-            j.courses.find((c) => c.courseName === "TPC Twin Cities") ??
-            [...j.courses].sort((a, b) => b.totalRounds - a.totalRounds)[0];
-          if (preferred) {
-            setSelectedCourse(preferred.courseName);
-            setCourseQuery(preferred.courseName);
-          }
-        }
+        if (j.ok && j.courses) setCourses(j.courses);
       } catch {
         /* silent — user can try again */
       } finally {
@@ -209,6 +200,36 @@ export default function CourseHistoryTool() {
       }
     })();
   }, []);
+
+  // Auto-select this week's venue once we know it. Runs after either
+  // the courses list or the active field lands; only fires when the
+  // user hasn't picked a course yet. Match strategy: find the course
+  // whose hostingEvents contains the active tournament name — so
+  // "FedEx St. Jude Championship" → "TPC Southwind" this week,
+  // whichever event is up next week, and so on. Falls back to the
+  // most-rounds course if the active field hasn't loaded yet.
+  useEffect(() => {
+    if (selectedCourse || !courses || courses.length === 0) return;
+    let preferred: CuratedCourse | null = null;
+    const eventName = activeField?.tournamentName?.trim().toLowerCase() ?? null;
+    if (eventName) {
+      preferred =
+        courses.find((c) =>
+          c.hostingEvents.some((e) => e.trim().toLowerCase() === eventName),
+        ) ?? null;
+    }
+    // Only fall back to most-rounds AFTER we've heard back from the
+    // active-field endpoint. Otherwise the courses-first race would
+    // pin the wrong venue for a beat, then never update once the
+    // field lands (selectedCourse is already set).
+    if (!preferred && activeFieldChecked) {
+      preferred = [...courses].sort((a, b) => b.totalRounds - a.totalRounds)[0];
+    }
+    if (preferred) {
+      setSelectedCourse(preferred.courseName);
+      setCourseQuery(preferred.courseName);
+    }
+  }, [courses, activeField, activeFieldChecked, selectedCourse]);
 
   // Load the current tour week's field so we can offer a
   // "only this week's players" filter. Silent failure — the toggle
@@ -232,6 +253,8 @@ export default function CourseHistoryTool() {
         });
       } catch {
         /* toggle stays hidden */
+      } finally {
+        setActiveFieldChecked(true);
       }
     })();
   }, []);
