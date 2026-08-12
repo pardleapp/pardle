@@ -147,6 +147,17 @@ type SortKey =
   | "eventEdge"
   | "modelGap";
 
+interface ActiveField {
+  tournamentName: string | null;
+  dgIds: Set<number>;
+}
+
+interface FieldResp {
+  ok?: boolean;
+  tournamentName?: string | null;
+  players?: { dgId?: string | number | null }[];
+}
+
 // ── Main component ─────────────────────────────────────────────────
 export default function CourseHistoryTool() {
   const [courses, setCourses] = useState<CuratedCourse[] | null>(null);
@@ -163,6 +174,8 @@ export default function CourseHistoryTool() {
   const [minRounds, setMinRounds] = useState(4);
   const [sortKey, setSortKey] = useState<SortKey>("outperformanceCombined");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
+  const [activeField, setActiveField] = useState<ActiveField | null>(null);
+  const [onlyThisWeek, setOnlyThisWeek] = useState(false);
 
   // Load course list. First cold hit can take up to a minute while
   // the server warms the DataGolf/Redis caches, so we show a
@@ -193,6 +206,32 @@ export default function CourseHistoryTool() {
         /* silent — user can try again */
       } finally {
         setWarming(false);
+      }
+    })();
+  }, []);
+
+  // Load the current tour week's field so we can offer a
+  // "only this week's players" filter. Silent failure — the toggle
+  // just stays disabled if there's no active tournament.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/scoring-model/field", {
+          cache: "no-store",
+        });
+        const j = (await res.json()) as FieldResp;
+        if (!j?.ok || !Array.isArray(j.players)) return;
+        const ids = new Set<number>();
+        for (const p of j.players) {
+          const n = typeof p.dgId === "string" ? Number(p.dgId) : p.dgId;
+          if (typeof n === "number" && Number.isFinite(n)) ids.add(n);
+        }
+        setActiveField({
+          tournamentName: j.tournamentName ?? null,
+          dgIds: ids,
+        });
+      } catch {
+        /* toggle stays hidden */
       }
     })();
   }, []);
@@ -288,9 +327,15 @@ export default function CourseHistoryTool() {
 
   const rows = useMemo(() => {
     if (!data?.players) return [];
-    const filtered = data.players.filter(
+    let filtered = data.players.filter(
       (p) => p.roundsPlayed >= minRounds,
     );
+    // "Only this week's field" filter — surface the intersection of
+    // this venue's historical population with the current tour week's
+    // starting field. Silently no-op if we couldn't load the field.
+    if (onlyThisWeek && activeField && activeField.dgIds.size > 0) {
+      filtered = filtered.filter((p) => activeField.dgIds.has(p.dgId));
+    }
     // Parent sorter only handles the base course-history columns;
     // predicted/gap are re-sorted inside RankingTable using the
     // forecast lookup (which only exists there).
@@ -314,7 +359,7 @@ export default function CourseHistoryTool() {
       return dir * (av - bv);
     });
     return sorted;
-  }, [data, minRounds, sortKey, sortDir]);
+  }, [data, minRounds, sortKey, sortDir, onlyThisWeek, activeField]);
 
   const clickSort = useCallback(
     (k: SortKey) => {
@@ -479,6 +524,18 @@ export default function CourseHistoryTool() {
               style={{ ...ip(), maxWidth: 120 }}
             />
           </Field>
+          {activeField && activeField.dgIds.size > 0 && (
+            <ThisWeekToggle
+              on={onlyThisWeek}
+              onChange={setOnlyThisWeek}
+              tournamentName={activeField.tournamentName}
+              fieldCount={activeField.dgIds.size}
+              matchedCount={rows.length}
+              totalPlayers={
+                data?.players?.filter((p) => p.roundsPlayed >= minRounds).length ?? 0
+              }
+            />
+          )}
         </div>
       </div>
 
@@ -584,8 +641,9 @@ export default function CourseHistoryTool() {
               fontFamily: T.fontUi,
             }}
           >
-            No players meet the minimum-rounds filter. Try lowering
-            it above.
+            {onlyThisWeek
+              ? `No players in ${activeField?.tournamentName ?? "this week's field"} have ${minRounds}+ rounds at this course. Try lowering the min-rounds filter or turning off "Only this week's field".`
+              : "No players meet the minimum-rounds filter. Try lowering it above."}
           </div>
         )}
       </div>
@@ -1302,6 +1360,105 @@ function CorrelationBar({ r }: { r: number }) {
         <span>+0.5</span>
       </div>
     </div>
+  );
+}
+
+// ── This-week field toggle ─────────────────────────────────────────
+/** Pill toggle for "restrict the rankings table to players actually
+ *  teeing off this week". Renders inline with the other setup
+ *  controls so the two filters (min rounds + this-week) live in one
+ *  place. Hidden entirely when there's no active tour week. */
+function ThisWeekToggle({
+  on,
+  onChange,
+  tournamentName,
+  fieldCount,
+  matchedCount,
+  totalPlayers,
+}: {
+  on: boolean;
+  onChange: (v: boolean) => void;
+  tournamentName: string | null;
+  fieldCount: number;
+  matchedCount: number;
+  totalPlayers: number;
+}) {
+  return (
+    <Field
+      label="Filter by this week's field"
+      help={
+        on
+          ? `Showing ${matchedCount} of ${fieldCount} players in ${tournamentName ?? "this week's field"} who have prior rounds at this course.`
+          : tournamentName
+            ? `Toggle on to hide players not teeing off in ${tournamentName} this week. Historical rankings shown across all ${totalPlayers} players otherwise.`
+            : "Toggle on to hide players not teeing off this week."
+      }
+    >
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        onClick={() => onChange(!on)}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "8px 14px",
+          fontSize: 13,
+          fontWeight: 700,
+          fontFamily: T.fontUi,
+          border: `1.5px solid ${on ? T.emerald : T.line}`,
+          borderRadius: 999,
+          background: on ? T.emeraldTint : "white",
+          color: on ? T.emeraldD : T.ink,
+          cursor: "pointer",
+          alignSelf: "flex-start",
+        }}
+      >
+        <span
+          aria-hidden
+          style={{
+            display: "inline-block",
+            width: 30,
+            height: 16,
+            borderRadius: 999,
+            background: on ? T.emerald : T.line,
+            position: "relative",
+            flexShrink: 0,
+            transition: "background 120ms ease",
+          }}
+        >
+          <span
+            style={{
+              position: "absolute",
+              top: 2,
+              left: on ? 16 : 2,
+              width: 12,
+              height: 12,
+              borderRadius: "50%",
+              background: "white",
+              boxShadow: "0 1px 2px oklch(0 0 0 / 0.2)",
+              transition: "left 120ms ease",
+            }}
+          />
+        </span>
+        <span>
+          Only this week&apos;s field
+          {tournamentName && (
+            <span
+              style={{
+                marginLeft: 6,
+                color: on ? T.emeraldD : T.muted,
+                fontWeight: 600,
+                fontSize: 12,
+              }}
+            >
+              · {tournamentName}
+            </span>
+          )}
+        </span>
+      </button>
+    </Field>
   );
 }
 
