@@ -61,3 +61,6 @@ __pycache__/
 
 .vercel
 .env*
+
+# Local DG round cache — regenerated on-demand by scripts/rebuild-skill-baselines.mjs
+/data/dg-rounds-cache/

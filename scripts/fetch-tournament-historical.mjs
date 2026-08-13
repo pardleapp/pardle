@@ -48,6 +48,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildPreTournamentSkillMap } from "./lib/pretournament-skill.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
@@ -385,9 +386,12 @@ async function fetchPerRoundPins(tournamentId, playerIds) {
  * ~[-2.5, +2] on a mid-strength field like the 3M Open, and would
  * cleanly extend to +3 on a Scheffler-in-a-major field.
  *
- * Fallback (no CSV): within-event 4-round average sg_total per
- * player. Not as good — reveals week form rather than pre-tournament
- * skill — but strictly better than nothing.
+ * Fallback (no CSV): trailing-12mo mean of sg_total from DG's
+ * historical rounds, ending the day before R1 (matches how DG
+ * frames their own skill rating). Last-resort fallback for
+ * players with <5 rounds in the window: within-event 4-round
+ * average — reveals week form rather than skill, but strictly
+ * better than an empty column.
  */
 function skillFromWinProb(winProb, fieldSize) {
   if (fieldSize <= 0) return null;
@@ -599,17 +603,32 @@ function buildCsvSkillMap(csvRows) {
   return out;
 }
 
-function derivePerPlayerSkillBaseline(dgScores, csvSkillMap) {
+function derivePerPlayerSkillBaseline(dgScores, csvSkillMap, preTournamentMap) {
   const out = {};
   for (const row of dgScores ?? []) {
     const dgId = String(row.dg_id);
-    // Preferred: CSV-derived skill from pre-tournament win probability.
+    // Preferred: CSV-derived skill from pre-tournament win probability
+    // — historically only present when a predictions CSV was archived
+    // for the year (rare).
     const csvSkill = csvSkillMap?.get(normNameForCsv(row.player_name));
     if (typeof csvSkill === "number") {
       out[dgId] = csvSkill;
       continue;
     }
-    // Fallback: within-event 4-round average sg_total.
+    // Next: the trailing-12-month mean of sg_total from DG rounds
+    // ending immediately before this tournament's R1. Mirrors how
+    // DG frames their own skill rating; doesn't leak the target
+    // week's scoring back into its own baseline. Requires ≥5 rounds
+    // in the window (enforced by the helper).
+    const preRec = preTournamentMap?.[dgId];
+    if (preRec && typeof preRec.mean === "number") {
+      out[dgId] = preRec.mean;
+      continue;
+    }
+    // Last resort: within-event 4-round average sg_total. Reveals
+    // week form rather than skill — kept only so players who don't
+    // clear the 5-round threshold still get *something* rather than
+    // an empty column.
     const sgs = [];
     for (let rn = 1; rn <= 4; rn++) {
       const r = row[`round_${rn}`];
@@ -657,17 +676,45 @@ async function main() {
     const csvSkillMap = buildCsvSkillMap(csvRows);
     if (csvRows) {
       console.log(`[csv] predictions CSV loaded for ${year}: ${csvRows.length} rows`);
-    } else {
-      console.log(`[csv] no predictions CSV for ${year} — falling back to within-event avg`);
     }
-    const skillMap = derivePerPlayerSkillBaseline(dgRounds.scores, csvSkillMap);
-    const csvBackedCount = Object.entries(skillMap).filter(([id]) => {
-      const row = dgRounds.scores?.find((s) => String(s.dg_id) === id);
-      return row && csvSkillMap.get(normNameForCsv(row.player_name)) != null;
-    }).length;
+    // Trailing-12mo mean of sg_total per player, ending the day
+    // before R1. This is our default skill baseline — see
+    // scripts/lib/pretournament-skill.mjs for the exact definition.
+    // Needs R1's actual date; DG's rounds payload has it. Fall back
+    // to the round-1 event date field, then to the DG event's `date`.
+    const r1Date =
+      dgRounds.scores?.[0]?.round_1?.date ??
+      dgRounds.event_completed ??
+      dgMeta.event_date ??
+      null;
+    let preTournamentMap = {};
+    if (r1Date) {
+      preTournamentMap = await buildPreTournamentSkillMap(r1Date, {
+        log: (m) => console.log(`  ${m}`),
+      });
+    } else {
+      console.warn(
+        `[skill] no R1 date resolved for ${year} — trailing baseline skipped`,
+      );
+    }
+    const skillMap = derivePerPlayerSkillBaseline(
+      dgRounds.scores,
+      csvSkillMap,
+      preTournamentMap,
+    );
+    let csvBacked = 0;
+    let preBacked = 0;
+    let withinEventBacked = 0;
+    for (const [id] of Object.entries(skillMap)) {
+      if (csvSkillMap.get(
+        normNameForCsv(dgRounds.scores?.find((s) => String(s.dg_id) === id)?.player_name ?? ""),
+      ) != null) csvBacked++;
+      else if (preTournamentMap[id]?.mean != null) preBacked++;
+      else withinEventBacked++;
+    }
     console.log(
-      `[dg] skill baselines: ${csvBackedCount} from CSV (pre-tournament win-prob), ` +
-        `${Object.keys(skillMap).length - csvBackedCount} from within-event 4-round avg`,
+      `[dg] skill baselines: ${csvBacked} CSV (pre-tournament win-prob) · ` +
+        `${preBacked} trailing-12mo mean · ${withinEventBacked} within-event fallback`,
     );
 
     // PGA hole-level data (optional — heatmap degrades if missing)

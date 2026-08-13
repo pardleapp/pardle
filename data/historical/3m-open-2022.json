@@ -1346,7 +1346,7 @@
       "pgaId": "29725",
       "name": "Tony Finau",
       "finText": "1",
-      "skillBaseline": 4.38025,
+      "skillBaseline": 0.953,
       "rounds": {
         "1": {
           "teetime": "12:33pm",
@@ -1771,7 +1771,7 @@
       "pgaId": "31646",
       "name": "Emiliano Grillo",
       "finText": "T2",
-      "skillBaseline": 3.63025,
+      "skillBaseline": -0.147,
       "rounds": {
         "1": {
           "teetime": "12:44pm",
@@ -2196,7 +2196,7 @@
       "pgaId": "39971",
       "name": "Sungjae Im",
       "finText": "T2",
-      "skillBaseline": 3.63025,
+      "skillBaseline": 1.079,
       "rounds": {
         "1": {
           "teetime": "7:23am",
@@ -2621,7 +2621,7 @@
       "pgaId": "25818",
       "name": "Scott Piercy",
       "finText": "T4",
-      "skillBaseline": 3.38025,
+      "skillBaseline": -0.075,
       "rounds": {
         "1": {
           "teetime": "7:01am",
@@ -3046,7 +3046,7 @@
       "pgaId": "32448",
       "name": "James Hahn",
       "finText": "T4",
-      "skillBaseline": 3.38025,
+      "skillBaseline": -0.211,
       "rounds": {
         "1": {
           "teetime": "8:07am",
@@ -3471,7 +3471,7 @@
       "pgaId": "35532",
       "name": "Tom Hoge",
       "finText": "T4",
-      "skillBaseline": 3.38025,
+      "skillBaseline": 0.505,
       "rounds": {
         "1": {
           "teetime": "7:23am",
@@ -3896,7 +3896,7 @@
       "pgaId": "51890",
       "name": "Greyson Sigg",
       "finText": "T7",
-      "skillBaseline": 2.63025,
+      "skillBaseline": 0.298,
       "rounds": {
         "1": {
           "teetime": "1:39pm",
@@ -4321,7 +4321,7 @@
       "pgaId": "48699",
       "name": "Callum Tarren",
       "finText": "T7",
-      "skillBaseline": 2.63025,
+      "skillBaseline": 0.037,
       "rounds": {
         "1": {
           "teetime": "1:50pm",
@@ -4746,7 +4746,7 @@
       "pgaId": "32139",
       "name": "Danny Willett",
       "finText": "T7",
-      "skillBaseline": 2.6302499999999998,
+      "skillBaseline": -0.007,
       "rounds": {
         "1": {
           "teetime": "7:34am",
@@ -5171,7 +5171,7 @@
       "pgaId": "34563",
       "name": "Chesson Hadley",
       "finText": "10",
-      "skillBaseline": 2.3802499999999998,
+      "skillBaseline": -0.385,
       "rounds": {
         "1": {
           "teetime": "7:12am",
@@ -5596,7 +5596,7 @@
       "pgaId": "34256",
       "name": "Andrew Putnam",
       "finText": "T11",
-      "skillBaseline": 2.13025,
+      "skillBaseline": 0.261,
       "rounds": {
         "1": {
           "teetime": "1:06pm",
@@ -6021,7 +6021,7 @@
       "pgaId": "34466",
       "name": "Peter Malnati",
       "finText": "T11",
-      "skillBaseline": 2.13025,
+      "skillBaseline": -0.038,
       "rounds": {
         "1": {
           "teetime": "7:56am",
@@ -6446,7 +6446,7 @@
       "pgaId": "49771",
       "name": "J.T. Poston",
       "finText": "T11",
-      "skillBaseline": 2.13025,
+      "skillBaseline": 0.259,
       "rounds": {
         "1": {
           "teetime": "12:55pm",
@@ -6871,7 +6871,7 @@
       "pgaId": "35879",
       "name": "Kelly Kraft",
       "finText": "T11",
-      "skillBaseline": 2.13025,
+      "skillBaseline": -0.157,
       "rounds": {
         "1": {
           "teetime": "8:40am",
@@ -7296,7 +7296,7 @@
       "pgaId": "34431",
       "name": "Robert Streb",
       "finText": "T11",
-      "skillBaseline": 2.13025,
+      "skillBaseline": -0.33,
       "rounds": {
         "1": {
           "teetime": "12:55pm",
@@ -7721,7 +7721,7 @@
       "pgaId": "35449",
       "name": "Adam Long",
       "finText": "T16",
-      "skillBaseline": 1.8802500000000002,
+      "skillBaseline": 0.612,
       "rounds": {
         "1": {
           "teetime": "12:55pm",
@@ -8146,7 +8146,7 @@
       "pgaId": "52375",
       "name": "Doug Ghim",
       "finText": "T16",
-      "skillBaseline": 1.8802500000000002,
+      "skillBaseline": 0.032,
       "rounds": {
         "1": {
           "teetime": "8:18am",
@@ -8571,7 +8571,7 @@
       "pgaId": "49766",
       "name": "Hank Lebioda",
       "finText": "T16",
-      "skillBaseline": 1.8802499999999998,
+      "skillBaseline": -0.149,
       "rounds": {
         "1": {
           "teetime": "1:06pm",
@@ -8996,7 +8996,7 @@
       "pgaId": "29479",
       "name": "Scott Brown",
       "finText": "T16",
-      "skillBaseline": 1.8802500000000002,
+      "skillBaseline": -0.383,
       "rounds": {
         "1": {
           "teetime": "1:28pm",
@@ -9421,7 +9421,7 @@
       "pgaId": "45157",
       "name": "Cam Davis",
       "finText": "T16",
-      "skillBaseline": 1.8802500000000002,
+      "skillBaseline": 0.238,
       "rounds": {
         "1": {
           "teetime": "12:55pm",
@@ -9846,7 +9846,7 @@
       "pgaId": "54628",
       "name": "Lee Hodges",
       "finText": "T16",
-      "skillBaseline": 1.8802500000000002,
+      "skillBaseline": -0.074,
       "rounds": {
         "1": {
           "teetime": "1:28pm",
@@ -10271,7 +10271,7 @@
       "pgaId": "32662",
       "name": "Michael Gligic",
       "finText": "T16",
-      "skillBaseline": 1.88025,
+      "skillBaseline": -0.108,
       "rounds": {
         "1": {
           "teetime": "1:50pm",
@@ -10696,7 +10696,7 @@
       "pgaId": "52372",
       "name": "Cameron Champ",
       "finText": "T16",
-      "skillBaseline": 1.88025,
+      "skillBaseline": -0.135,
       "rounds": {
         "1": {
           "teetime": "12:44pm",
@@ -11121,7 +11121,7 @@
       "pgaId": "50095",
       "name": "Austin Smotherman",
       "finText": "T24",
-      "skillBaseline": 1.63025,
+      "skillBaseline": 0.198,
       "rounds": {
         "1": {
           "teetime": "2:01pm",
@@ -11546,7 +11546,7 @@
       "pgaId": "20229",
       "name": "Stewart Cink",
       "finText": "T24",
-      "skillBaseline": 1.6302499999999998,
+      "skillBaseline": -0.278,
       "rounds": {
         "1": {
           "teetime": "7:45am",
@@ -11971,7 +11971,7 @@
       "pgaId": "55708",
       "name": "Hayden Buckley",
       "finText": "T26",
-      "skillBaseline": 1.38025,
+      "skillBaseline": 0.001,
       "rounds": {
         "1": {
           "teetime": "12:11pm",
@@ -12396,7 +12396,7 @@
       "pgaId": "48887",
       "name": "Matt Wallace",
       "finText": "T26",
-      "skillBaseline": 1.3802500000000002,
+      "skillBaseline": -1.052,
       "rounds": {
         "1": {
           "teetime": "7:12am",
@@ -12821,7 +12821,7 @@
       "pgaId": null,
       "name": "Joohyung Kim",
       "finText": "T26",
-      "skillBaseline": 1.38025,
+      "skillBaseline": 0.764,
       "rounds": {
         "1": {
           "teetime": "7:12am",
@@ -12882,7 +12882,7 @@
       "pgaId": "32150",
       "name": "Michael Thompson",
       "finText": "T26",
-      "skillBaseline": 1.38025,
+      "skillBaseline": 0.117,
       "rounds": {
         "1": {
           "teetime": "12:44pm",
@@ -13307,7 +13307,7 @@
       "pgaId": "22056",
       "name": "Cameron Percy",
       "finText": "T26",
-      "skillBaseline": 1.38025,
+      "skillBaseline": 0.142,
       "rounds": {
         "1": {
           "teetime": "1:28pm",
@@ -13732,7 +13732,7 @@
       "pgaId": "24980",
       "name": "Scott Gutschewski",
       "finText": "T31",
-      "skillBaseline": 1.13025,
+      "skillBaseline": 0.164,
       "rounds": {
         "1": {
           "teetime": "7:01am",
@@ -14157,7 +14157,7 @@
       "pgaId": "37212",
       "name": "Paul Barjon",
       "finText": "T31",
-      "skillBaseline": 1.13025,
+      "skillBaseline": -0.579,
       "rounds": {
         "1": {
           "teetime": "2:12pm",
@@ -14582,7 +14582,7 @@
       "pgaId": "29535",
       "name": "Brice Garnett",
       "finText": "T31",
-      "skillBaseline": 1.1302499999999998,
+      "skillBaseline": 0.06,
       "rounds": {
         "1": {
           "teetime": "8:18am",
@@ -15007,7 +15007,7 @@
       "pgaId": "29908",
       "name": "C.T. Pan",
       "finText": "T31",
-      "skillBaseline": 1.1302500000000002,
+      "skillBaseline": 0.476,
       "rounds": {
         "1": {
           "teetime": "7:34am",
@@ -15432,7 +15432,7 @@
       "pgaId": "28420",
       "name": "Ryan Brehm",
       "finText": "T31",
-      "skillBaseline": 1.13025,
+      "skillBaseline": -1.15,
       "rounds": {
         "1": {
           "teetime": "12:44pm",
@@ -15857,7 +15857,7 @@
       "pgaId": "59095",
       "name": "Chris Gotterup",
       "finText": "T31",
-      "skillBaseline": 1.13025,
+      "skillBaseline": 1.131,
       "rounds": {
         "1": {
           "teetime": "1:50pm",
@@ -16282,7 +16282,7 @@
       "pgaId": "23320",
       "name": "Ryan Palmer",
       "finText": "T31",
-      "skillBaseline": 1.13025,
+      "skillBaseline": -0.147,
       "rounds": {
         "1": {
           "teetime": "7:34am",
@@ -16707,7 +16707,7 @@
       "pgaId": "32102",
       "name": "Rickie Fowler",
       "finText": "T38",
-      "skillBaseline": 0.88025,
+      "skillBaseline": -0.075,
       "rounds": {
         "1": {
           "teetime": "7:34am",
@@ -17132,7 +17132,7 @@
       "pgaId": "33399",
       "name": "Adam Hadwin",
       "finText": "T38",
-      "skillBaseline": 0.8802499999999999,
+      "skillBaseline": 0.835,
       "rounds": {
         "1": {
           "teetime": "8:07am",
@@ -17557,7 +17557,7 @@
       "pgaId": "33486",
       "name": "Roger Sloan",
       "finText": "T38",
-      "skillBaseline": 0.8802500000000001,
+      "skillBaseline": -0.288,
       "rounds": {
         "1": {
           "teetime": "12:11pm",
@@ -17982,7 +17982,7 @@
       "pgaId": "51766",
       "name": "Wyndham Clark",
       "finText": "T38",
-      "skillBaseline": 0.8802499999999998,
+      "skillBaseline": 0.008,
       "rounds": {
         "1": {
           "teetime": "1:28pm",
@@ -18407,7 +18407,7 @@
       "pgaId": "28114",
       "name": "Dawie van der Walt",
       "finText": "T38",
-      "skillBaseline": 0.88025,
+      "skillBaseline": -1.156,
       "rounds": {
         "1": {
           "teetime": "1:50pm",
@@ -18832,7 +18832,7 @@
       "pgaId": "32757",
       "name": "Patton Kizzire",
       "finText": "T38",
-      "skillBaseline": 0.8802499999999999,
+      "skillBaseline": -0.041,
       "rounds": {
         "1": {
           "teetime": "12:33pm",
@@ -19257,7 +19257,7 @@
       "pgaId": null,
       "name": "Seung-Yul Noh",
       "finText": "T38",
-      "skillBaseline": 0.8802500000000001,
+      "skillBaseline": -0.112,
       "rounds": {
         "1": {
           "teetime": "8:18am",
@@ -19318,7 +19318,7 @@
       "pgaId": "33490",
       "name": "Bo Hoag",
       "finText": "T45",
-      "skillBaseline": 0.63025,
+      "skillBaseline": -0.86,
       "rounds": {
         "1": {
           "teetime": "2:01pm",
@@ -19743,7 +19743,7 @@
       "pgaId": "39953",
       "name": "Chase Seiffert",
       "finText": "T45",
-      "skillBaseline": 0.6302499999999998,
+      "skillBaseline": 0.003,
       "rounds": {
         "1": {
           "teetime": "9:02am",
@@ -20168,7 +20168,7 @@
       "pgaId": "45609",
       "name": "Tyler Duncan",
       "finText": "T45",
-      "skillBaseline": 0.63025,
+      "skillBaseline": 0.381,
       "rounds": {
         "1": {
           "teetime": "7:45am",
@@ -20593,7 +20593,7 @@
       "pgaId": "24846",
       "name": "Ricky Barnes",
       "finText": "T45",
-      "skillBaseline": 0.6302499999999999,
+      "skillBaseline": -1.596,
       "rounds": {
         "1": {
           "teetime": "7:12am",
@@ -21018,7 +21018,7 @@
       "pgaId": "23623",
       "name": "Bo Van Pelt",
       "finText": "T49",
-      "skillBaseline": 0.38025000000000003,
+      "skillBaseline": -0.337,
       "rounds": {
         "1": {
           "teetime": "7:12am",
@@ -21443,7 +21443,7 @@
       "pgaId": "32640",
       "name": "Troy Merritt",
       "finText": "T49",
-      "skillBaseline": 0.38025000000000003,
+      "skillBaseline": 0.602,
       "rounds": {
         "1": {
           "teetime": "7:45am",
@@ -21868,7 +21868,7 @@
       "pgaId": "46442",
       "name": "Maverick McNealy",
       "finText": "T49",
-      "skillBaseline": 0.38025000000000003,
+      "skillBaseline": 0.914,
       "rounds": {
         "1": {
           "teetime": "7:56am",
@@ -22293,7 +22293,7 @@
       "pgaId": "22371",
       "name": "Aaron Baddeley",
       "finText": "T49",
-      "skillBaseline": 0.3802499999999999,
+      "skillBaseline": -0.464,
       "rounds": {
         "1": {
           "teetime": "1:17pm",
@@ -22718,7 +22718,7 @@
       "pgaId": "26476",
       "name": "Chez Reavie",
       "finText": "T49",
-      "skillBaseline": 0.38025,
+      "skillBaseline": 0.275,
       "rounds": {
         "1": {
           "teetime": "12:44pm",
@@ -23143,7 +23143,7 @@
       "pgaId": "51997",
       "name": "Andrew Novak",
       "finText": "T54",
-      "skillBaseline": 0.13025000000000014,
+      "skillBaseline": -0.022,
       "rounds": {
         "1": {
           "teetime": "8:51am",
@@ -23568,7 +23568,7 @@
       "pgaId": "27139",
       "name": "David Skinns",
       "finText": "T54",
-      "skillBaseline": 0.13025000000000003,
+      "skillBaseline": -0.686,
       "rounds": {
         "1": {
           "teetime": "8:40am",
@@ -23993,7 +23993,7 @@
       "pgaId": "45540",
       "name": "Jared Wolfe",
       "finText": "T54",
-      "skillBaseline": 0.13024999999999975,
+      "skillBaseline": -0.4,
       "rounds": {
         "1": {
           "teetime": "2:12pm",
@@ -24418,7 +24418,7 @@
       "pgaId": "47347",
       "name": "Adam Schenk",
       "finText": "T54",
-      "skillBaseline": 0.13025,
+      "skillBaseline": 0.015,
       "rounds": {
         "1": {
           "teetime": "1:06pm",
@@ -24843,7 +24843,7 @@
       "pgaId": "27770",
       "name": "Camilo Villegas",
       "finText": "T58",
-      "skillBaseline": -0.11975000000000002,
+      "skillBaseline": -0.322,
       "rounds": {
         "1": {
           "teetime": "1:17pm",
@@ -25268,7 +25268,7 @@
       "pgaId": "24490",
       "name": "George McNeill",
       "finText": "T58",
-      "skillBaseline": -0.11975000000000002,
+      "skillBaseline": -2.496,
       "rounds": {
         "1": {
           "teetime": "12:22pm",
@@ -25693,7 +25693,7 @@
       "pgaId": "47988",
       "name": "Nick Hardy",
       "finText": "T58",
-      "skillBaseline": -0.11975,
+      "skillBaseline": 0.568,
       "rounds": {
         "1": {
           "teetime": "2:01pm",
@@ -26118,7 +26118,7 @@
       "pgaId": "06643",
       "name": "Paul Goydos",
       "finText": "T58",
-      "skillBaseline": -0.11975000000000002,
+      "skillBaseline": null,
       "rounds": {
         "1": {
           "teetime": "1:39pm",
@@ -26543,7 +26543,7 @@
       "pgaId": "24925",
       "name": "Jonathan Byrd",
       "finText": "T58",
-      "skillBaseline": -0.11975000000000002,
+      "skillBaseline": 0.147,
       "rounds": {
         "1": {
           "teetime": "1:39pm",
@@ -26968,7 +26968,7 @@
       "pgaId": "46732",
       "name": "Rick Lamb",
       "finText": "T58",
-      "skillBaseline": -0.11975000000000025,
+      "skillBaseline": 1.181,
       "rounds": {
         "1": {
           "teetime": "2:01pm",
@@ -27393,7 +27393,7 @@
       "pgaId": "34213",
       "name": "Grayson Murray",
       "finText": "T64",
-      "skillBaseline": -0.36975,
+      "skillBaseline": -0.76,
       "rounds": {
         "1": {
           "teetime": "12:11pm",
@@ -27818,7 +27818,7 @@
       "pgaId": "28089",
       "name": "Jason Day",
       "finText": "T64",
-      "skillBaseline": -0.36974999999999997,
+      "skillBaseline": 0.267,
       "rounds": {
         "1": {
           "teetime": "12:33pm",
@@ -28243,7 +28243,7 @@
       "pgaId": "30927",
       "name": "Brendon Todd",
       "finText": "T64",
-      "skillBaseline": -0.36974999999999997,
+      "skillBaseline": 0.562,
       "rounds": {
         "1": {
           "teetime": "7:45am",
@@ -28668,7 +28668,7 @@
       "pgaId": "36852",
       "name": "Jim Knous",
       "finText": "T64",
-      "skillBaseline": -0.36975,
+      "skillBaseline": -0.144,
       "rounds": {
         "1": {
           "teetime": "8:51am",
@@ -29093,7 +29093,7 @@
       "pgaId": "32816",
       "name": "Satoshi Kodaira",
       "finText": "T64",
-      "skillBaseline": -0.36975,
+      "skillBaseline": -0.076,
       "rounds": {
         "1": {
           "teetime": "8:29am",
@@ -29518,7 +29518,7 @@
       "pgaId": "32366",
       "name": "Kevin Chappell",
       "finText": "69",
-      "skillBaseline": -0.6197500000000001,
+      "skillBaseline": -0.51,
       "rounds": {
         "1": {
           "teetime": "1:17pm",
@@ -29943,7 +29943,7 @@
       "pgaId": "20593",
       "name": "Greg Chalmers",
       "finText": "T70",
-      "skillBaseline": -0.8697499999999999,
+      "skillBaseline": -0.161,
       "rounds": {
         "1": {
           "teetime": "7:56am",
@@ -30368,7 +30368,7 @@
       "pgaId": "34409",
       "name": "David Lingmerth",
       "finText": "T70",
-      "skillBaseline": -0.86975,
+      "skillBaseline": 0.11,
       "rounds": {
         "1": {
           "teetime": "7:56am",
@@ -30793,7 +30793,7 @@
       "pgaId": "36871",
       "name": "Matthew NeSmith",
       "finText": "T72",
-      "skillBaseline": -1.11975,
+      "skillBaseline": 0.26,
       "rounds": {
         "1": {
           "teetime": "7:01am",
@@ -31218,7 +31218,7 @@
       "pgaId": "34610",
       "name": "Matthias Schwab",
       "finText": "T72",
-      "skillBaseline": -1.1197499999999998,
+      "skillBaseline": 0.56,
       "rounds": {
         "1": {
           "teetime": "6:50am",
@@ -31643,7 +31643,7 @@
       "pgaId": "23353",
       "name": "J.J. Henry",
       "finText": "T72",
-      "skillBaseline": -1.11975,
+      "skillBaseline": -0.51,
       "rounds": {
         "1": {
           "teetime": "7:56am",
@@ -32068,7 +32068,7 @@
       "pgaId": "27895",
       "name": "Jonas Blixt",
       "finText": "T72",
-      "skillBaseline": -1.1197499999999998,
+      "skillBaseline": -1.744,
       "rounds": {
         "1": {
           "teetime": "1:17pm",
@@ -32493,7 +32493,7 @@
       "pgaId": "35617",
       "name": "Martin Trainer",
       "finText": "CUT",
-      "skillBaseline": 0.054000000000000006,
+      "skillBaseline": -0.713,
       "rounds": {
         "1": {
           "teetime": "12:55pm",
@@ -32710,7 +32710,7 @@
       "pgaId": "33597",
       "name": "Harry Higgs",
       "finText": "CUT",
-      "skillBaseline": 0.054000000000000006,
+      "skillBaseline": -0.346,
       "rounds": {
         "1": {
           "teetime": "12:00pm",
@@ -32927,7 +32927,7 @@
       "pgaId": "27936",
       "name": "Martin Laird",
       "finText": "CUT",
-      "skillBaseline": 0.054000000000000006,
+      "skillBaseline": 0.499,
       "rounds": {
         "1": {
           "teetime": "7:34am",
@@ -33144,7 +33144,7 @@
       "pgaId": "46435",
       "name": "Austin Cook",
       "finText": "CUT",
-      "skillBaseline": 0.05400000000000005,
+      "skillBaseline": -0.383,
       "rounds": {
         "1": {
           "teetime": "1:06pm",
@@ -33361,7 +33361,7 @@
       "pgaId": "32333",
       "name": "Kevin Tway",
       "finText": "CUT",
-      "skillBaseline": 0.05400000000000005,
+      "skillBaseline": -0.322,
       "rounds": {
         "1": {
           "teetime": "12:33pm",
@@ -33578,7 +33578,7 @@
       "pgaId": "24140",
       "name": "Sean O'Hair",
       "finText": "CUT",
-      "skillBaseline": 0.05400000000000005,
+      "skillBaseline": 0.394,
       "rounds": {
         "1": {
           "teetime": "1:28pm",
@@ -33795,7 +33795,7 @@
       "pgaId": "37275",
       "name": "Sam Ryder",
       "finText": "CUT",
-      "skillBaseline": 0.05399999999999994,
+      "skillBaseline": 0.064,
       "rounds": {
         "1": {
           "teetime": "12:11pm",
@@ -34012,7 +34012,7 @@
       "pgaId": "47995",
       "name": "Davis Riley",
       "finText": "CUT",
-      "skillBaseline": 0.054000000000000006,
+      "skillBaseline": 0.746,
       "rounds": {
         "1": {
           "teetime": "12:33pm",
@@ -34229,7 +34229,7 @@
       "pgaId": "39436",
       "name": "Joshua Creel",
       "finText": "CUT",
-      "skillBaseline": -0.44599999999999995,
+      "skillBaseline": -1.173,
       "rounds": {
         "1": {
           "teetime": "1:50pm",
@@ -34446,7 +34446,7 @@
       "pgaId": "63125",
       "name": "Dylan Menante",
       "finText": "CUT",
-      "skillBaseline": -0.446,
+      "skillBaseline": null,
       "rounds": {
         "1": {
           "teetime": "9:02am",
@@ -34663,7 +34663,7 @@
       "pgaId": "24924",
       "name": "Bill Haas",
       "finText": "CUT",
-      "skillBaseline": -0.44600000000000006,
+      "skillBaseline": -0.049,
       "rounds": {
         "1": {
           "teetime": "8:07am",
@@ -34880,7 +34880,7 @@
       "pgaId": "35461",
       "name": "Beau Hossler",
       "finText": "CUT",
-      "skillBaseline": -0.44599999999999995,
+      "skillBaseline": 0.041,
       "rounds": {
         "1": {
           "teetime": "7:56am",
@@ -35097,7 +35097,7 @@
       "pgaId": "24507",
       "name": "Jason Bohn",
       "finText": "CUT",
-      "skillBaseline": -0.44599999999999995,
+      "skillBaseline": -1.34,
       "rounds": {
         "1": {
           "teetime": "8:40am",
@@ -35314,7 +35314,7 @@
       "pgaId": "36884",
       "name": "Ben Kohles",
       "finText": "CUT",
-      "skillBaseline": -0.446,
+      "skillBaseline": -0.082,
       "rounds": {
         "1": {
           "teetime": "2:12pm",
@@ -35531,7 +35531,7 @@
       "pgaId": "23325",
       "name": "Vaughn Taylor",
       "finText": "CUT",
-      "skillBaseline": -0.44599999999999995,
+      "skillBaseline": -0.065,
       "rounds": {
         "1": {
           "teetime": "8:07am",
@@ -35748,7 +35748,7 @@
       "pgaId": "34174",
       "name": "John Huh",
       "finText": "CUT",
-      "skillBaseline": -0.446,
+      "skillBaseline": 0.165,
       "rounds": {
         "1": {
           "teetime": "12:00pm",
@@ -35965,7 +35965,7 @@
       "pgaId": "25493",
       "name": "Nick Taylor",
       "finText": "CUT",
-      "skillBaseline": -0.44600000000000006,
+      "skillBaseline": 0.279,
       "rounds": {
         "1": {
           "teetime": "7:23am",
@@ -36182,7 +36182,7 @@
       "pgaId": "30163",
       "name": "Henrik Norlander",
       "finText": "CUT",
-      "skillBaseline": -0.446,
+      "skillBaseline": -0.447,
       "rounds": {
         "1": {
           "teetime": "12:00pm",
@@ -36399,7 +36399,7 @@
       "pgaId": "47856",
       "name": "Seth Reeves",
       "finText": "CUT",
-      "skillBaseline": -0.446,
+      "skillBaseline": -0.742,
       "rounds": {
         "1": {
           "teetime": "9:02am",
@@ -36616,7 +36616,7 @@
       "pgaId": "31560",
       "name": "Brian Stuard",
       "finText": "CUT",
-      "skillBaseline": -0.946,
+      "skillBaseline": -0.204,
       "rounds": {
         "1": {
           "teetime": "8:07am",
@@ -36833,7 +36833,7 @@
       "pgaId": "37273",
       "name": "Derek Ernst",
       "finText": "CUT",
-      "skillBaseline": -0.9460000000000001,
+      "skillBaseline": -1.901,
       "rounds": {
         "1": {
           "teetime": "8:18am",
@@ -37050,7 +37050,7 @@
       "pgaId": "29970",
       "name": "Dylan Frittelli",
       "finText": "CUT",
-      "skillBaseline": -0.946,
+      "skillBaseline": 0.021,
       "rounds": {
         "1": {
           "teetime": "7:23am",
@@ -37267,7 +37267,7 @@
       "pgaId": "51634",
       "name": "Sahith Theegala",
       "finText": "CUT",
-      "skillBaseline": -0.9460000000000001,
+      "skillBaseline": 0.472,
       "rounds": {
         "1": {
           "teetime": "7:12am",
@@ -37484,7 +37484,7 @@
       "pgaId": "23541",
       "name": "Ben Crane",
       "finText": "CUT",
-      "skillBaseline": -0.9460000000000001,
+      "skillBaseline": -1.757,
       "rounds": {
         "1": {
           "teetime": "1:17pm",
@@ -37701,7 +37701,7 @@
       "pgaId": "47128",
       "name": "Richy Werenski",
       "finText": "CUT",
-      "skillBaseline": -0.9460000000000002,
+      "skillBaseline": -1.285,
       "rounds": {
         "1": {
           "teetime": "7:23am",
@@ -37918,7 +37918,7 @@
       "pgaId": "26596",
       "name": "Ryan Moore",
       "finText": "CUT",
-      "skillBaseline": -0.9460000000000001,
+      "skillBaseline": -0.517,
       "rounds": {
         "1": {
           "teetime": "8:07am",
@@ -38135,7 +38135,7 @@
       "pgaId": "24357",
       "name": "K.J. Choi",
       "finText": "CUT",
-      "skillBaseline": -0.9460000000000001,
+      "skillBaseline": -0.591,
       "rounds": {
         "1": {
           "teetime": "8:29am",
@@ -38352,7 +38352,7 @@
       "pgaId": "33419",
       "name": "Cameron Tringale",
       "finText": "CUT",
-      "skillBaseline": -0.9460000000000001,
+      "skillBaseline": 0.583,
       "rounds": {
         "1": {
           "teetime": "12:22pm",
@@ -38569,7 +38569,7 @@
       "pgaId": "28775",
       "name": "Nate Lashley",
       "finText": "CUT",
-      "skillBaseline": -1.446,
+      "skillBaseline": 0.258,
       "rounds": {
         "1": {
           "teetime": "12:44pm",
@@ -38786,7 +38786,7 @@
       "pgaId": "40115",
       "name": "Adam Svensson",
       "finText": "CUT",
-      "skillBaseline": -1.446,
+      "skillBaseline": 0.261,
       "rounds": {
         "1": {
           "teetime": "6:50am",
@@ -39003,7 +39003,7 @@
       "pgaId": "27797",
       "name": "Derek Lamely",
       "finText": "CUT",
-      "skillBaseline": -1.4460000000000002,
+      "skillBaseline": null,
       "rounds": {
         "1": {
           "teetime": "6:50am",
@@ -39220,7 +39220,7 @@
       "pgaId": "29518",
       "name": "Brendan Steele",
       "finText": "CUT",
-      "skillBaseline": -1.446,
+      "skillBaseline": 0.357,
       "rounds": {
         "1": {
           "teetime": "8:29am",
@@ -39437,7 +39437,7 @@
       "pgaId": null,
       "name": "Jr. Potter",
       "finText": "CUT",
-      "skillBaseline": -1.446,
+      "skillBaseline": -3.468,
       "rounds": {
         "1": {
           "teetime": "8:29am",
@@ -39472,7 +39472,7 @@
       "pgaId": "34255",
       "name": "Joseph Bramlett",
       "finText": "CUT",
-      "skillBaseline": -1.446,
+      "skillBaseline": -0.324,
       "rounds": {
         "1": {
           "teetime": "1:39pm",
@@ -39689,7 +39689,7 @@
       "pgaId": "25900",
       "name": "Lucas Glover",
       "finText": "CUT",
-      "skillBaseline": -1.446,
+      "skillBaseline": -0.29,
       "rounds": {
         "1": {
           "teetime": "7:45am",
@@ -39906,7 +39906,7 @@
       "pgaId": "01553",
       "name": "John Huston",
       "finText": "CUT",
-      "skillBaseline": -1.446,
+      "skillBaseline": null,
       "rounds": {
         "1": {
           "teetime": "1:39pm",
@@ -40123,7 +40123,7 @@
       "pgaId": "19803",
       "name": "Ryan Armour",
       "finText": "CUT",
-      "skillBaseline": -1.4460000000000002,
+      "skillBaseline": 0.061,
       "rounds": {
         "1": {
           "teetime": "1:06pm",
@@ -40340,7 +40340,7 @@
       "pgaId": "47987",
       "name": "Cole Hammer",
       "finText": "CUT",
-      "skillBaseline": -1.4460000000000002,
+      "skillBaseline": null,
       "rounds": {
         "1": {
           "teetime": "8:51am",
@@ -40557,7 +40557,7 @@
       "pgaId": "40162",
       "name": "Justin Lower",
       "finText": "CUT",
-      "skillBaseline": -1.446,
+      "skillBaseline": 0.119,
       "rounds": {
         "1": {
           "teetime": "2:12pm",
@@ -40774,7 +40774,7 @@
       "pgaId": "30750",
       "name": "Tommy Gainey",
       "finText": "CUT",
-      "skillBaseline": -1.446,
+      "skillBaseline": -1.035,
       "rounds": {
         "1": {
           "teetime": "12:22pm",
@@ -40991,7 +40991,7 @@
       "pgaId": "27963",
       "name": "Chris Stroud",
       "finText": "CUT",
-      "skillBaseline": -1.946,
+      "skillBaseline": -0.181,
       "rounds": {
         "1": {
           "teetime": "6:50am",
@@ -41208,7 +41208,7 @@
       "pgaId": "10381",
       "name": "Curtis Thompson",
       "finText": "CUT",
-      "skillBaseline": -1.9460000000000002,
+      "skillBaseline": -0.578,
       "rounds": {
         "1": {
           "teetime": "8:51am",
@@ -41425,7 +41425,7 @@
       "pgaId": "33413",
       "name": "Ben Martin",
       "finText": "CUT",
-      "skillBaseline": -1.9460000000000002,
+      "skillBaseline": -0.267,
       "rounds": {
         "1": {
           "teetime": "12:22pm",
@@ -41642,7 +41642,7 @@
       "pgaId": "23788",
       "name": "D.J. Trahan",
       "finText": "CUT",
-      "skillBaseline": -1.946,
+      "skillBaseline": -0.708,
       "rounds": {
         "1": {
           "teetime": "12:11pm",
@@ -41859,7 +41859,7 @@
       "pgaId": "36754",
       "name": "Andre Metzger",
       "finText": "CUT",
-      "skillBaseline": -1.946,
+      "skillBaseline": null,
       "rounds": {
         "1": {
           "teetime": "2:12pm",
@@ -42076,7 +42076,7 @@
       "pgaId": "26758",
       "name": "David Hearn",
       "finText": "CUT",
-      "skillBaseline": -1.946,
+      "skillBaseline": -0.67,
       "rounds": {
         "1": {
           "teetime": "8:29am",
@@ -42293,7 +42293,7 @@
       "pgaId": "53165",
       "name": "Doc Redman",
       "finText": "CUT",
-      "skillBaseline": -1.9460000000000002,
+      "skillBaseline": -0.375,
       "rounds": {
         "1": {
           "teetime": "8:40am",
@@ -42510,7 +42510,7 @@
       "pgaId": "39954",
       "name": "Cody Gribble",
       "finText": "CUT",
-      "skillBaseline": -1.9460000000000002,
+      "skillBaseline": null,
       "rounds": {
         "1": {
           "teetime": "1:39pm",
@@ -42727,7 +42727,7 @@
       "pgaId": "30978",
       "name": "Kiradech Aphibarnrat",
       "finText": "CUT",
-      "skillBaseline": -1.946,
+      "skillBaseline": -0.504,
       "rounds": {
         "1": {
           "teetime": "12:00pm",
@@ -42944,7 +42944,7 @@
       "pgaId": "36799",
       "name": "Stephan Jaeger",
       "finText": "CUT",
-      "skillBaseline": -1.9460000000000002,
+      "skillBaseline": -0.011,
       "rounds": {
         "1": {
           "teetime": "12:22pm",
@@ -43161,7 +43161,7 @@
       "pgaId": "47081",
       "name": "Daniel Gale",
       "finText": "CUT",
-      "skillBaseline": -1.9460000000000002,
+      "skillBaseline": null,
       "rounds": {
         "1": {
           "teetime": "8:51am",
@@ -43378,7 +43378,7 @@
       "pgaId": "49298",
       "name": "Kramer Hickok",
       "finText": "CUT",
-      "skillBaseline": -1.9460000000000002,
+      "skillBaseline": -0.083,
       "rounds": {
         "1": {
           "teetime": "8:29am",
@@ -43595,7 +43595,7 @@
       "pgaId": "46550",
       "name": "Brandon Hagy",
       "finText": "CUT",
-      "skillBaseline": -2.4459999999999997,
+      "skillBaseline": -0.712,
       "rounds": {
         "1": {
           "teetime": "12:22pm",
@@ -43812,7 +43812,7 @@
       "pgaId": "27974",
       "name": "Sung Kang",
       "finText": "CUT",
-      "skillBaseline": -2.4459999999999997,
+      "skillBaseline": -0.69,
       "rounds": {
         "1": {
           "teetime": "7:34am",
@@ -44029,7 +44029,7 @@
       "pgaId": "21753",
       "name": "Brian Davis",
       "finText": "CUT",
-      "skillBaseline": -2.446,
+      "skillBaseline": -2.404,
       "rounds": {
         "1": {
           "teetime": "6:50am",
@@ -44246,7 +44246,7 @@
       "pgaId": "28307",
       "name": "Matt Every",
       "finText": "CUT",
-      "skillBaseline": -2.446,
+      "skillBaseline": -3.679,
       "rounds": {
         "1": {
           "teetime": "7:01am",
@@ -44463,7 +44463,7 @@
       "pgaId": "33410",
       "name": "Andrew Landry",
       "finText": "CUT",
-      "skillBaseline": -2.9459999999999997,
+      "skillBaseline": -1.004,
       "rounds": {
         "1": {
           "teetime": "12:33pm",
@@ -44680,7 +44680,7 @@
       "pgaId": "54783",
       "name": "Dylan Wu",
       "finText": "CUT",
-      "skillBaseline": -2.9459999999999997,
+      "skillBaseline": -0.272,
       "rounds": {
         "1": {
           "teetime": "9:02am",
@@ -44897,7 +44897,7 @@
       "pgaId": "28475",
       "name": "Jeff Overton",
       "finText": "CUT",
-      "skillBaseline": -2.946,
+      "skillBaseline": null,
       "rounds": {
         "1": {
           "teetime": "9:02am",
@@ -45114,7 +45114,7 @@
       "pgaId": "27095",
       "name": "Nick Watney",
       "finText": "CUT",
-      "skillBaseline": -2.946,
+      "skillBaseline": -0.707,
       "rounds": {
         "1": {
           "teetime": "8:18am",
@@ -45331,7 +45331,7 @@
       "pgaId": "19846",
       "name": "Brian Gay",
       "finText": "CUT",
-      "skillBaseline": -2.946,
+      "skillBaseline": -0.6,
       "rounds": {
         "1": {
           "teetime": "12:55pm",
@@ -45548,7 +45548,7 @@
       "pgaId": "54421",
       "name": "Garrick Higgo",
       "finText": "CUT",
-      "skillBaseline": -2.9459999999999997,
+      "skillBaseline": -0.884,
       "rounds": {
         "1": {
           "teetime": "7:45am",
@@ -45765,7 +45765,7 @@
       "pgaId": "27933",
       "name": "John Merrick",
       "finText": "CUT",
-      "skillBaseline": -2.9459999999999997,
+      "skillBaseline": -2.619,
       "rounds": {
         "1": {
           "teetime": "1:06pm",
@@ -45982,7 +45982,7 @@
       "pgaId": "22892",
       "name": "Jason Gore",
       "finText": "CUT",
-      "skillBaseline": -2.946,
+      "skillBaseline": null,
       "rounds": {
         "1": {
           "teetime": "8:40am",
@@ -46199,7 +46199,7 @@
       "pgaId": "54323",
       "name": "Mo Lim",
       "finText": "CUT",
-      "skillBaseline": -3.446,
+      "skillBaseline": null,
       "rounds": {
         "1": {
           "teetime": "2:12pm",
@@ -46416,7 +46416,7 @@
       "pgaId": "35110",
       "name": "Brett Drewitt",
       "finText": "CUT",
-      "skillBaseline": -3.4459999999999997,
+      "skillBaseline": -0.954,
       "rounds": {
         "1": {
           "teetime": "8:51am",
@@ -46633,7 +46633,7 @@
       "pgaId": "30933",
       "name": "Jeff Sorenson",
       "finText": "CUT",
-      "skillBaseline": -3.446,
+      "skillBaseline": null,
       "rounds": {
         "1": {
           "teetime": "1:50pm",
@@ -46850,7 +46850,7 @@
       "pgaId": "51950",
       "name": "Max McGreevy",
       "finText": "CUT",
-      "skillBaseline": -3.4459999999999997,
+      "skillBaseline": -0.549,
       "rounds": {
         "1": {
           "teetime": "1:17pm",
@@ -47067,7 +47067,7 @@
       "pgaId": "20850",
       "name": "Daniel Chopra",
       "finText": "CUT",
-      "skillBaseline": -3.446,
+      "skillBaseline": null,
       "rounds": {
         "1": {
           "teetime": "1:28pm",
@@ -47284,7 +47284,7 @@
       "pgaId": "25686",
       "name": "Jason Dufner",
       "finText": "CUT",
-      "skillBaseline": -3.9459999999999997,
+      "skillBaseline": -0.424,
       "rounds": {
         "1": {
           "teetime": "8:18am",
@@ -47501,7 +47501,7 @@
       "pgaId": "24449",
       "name": "Parker McLachlin",
       "finText": "CUT",
-      "skillBaseline": -3.946,
+      "skillBaseline": -5.188,
       "rounds": {
         "1": {
           "teetime": "7:01am",
@@ -47718,7 +47718,7 @@
       "pgaId": "39537",
       "name": "Chris Naegel",
       "finText": "CUT",
-      "skillBaseline": -3.9459999999999997,
+      "skillBaseline": 0.209,
       "rounds": {
         "1": {
           "teetime": "2:01pm",
@@ -47935,7 +47935,7 @@
       "pgaId": "21959",
       "name": "Ted Purdy",
       "finText": "CUT",
-      "skillBaseline": -4.946,
+      "skillBaseline": -3.951,
       "rounds": {
         "1": {
           "teetime": "2:01pm",
@@ -48152,7 +48152,7 @@
       "pgaId": "46547",
       "name": "Mardy Fish",
       "finText": "CUT",
-      "skillBaseline": -5.446,
+      "skillBaseline": null,
       "rounds": {
         "1": {
           "teetime": "9:02am",
@@ -48369,7 +48369,7 @@
       "pgaId": "51491",
       "name": "Brandon Matthews",
       "finText": "CUT",
-      "skillBaseline": -5.946,
+      "skillBaseline": -1.742,
       "rounds": {
         "1": {
           "teetime": "8:40am",
@@ -48586,7 +48586,7 @@
       "pgaId": "26679",
       "name": "Kevin Stadler",
       "finText": "CUT",
-      "skillBaseline": -6.446,
+      "skillBaseline": -3.895,
       "rounds": {
         "1": {
           "teetime": "12:00pm",
@@ -48803,7 +48803,7 @@
       "pgaId": "48084",
       "name": "Wesley Bryan",
       "finText": "CUT",
-      "skillBaseline": -7.446,
+      "skillBaseline": -0.71,
       "rounds": {
         "1": {
           "teetime": "12:11pm",
@@ -49020,7 +49020,7 @@
       "pgaId": "32839",
       "name": "Hideki Matsuyama",
       "finText": "WD",
-      "skillBaseline": -4.219,
+      "skillBaseline": 1.113,
       "rounds": {
         "1": {
           "teetime": "7:23am",
@@ -49133,7 +49133,7 @@
       "pgaId": "25240",
       "name": "D.A. Points",
       "finText": "WD",
-      "skillBaseline": -6.219,
+      "skillBaseline": -1.421,
       "rounds": {
         "1": {
           "teetime": "12:00pm",
@@ -49246,7 +49246,7 @@
       "pgaId": "21407",
       "name": "Arjun Atwal",
       "finText": "DQ",
-      "skillBaseline": -3.446,
+      "skillBaseline": -1.633,
       "rounds": {
         "1": {
           "teetime": "7:01am",
