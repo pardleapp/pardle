@@ -250,12 +250,14 @@ async function familyFor(tournamentId: string): Promise<FamilyDef | null> {
 // ── Endpoint ────────────────────────────────────────────────────────
 
 function cacheKey(tournamentId: string): string {
-  // v14 — v13 payloads pre-date the extension of BirdieCount with
-  // bogeys, sumVsPar, bogeyRate, avgVsPar. Cached rows lack those
-  // fields so the new metric toggle would render zeros for bogey
-  // rate + avg vs par until the cache turned over naturally. Bump
-  // to force a fresh compute that fills the new counters.
-  return `feed:pin-birdies:v14:${tournamentId}`;
+  // v15 — force-refresh after this week's onboarding of the FedEx
+  // St. Jude Championship (fedex-stjude slug + 7 historical years
+  // now on file). v14 payloads for R2026027 predate the family
+  // registration and would have familySlug: null and only the
+  // live event's data. v14 payloads for the other three tournaments
+  // are fine but bumping globally keeps every family cohort in
+  // sync post-onboarding.
+  return `feed:pin-birdies:v15:${tournamentId}`;
 }
 
 export async function GET(req: Request) {
