@@ -29,6 +29,7 @@ import {
   getHrrrHourlyWind,
   summariseHrrrDay,
 } from "@/lib/scoring-model/hrrr-hourly";
+import { getTournamentConfig } from "@/lib/scoring-model/tournament-config";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -459,6 +460,16 @@ export async function GET(req: Request) {
     // hole-by-hole data.
     const activeTourney = await getActiveTournament();
     const activeTournamentId = activeTourney?.tournament?.id ?? null;
+    // Round dates from the tournament-config registry (populated by
+    // fetch-tournament-historical.mjs into _live-tournaments.json).
+    // Used to distinguish "past round → thru=18 is a genuine
+    // completion" from "future round → DG is echoing prior round
+    // data and thru=18 is a phantom".
+    const activeConfig = activeTournamentId
+      ? await getTournamentConfig(activeTournamentId).catch(() => null)
+      : null;
+    const roundDates = activeConfig?.liveRoundDates ?? null;
+    const todayIso = new Date().toISOString().slice(0, 10);
 
     const dgStats = "sg_total,sg_ott,sg_app,sg_arg,sg_putt";
     const [
@@ -525,9 +536,22 @@ export async function GET(req: Request) {
     if (activeTournamentId && weatherByRound) {
       const coords = coordsForTournamentId(activeTournamentId);
       if (coords) {
-        const dates = HARDCODED_ROUND_DATES[activeTournamentId] ??
+        // Prefer the tournament-config's live round dates (populated
+        // from _live-tournaments.json by the onboarding script). Falls
+        // back to the legacy hardcoded table, then to DG-teetime
+        // derivation.
+        const cfgDates = roundDates
+          ? {
+              1: roundDates["1"],
+              2: roundDates["2"],
+              3: roundDates["3"],
+              4: roundDates["4"],
+            }
+          : null;
+        const dates =
+          (cfgDates as Record<1 | 2 | 3 | 4, string> | null) ??
+          HARDCODED_ROUND_DATES[activeTournamentId] ??
           deriveRoundDates(fieldRows);
-        const todayIso = new Date().toISOString().slice(0, 10);
         for (const r of [1, 2, 3, 4] as const) {
           if (dates[r] >= todayIso) {
             try {
@@ -756,23 +780,33 @@ export async function GET(req: Request) {
     ): OutRow[] => {
       const drops = dropCounts[`r${round}` as "r1" | "r2" | "r3" | "r4"];
       const out: OutRow[] = [];
-      // Guard against DG's echo behaviour: when a round hasn't started
-      // yet, DG's live-tournament-stats?round=N returns 144 rows all
-      // showing thru:18 with the previous round's score. If the round
-      // is genuinely underway, some players will show thru<18 (still
-      // on course). So: process the round IF EITHER
-      //   (a) the snapshot has R3 data for at least one player (feed
-      //       engine has caught up), OR
+      // Guard against DG's echo behaviour: when a FUTURE round hasn't
+      // started yet, DG's live-tournament-stats?round=N returns 144
+      // rows all showing thru:18 with the previous round's score. Accept
+      // the round's rows IF ANY of:
+      //   (a) the snapshot has data for this round (feed engine has
+      //       caught up mid-round — genuine live signal), OR
       //   (b) DG's response shows in-progress rows (some thru < 18,
-      //       > 0) — the "real live" signal that isn't an echo.
-      // If neither, DG is echoing and we should skip the round.
+      //       > 0) — the "real live" signal that isn't an echo, OR
+      //   (c) the round's date is strictly BEFORE today — the round
+      //       is definitely complete, so thru:18 across the board is
+      //       a real completion, not an echo. This was the R1-during-R2
+      //       bug: once the snapshot rolled to R2 and every player was
+      //       thru:18, the guard mis-classified R1 completions as
+      //       phantom and dropped 69 real rounds.
+      const roundDate = roundDates?.[String(round)] ?? null;
+      const roundInPast = roundDate != null && roundDate < todayIso;
       const inProgressCount = liveRows.filter((l) => {
         const t = typeof l.thru === "number"
           ? l.thru
           : typeof l.thru === "string" ? Number(l.thru.trim()) : NaN;
         return Number.isFinite(t) && t > 0 && t < 18;
       }).length;
-      if (!roundHasSnapshotData[round] && inProgressCount === 0) {
+      if (
+        !roundHasSnapshotData[round] &&
+        inProgressCount === 0 &&
+        !roundInPast
+      ) {
         return out;
       }
       for (const l of liveRows) {
