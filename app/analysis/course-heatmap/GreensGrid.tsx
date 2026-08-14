@@ -78,28 +78,33 @@ function pinFlagFor(
   metric: ScoringMetric,
 ): PinFlag | null {
   if (!birdie || birdie.clusters.length < 2) return null;
-  const values = birdie.clusters
-    .filter((c) => c.total > 0)
-    .map((c) => metricValue(c, metric));
-  if (values.length < 2) return null;
-  const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  let best: PinFlag | null = null;
-  let bestAbs = pinChipThreshold(metric);
-  birdie.clusters.forEach((c, i) => {
-    if (c.total === 0) return;
-    const v = metricValue(c, metric);
-    const delta = v - mean;
-    if (Math.abs(delta) > bestAbs) {
-      bestAbs = Math.abs(delta);
-      best = {
-        delta,
-        clusterLetter: String.fromCharCode(65 + i),
-        clusterValue: v,
-        meanValue: mean,
-      };
+  const withData = birdie.clusters
+    .map((c, i) => ({ cluster: c, index: i, value: metricValue(c, metric) }))
+    .filter((x) => x.cluster.total > 0);
+  if (withData.length < 2) return null;
+  const values = withData.map((x) => x.value);
+  const spread = Math.max(...values) - Math.min(...values);
+  if (spread < pinChipThreshold(metric)) return null;
+  // Report the outlier cluster: whichever one sits furthest from
+  // the mean of the OTHER clusters. Signed delta matches the
+  // chip's + / − rendering.
+  let best: { delta: number; index: number; value: number; othersMean: number } | null = null;
+  for (const { index, value } of withData) {
+    const others = withData.filter((x) => x.index !== index);
+    const othersMean =
+      others.reduce((a, x) => a + x.value, 0) / others.length;
+    const delta = value - othersMean;
+    if (!best || Math.abs(delta) > Math.abs(best.delta)) {
+      best = { delta, index, value, othersMean };
     }
-  });
-  return best;
+  }
+  if (!best) return null;
+  return {
+    delta: best.delta,
+    clusterLetter: String.fromCharCode(65 + best.index),
+    clusterValue: best.value,
+    meanValue: best.othersMean,
+  };
 }
 
 function teeFlagFor(pin: CoursePinHole | undefined): TeeFlag | null {

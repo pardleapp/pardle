@@ -107,9 +107,15 @@ interface TeeFlag {
   maxRound: number;
 }
 
-/** Compute the pin-variance flag for a hole, if any of its clusters
- *  deviates from the cluster-rate mean by more than the threshold.
- *  Returns null when no cluster crosses the line.
+/** Compute the pin-variance flag for a hole. Fires when the max
+ *  cluster's birdie-or-better rate differs from the MIN cluster's
+ *  by at least PIN_VARIANCE_THRESHOLD — matches the plain-English
+ *  copy on the page ("different clusters have a >X% difference").
+ *
+ *  Reports the OUTLIER cluster — whichever one sits furthest from
+ *  the mean-of-the-others, so the chip surfaces whether the venue
+ *  has a permanently-easy or permanently-hard pin neighbourhood
+ *  rather than just naming a random member of the extremes.
  *
  *  Deliberately cross-year: the clusters themselves aggregate every
  *  historical pin location at the hole, so the "biggest outlier
@@ -119,28 +125,34 @@ interface TeeFlag {
  *  outliers) the column exists to surface. */
 function pinFlagFor(birdie: HoleBirdieData | undefined): PinFlag | null {
   if (!birdie || birdie.clusters.length < 2) return null;
-  const rates = birdie.clusters
-    .filter((c) => c.total > 0)
-    .map((c) => c.rate);
-  if (rates.length < 2) return null;
-  const mean = rates.reduce((a, b) => a + b, 0) / rates.length;
-  let best: PinFlag | null = null;
-  let bestAbs = PIN_VARIANCE_THRESHOLD; // enforce minimum to fire
-  birdie.clusters.forEach((c, i) => {
-    if (c.total === 0) return;
-    // Absolute percentage-point delta from the hole's cluster mean.
-    const delta = c.rate - mean;
-    if (Math.abs(delta) > bestAbs) {
-      bestAbs = Math.abs(delta);
-      best = {
-        delta,
-        clusterLetter: String.fromCharCode(65 + i),
-        clusterRate: c.rate,
-        meanRate: mean,
-      };
+  const withData = birdie.clusters
+    .map((c, i) => ({ cluster: c, index: i }))
+    .filter((x) => x.cluster.total > 0);
+  if (withData.length < 2) return null;
+  const rates = withData.map((x) => x.cluster.rate);
+  const spread = Math.max(...rates) - Math.min(...rates);
+  if (spread < PIN_VARIANCE_THRESHOLD) return null;
+  // Identify the outlier cluster: whichever one has the largest
+  // absolute delta from the mean of the OTHER clusters. That gives
+  // us a signed delta (+ = this cluster easier, − = harder) that
+  // matches how the chip renders (green tint above, red below).
+  let best: { delta: number; index: number; rate: number; othersMean: number } | null = null;
+  for (const { cluster, index } of withData) {
+    const others = withData.filter((x) => x.index !== index);
+    const othersMean =
+      others.reduce((a, x) => a + x.cluster.rate, 0) / others.length;
+    const delta = cluster.rate - othersMean;
+    if (!best || Math.abs(delta) > Math.abs(best.delta)) {
+      best = { delta, index, rate: cluster.rate, othersMean };
     }
-  });
-  return best;
+  }
+  if (!best) return null;
+  return {
+    delta: best.delta,
+    clusterLetter: String.fromCharCode(65 + best.index),
+    clusterRate: best.rate,
+    meanRate: best.othersMean,
+  };
 }
 
 /** Compute the tee-movement flag for a hole — the spread of max-min
