@@ -331,10 +331,23 @@ export async function GET(req: Request) {
       fetchJson<{ field?: FieldEntry[] }>("/field-updates?tour=pga"),
     ]);
     if (!snapshot) {
-      return NextResponse.json(
-        { ok: false, error: "no-snapshot" },
-        { status: 404 },
-      );
+      // Snapshot hasn't been recorded for this tournament yet — heatmap
+      // has nothing to render, but the client still needs the
+      // tournamentId so it can load the pin sheet + birdie history for
+      // the green cards. ok:true + empty cells keeps the pin guide
+      // usable pre-R1 instead of stranding it on "Green image loading…".
+      return NextResponse.json({
+        ok: true,
+        source: "live",
+        tournamentId,
+        eventName: active.tournament.name ?? null,
+        bucketMinutes: BUCKET_MIN,
+        cells: [],
+        roundRanges: {},
+        weatherByRound: null,
+        generatedAt: Date.now(),
+        diag: { reason: "no-snapshot" },
+      });
     }
 
     // Map: pgaTourId → { round → { teeMins, startHole } }
