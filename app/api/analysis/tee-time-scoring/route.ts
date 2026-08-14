@@ -822,21 +822,28 @@ export async function GET(req: Request) {
           drops.noTeeTime++;
           continue;
         }
-        // Drop players whose round hasn't started yet.
+        // Players whose round hasn't started yet still get a row —
+        // as a pre-round projection anchored at their tee time. Makes
+        // the search bar find late-tee players before they've hit a
+        // shot AND lets the reader see the projected morning-wave vs
+        // afternoon-wave gap for the round underway.
         const teeEpoch = teeToEpochMs(tt?.teetime);
-        if (teeEpoch != null && teeEpoch > nowMs) {
-          drops.notDone++;
-          continue;
-        }
+        const notYetTeedOff = teeEpoch != null && teeEpoch > nowMs;
         // Score source priority: Pardle snapshot (authoritative
         // per-hole data) → DG live-tournament-stats (unreliable for
-        // in-progress rounds — DG echoes previous round data).
+        // in-progress rounds — DG echoes previous round data). Both
+        // sources are skipped for a not-yet-teed-off player; we plot
+        // them as a pure pre-round projection at (par, all-18-remaining).
         const pgaId = f.player_num ? String(f.player_num) : undefined;
-        const snap = snapshotScore(pgaId, round);
+        const snap = notYetTeedOff ? null : snapshotScore(pgaId, round);
         let thruHoles: number;
         let rndScore: number;
         let thruDone: boolean;
-        if (snap) {
+        if (notYetTeedOff) {
+          thruHoles = 0;
+          rndScore = 0;
+          thruDone = false;
+        } else if (snap) {
           thruHoles = snap.thruHoles;
           rndScore = snap.toPar;
           thruDone = snap.thruHoles === 18;
@@ -856,14 +863,17 @@ export async function GET(req: Request) {
             ? Math.max(0, Math.min(18, Math.floor(thruNum)))
             : 0;
           if (!thruDone && thruHoles === 0) {
-            drops.notDone++;
-            continue;
-          }
-          if (typeof l.round !== "number") {
+            // DG has this player as thru:0 but their tee time is in
+            // the past — either DG hasn't caught up yet or the
+            // player WD'd. Fall through as a projection row so the
+            // dot still renders and search still finds them.
+            rndScore = 0;
+          } else if (typeof l.round !== "number") {
             drops.noScore++;
             continue;
+          } else {
+            rndScore = l.round;
           }
-          rndScore = l.round;
         }
         // Skill priority: CSV final_prediction → DG skill-ratings → 0.
         const csvSg = csvSkill.get(l.player_name);
