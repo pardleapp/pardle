@@ -166,8 +166,12 @@ export async function fetchDkRoundScoreQuotes(
   leagueId: number,
   round: number,
 ): Promise<RoundScoreQuote[]> {
+  // Hitting /categories/1129 alone returns whatever DK's default
+  // subcategory tab is (usually Birdies-or-Better). To get the
+  // Player Round Score markets we have to specify the subcategory
+  // explicitly in the URL path.
   const data = await dkFetch<DKCategoryPayload>(
-    `/v1/leagues/${leagueId}/categories/${ROUND_PROPS_CATEGORY_ID}`,
+    `/v1/leagues/${leagueId}/categories/${ROUND_PROPS_CATEGORY_ID}/subcategories/${PLAYER_ROUND_SCORE_SUBCATEGORY_ID}`,
   );
   const markets = data.markets ?? [];
   const selections = data.selections ?? [];
