@@ -17,6 +17,7 @@
 
 import "server-only";
 import type { BookKey, RoundScoreQuote } from "../types";
+import { proxiedFetch } from "../proxied-fetch";
 
 const BASE = "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusva";
 
@@ -26,8 +27,7 @@ const UA =
   "Chrome/123.0.0.0 Safari/537.36";
 
 async function dkFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    cache: "no-store",
+  const res = await proxiedFetch(`${BASE}${path}`, {
     headers: { "User-Agent": UA, Accept: "application/json" },
   });
   if (!res.ok) {

@@ -9,6 +9,10 @@
 
 import { NextResponse } from "next/server";
 import { getActiveTournament } from "@/lib/golf-api/pgatour";
+import {
+  proxiedFetch,
+  proxyConfigured,
+} from "@/lib/odds-compare/proxied-fetch";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -25,9 +29,8 @@ export async function GET() {
   if (!name) {
     return NextResponse.json({ ok: false, error: "no active tournament" });
   }
-  const leagueRes = await fetch(`${BASE}/v1/leagues/9`, {
+  const leagueRes = await proxiedFetch(`${BASE}/v1/leagues/9`, {
     headers: { "User-Agent": UA, Accept: "application/json" },
-    cache: "no-store",
   });
   if (!leagueRes.ok) {
     return NextResponse.json({
