@@ -31,6 +31,8 @@ import {
   findLeagueId as findDkLeagueId,
 } from "@/lib/odds-compare/sources/draftkings";
 import { fetchKalshiRoundScoreQuotes } from "@/lib/odds-compare/sources/kalshi";
+import { fetchPrizePicksRoundScoreQuotes } from "@/lib/odds-compare/sources/prizepicks";
+import { fetchUnderdogRoundScoreQuotes } from "@/lib/odds-compare/sources/underdog";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -139,14 +141,12 @@ export async function GET(req: Request) {
       if (id == null) return [];
       return fetchDkRoundScoreQuotes(id, round);
     })();
-    const kalshiQuotesPromise = fetchKalshiRoundScoreQuotes(
-      tournamentName,
-      round,
-    );
 
-    const [dk, ks] = await Promise.all([
+    const [dk, pp, ud, ks] = await Promise.all([
       safeFetch(() => dkQuotesPromise),
-      safeFetch(() => kalshiQuotesPromise),
+      safeFetch(() => fetchPrizePicksRoundScoreQuotes(round)),
+      safeFetch(() => fetchUnderdogRoundScoreQuotes(round)),
+      safeFetch(() => fetchKalshiRoundScoreQuotes(tournamentName, round)),
     ]);
 
     // Trim to the top-30 by outright — matches the "contenders only"
@@ -161,11 +161,15 @@ export async function GET(req: Request) {
       /* graceful */
     }
 
+    const countPlayers = (qs: RoundScoreQuote[]) =>
+      new Set(qs.map((q) => normalisePlayerName(q.playerName))).size;
+    const emptyNote = (qs: RoundScoreQuote[]) =>
+      qs.length === 0 ? "no round-score lines posted" : undefined;
+
     const bookQuotes: Record<BookKey, RoundScoreQuote[]> = {
       draftkings: dk.quotes,
-      fanduel: [],
-      caesars: [],
-      betmgm: [],
+      prizepicks: pp.quotes,
+      underdog: ud.quotes,
       kalshi: ks.quotes,
     };
     const bookStatus: Record<
@@ -174,18 +178,23 @@ export async function GET(req: Request) {
     > = {
       draftkings: {
         ok: dk.ok,
-        error: dk.error,
-        playerCount: new Set(dk.quotes.map((q) => normalisePlayerName(q.playerName)))
-          .size,
+        error: dk.error ?? (dk.ok ? emptyNote(dk.quotes) : undefined),
+        playerCount: countPlayers(dk.quotes),
       },
-      fanduel: { ok: false, error: "not yet integrated", playerCount: 0 },
-      caesars: { ok: false, error: "not yet integrated", playerCount: 0 },
-      betmgm: { ok: false, error: "not yet integrated", playerCount: 0 },
+      prizepicks: {
+        ok: pp.ok,
+        error: pp.ok ? emptyNote(pp.quotes) : pp.error,
+        playerCount: countPlayers(pp.quotes),
+      },
+      underdog: {
+        ok: ud.ok,
+        error: ud.ok ? emptyNote(ud.quotes) : ud.error,
+        playerCount: countPlayers(ud.quotes),
+      },
       kalshi: {
         ok: ks.ok,
-        error: ks.ok && ks.quotes.length === 0 ? "no round-score contracts posted" : ks.error,
-        playerCount: new Set(ks.quotes.map((q) => normalisePlayerName(q.playerName)))
-          .size,
+        error: ks.ok ? emptyNote(ks.quotes) : ks.error,
+        playerCount: countPlayers(ks.quotes),
       },
     };
 

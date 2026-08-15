@@ -82,9 +82,13 @@ export default function Page() {
           }}
         >
           Live over/under round-score pricing for the top of this
-          week&apos;s field, side-by-side across the five books that
-          post it. Best price per side is bordered emerald so it&apos;s
-          scannable at a glance. Pricing refreshes every ~30 seconds.
+          week&apos;s field, across DraftKings (a real sportsbook
+          O/U), PrizePicks and Underdog (DFS pick&apos;em, symmetric
+          payouts), and Kalshi (prediction-market exchange). Best
+          price per side is bordered emerald so the best line reads
+          at a glance. DFS + Kalshi typically post props only for
+          majors; DraftKings covers most weeks. Pricing refreshes
+          every ~30 seconds.
         </p>
         <CompareTool />
       </section>

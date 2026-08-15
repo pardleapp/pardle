@@ -275,7 +275,7 @@ export default function CompareTool() {
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
                       <span>{b.label}</span>
                       <span style={{ fontSize: 9, fontWeight: 600, color: T.dim, letterSpacing: 0.4 }}>
-                        Over / Under
+                        {b.kindLabel}
                       </span>
                     </div>
                   </th>
