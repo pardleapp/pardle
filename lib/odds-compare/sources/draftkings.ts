@@ -84,36 +84,41 @@ interface DKEvent {
   name?: string;
   startEventDate?: string;
 }
-interface DKLeagueNode {
-  id: string;
-  name: string;
-  sportId?: string;
-}
-interface DKLeagueListResponse {
-  leagues?: DKLeagueNode[];
-}
 interface DKCategoryPayload {
   markets?: DKMarket[];
   selections?: DKSelection[];
   events?: DKEvent[];
 }
 
-/** Fuzzy tournament-name match against DK's current golf leagues.
- *  Weekly discovery — the leagueId changes every event. */
+/** Discover the current DK leagueId for a tournament by scraping
+ *  the /leagues/golf SPA page — it embeds a
+ *  { eventGroupId, eventGroupName } tuple per active tournament in
+ *  the initial state blob. One HTML request per week is cheap and
+ *  survives DK's periodic API-tree shuffles.
+ *
+ *  Falls back to null when no fuzzy match — the aggregator surfaces
+ *  that as bookStatus.draftkings.ok=false so we know to look. */
 export async function findLeagueId(tournamentName: string): Promise<number | null> {
-  const data = await dkFetch<DKLeagueListResponse>(
-    `/v1/sports/${GOLF_SPORT_ID}`,
-  );
   const target = tournamentName.toLowerCase().replace(/[^a-z0-9]/g, "");
-  for (const lg of data.leagues ?? []) {
-    if (lg.sportId != null && String(lg.sportId) !== GOLF_SPORT_ID) continue;
-    const norm = (lg.name ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const res = await proxiedFetch("https://sportsbook.draftkings.com/leagues/golf", {
+    headers: { "User-Agent": UA, Accept: "text/html,*/*" },
+  });
+  if (!res.ok) return null;
+  const html = await res.text();
+  // Match "eventGroupId":41404,"eventGroupName":"FedEx St. Jude Championship"
+  const pairRe = /"eventGroupId":(\d+),"eventGroupName":"([^"]+)"/g;
+  let best: { id: number; name: string } | null = null;
+  for (const m of html.matchAll(pairRe)) {
+    const id = Number(m[1]);
+    const name = m[2];
+    const norm = name.toLowerCase().replace(/[^a-z0-9]/g, "");
     if (!norm) continue;
     if (norm.includes(target) || target.includes(norm)) {
-      return Number(lg.id);
+      best = { id, name };
+      break;
     }
   }
-  return null;
+  return best?.id ?? null;
 }
 
 /** Parse the round number out of a market name. DK's naming is
