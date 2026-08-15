@@ -30,6 +30,7 @@ import {
   fetchDkRoundScoreQuotes,
   findLeagueId as findDkLeagueId,
 } from "@/lib/odds-compare/sources/draftkings";
+import { fetchKalshiRoundScoreQuotes } from "@/lib/odds-compare/sources/kalshi";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -138,8 +139,15 @@ export async function GET(req: Request) {
       if (id == null) return [];
       return fetchDkRoundScoreQuotes(id, round);
     })();
+    const kalshiQuotesPromise = fetchKalshiRoundScoreQuotes(
+      tournamentName,
+      round,
+    );
 
-    const [dk] = await Promise.all([safeFetch(() => dkQuotesPromise)]);
+    const [dk, ks] = await Promise.all([
+      safeFetch(() => dkQuotesPromise),
+      safeFetch(() => kalshiQuotesPromise),
+    ]);
 
     // Trim to the top-30 by outright — matches the "contenders only"
     // decision. If leaderboard is unavailable, keep everyone (rare —
@@ -158,7 +166,7 @@ export async function GET(req: Request) {
       fanduel: [],
       caesars: [],
       betmgm: [],
-      kalshi: [],
+      kalshi: ks.quotes,
     };
     const bookStatus: Record<
       BookKey,
@@ -173,7 +181,12 @@ export async function GET(req: Request) {
       fanduel: { ok: false, error: "not yet integrated", playerCount: 0 },
       caesars: { ok: false, error: "not yet integrated", playerCount: 0 },
       betmgm: { ok: false, error: "not yet integrated", playerCount: 0 },
-      kalshi: { ok: false, error: "not yet integrated", playerCount: 0 },
+      kalshi: {
+        ok: ks.ok,
+        error: ks.ok && ks.quotes.length === 0 ? "no round-score contracts posted" : ks.error,
+        playerCount: new Set(ks.quotes.map((q) => normalisePlayerName(q.playerName)))
+          .size,
+      },
     };
 
     // Flatten + optionally filter to top-30 by leaderboard.
