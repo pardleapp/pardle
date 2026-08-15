@@ -28,7 +28,7 @@ import type {
 } from "@/lib/odds-compare/types";
 import {
   fetchDkRoundScoreQuotes,
-  findEventGroup as findDkEventGroup,
+  findLeagueId as findDkLeagueId,
 } from "@/lib/odds-compare/sources/draftkings";
 
 export const dynamic = "force-dynamic";
@@ -132,11 +132,9 @@ export async function GET(req: Request) {
 
     // Resolve each book's active event id, then pull round-score quotes
     // for the requested round. Parallel + isolated.
-    const dkEventGroupPromise = findDkEventGroup(tournamentName).catch(
-      () => null,
-    );
+    const dkLeaguePromise = findDkLeagueId(tournamentName).catch(() => null);
     const dkQuotesPromise = (async () => {
-      const id = await dkEventGroupPromise;
+      const id = await dkLeaguePromise;
       if (id == null) return [];
       return fetchDkRoundScoreQuotes(id, round);
     })();

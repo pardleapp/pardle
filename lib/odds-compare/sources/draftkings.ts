@@ -1,25 +1,43 @@
 /**
  * DraftKings round-score O/U fetcher.
  *
- * Reuses the /v1/eventgroups/{id} response we already pull for
- * top-X markets; the round-score subcategories sit in the same
- * offerSubcategoryDescriptors tree, keyed by name.
+ * Endpoint tree (as of 2026-08 discovery via proxied fetch):
+ *   /api/sportscontent/dkuswv/v1/leagues/{leagueId}/categories/1129
  *
- * DK's subcategory naming for round-score is inconsistent across
- * tournaments — sometimes "Round 1 Match Ups", sometimes "Round
- * Scoring", sometimes "1st Round Score". We match with a permissive
- * regex and let the round label parse out the round number.
+ * `dkuswv` is the West-Virginia state slug — the DK sportsbook API
+ * shards by regulated jurisdiction, and WV is the one ScraperAPI's
+ * US residential pool exits through. Other state slugs (dkusva,
+ * dkusnj, dkusny) return the same market data but sometimes 404
+ * depending on which state the exit IP resolves to; dkuswv is
+ * stable across every exit we've tested.
  *
- * DK offers usually price BOTH sides (over + under) of a line as
- * TWO separate outcomes on the same offer, so we pair them up by
- * matching the label prefix.
+ * Category 1129 = "Round Props". Within it, subcategoryId 11786 is
+ * "Player Round Score" — the round-score O/U pool we want.
+ *
+ * Response schema is flat: {events, markets, selections}. Markets
+ * carry name ("Corey Conners Player Round Score - Round 2 O/U"),
+ * subcategoryId, eventId. Selections join to markets via marketId
+ * and carry (label: "Over"|"Under", points: 68.5, displayOdds).
+ *
+ * League ids are per-tournament and change every week; we discover
+ * the current one by scanning DK's golf league list for a fuzzy
+ * name match.
  */
 
 import "server-only";
 import type { BookKey, RoundScoreQuote } from "../types";
 import { proxiedFetch } from "../proxied-fetch";
 
-const BASE = "https://sportsbook-nash.draftkings.com/api/sportscontent/dkusva";
+const BASE = "https://sportsbook-nash.draftkings.com/api/sportscontent/dkuswv";
+const GOLF_SPORT_ID = "12";
+/** Category id for "Round Props" — parent of the round-score O/U
+ *  subcategory. Constants pinned to what the discovery pass on
+ *  2026-08 returned; if DK reshuffles their taxonomy the fetch
+ *  will surface as zero-quotes and the debug endpoint reveals the
+ *  new tree. */
+const ROUND_PROPS_CATEGORY_ID = "1129";
+/** Subcategory id for "Player Round Score" O/U. */
+const PLAYER_ROUND_SCORE_SUBCATEGORY_ID = 11786;
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
@@ -31,198 +49,174 @@ async function dkFetch<T>(path: string): Promise<T> {
     headers: { "User-Agent": UA, Accept: "application/json" },
   });
   if (!res.ok) {
-    throw new Error(`DraftKings ${path} ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    throw new Error(
+      `DraftKings ${path} ${res.status}: ${(await res.text()).slice(0, 200)}`,
+    );
   }
   return (await res.json()) as T;
 }
 
-interface DKOutcome {
-  label: string;
-  oddsAmerican?: string;
-  oddsDecimal?: string;
-  line?: number | string;
+interface DKSelection {
+  id: string;
+  marketId: string;
+  label: string; // "Over" | "Under"
+  displayOdds?: {
+    american?: string;
+    decimal?: string;
+    fractional?: string;
+  };
+  trueOdds?: number;
+  points?: number;
+  outcomeType?: string;
+  participants?: Array<{ name?: string }>;
 }
-interface DKOffer {
-  label: string;
-  outcomes?: DKOutcome[];
-  lastUpdatedDate?: string;
-}
-interface DKSubcategory {
-  subcategoryId: number;
+interface DKMarket {
+  id: string;
+  eventId: string;
+  leagueId: string;
   name: string;
-  offers?: DKOffer[][];
+  subcategoryId?: number;
+  isSuspended?: boolean;
+  marketType?: { id?: string; name?: string };
 }
-interface DKCategory {
-  categoryId: number;
+interface DKEvent {
+  id: string;
+  name?: string;
+  startEventDate?: string;
+}
+interface DKLeagueNode {
+  id: string;
   name: string;
-  offerSubcategoryDescriptors?: DKSubcategory[];
+  sportId?: string;
 }
-interface DKEventGroupResponse {
-  eventGroup?: { offerCategories?: DKCategory[] };
+interface DKLeagueListResponse {
+  leagues?: DKLeagueNode[];
+}
+interface DKCategoryPayload {
+  markets?: DKMarket[];
+  selections?: DKSelection[];
+  events?: DKEvent[];
 }
 
-const ROUND_RE = /(?:^|\W)(?:round\s*|r\s*|(\d+)\s*(?:st|nd|rd|th)\s+round)(\d+)?/i;
-
-/** Parse a round number 1-4 out of a subcategory name. Returns
- *  null when the name doesn't match the round-score family. */
-function roundFromSubcategoryName(name: string): number | null {
-  const n = name.toLowerCase();
-  // "1st round", "round 1", "r1"
-  const patterns = [
-    /(\d)(?:st|nd|rd|th)\s+round/,
-    /round\s*(\d)/,
-    /\br(\d)\b/,
-  ];
-  for (const re of patterns) {
-    const m = n.match(re);
-    if (m) {
-      const r = Number(m[1]);
-      if (r >= 1 && r <= 4) return r;
+/** Fuzzy tournament-name match against DK's current golf leagues.
+ *  Weekly discovery — the leagueId changes every event. */
+export async function findLeagueId(tournamentName: string): Promise<number | null> {
+  const data = await dkFetch<DKLeagueListResponse>(
+    `/v1/sports/${GOLF_SPORT_ID}`,
+  );
+  const target = tournamentName.toLowerCase().replace(/[^a-z0-9]/g, "");
+  for (const lg of data.leagues ?? []) {
+    if (lg.sportId != null && String(lg.sportId) !== GOLF_SPORT_ID) continue;
+    const norm = (lg.name ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (!norm) continue;
+    if (norm.includes(target) || target.includes(norm)) {
+      return Number(lg.id);
     }
   }
   return null;
 }
 
-/** Does this subcategory name look like a round-score O/U market
- *  (as opposed to matchups, 3-balls, cuts, top-X)? */
-function looksLikeRoundScoreSub(name: string): boolean {
-  const n = name.toLowerCase();
-  if (!roundFromSubcategoryName(name)) return false;
-  // Positive keywords for O/U totals
-  if (n.includes("score") || n.includes("total")) return true;
-  if (/o\s*\/\s*u|over.*under/i.test(n)) return true;
-  return false;
+/** Parse the round number out of a market name. DK's naming is
+ *  consistent: "<Player> Player Round Score - Round N O/U" or
+ *  "<Player> - Round N O/U". */
+function roundFromMarketName(name: string): number | null {
+  const m = name.match(/round\s*(\d)/i);
+  if (!m) return null;
+  const r = Number(m[1]);
+  return r >= 1 && r <= 4 ? r : null;
 }
 
-/** Convert DK's odds fields into a decimal price. */
-function decimalOdds(o: DKOutcome): number | null {
-  if (o.oddsDecimal) {
-    const n = Number(o.oddsDecimal);
+/** Extract player name from a market name. Strips the trailing
+ *  " - Round N O/U" and any "Player Round Score" / "Birdies or
+ *  Better" tag. */
+function playerFromMarketName(name: string): string | null {
+  const cleaned = name
+    .replace(/\s*-\s*Round\s*\d\s*(?:O\/?U)?\s*$/i, "")
+    .replace(/\s*Player\s+Round\s+Score\s*$/i, "")
+    .replace(/\s*Birdies\s+or\s+Better\s*$/i, "")
+    .replace(/\s*O\/?U\s*$/i, "")
+    .trim();
+  return cleaned || null;
+}
+
+function decimalFromSelection(s: DKSelection): number | null {
+  if (typeof s.trueOdds === "number" && s.trueOdds > 1) return s.trueOdds;
+  const d = s.displayOdds?.decimal;
+  if (d) {
+    const n = Number(d);
     if (Number.isFinite(n) && n > 1) return n;
   }
-  if (o.oddsAmerican) {
-    const n = Number(o.oddsAmerican);
-    if (Number.isFinite(n)) {
-      return n > 0 ? 1 + n / 100 : 1 + 100 / Math.abs(n);
-    }
+  const a = s.displayOdds?.american;
+  if (a) {
+    const n = Number(a);
+    if (Number.isFinite(n)) return n > 0 ? 1 + n / 100 : 1 + 100 / Math.abs(n);
   }
   return null;
 }
 
-/** DK outcome labels for round-score come as "Player Name Over" and
- *  "Player Name Under" (or the offer label carries the player and
- *  outcomes carry only Over/Under). Extract the (player, side, line)
- *  triple from an offer + its outcomes. */
-function parseRoundScoreOffer(
-  offer: DKOffer,
-): { player: string; line: number; overDec: number | null; underDec: number | null } | null {
-  const outcomes = offer.outcomes ?? [];
-  if (outcomes.length === 0) return null;
-  // Case A: offer label = player name; outcomes = "Over 67.5" / "Under 67.5"
-  const offerLabel = (offer.label ?? "").trim();
-  let player = "";
-  let over: DKOutcome | undefined;
-  let under: DKOutcome | undefined;
-  let line: number | null = null;
-  for (const o of outcomes) {
-    const lbl = (o.label ?? "").trim();
-    const isOver = /\bover\b/i.test(lbl);
-    const isUnder = /\bunder\b/i.test(lbl);
-    if (!isOver && !isUnder) continue;
-    if (isOver) over = o;
-    if (isUnder) under = o;
-    // Capture line from outcome's .line field OR by regex on the label.
-    if (line == null) {
-      if (o.line != null && Number.isFinite(Number(o.line))) {
-        line = Number(o.line);
-      } else {
-        const m = lbl.match(/(\d+(?:\.\d+)?)/);
-        if (m) line = Number(m[1]);
-      }
-    }
-  }
-  if (!over && !under) return null;
-  if (line == null) return null;
-  // Prefer offer label as player (cleaner); otherwise strip "Over/Under 67.5"
-  // off the outcome label.
-  if (offerLabel && !/\bover\b|\bunder\b/i.test(offerLabel)) {
-    player = offerLabel;
-  } else {
-    // Take one outcome's label and strip "over ##" / "under ##"
-    const src = over ?? under;
-    const cleaned = (src?.label ?? "")
-      .replace(/\b(over|under)\b/gi, "")
-      .replace(/\b\d+(?:\.\d+)?\b/g, "")
-      .trim();
-    player = cleaned;
-  }
-  if (!player) return null;
-  return {
-    player,
-    line,
-    overDec: over ? decimalOdds(over) : null,
-    underDec: under ? decimalOdds(under) : null,
-  };
-}
-
-interface DKEventGroupNode {
-  eventGroupId: number;
-  eventGroupName: string;
-  eventGroupStartDate?: string;
-}
-interface DKLeagueResponse {
-  eventGroups?: DKEventGroupNode[];
-}
-
-/** Match a tournament name against DK event groups. Loose contains
- *  match — DK sometimes prefixes with "PGA" or the sponsor. */
-export async function findEventGroup(
-  tournamentName: string,
-): Promise<number | null> {
-  const data = await dkFetch<DKLeagueResponse>(`/v1/leagues/9`);
-  const target = tournamentName.toLowerCase().replace(/[^a-z0-9]/g, "");
-  for (const g of data.eventGroups ?? []) {
-    const norm = (g.eventGroupName ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
-    // Match either direction — DK's label might carry sponsor/tour prefix.
-    if (norm.includes(target) || target.includes(norm)) return g.eventGroupId;
-  }
-  return null;
-}
-
-/** Fetch all round-score O/U quotes for a tournament. Round argument
- *  filters to that round only. */
+/** Fetch all Player Round Score O/U quotes for one round of a
+ *  tournament. Returns empty when DK hasn't posted the market
+ *  yet (common on late-round days before tee times). */
 export async function fetchDkRoundScoreQuotes(
-  eventGroupId: number,
+  leagueId: number,
   round: number,
 ): Promise<RoundScoreQuote[]> {
-  const data = await dkFetch<DKEventGroupResponse>(
-    `/v1/eventgroups/${eventGroupId}`,
+  const data = await dkFetch<DKCategoryPayload>(
+    `/v1/leagues/${leagueId}/categories/${ROUND_PROPS_CATEGORY_ID}`,
   );
-  const cats = data.eventGroup?.offerCategories ?? [];
-  const now = new Date().toISOString();
-  const out: RoundScoreQuote[] = [];
+  const markets = data.markets ?? [];
+  const selections = data.selections ?? [];
   const BOOK: BookKey = "draftkings";
-  for (const cat of cats) {
-    for (const sub of cat.offerSubcategoryDescriptors ?? []) {
-      if (!looksLikeRoundScoreSub(sub.name)) continue;
-      const r = roundFromSubcategoryName(sub.name);
-      if (r !== round) continue;
-      for (const group of sub.offers ?? []) {
-        for (const offer of group) {
-          const parsed = parseRoundScoreOffer(offer);
-          if (!parsed) continue;
-          out.push({
-            book: BOOK,
-            playerName: parsed.player,
-            round: r,
-            line: parsed.line,
-            over: parsed.overDec,
-            under: parsed.underDec,
-            lastUpdatedAt: offer.lastUpdatedDate ?? now,
-          });
-        }
-      }
+  const now = new Date().toISOString();
+
+  // Filter markets to Player Round Score for the requested round.
+  const targetMarkets = new Map<string, { player: string }>();
+  for (const m of markets) {
+    if (m.subcategoryId !== PLAYER_ROUND_SCORE_SUBCATEGORY_ID) continue;
+    if (m.isSuspended) continue;
+    const r = roundFromMarketName(m.name);
+    if (r !== round) continue;
+    const player = playerFromMarketName(m.name);
+    if (!player) continue;
+    targetMarkets.set(m.id, { player });
+  }
+
+  // Group selections by marketId, pair the Over + Under.
+  const grouped = new Map<
+    string,
+    { over?: DKSelection; under?: DKSelection; line?: number }
+  >();
+  for (const sel of selections) {
+    if (!targetMarkets.has(sel.marketId)) continue;
+    const bucket = grouped.get(sel.marketId) ?? {};
+    if (sel.label?.toLowerCase() === "over") bucket.over = sel;
+    if (sel.label?.toLowerCase() === "under") bucket.under = sel;
+    if (bucket.line == null && typeof sel.points === "number") {
+      bucket.line = sel.points;
     }
+    grouped.set(sel.marketId, bucket);
+  }
+
+  const out: RoundScoreQuote[] = [];
+  for (const [marketId, { over, under, line }] of grouped) {
+    if (line == null) continue;
+    const meta = targetMarkets.get(marketId);
+    if (!meta) continue;
+    // Prefer selection.participants[0].name over the parsed market
+    // name when present — it's the canonical form.
+    const participantName =
+      over?.participants?.[0]?.name ??
+      under?.participants?.[0]?.name ??
+      meta.player;
+    out.push({
+      book: BOOK,
+      playerName: participantName,
+      round,
+      line,
+      over: over ? decimalFromSelection(over) : null,
+      under: under ? decimalFromSelection(under) : null,
+      lastUpdatedAt: now,
+    });
   }
   return out;
 }
