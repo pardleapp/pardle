@@ -41,66 +41,76 @@ export async function scrapeCaesars(page) {
 
   const nowIso = new Date().toISOString();
   const quotes = await page.evaluate((now) => {
-    const decimalFromAmerican = (s) => {
-      const n = Number(String(s).replace(/[^0-9+\-]/g, ""));
+    /** Decimal odds from an American price integer. */
+    const decimalFromAmerican = (n) => {
       if (!Number.isFinite(n) || n === 0) return null;
       return n > 0 ? 1 + n / 100 : 1 + 100 / Math.abs(n);
     };
-    const out = [];
-    const headers = [
-      ...document.querySelectorAll("h1, h2, h3, h4, h5, [role='heading']"),
-    ].filter((h) =>
-      /round\s*\d.*(?:score|total|strokes)/i.test(h.textContent || ""),
+
+    // Caesars' Round Props DOM (recon 2026-08):
+    //  - Every player's O/U pair sits inside a card
+    //    [data-cy="cui__card"][id^="cui__market-template-"]
+    //  - Card header text: "Round N Score - <Player Name> Live"
+    //  - Each side is a button [data-cy="market-button-btn"] with
+    //    aria-label "Over 72.5 odds at +200" (or "Under ...").
+    //  - Both buttons share data-market so we pair by that.
+    const results = [];
+    const cards = document.querySelectorAll(
+      '[data-cy="cui__card"][id^="cui__market-template-"]',
     );
-    for (const header of headers) {
-      const m = String(header.textContent || "").match(/round\s*(\d)/i);
-      if (!m) continue;
-      const round = Number(m[1]);
-      if (round < 1 || round > 4) continue;
-      let container = header.parentElement;
-      let depth = 0;
-      while (container && depth < 6) {
-        const cards = container.querySelectorAll(
-          "[data-testid='MarketBoard'], [data-testid='market-container'], .market-list__item",
-        );
-        if (cards.length > 0) {
-          for (const card of cards) {
-            const nameEl = card.querySelector(
-              "[data-testid='MarketName'], .market-title, [data-testid='participant-name']",
-            );
-            const playerName = (nameEl?.textContent || "").trim();
-            if (!playerName) continue;
-            const buttons = card.querySelectorAll("button, [role='button']");
-            let over = null;
-            let under = null;
-            let line = null;
-            for (const btn of buttons) {
-              const label = String(btn.textContent || "").trim();
-              const lm = label.match(/(\d+(?:\.\d+)?)/);
-              if (lm && line == null) line = Number(lm[1]);
-              const pm = label.match(/([+\-]\d{2,4})/);
-              const dec = pm ? decimalFromAmerican(pm[1]) : null;
-              if (/over|higher/i.test(label)) over = dec ?? over;
-              else if (/under|lower/i.test(label)) under = dec ?? under;
-            }
-            if (line == null || (over == null && under == null)) continue;
-            out.push({
-              book: "caesars",
-              playerName,
-              round,
-              line,
-              over,
-              under,
-              lastUpdatedAt: now,
-            });
+    for (const card of cards) {
+      // Header: e.g. "Round 4 Score - Sam Burns Live". Sometimes
+      // "Round 4 Score - Scottie Scheffler" (no Live suffix if
+      // suspended). Match round + player in one regex.
+      let round = null;
+      let playerName = null;
+      const headerCandidates = card.querySelectorAll(
+        ".heading-sm-bold, .cui-text-fg-moderate",
+      );
+      for (const h of headerCandidates) {
+        const t = String(h.textContent || "").trim();
+        const m = t.match(/Round\s*(\d)\s*Score\s*[-–—]\s*(.+?)(?:\s+Live)?\s*$/i);
+        if (m) {
+          const r = Number(m[1]);
+          if (r >= 1 && r <= 4) {
+            round = r;
+            playerName = m[2].trim();
+            break;
           }
-          break;
         }
-        container = container.parentElement;
-        depth++;
       }
+      if (round == null || !playerName) continue;
+
+      const buttons = card.querySelectorAll('[data-cy="market-button-btn"]');
+      let over = null;
+      let under = null;
+      let line = null;
+      for (const btn of buttons) {
+        const label = btn.getAttribute("aria-label") ?? "";
+        // e.g. "Over 72.5 odds at +200" — pull side, line, price.
+        const m = label.match(/^(Over|Under)\s+(\d+(?:\.\d+)?)\s+odds\s+at\s+([+\-]?\d+)/i);
+        if (!m) continue;
+        const side = m[1].toLowerCase();
+        const l = Number(m[2]);
+        const price = Number(m[3]);
+        if (!Number.isFinite(l) || !Number.isFinite(price)) continue;
+        if (line == null) line = l;
+        const dec = decimalFromAmerican(price);
+        if (side === "over") over = dec;
+        else if (side === "under") under = dec;
+      }
+      if (line == null || (over == null && under == null)) continue;
+      results.push({
+        book: "caesars",
+        playerName,
+        round,
+        line,
+        over,
+        under,
+        lastUpdatedAt: now,
+      });
     }
-    return out;
+    return results;
   }, nowIso);
   if (quotes.length === 0 && DEBUG_DUMP) {
     // Grab enough surrounding markup to see the round-props
