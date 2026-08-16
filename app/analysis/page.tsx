@@ -7,6 +7,7 @@ import TeeTimePreview from "./_previews/TeeTimePreview";
 import TeeShotPreview from "./_previews/TeeShotPreview";
 import ScoreForecastPreview from "./_previews/ScoreForecastPreview";
 import CourseHistoryPreview from "./_previews/CourseHistoryPreview";
+import OddsComparePreview from "./_previews/OddsComparePreview";
 
 export const metadata = {
   title: `Tools — ${BRAND.name}`,
@@ -64,6 +65,14 @@ const CARDS: Card[] = [
       "Every player's driver ball flight — average shape, dispersion cloud, closest matches in the field.",
     status: "live",
     Preview: TeeShotPreview,
+  },
+  {
+    href: "/analysis/odds-compare",
+    title: "Round-score odds compare",
+    blurb:
+      "Live over/under pricing on this week's field, side-by-side across the books that post it. Best price per side is highlighted.",
+    status: "live",
+    Preview: OddsComparePreview,
   },
 ];
 
