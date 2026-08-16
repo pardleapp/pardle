@@ -33,7 +33,7 @@ import {
 import { fetchKalshiRoundScoreQuotes } from "@/lib/odds-compare/sources/kalshi";
 import { fetchPrizePicksRoundScoreQuotes } from "@/lib/odds-compare/sources/prizepicks";
 import { fetchUnderdogRoundScoreQuotes } from "@/lib/odds-compare/sources/underdog";
-import { ingestKey } from "./ingest/route";
+import { ingestKey } from "@/lib/odds-compare/ingest-store";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

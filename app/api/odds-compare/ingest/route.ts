@@ -19,26 +19,20 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
 import type { BookKey, RoundScoreQuote } from "@/lib/odds-compare/types";
+import {
+  ingestKey,
+  INGEST_TTL_SECONDS,
+  INGEST_ALLOWED_BOOKS,
+} from "@/lib/odds-compare/ingest-store";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const redis = Redis.fromEnv();
-/** TTL long enough to survive one missed poll but short enough that
- *  a genuinely-dead scraper drops out of the aggregator inside a
- *  couple of minutes. 30 s poll + 30 s cache + 90 s safety = 3 min. */
-const INGEST_TTL_SECONDS = 180;
-
-const ALLOWED_BOOKS: BookKey[] = ["fanduel", "caesars", "betmgm"];
 
 interface IngestBody {
   book: string;
   quotes: unknown;
-}
-
-/** Redis key for one book's most-recent ingest payload. */
-export function ingestKey(book: BookKey): string {
-  return `feed:odds-compare:ingest:v1:${book}`;
 }
 
 function isRoundScoreQuote(v: unknown): v is RoundScoreQuote {
@@ -88,7 +82,7 @@ export async function POST(req: Request) {
   }
 
   const book = body.book as BookKey;
-  if (!ALLOWED_BOOKS.includes(book)) {
+  if (!INGEST_ALLOWED_BOOKS.includes(book)) {
     return NextResponse.json(
       { ok: false, error: `book not accepted for ingest: ${book}` },
       { status: 400 },
