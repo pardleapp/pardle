@@ -39,10 +39,23 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const redis = Redis.fromEnv();
-const CACHE_TTL = 30; // seconds
+/** Aggregator payload TTL. Round-score prices don't move fast
+ *  enough to justify a 30 s refresh — 90 s cuts our ScraperAPI
+ *  hits by 3× while still feeling live for a comparison view. */
+const CACHE_TTL = 90;
+/** Per-book "no data" cooldown. When a proxied source (PrizePicks,
+ *  Underdog, Kalshi) returns zero quotes, we cache that empty
+ *  state for 30 min so the aggregator hot path doesn't burn a
+ *  ScraperAPI credit re-asking every 90 s during non-major weeks
+ *  when those sources habitually have no golf props posted. */
+const EMPTY_BOOK_COOLDOWN_SECONDS = 30 * 60;
 
 function cacheKey(tournamentId: string, round: number): string {
   return `feed:odds-compare:v1:${tournamentId}:r${round}`;
+}
+
+function emptyCooldownKey(book: BookKey, tournamentId: string, round: number): string {
+  return `feed:odds-compare:empty-cooldown:v1:${book}:${tournamentId}:r${round}`;
 }
 
 /** Normalise a player name so DK's "R. McIlroy" and PGA Tour's
@@ -136,6 +149,35 @@ export async function GET(req: Request) {
 
     // Resolve each book's active event id, then pull round-score quotes
     // for the requested round. Parallel + isolated.
+    // Capture as narrowed locals — TS re-widens outer consts to
+    // their pre-guard nullable types inside nested function closures.
+    const tidStr: string = tournamentId;
+    const roundNum: number = round;
+    /** Skip a proxied fetch when we saw the same book empty in the
+     *  last 30 min. Returns the empty array + a shared "skipped"
+     *  marker so status can still surface the reason. */
+    async function callWithCooldown(
+      book: BookKey,
+      fn: () => Promise<RoundScoreQuote[]>,
+    ): Promise<{ quotes: RoundScoreQuote[]; cooled: boolean }> {
+      const cooldownKey = emptyCooldownKey(book, tidStr, roundNum);
+      try {
+        const cool = await redis.get<number>(cooldownKey);
+        if (cool != null) return { quotes: [], cooled: true };
+      } catch {
+        /* cache miss */
+      }
+      const quotes = await fn();
+      if (quotes.length === 0) {
+        try {
+          await redis.set(cooldownKey, 1, { ex: EMPTY_BOOK_COOLDOWN_SECONDS });
+        } catch {
+          /* not fatal */
+        }
+      }
+      return { quotes, cooled: false };
+    }
+
     const dkLeaguePromise = findDkLeagueId(tournamentName).catch(() => null);
     const dkQuotesPromise = (async () => {
       const id = await dkLeaguePromise;
@@ -164,10 +206,21 @@ export async function GET(req: Request) {
     );
 
     const [dk, pp, ud, ks, ingested] = await Promise.all([
+      // DK is the primary source — no cooldown, we always want it.
       safeFetch(() => dkQuotesPromise),
-      safeFetch(() => fetchPrizePicksRoundScoreQuotes(round)),
-      safeFetch(() => fetchUnderdogRoundScoreQuotes(round)),
-      safeFetch(() => fetchKalshiRoundScoreQuotes(tournamentName, round)),
+      // PrizePicks / Underdog / Kalshi rarely post golf props outside
+      // major weeks. Cooldown suppresses re-fetches when the last
+      // response was empty, saving ScraperAPI credits on regular tour
+      // stops (Kalshi is a public API but included for consistency).
+      safeFetch(async () =>
+        (await callWithCooldown("prizepicks", () => fetchPrizePicksRoundScoreQuotes(round))).quotes,
+      ),
+      safeFetch(async () =>
+        (await callWithCooldown("underdog", () => fetchUnderdogRoundScoreQuotes(round))).quotes,
+      ),
+      safeFetch(async () =>
+        (await callWithCooldown("kalshi", () => fetchKalshiRoundScoreQuotes(tournamentName, round))).quotes,
+      ),
       ingestReads,
     ]);
     // Bucket ingested payloads per book. Filter to the requested

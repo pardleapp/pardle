@@ -25,8 +25,21 @@
  */
 
 import "server-only";
+import { Redis } from "@upstash/redis";
 import type { BookKey, RoundScoreQuote } from "../types";
 import { proxiedFetch } from "../proxied-fetch";
+
+const redis = Redis.fromEnv();
+/** DK's per-tournament leagueId changes weekly (each tour stop
+ *  gets its own id). Between changes, no reason to re-scrape the
+ *  golf hub HTML. 24 h Redis cache halves ScraperAPI spend on the
+ *  aggregator hot path. Keyed by tournament name so a new-week
+ *  cutover naturally invalidates the previous week's entry. */
+const LEAGUE_ID_TTL_SECONDS = 60 * 60 * 24;
+function leagueIdCacheKey(tournamentName: string): string {
+  const norm = tournamentName.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return `feed:odds-compare:dk-league-id:v1:${norm}`;
+}
 
 const BASE = "https://sportsbook-nash.draftkings.com/api/sportscontent/dkuswv";
 const GOLF_SPORT_ID = "12";
@@ -96,9 +109,23 @@ interface DKCategoryPayload {
  *  the initial state blob. One HTML request per week is cheap and
  *  survives DK's periodic API-tree shuffles.
  *
+ *  Cached in Redis for 24h since the leagueId only rotates
+ *  weekly. Aggregator hot path used to burn a ScraperAPI credit
+ *  every 30 s hitting this — now it's ~1 fresh scrape per tournament
+ *  per day, saving ~50% of DK-related credits.
+ *
  *  Falls back to null when no fuzzy match — the aggregator surfaces
  *  that as bookStatus.draftkings.ok=false so we know to look. */
 export async function findLeagueId(tournamentName: string): Promise<number | null> {
+  // Cache read.
+  const cacheKey = leagueIdCacheKey(tournamentName);
+  try {
+    const cached = await redis.get<number>(cacheKey);
+    if (typeof cached === "number" && cached > 0) return cached;
+  } catch {
+    /* cache miss / read fail — fall through to fresh scrape */
+  }
+
   const target = tournamentName.toLowerCase().replace(/[^a-z0-9]/g, "");
   const res = await proxiedFetch("https://sportsbook.draftkings.com/leagues/golf", {
     headers: { "User-Agent": UA, Accept: "text/html,*/*" },
@@ -116,6 +143,13 @@ export async function findLeagueId(tournamentName: string): Promise<number | nul
     if (norm.includes(target) || target.includes(norm)) {
       best = { id, name };
       break;
+    }
+  }
+  if (best?.id) {
+    try {
+      await redis.set(cacheKey, best.id, { ex: LEAGUE_ID_TTL_SECONDS });
+    } catch {
+      /* cache write failure not fatal */
     }
   }
   return best?.id ?? null;

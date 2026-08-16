@@ -42,7 +42,10 @@ const T = {
   fontMono: "'IBM Plex Mono', ui-monospace, monospace",
 };
 
-const POLL_MS = 30_000;
+/** Client poll cadence. Book prices don't move fast enough on
+ *  round-score O/U to justify a 30 s refresh; 60 s keeps the
+ *  server-side ScraperAPI spend halved without feeling stale. */
+const POLL_MS = 60_000;
 
 /** Convert decimal odds to American for display — bettors read
  *  American faster in the US context. Positive when underdog,
@@ -339,7 +342,7 @@ export default function CompareTool() {
           }}
         >
           Last update {new Date(data.generatedAt).toLocaleTimeString()}
-          {" · refreshes every 30s"}
+          {" · refreshes every minute"}
         </div>
       )}
     </div>

@@ -88,7 +88,7 @@ export default function Page() {
           price per side is bordered emerald so the best line reads
           at a glance. DFS + Kalshi typically post props only for
           majors; DraftKings covers most weeks. Pricing refreshes
-          every ~30 seconds.
+          every minute.
         </p>
         <CompareTool />
       </section>
