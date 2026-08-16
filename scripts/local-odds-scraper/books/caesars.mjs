@@ -15,36 +15,19 @@
  * pick new selectors.
  */
 
-/** Caesars auto-redirects /golf to /us/{state}/bet/golf based on
- *  the visitor's IP-derived region. Starting from the state-agnostic
- *  URL lets the scraper work from any US state without hard-coding
- *  a state slug. */
-const HUB_URL = "https://sportsbook.caesars.com/golf";
-
-async function findTournamentUrl(page) {
-  await page.goto(HUB_URL, {
-    waitUntil: "domcontentloaded",
-    timeout: 45_000,
-  });
-  // After the redirect, tournament links live under /bet/golf/.
-  await page
-    .waitForSelector("a[href*='/bet/golf/']", { timeout: 30_000 })
-    .catch(() => {});
-  const href = await page
-    .locator("a[href*='/bet/golf/']")
-    .first()
-    .getAttribute("href")
-    .catch(() => null);
-  if (!href) throw new Error("no active tournament link on Caesars golf hub");
-  return new URL(href, page.url()).toString();
-}
+/** Direct link to Caesars' "Round Props" tab — surfaces every
+ *  active round-score O/U across every current tournament in one
+ *  view. Auto-redirects to the visitor's state-scoped page. */
+const ROUND_PROPS_URL =
+  "https://sportsbook.caesars.com/golf?tab=SCHEDULE%7CRound%20Props";
 
 export async function scrapeCaesars(page) {
-  const url = await findTournamentUrl(page);
-  await page.goto(url, {
+  await page.goto(ROUND_PROPS_URL, {
     waitUntil: "domcontentloaded",
     timeout: 45_000,
   });
+  // The Round Props tab renders one accordion per active round;
+  // wait until at least one shows up before we walk the DOM.
   await page
     .waitForSelector("text=/round\\s*\\d/i", { timeout: 30_000 })
     .catch(() => {});
