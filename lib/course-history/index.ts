@@ -55,10 +55,14 @@ const CURRENT_YEAR = 2026;
 const KEY_ROUND = (eventId: number, year: number) =>
   `course-history:round:${eventId}:${year}`;
 const KEY_EVENT_LIST = "course-history:event-list:pga";
-// v8 = second-round split-personality fixes (Bay Hill, Torrey Pines,
-// Country Club of Jackson, Dunes, Riviera). Drop v7 aggregates.
+// v9 = field-strength-adjusted outperformance. Every player's SG:OTT
+// + SG:APP at the target course is now adjusted by (event field
+// strength − tour average field strength) before comparison to their
+// year-baseline. Fixes the systematic negative-bias where strong-field
+// courses (WGCs, majors, FedExCup Playoffs) showed 70%+ of players as
+// underperformers.
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v8:${slugify(courseName)}`;
+  `course-history:agg-course:v9:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
@@ -600,6 +604,124 @@ export async function getCourseHistoryByCourse(
     excludedByYear.set(o.year, set);
   }
 
+  // ── Field-strength adjustment ─────────────────────────────────────
+  // DG's SG numbers are measured vs the FIELD each week. Strong-field
+  // events (WGCs, majors, FedExCup Playoffs) produce lower observed
+  // SG for the same "true skill" than weak-field opposite events.
+  // Without adjusting for this, aggregating a player's rounds at a
+  // strong-field course against a baseline that averages all their
+  // events (many weak-field) yields a systematic NEGATIVE
+  // outperformance — 143 vs 65 under/over on our first audit.
+  //
+  // The fix: for each event this player played at the target course,
+  // measure the event's field strength = mean of its participants'
+  // that-year leave-one-out baselines (excluding the event itself,
+  // so field strength isn't inflated by whichever star had a hot
+  // week). Then adjust the player's raw SG at that round by
+  //   adjusted_sg = raw_sg + (event_fs − tour_avg_fs)
+  // which centres every round on a common field-strength reference.
+
+  /** Sum of a player's year-baseline totals with a specific event's
+   *  contribution subtracted. Nulls when the player has no rounds
+   *  outside that event that year. */
+  function eventLoocBaselineForFieldStrength(
+    yearBaseline: YearBaseline,
+    dgId: number,
+    excludedEventId: number,
+  ): { sgOtt: number; sgApp: number } | null {
+    const row = yearBaseline.get(dgId);
+    if (!row) return null;
+    const ev = row.byEvent[excludedEventId];
+    const otherOtt = row.sumOtt - (ev?.sumOtt ?? 0);
+    const otherApp = row.sumApp - (ev?.sumApp ?? 0);
+    const otherRounds = row.rounds - (ev?.rounds ?? 0);
+    if (otherRounds <= 0) return null;
+    return {
+      sgOtt: otherOtt / otherRounds,
+      sgApp: otherApp / otherRounds,
+    };
+  }
+
+  /** Cache per (eventId, year) → {ott, app, participants}. Built from
+   *  the round set for each occurrence: iterate every player who has
+   *  ≥1 round at this event-year, look up their year-leave-one-out
+   *  baseline (excluding this event), average. */
+  const fieldStrengthByOccurrence = new Map<
+    string,
+    { sgOtt: number; sgApp: number }
+  >();
+  const occKey = (eid: number, y: number) => `${eid}:${y}`;
+
+  for (let i = 0; i < occurrences.length; i++) {
+    const occ = occurrences[i];
+    const eventRounds = roundBatches[i];
+    const yearBaseline = baselinesByYear.get(occ.year);
+    if (!yearBaseline) continue;
+    // Unique dgIds in this event-year — one contribution per player,
+    // no matter how many rounds they played.
+    const participantIds = new Set<number>();
+    for (const r of eventRounds) participantIds.add(r.dgId);
+    let sumOtt = 0;
+    let sumApp = 0;
+    let n = 0;
+    for (const dgId of participantIds) {
+      const b = eventLoocBaselineForFieldStrength(
+        yearBaseline,
+        dgId,
+        occ.eventId,
+      );
+      if (!b) continue;
+      sumOtt += b.sgOtt;
+      sumApp += b.sgApp;
+      n++;
+    }
+    if (n === 0) continue;
+    fieldStrengthByOccurrence.set(occKey(occ.eventId, occ.year), {
+      sgOtt: sumOtt / n,
+      sgApp: sumApp / n,
+    });
+  }
+
+  // Tour-average field strength: mean field-strength across every
+  // event-year in ALL the year baselines we loaded. Used as the
+  // reference point so an "average field" event round gets zero
+  // adjustment.
+  let tourFsSumOtt = 0;
+  let tourFsSumApp = 0;
+  let tourFsN = 0;
+  for (const [year, yearBaseline] of baselinesByYear) {
+    // Every event that appears in a player's byEvent breakdown.
+    const eventIds = new Set<number>();
+    for (const row of yearBaseline.values()) {
+      for (const eid of Object.keys(row.byEvent)) {
+        eventIds.add(Number(eid));
+      }
+    }
+    for (const eid of eventIds) {
+      const participantIds = new Set<number>();
+      for (const [pid, row] of yearBaseline) {
+        if (row.byEvent[eid]) participantIds.add(pid);
+      }
+      let sumOtt = 0;
+      let sumApp = 0;
+      let n = 0;
+      for (const dgId of participantIds) {
+        const b = eventLoocBaselineForFieldStrength(yearBaseline, dgId, eid);
+        if (!b) continue;
+        sumOtt += b.sgOtt;
+        sumApp += b.sgApp;
+        n++;
+      }
+      if (n === 0) continue;
+      tourFsSumOtt += sumOtt / n;
+      tourFsSumApp += sumApp / n;
+      tourFsN++;
+    }
+    void year;
+  }
+  const tourAvgFsOtt = tourFsN > 0 ? tourFsSumOtt / tourFsN : 0;
+  const tourAvgFsApp = tourFsN > 0 ? tourFsSumApp / tourFsN : 0;
+
   /** Look up a player's leave-one-out baseline SG:OTT + SG:APP for a
    *  specific year, excluding all events that used the target course
    *  that year. So a Riviera query subtracts BOTH the Genesis
@@ -656,6 +778,19 @@ export async function getCourseHistoryByCourse(
     courses: Map<string, number>;
   }
   const byPlayer = new Map<number, Bucket>();
+  // Map each round to its (eventId, year) so we can look up the
+  // event's field-strength adjustment. allRounds carries year but
+  // not eventId directly (RoundRecord doesn't); reconstruct by
+  // matching against roundBatches parallel index.
+  const roundEventLookup = new Map<RoundRecord, number>();
+  for (let i = 0; i < occurrences.length; i++) {
+    for (const r of roundBatches[i]) {
+      if (r.courseName === cleanCourse) {
+        roundEventLookup.set(r, occurrences[i].eventId);
+      }
+    }
+  }
+
   for (const r of allRounds) {
     let b = byPlayer.get(r.dgId);
     if (!b) {
@@ -673,8 +808,18 @@ export async function getCourseHistoryByCourse(
       };
       byPlayer.set(r.dgId, b);
     }
-    b.sumAtOtt += r.sgOtt;
-    b.sumAtApp += r.sgApp;
+    // Field-strength adjustment: centre this round's SG on the tour
+    // average field. If the event was above-average strength, the
+    // player's raw SG understates their performance — add the delta
+    // back. Below-average strength → subtract.
+    const eventId = roundEventLookup.get(r);
+    const fs = eventId != null
+      ? fieldStrengthByOccurrence.get(occKey(eventId, r.year))
+      : undefined;
+    const adjOtt = r.sgOtt + (fs ? fs.sgOtt - tourAvgFsOtt : 0);
+    const adjApp = r.sgApp + (fs ? fs.sgApp - tourAvgFsApp : 0);
+    b.sumAtOtt += adjOtt;
+    b.sumAtApp += adjApp;
     b.rounds += 1;
     b.years.add(r.year);
     if (r.courseName) {
