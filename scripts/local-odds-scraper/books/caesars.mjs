@@ -27,10 +27,17 @@ export async function scrapeCaesars(page) {
     timeout: 45_000,
   });
   // The Round Props tab renders one accordion per active round;
-  // wait until at least one shows up before we walk the DOM.
+  // wait until at least one shows up before we walk the DOM. Longer
+  // for Caesars — their SPA is slower than DK/FD.
   await page
-    .waitForSelector("text=/round\\s*\\d/i", { timeout: 30_000 })
+    .waitForSelector("text=/round\\s*\\d/i", { timeout: 45_000 })
     .catch(() => {});
+  await page.waitForTimeout(3000);
+  // When DEBUG_DUMP=1, save the round-props section HTML to
+  // caesars-debug.html so Claude can inspect the real markup and
+  // tune selectors. Only fires when the parse below returns 0
+  // quotes, so it's dormant once the parser is working.
+  const DEBUG_DUMP = process.env.DEBUG_DUMP === "1";
 
   const nowIso = new Date().toISOString();
   const quotes = await page.evaluate((now) => {
@@ -95,5 +102,24 @@ export async function scrapeCaesars(page) {
     }
     return out;
   }, nowIso);
+  if (quotes.length === 0 && DEBUG_DUMP) {
+    // Grab enough surrounding markup to see the round-props
+    // structure Caesars actually uses. Trim the whole document to
+    // whichever main-content container the SPA renders into.
+    const html = await page.evaluate(() => {
+      const main =
+        document.querySelector("main") ??
+        document.querySelector("[role='main']") ??
+        document.body;
+      return main.outerHTML;
+    });
+    const { writeFileSync } = await import("node:fs");
+    const { resolve, dirname } = await import("node:path");
+    const { fileURLToPath } = await import("node:url");
+    const here = dirname(fileURLToPath(import.meta.url));
+    const outPath = resolve(here, "..", "caesars-debug.html");
+    writeFileSync(outPath, html, "utf-8");
+    console.log(`  [caesars] DEBUG_DUMP → wrote ${outPath} (${html.length} bytes)`);
+  }
   return quotes;
 }
