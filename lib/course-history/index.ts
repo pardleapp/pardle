@@ -67,7 +67,7 @@ const KEY_EVENT_LIST = "course-history:event-list:pga";
 // same (event_fs − tour_avg_fs) delta is applied symmetrically to
 // each round on both sides.
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v11:${slugify(courseName)}`;
+  `course-history:agg-course:v12:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
@@ -113,8 +113,16 @@ async function pMapLimit<T, R>(
 }
 
 /** Historical years we look back over. 2019 is where DataGolf's
- *  full SG-by-category coverage is reliable across PGA events. */
-export const HISTORICAL_YEARS = [2019, 2020, 2021, 2022, 2023, 2024, 2025];
+ *  full SG-by-category coverage is reliable across PGA events. The
+ *  current year is included so completed events from this season
+ *  (e.g. Deere in July) contribute to a player's course sample; DG
+ *  returns completed events only, and the per-year baseline cache
+ *  gets a short (6h) TTL for the in-progress year so new events
+ *  land as they wrap up. Bump this each January when the calendar
+ *  rolls over. */
+export const HISTORICAL_YEARS = [
+  2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026,
+];
 
 interface RoundRecord {
   dgId: number;
