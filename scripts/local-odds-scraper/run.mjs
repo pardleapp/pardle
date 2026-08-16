@@ -34,7 +34,7 @@
  */
 
 import { chromium } from "playwright";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { scrapeFanduel } from "./books/fanduel.mjs";
@@ -128,23 +128,43 @@ async function postToPardle(book, quotes) {
 /** One book's scrape loop: run the scraper, POST, wait, repeat.
  *  Runs forever; catches its own errors so a book-specific crash
  *  doesn't take down the other book loops. */
-async function runBookLoop(book, browser) {
+async function runBookLoop(book) {
   const scraper = SCRAPERS[book];
   if (!scraper) {
     console.warn(`[skip] no scraper registered for ${book}`);
     return;
   }
-  // One dedicated context per book so cookies + session state
-  // persist across polls (bookies build trust in stable sessions).
-  const ctx = await browser.newContext({
+  // Per-book persistent Chrome profile. Datadome (FanDuel) and
+  // other anti-bot systems flag fresh browser sessions instantly;
+  // a persistent profile that lives on disk between runs
+  // accumulates cookies, localStorage, and site permissions that
+  // look like a normal user. Kept in ./chrome-profiles/{book} so
+  // each book has its own account state (avoids cross-book
+  // contamination and lets one book's Datadome block not poison
+  // the others).
+  //
+  // Using channel:'chrome' launches the user's installed Google
+  // Chrome (not Playwright's Chromium build). Chrome ships with
+  // signed binaries that don't trip navigator.webdriver =
+  // undefined and other cheap detection tricks.
+  const here = dirname(fileURLToPath(import.meta.url));
+  const profileDir = resolve(here, "chrome-profiles", book);
+  mkdirSync(profileDir, { recursive: true });
+  const ctx = await chromium.launchPersistentContext(profileDir, {
+    headless: HEADLESS,
+    channel: "chrome",
     viewport: { width: 1400, height: 900 },
     userAgent:
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
       "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
     locale: "en-US",
     timezoneId: "America/New_York",
+    // Match a real Chrome install's default args by omitting the
+    // automation-related switches Playwright adds by default.
+    ignoreDefaultArgs: ["--enable-automation"],
+    args: ["--disable-blink-features=AutomationControlled"],
   });
-  const page = await ctx.newPage();
+  const page = ctx.pages()[0] ?? (await ctx.newPage());
   console.log(`[${book}] session ready`);
   while (true) {
     const t0 = Date.now();
@@ -168,14 +188,16 @@ async function runBookLoop(book, browser) {
 }
 
 async function main() {
-  const browser = await chromium.launch({ headless: HEADLESS });
-  console.log(
-    `[main] launched ${HEADLESS ? "headless" : "headed"} Chromium`,
-  );
   const books = [...ENABLED].filter((b) => SCRAPERS[b]);
+  console.log(
+    `[main] launching ${HEADLESS ? "headless" : "headed"} Chrome per book`,
+  );
   console.log(`[main] enabled books: ${books.join(", ")}`);
   console.log(`[main] posting to ${INGEST_URL} every ${POLL_INTERVAL_MS}ms`);
-  await Promise.all(books.map((book) => runBookLoop(book, browser)));
+  // One persistent Chrome per book — profile lives in
+  // chrome-profiles/{book}/ so cookies + session state survive
+  // between runs.
+  await Promise.all(books.map((book) => runBookLoop(book)));
 }
 
 process.on("SIGINT", () => {

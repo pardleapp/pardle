@@ -15,24 +15,28 @@
  * pick new selectors.
  */
 
-const HUB_URL = "https://sportsbook.caesars.com/us/wv/bet/golf";
+/** Caesars auto-redirects /golf to /us/{state}/bet/golf based on
+ *  the visitor's IP-derived region. Starting from the state-agnostic
+ *  URL lets the scraper work from any US state without hard-coding
+ *  a state slug. */
+const HUB_URL = "https://sportsbook.caesars.com/golf";
 
 async function findTournamentUrl(page) {
   await page.goto(HUB_URL, {
     waitUntil: "domcontentloaded",
     timeout: 45_000,
   });
+  // After the redirect, tournament links live under /bet/golf/.
   await page
-    .waitForSelector("a[href*='/us/wv/bet/golf/']", { timeout: 30_000 })
+    .waitForSelector("a[href*='/bet/golf/']", { timeout: 30_000 })
     .catch(() => {});
-  // Grab the first tournament link that isn't the hub itself.
   const href = await page
-    .locator("a[href*='/us/wv/bet/golf/']")
+    .locator("a[href*='/bet/golf/']")
     .first()
     .getAttribute("href")
     .catch(() => null);
   if (!href) throw new Error("no active tournament link on Caesars golf hub");
-  return new URL(href, "https://sportsbook.caesars.com").toString();
+  return new URL(href, page.url()).toString();
 }
 
 export async function scrapeCaesars(page) {

@@ -1,0 +1,4 @@
+# Local runtime state — never commit
+.env
+chrome-profiles/
+node_modules/
