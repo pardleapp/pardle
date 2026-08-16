@@ -55,16 +55,19 @@ const CURRENT_YEAR = 2026;
 const KEY_ROUND = (eventId: number, year: number) =>
   `course-history:round:${eventId}:${year}`;
 const KEY_EVENT_LIST = "course-history:event-list:pga";
-// v10 = symmetric field-strength adjustment. v9 only normalised
-// at-course rounds — the baseline stayed raw, which over-corrected
-// at weak-field courses (they moved from small positive bias to
-// larger negative bias). v10 applies the same (event_fs −
-// tour_avg_fs) delta per-round to BOTH sides via a per-event
-// baseline adjustment that sums event.rounds × fs_delta into the
-// baseline totals. Result: both sides referenced to tour-average
-// field strength, mean outperformance ≈ 0 across all courses.
+// v11 = trailing-N-rounds baseline ending on the target event's
+// start date, replacing the year-level leave-one-out baseline that
+// v10 used. The year-level LOO leaked future rounds: a February
+// Riviera round's baseline included rounds played in May-December
+// the same year, contaminating the "what did we know entering the
+// week" comparison. v11 walks each player's per-event contributions
+// across all loaded years, sorts by date DESC, filters to events
+// before the target date and outside the excluded set, and takes
+// the most recent 50 rounds. Field-strength adjustment kept — the
+// same (event_fs − tour_avg_fs) delta is applied symmetrically to
+// each round on both sides.
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v10:${slugify(courseName)}`;
+  `course-history:agg-course:v11:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
@@ -576,23 +579,40 @@ export async function getCourseHistoryByCourse(
   }
   if (allRounds.length === 0) return null;
 
-  // Which years does the target event actually have data for? Only
-  // fetch per-year baselines for those years — the others aren't
-  // needed and we don't want to spend the fetch budget on empty
-  // years.
+  // Which years does the target event actually have data for? Used
+  // to decide which years' rounds to aggregate on the AT-COURSE side.
   const yearsWithData = Array.from(
     new Set(allRounds.map((r) => r.year)),
   ).sort();
 
-  // Kick off per-year baseline fetches in parallel. Each one may
-  // itself fan out ~40 event fetches on cold cache, so the whole
-  // block is the expensive part.
+  // Baseline fetches: we need every HISTORICAL_YEAR loaded, not just
+  // yearsWithData. A February target round's trailing-50 baseline
+  // reaches back into the previous calendar year, so we can't
+  // restrict to years that hosted the target course. On warm cache
+  // this is 7 Redis reads; on cold, ~7 × ~40 event fetches (same
+  // fanout the tool always eventually does when different courses
+  // are queried).
+  const baselineYears = HISTORICAL_YEARS;
   const yearBaselineArr = await Promise.all(
-    yearsWithData.map((y) => getYearlyPlayerBaselines(y)),
+    baselineYears.map((y) => getYearlyPlayerBaselines(y)),
   );
   const baselinesByYear = new Map<number, YearBaseline>();
-  for (let i = 0; i < yearsWithData.length; i++) {
-    baselinesByYear.set(yearsWithData[i], yearBaselineArr[i]);
+  for (let i = 0; i < baselineYears.length; i++) {
+    baselinesByYear.set(baselineYears[i], yearBaselineArr[i]);
+  }
+
+  // Event-date lookup: {eventId:year → YYYY-MM-DD start date}. Built
+  // from the same cached event list the year-baseline fetches use.
+  // We need dates to (a) locate each at-course round's target date
+  // and (b) filter each player's baseline events to "prior to that
+  // date". Dates are stable per (eventId, year) — no per-player
+  // storage needed.
+  const eventList = await getCachedEventList();
+  const eventDateByKey = new Map<string, string>();
+  for (const e of eventList) {
+    if (typeof e.event_id === "number" && typeof e.calendar_year === "number") {
+      eventDateByKey.set(`${e.event_id}:${e.calendar_year}`, e.date);
+    }
   }
 
   // For each year, gather the set of eventIds that hosted this
@@ -604,6 +624,14 @@ export async function getCourseHistoryByCourse(
     const set = excludedByYear.get(o.year) ?? new Set<number>();
     set.add(o.eventId);
     excludedByYear.set(o.year, set);
+  }
+  // Union across every year — the trailing baseline window can span
+  // years, so a target course hosted by Ryder Cup one year and PGA
+  // the next needs both eventIds excluded from every player's
+  // baseline regardless of which year the at-course round sits in.
+  const excludedAllYears = new Set<number>();
+  for (const set of excludedByYear.values()) {
+    for (const eid of set) excludedAllYears.add(eid);
   }
 
   // ── Field-strength adjustment ─────────────────────────────────────
@@ -698,36 +726,88 @@ export async function getCourseHistoryByCourse(
   const tourAvgFsOtt = tourFsN > 0 ? tourFsSumOtt / tourFsN : 0;
   const tourAvgFsApp = tourFsN > 0 ? tourFsSumApp / tourFsN : 0;
 
-  /** For a player's baseline row (year-total, less the excluded
-   *  target-course events), compute the FIELD-STRENGTH-ADJUSTED
-   *  baseline mean SG. Normalisation: for each event that contributed
-   *  to the baseline, add (event_fs − tour_avg_fs) × rounds to the
-   *  raw sum. Applies the same adjustment to both sides — at-course
-   *  rounds get normalised per-round below with the same formula. */
-  function fieldAdjustedBaseline(
+  /** Trailing-K-rounds baseline ending on the target event's start
+   *  date. Walks all this player's per-event contributions across
+   *  every loaded HISTORICAL_YEAR, sorts them by date DESC, filters
+   *  to events strictly before targetDate and not in excludedEventIds
+   *  (i.e. drop the target course entirely), then accumulates from
+   *  most-recent until we hit K rounds. Each event's contribution is
+   *  field-strength-adjusted the same way the at-course side is, so
+   *  both sides live on a common reference.
+   *
+   *  Rationale: this replaces v10's year-level LOO baseline, which
+   *  aggregated the whole year around the target event and thus
+   *  leaked future rounds into the "expected form" baseline. */
+  function trailingBaselineFor(
     dgId: number,
-    year: number,
-  ): { sgOtt: number; sgApp: number } | null {
-    const yearBaseline = baselinesByYear.get(year);
-    if (!yearBaseline) return null;
-    const row = yearBaseline.get(dgId);
-    if (!row) return null;
-    const excluded = excludedByYear.get(year) ?? new Set<number>();
+    targetDate: string, // YYYY-MM-DD (event R1 start)
+    excludedEventIds: Set<number>,
+    kRounds: number,
+  ): { sgOtt: number; sgApp: number; rounds: number } | null {
+    interface Entry {
+      date: string;
+      eventId: number;
+      year: number;
+      sumOtt: number;
+      sumApp: number;
+      rounds: number;
+    }
+    const entries: Entry[] = [];
+    for (const [year, yb] of baselinesByYear) {
+      const row = yb.get(dgId);
+      if (!row) continue;
+      for (const [eidStr, ev] of Object.entries(row.byEvent)) {
+        const eid = Number(eidStr);
+        if (excludedEventIds.has(eid)) continue;
+        const date = eventDateByKey.get(fsKey(eid, year));
+        if (!date) continue;
+        if (date >= targetDate) continue;
+        entries.push({
+          date,
+          eventId: eid,
+          year,
+          sumOtt: ev.sumOtt,
+          sumApp: ev.sumApp,
+          rounds: ev.rounds,
+        });
+      }
+    }
+    // Sort DESC (newest first) — lexicographic sort works on
+    // ISO-8601 YYYY-MM-DD.
+    entries.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
     let sumOtt = 0;
     let sumApp = 0;
     let rounds = 0;
-    for (const [eidStr, ev] of Object.entries(row.byEvent)) {
-      const eid = Number(eidStr);
-      if (excluded.has(eid)) continue;
-      const fs = fieldStrengthByEvent.get(fsKey(eid, year));
+    for (const e of entries) {
+      const fs = fieldStrengthByEvent.get(fsKey(e.eventId, e.year));
       const deltaOtt = fs ? fs.sgOtt - tourAvgFsOtt : 0;
       const deltaApp = fs ? fs.sgApp - tourAvgFsApp : 0;
-      sumOtt += ev.sumOtt + deltaOtt * ev.rounds;
-      sumApp += ev.sumApp + deltaApp * ev.rounds;
-      rounds += ev.rounds;
+      sumOtt += e.sumOtt + deltaOtt * e.rounds;
+      sumApp += e.sumApp + deltaApp * e.rounds;
+      rounds += e.rounds;
+      if (rounds >= kRounds) break;
     }
     if (rounds <= 0) return null;
-    return { sgOtt: sumOtt / rounds, sgApp: sumApp / rounds };
+    return { sgOtt: sumOtt / rounds, sgApp: sumApp / rounds, rounds };
+  }
+
+  // Per-round baseline lookup is expensive (walks all event
+  // contributions for the player). Cache per (dgId, targetDate)
+  // since all rounds sharing the same event share the same baseline.
+  const baselineCache = new Map<
+    string,
+    { sgOtt: number; sgApp: number; rounds: number } | null
+  >();
+  function cachedTrailingBaseline(
+    dgId: number,
+    targetDate: string,
+    excludedEventIds: Set<number>,
+  ): { sgOtt: number; sgApp: number; rounds: number } | null {
+    const key = `${dgId}:${targetDate}`;
+    if (baselineCache.has(key)) return baselineCache.get(key)!;
+    const v = trailingBaselineFor(dgId, targetDate, excludedEventIds, 50);
+    baselineCache.set(key, v);
+    return v;
   }
 
   // Group target-event rounds by player and aggregate.
@@ -796,15 +876,25 @@ export async function getCourseHistoryByCourse(
     if (r.courseName) {
       b.courses.set(r.courseName, (b.courses.get(r.courseName) ?? 0) + 1);
     }
-    // Baseline for this specific round: the player's year-Y baseline
-    // with the SAME field-strength normalisation applied per
-    // baseline-event contribution. Ensures both sides live on the
-    // same reference — pure course-fit signal, no field bias.
-    const baseline = fieldAdjustedBaseline(r.dgId, r.year);
-    if (baseline) {
-      b.sumBaselineOtt += baseline.sgOtt;
-      b.sumBaselineApp += baseline.sgApp;
-      b.baselineRounds += 1;
+    // Baseline for this specific round: trailing 50 rounds ending
+    // on the target event's R1 start date, with the SAME field-
+    // strength normalisation applied per baseline-event contribution.
+    // Ensures both sides live on the same reference AND the baseline
+    // only contains information that pre-dated the round we're
+    // scoring (no lookahead leakage).
+    const eventDate =
+      eventId != null ? eventDateByKey.get(fsKey(eventId, r.year)) : undefined;
+    if (eventDate) {
+      const baseline = cachedTrailingBaseline(
+        r.dgId,
+        eventDate,
+        excludedAllYears,
+      );
+      if (baseline) {
+        b.sumBaselineOtt += baseline.sgOtt;
+        b.sumBaselineApp += baseline.sgApp;
+        b.baselineRounds += 1;
+      }
     }
   }
 
