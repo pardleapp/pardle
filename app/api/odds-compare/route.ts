@@ -33,6 +33,7 @@ import {
 import { fetchKalshiRoundScoreQuotes } from "@/lib/odds-compare/sources/kalshi";
 import { fetchPrizePicksRoundScoreQuotes } from "@/lib/odds-compare/sources/prizepicks";
 import { fetchUnderdogRoundScoreQuotes } from "@/lib/odds-compare/sources/underdog";
+import { ingestKey } from "./ingest/route";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -142,12 +143,47 @@ export async function GET(req: Request) {
       return fetchDkRoundScoreQuotes(id, round);
     })();
 
-    const [dk, pp, ud, ks] = await Promise.all([
+    // Ingested books (FD/Caesars/BetMGM) come off Redis, populated
+    // by the home Playwright scraper's POSTs to /api/odds-compare/ingest.
+    // Each entry expires after 3 min if the scraper stops posting;
+    // absence => stale-column state in bookStatus.
+    interface IngestPayload {
+      book: BookKey;
+      receivedAt: string;
+      quotes: RoundScoreQuote[];
+    }
+    const ingestReads = Promise.all(
+      (["fanduel", "caesars", "betmgm"] as const).map(async (b) => {
+        try {
+          const payload = await redis.get<IngestPayload>(ingestKey(b));
+          return { book: b, payload };
+        } catch {
+          return { book: b, payload: null };
+        }
+      }),
+    );
+
+    const [dk, pp, ud, ks, ingested] = await Promise.all([
       safeFetch(() => dkQuotesPromise),
       safeFetch(() => fetchPrizePicksRoundScoreQuotes(round)),
       safeFetch(() => fetchUnderdogRoundScoreQuotes(round)),
       safeFetch(() => fetchKalshiRoundScoreQuotes(tournamentName, round)),
+      ingestReads,
     ]);
+    // Bucket ingested payloads per book. Filter to the requested
+    // round — the scraper posts every round it can see, we serve
+    // only the one asked for.
+    const ingestedByBook = new Map<
+      BookKey,
+      { quotes: RoundScoreQuote[]; receivedAt: string | null }
+    >();
+    for (const { book, payload } of ingested) {
+      const quotes = (payload?.quotes ?? []).filter((q) => q.round === round);
+      ingestedByBook.set(book, {
+        quotes,
+        receivedAt: payload?.receivedAt ?? null,
+      });
+    }
 
     // Trim to the top-30 by outright — matches the "contenders only"
     // decision. If leaderboard is unavailable, keep everyone (rare —
@@ -166,8 +202,30 @@ export async function GET(req: Request) {
     const emptyNote = (qs: RoundScoreQuote[]) =>
       qs.length === 0 ? "no round-score lines posted" : undefined;
 
+    /** Build book status for an ingested book: OK if a fresh
+     *  payload is on Redis, "feed offline" when it isn't (scraper
+     *  laptop closed / scraper broken). */
+    const ingestStatus = (b: BookKey) => {
+      const rec = ingestedByBook.get(b);
+      if (!rec || rec.receivedAt == null) {
+        return {
+          ok: false,
+          error: "home scraper offline",
+          playerCount: 0,
+        };
+      }
+      return {
+        ok: true,
+        error: rec.quotes.length === 0 ? emptyNote(rec.quotes) : undefined,
+        playerCount: countPlayers(rec.quotes),
+      };
+    };
+
     const bookQuotes: Record<BookKey, RoundScoreQuote[]> = {
       draftkings: dk.quotes,
+      fanduel: ingestedByBook.get("fanduel")?.quotes ?? [],
+      caesars: ingestedByBook.get("caesars")?.quotes ?? [],
+      betmgm: ingestedByBook.get("betmgm")?.quotes ?? [],
       prizepicks: pp.quotes,
       underdog: ud.quotes,
       kalshi: ks.quotes,
@@ -181,6 +239,9 @@ export async function GET(req: Request) {
         error: dk.error ?? (dk.ok ? emptyNote(dk.quotes) : undefined),
         playerCount: countPlayers(dk.quotes),
       },
+      fanduel: ingestStatus("fanduel"),
+      caesars: ingestStatus("caesars"),
+      betmgm: ingestStatus("betmgm"),
       prizepicks: {
         ok: pp.ok,
         error: pp.ok ? emptyNote(pp.quotes) : pp.error,

@@ -1,0 +1,17 @@
+{
+  "name": "pardle-local-odds-scraper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Home Playwright runner. Scrapes FanDuel / Caesars / BetMGM round-score O/U from a residential IP and POSTs into pardle.app's /api/odds-compare/ingest endpoint.",
+  "scripts": {
+    "start": "node run.mjs",
+    "install-browsers": "playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.47.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

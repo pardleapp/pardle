@@ -12,15 +12,18 @@
  * 1/decimal) cleanly and matches DataGolf's convention.
  */
 
-/** The four sources we can reach today. FanDuel / Caesars / BetMGM
- *  all use Datadome and cannot be scraped from cloud infrastructure
- *  (documented investigation in git history). DK is a real
- *  sportsbook O/U with per-side prices; PrizePicks + Underdog are
- *  DFS pick'ems (symmetric ~-110/-110 payouts) whose golf coverage
- *  lights up during majors; Kalshi is a prediction market whose
- *  golf contracts do the same. */
+/** Sources the compare tool aggregates. Two flavours:
+ *  - Direct: DK/PrizePicks/Underdog/Kalshi are reachable from Vercel
+ *    via ScraperAPI / public APIs and fetched server-side.
+ *  - Ingested: FanDuel/Caesars/BetMGM require a real-Chrome session
+ *    from a residential IP (Datadome blocks server IPs). Those are
+ *    scraped from a home Playwright runner and POSTed to
+ *    /api/odds-compare/ingest, then merged in by the aggregator. */
 export type BookKey =
   | "draftkings"
+  | "fanduel"
+  | "caesars"
+  | "betmgm"
   | "prizepicks"
   | "underdog"
   | "kalshi";
@@ -36,6 +39,9 @@ export interface BookMeta {
 
 export const BOOKS: BookMeta[] = [
   { key: "draftkings", label: "DraftKings", kindLabel: "Sportsbook" },
+  { key: "fanduel", label: "FanDuel", kindLabel: "Sportsbook" },
+  { key: "caesars", label: "Caesars", kindLabel: "Sportsbook" },
+  { key: "betmgm", label: "BetMGM", kindLabel: "Sportsbook" },
   { key: "prizepicks", label: "PrizePicks", kindLabel: "DFS pick'em" },
   { key: "underdog", label: "Underdog", kindLabel: "DFS pick'em" },
   { key: "kalshi", label: "Kalshi", kindLabel: "Exchange" },
