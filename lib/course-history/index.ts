@@ -80,8 +80,17 @@ const KEY_EVENT_LIST = "course-history:event-list:pga";
 // without touching well-sampled tour regulars.
 const BASELINE_SHRINKAGE_K = 20;
 
+// Skill-drift threshold applied at the MODEL layer. When the player's
+// current DG skill diverges from their historical baseline by more
+// than this many SG (breakout or decline), the outperformance number
+// isn't a clean course-fit signal — it's contaminated by a change in
+// the player's underlying skill (Jake Knapp 2026, etc). We drop these
+// rows from the output because they'd mislead any consumer. Non-
+// optional: consumers should never see numbers we know are wrong.
+const SKILL_DRIFT_THRESHOLD = 1.0;
+
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v14:${slugify(courseName)}`;
+  `course-history:agg-course:v15:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
@@ -1039,6 +1048,14 @@ export async function getCourseHistoryByCourse(
       currentSkillOttApp != null
         ? currentSkillOttApp - (baseOtt + baseApp)
         : null;
+    // Drop drift-contaminated rows at the model layer — every consumer
+    // (by-course table, specialists ranking, archetype/forecast) gets
+    // the same clean output. Rows with null drift (players DG hasn't
+    // rated — mostly retired) stay in; there's nothing to compare
+    // against, so we can't call them drift-contaminated.
+    if (skillDrift != null && Math.abs(skillDrift) > SKILL_DRIFT_THRESHOLD) {
+      continue;
+    }
     players.push({
       dgId: b.dgId,
       name: b.name,

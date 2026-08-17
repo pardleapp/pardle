@@ -177,10 +177,7 @@ interface SpecialistsResp {
   ok: boolean;
   error?: string;
   minRounds?: number;
-  hideDrift?: boolean;
-  driftThreshold?: number;
   totalPairs?: number;
-  driftFiltered?: number;
   rows?: SpecialistRow[];
 }
 
@@ -211,7 +208,6 @@ export default function CourseHistoryTool() {
   // pairs at a rounds-played threshold.
   const [view, setView] = useState<ToolView>("by-course");
   const [specMinRounds, setSpecMinRounds] = useState(8);
-  const [specHideDrift, setSpecHideDrift] = useState(true);
   const [specialists, setSpecialists] = useState<SpecialistsResp | null>(null);
   const [specialistsLoading, setSpecialistsLoading] = useState(false);
 
@@ -369,9 +365,10 @@ export default function CourseHistoryTool() {
     };
   }, [selectedCourse, data?.ok]);
 
-  // Load global specialists when the Specialists tab activates or a
-  // filter control changes. Cheap in the warm cache path (~1s of
-  // Redis GETs), so re-fetching on every threshold change is fine.
+  // Load global specialists when the Specialists tab activates or the
+  // rounds threshold changes. Drift filtering happens client-side, so
+  // toggling it doesn't refetch. The API returns the same rows the
+  // By-course tab draws from — no server-side hiding.
   useEffect(() => {
     if (view !== "specialists") return;
     let cancelled = false;
@@ -379,7 +376,7 @@ export default function CourseHistoryTool() {
       setSpecialistsLoading(true);
       try {
         const res = await fetch(
-          `/api/course-history/specialists?min=${specMinRounds}&hideDrift=${specHideDrift ? 1 : 0}`,
+          `/api/course-history/specialists?min=${specMinRounds}`,
         );
         const j = (await res.json()) as SpecialistsResp;
         if (!cancelled) setSpecialists(j);
@@ -397,7 +394,7 @@ export default function CourseHistoryTool() {
     return () => {
       cancelled = true;
     };
-  }, [view, specMinRounds, specHideDrift]);
+  }, [view, specMinRounds]);
 
   const filteredCourses = useMemo(() => {
     const q = courseQuery.trim().toLowerCase();
@@ -472,8 +469,6 @@ export default function CourseHistoryTool() {
           loading={specialistsLoading}
           minRounds={specMinRounds}
           onMinRoundsChange={setSpecMinRounds}
-          hideDrift={specHideDrift}
-          onHideDriftChange={setSpecHideDrift}
         />
       )}
       {view === "by-course" && (
@@ -843,19 +838,14 @@ function SpecialistsPanel({
   loading,
   minRounds,
   onMinRoundsChange,
-  hideDrift,
-  onHideDriftChange,
 }: {
   data: SpecialistsResp | null;
   loading: boolean;
   minRounds: number;
   onMinRoundsChange: (v: number) => void;
-  hideDrift: boolean;
-  onHideDriftChange: (v: boolean) => void;
 }) {
   const rows = data?.rows ?? [];
   const total = data?.totalPairs ?? 0;
-  const filtered = data?.driftFiltered ?? 0;
 
   const top = useMemo(() => rows.slice(0, 25), [rows]);
   const bottom = useMemo(() => rows.slice(-25).reverse(), [rows]);
@@ -873,20 +863,13 @@ function SpecialistsPanel({
         title="Course specialists"
         subtitle={
           total
-            ? `${total.toLocaleString()} (player, course) pairs · ${filtered > 0 ? `${filtered.toLocaleString()} hidden as recent skill drift` : "no drift rows to hide"}`
+            ? `${total.toLocaleString()} clean (player, course) pairs · ranked by outperformance vs baseline`
             : "Best and worst course-fit signals across every venue in the archive"
         }
         accent
       />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))",
-          gap: 16,
-          marginBottom: 16,
-        }}
-      >
+      <div style={{ display: "grid", gap: 16, marginBottom: 16 }}>
         <Field
           label="Minimum rounds at course"
           help="8 rounds ≈ 2 tournaments at the same venue. Smaller samples get noisier."
@@ -906,61 +889,6 @@ function SpecialistsPanel({
             style={{ ...ip(), maxWidth: 120 }}
           />
         </Field>
-        <Field
-          label="Hide recent skill drift"
-          help="Rows where the player's current DG skill sits >1.0 SG above (or below) their historical baseline get filtered out — that's a breakout or decline, not course fit."
-        >
-          <button
-            type="button"
-            role="switch"
-            aria-checked={hideDrift}
-            onClick={() => onHideDriftChange(!hideDrift)}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "8px 14px",
-              fontSize: 13,
-              fontWeight: 700,
-              fontFamily: T.fontUi,
-              border: `1.5px solid ${hideDrift ? T.emerald : T.line}`,
-              borderRadius: 999,
-              background: hideDrift ? T.emeraldTint : "white",
-              color: hideDrift ? T.emeraldD : T.ink,
-              cursor: "pointer",
-              alignSelf: "flex-start",
-            }}
-          >
-            <span
-              aria-hidden
-              style={{
-                display: "inline-block",
-                width: 30,
-                height: 16,
-                borderRadius: 999,
-                background: hideDrift ? T.emerald : T.line,
-                position: "relative",
-                flexShrink: 0,
-                transition: "background 120ms ease",
-              }}
-            >
-              <span
-                style={{
-                  position: "absolute",
-                  top: 2,
-                  left: hideDrift ? 16 : 2,
-                  width: 12,
-                  height: 12,
-                  borderRadius: "50%",
-                  background: "white",
-                  boxShadow: "0 1px 2px oklch(0 0 0 / 0.2)",
-                  transition: "left 120ms ease",
-                }}
-              />
-            </span>
-            <span>Hide drift ({">"} 1.0 SG)</span>
-          </button>
-        </Field>
       </div>
 
       <div
@@ -977,14 +905,12 @@ function SpecialistsPanel({
         }}
       >
         <strong style={{ color: T.ink }}>How this reads.</strong>{" "}
-        Baselines are Bayesian-shrunk toward tour average, so
-        low-sample entries (Renaissance Club Scottish Open, Keene Trace
-        Barbasol, some Latin/Vidanta stops) no longer distort the top.
-        The <em>skill drift</em> filter — on by default — hides rows
-        where a player&apos;s current DG skill has moved &gt; 1.0 SG
-        from their historical baseline, catching recent breakouts (Jake
-        Knapp&apos;s 2026 leap) and declines that would otherwise show
-        as artificial course fit.
+        Baselines are Bayesian-shrunk toward tour average so low-sample
+        DP/opposite-field entries don&apos;t distort the top. Players
+        whose current tour form has drifted more than 1.0 SG from their
+        historical baseline (recent breakouts or declines) are removed
+        entirely — those numbers reflect a skill change, not course
+        fit. The same clean set feeds the By-course tab.
       </div>
 
       {loading && (
