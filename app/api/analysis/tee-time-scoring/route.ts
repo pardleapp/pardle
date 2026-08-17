@@ -42,39 +42,32 @@ function apiKey(): string {
   return k;
 }
 
-/** Load DataGolf decomposition CSV — event-specific skill projections
- *  including major_adj, course_history_adj, driving-fit adjustments.
- *  `final_prediction` is what we use as the skill baseline. Cached
- *  once per server process — the CSV is a static file bundled in the
- *  repo. */
-let csvSkillCache: Map<string, number> | null = null;
-async function loadDecompositionSkill(): Promise<Map<string, number>> {
-  if (csvSkillCache) return csvSkillCache;
+/** Event-specific skill projections — DG's pre-tournament
+ *  `baseline_pred` per player, which already includes their course-
+ *  fit + form adjustments for THIS event. Replaces the manually-
+ *  swapped `dg-open-decomposition.csv` so the map always tracks the
+ *  active tournament instead of whichever event was committed last.
+ *
+ *  Keyed by DG's raw "Last, First" so the downstream lookup by
+ *  `l.player_name` (from /preds/live-tournament-stats) hits directly. */
+interface PreTournamentRow {
+  dg_id: number;
+  player_name: string;
+  baseline_pred?: number;
+}
+async function loadPreTournamentSkill(): Promise<Map<string, number>> {
   const map = new Map<string, number>();
   try {
-    const csvPath = path.join(
-      process.cwd(),
-      "data",
-      "dg-open-decomposition.csv",
+    const data = await fetchJson<{ baseline?: PreTournamentRow[] }>(
+      "/preds/pre-tournament?tour=pga&odds_format=percent",
     );
-    const text = await fs.readFile(csvPath, "utf8");
-    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-    if (lines.length < 2) return map;
-    const header = parseCsvLine(lines[0]);
-    const nameIdx = header.indexOf("player_name");
-    const finalIdx = header.indexOf("final_prediction");
-    if (nameIdx < 0 || finalIdx < 0) return map;
-    for (let i = 1; i < lines.length; i++) {
-      const cells = parseCsvLine(lines[i]);
-      const name = cells[nameIdx];
-      const finalPred = Number(cells[finalIdx]);
-      if (name && Number.isFinite(finalPred)) {
-        map.set(name, finalPred);
+    for (const r of data.baseline ?? []) {
+      if (typeof r.baseline_pred === "number" && r.player_name) {
+        map.set(r.player_name, r.baseline_pred);
       }
     }
-    csvSkillCache = map;
   } catch (err) {
-    console.error("[tee-time-scoring] decomposition CSV load failed", err);
+    console.error("[tee-time-scoring] pre-tournament fetch failed", err);
   }
   return map;
 }
@@ -499,7 +492,7 @@ export async function GET(req: Request) {
         fetchJson<{ live_stats?: LiveEntry[] }>(
           "/preds/live-tournament-stats?tour=" + tour + "&round=4&stats=" + dgStats,
         ),
-        loadDecompositionSkill(),
+        loadPreTournamentSkill(),
         activeTournamentId ? getSnapshot(activeTournamentId) : Promise.resolve(null),
         activeTournamentId
           ? getCachedTournamentPars(activeTournamentId)

@@ -190,32 +190,11 @@ function parseCsvLine(line: string): string[] {
   return out;
 }
 
-async function loadCsvSg(): Promise<Map<string, number>> {
-  const map = new Map<string, number>();
-  try {
-    const p = path.join(
-      process.cwd(),
-      "data",
-      "dg-open-decomposition.csv",
-    );
-    const txt = await readFile(p, "utf-8");
-    const lines = txt.split(/\r?\n/).filter((l) => l.trim().length > 0);
-    if (lines.length < 2) return map;
-    const header = parseCsvLine(lines[0]);
-    const nameIdx = header.indexOf("player_name");
-    const finalIdx = header.indexOf("final_prediction");
-    if (nameIdx < 0 || finalIdx < 0) return map;
-    for (let i = 1; i < lines.length; i++) {
-      const cells = parseCsvLine(lines[i]);
-      const name = cells[nameIdx];
-      const fp = Number(cells[finalIdx]);
-      if (name && Number.isFinite(fp)) map.set(name, fp);
-    }
-  } catch {
-    /* file missing — empty map is fine */
-  }
-  return map;
-}
+// DEPRECATED: was loadCsvSg() reading data/dg-open-decomposition.csv.
+// That file was manually swapped per event and always lagged the active
+// tournament. Replaced by pulling baseline_pred directly from DG's
+// preds/pre-tournament payload (which we already fetch below), so the
+// event-specific SG estimate always matches the current tour week.
 
 /** Normalise "Last, First" ↔ "First Last" so DG's CSV format and
  *  the orchestrator's displayName both match. */
@@ -244,7 +223,6 @@ export async function GET() {
 
   const [
     leaderboard,
-    csvSg,
     dgTeeTimes,
     pgaToDg,
     dgSkillByDgId,
@@ -252,7 +230,6 @@ export async function GET() {
     dgPreProbs,
   ] = await Promise.all([
     getLeaderboard(tournamentId).catch(() => []),
-    loadCsvSg(),
     loadDgTeeTimes(),
     loadPgaIdToDgId(),
     loadDgSkillRatings(),
@@ -275,10 +252,14 @@ export async function GET() {
     if (Number.isFinite(n)) dgProbsByDgId.set(n, p);
   }
 
-  // Build normalised name → SG lookup once
+  // Event-specific SG per player, sourced from DG's pre-tournament
+  // payload (dgPreProbs already fetched above) rather than a hand-
+  // maintained CSV. Automatically tracks the active tournament.
   const sgByNorm = new Map<string, number>();
-  for (const [name, sg] of csvSg) {
-    sgByNorm.set(normalise(name), sg);
+  for (const p of dgPreProbs) {
+    if (typeof p.sgTotal === "number") {
+      sgByNorm.set(normalise(p.name), p.sgTotal);
+    }
   }
 
   // Pull per-round scores for every player in the field so the tool
