@@ -19,7 +19,11 @@
 
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import { getActiveTournament, getLeaderboard } from "@/lib/golf-api/pgatour";
+import {
+  getActiveTournament,
+  getCurrentRound,
+  getLeaderboard,
+} from "@/lib/golf-api/pgatour";
 import type {
   BookKey,
   CompareRow,
@@ -117,21 +121,28 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const roundParam = url.searchParams.get("round");
-    const round = roundParam && /^[1-4]$/.test(roundParam) ? Number(roundParam) : null;
+    const explicitRound =
+      roundParam && /^[1-4]$/.test(roundParam) ? Number(roundParam) : null;
     const nocache = url.searchParams.get("nocache") === "1";
 
     const active = await getActiveTournament();
     const tournamentId = active?.tournament?.id ?? null;
     const tournamentName = active?.tournament?.name ?? null;
-    if (!tournamentId || !tournamentName || round == null) {
+    if (!tournamentId || !tournamentName) {
       return NextResponse.json(
-        {
-          ok: false,
-          error: "no active tournament or round param missing",
-        },
-        { status: round == null ? 400 : 404 },
+        { ok: false, error: "no active tournament" },
+        { status: 404 },
       );
     }
+
+    // Round default: caller can pin an explicit round via ?round=;
+    // otherwise pull the current round from the leaderboard so a
+    // pre-tournament visitor gets R1 quotes automatically instead
+    // of a hardcoded R2. Also lets tools that don't know which
+    // round to ask for omit the param entirely.
+    const round =
+      explicitRound ??
+      getCurrentRound(active!.tournament.startDate, active!.isLive);
 
     // Cache read (short TTL — we're chasing live pricing).
     if (!nocache) {

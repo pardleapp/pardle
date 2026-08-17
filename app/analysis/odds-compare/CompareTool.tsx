@@ -62,20 +62,35 @@ function americanFromDecimal(dec: number): string {
 
 export default function CompareTool() {
   const [data, setData] = useState<OddsCompareResponse | null>(null);
-  const [round, setRound] = useState<number>(2);
+  // Round starts unset — the API resolves the current round (R1 pre-
+  // tournament, whichever round is in play otherwise) and the client
+  // syncs from the response. Once the user picks a round manually it
+  // becomes the explicit selection.
+  const [round, setRound] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/odds-compare?round=${round}`, {
+      const qs = round == null ? "" : `?round=${round}`;
+      const res = await fetch(`/api/odds-compare${qs}`, {
         cache: "no-store",
       });
       const j = (await res.json()) as OddsCompareResponse;
-      if (j.ok !== false) setData(j);
-      else setError((j as unknown as { error?: string }).error ?? "fetch failed");
-      setError(null);
+      if (j.ok !== false) {
+        setData(j);
+        setError(null);
+        // Sync round state from the API-chosen round the first time
+        // through, so the round tabs highlight what the server picked.
+        if (round == null && typeof j.round === "number") {
+          setRound(j.round);
+        }
+      } else {
+        setError(
+          (j as unknown as { error?: string }).error ?? "fetch failed",
+        );
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "network error");
     } finally {

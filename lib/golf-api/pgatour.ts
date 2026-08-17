@@ -130,18 +130,34 @@ const TOURNAMENT_INACTIVE_STATES = new Set([
 async function isTournamentConcluded(
   tournamentId: string,
   startDate: number,
+  scheduleSaysCompleted: boolean,
 ): Promise<boolean> {
-  // A four-round PGA Tour event can't be over until late Sunday at
-  // the earliest — even a Thursday-morning start with every R1
-  // finisher showing thru="F" is a between-rounds gap, not the end
-  // of the tournament. Require at least 80 hours since startDate
-  // before trusting the leaderboard's all-F signal as "concluded".
-  // 80h covers normal Thu→Sun finishes; weather-shortened events
-  // are rare enough that we'd rather over-include than over-exclude.
+  const elapsed = Date.now() - startDate;
+
+  // Trust the PGA schedule first — if the orchestrator has already
+  // moved this event into `completed`, we're done. This is the
+  // primary signal and avoids leaderboard-cache stale states.
+  if (scheduleSaysCompleted) return true;
+
+  // Safety net: a PGA event can't reasonably span more than 6 days
+  // (Mon finish after weather delay is the absolute upper bound).
+  // Past that, whatever the leaderboard says, treat it as concluded.
+  const MAX_TOURNAMENT_SPAN_MS = 6 * 24 * 60 * 60 * 1000;
+  if (elapsed > MAX_TOURNAMENT_SPAN_MS) return true;
+
+  // A four-round event can't be over until late Sunday at the
+  // earliest — even a Thursday-morning start with every R1 finisher
+  // showing thru="F" is a between-rounds gap, not the end of the
+  // tournament. Require at least 80 hours since startDate before
+  // trusting the leaderboard's all-F signal.
   const MIN_ELAPSED_MS = 80 * 60 * 60 * 1000;
-  if (Date.now() - startDate < MIN_ELAPSED_MS) return false;
+  if (elapsed < MIN_ELAPSED_MS) return false;
 
   const lb = await getCachedLeaderboard(tournamentId).catch(() => []);
+  // Empty leaderboard past the 80h threshold means the cache
+  // dropped — since scheduleSaysCompleted was false at this point,
+  // it's not definitively concluded. Return false; the caller will
+  // still consider the next upcoming event via the fallback branch.
   if (lb.length === 0) return false;
   return lb.every((r) => {
     if (TOURNAMENT_INACTIVE_STATES.has(r.playerState)) return true;
@@ -150,11 +166,16 @@ async function isTournamentConcluded(
 }
 
 /**
- * Resolve the tournament we should be showing a live feed for: the
- * one whose window (startDate → startDate + 5 days, generous for
- * Mon finishes) contains "now" AND that hasn't already fully wrapped
- * up on the leaderboard. Falls back to the next upcoming tournament
- * so the page can show a countdown.
+ * Resolve the tournament we should be showing across pardle's tools:
+ *
+ *   1. **In-window and not concluded** — return it with isLive=true.
+ *      This is the "current tournament week" case (Thu-Sun typically).
+ *   2. **Between events** — return the next upcoming tournament within
+ *      2 weeks with isLive=false. Books/DG usually publish
+ *      pre-tournament data early in the week, so surfacing the
+ *      upcoming event immediately after the previous one ends means
+ *      tools stop showing stale data from a finished tournament.
+ *   3. **Deep off-season** — return null.
  */
 export async function getActiveTournament(): Promise<{
   tournament: PGATournamentRef;
@@ -163,26 +184,60 @@ export async function getActiveTournament(): Promise<{
   const { upcoming, completed } = await getSchedule();
   const now = Date.now();
   const FIVE_DAYS = 5 * 24 * 60 * 60 * 1000;
+  const TWO_WEEKS = 14 * 24 * 60 * 60 * 1000;
+  const completedIds = new Set(completed.map((t) => t.id));
 
   // Walk all tournaments whose window contains "now", oldest start
-  // first, and return the first that isn't already concluded on
-  // the leaderboard.
+  // first, and return the first that isn't already concluded.
   const inWindow = [...completed, ...upcoming]
     .filter((t) => now >= t.startDate && now <= t.startDate + FIVE_DAYS)
     .sort((a, b) => a.startDate - b.startDate);
   for (const t of inWindow) {
-    const concluded = await isTournamentConcluded(t.id, t.startDate);
+    const concluded = await isTournamentConcluded(
+      t.id,
+      t.startDate,
+      completedIds.has(t.id),
+    );
     if (!concluded) {
       return { tournament: t, isLive: true };
     }
   }
 
-  // Nothing live (or everything in-window has concluded) — return
-  // the soonest upcoming for a countdown.
+  // Between events — prefer the next upcoming within 2 weeks so tools
+  // pivot away from the just-finished event to the imminent one that
+  // books already have pre-tournament lines for.
   const next = upcoming
-    .filter((t) => t.startDate > now)
+    .filter((t) => t.startDate > now && t.startDate - now <= TWO_WEEKS)
     .sort((a, b) => a.startDate - b.startDate)[0];
-  return next ? { tournament: next, isLive: false } : null;
+  if (next) return { tournament: next, isLive: false };
+
+  // Nothing scheduled inside the horizon (deep off-season).
+  return null;
+}
+
+/**
+ * Determine which round tools should default to for a given active
+ * tournament:
+ *
+ *   - Not yet started (`isLive=false` from getActiveTournament):
+ *     return 1 (books post R1 lines pre-tournament).
+ *   - In progress: estimate from elapsed days since startDate,
+ *     clamped [1, 4]. Between-rounds gaps naturally advance to the
+ *     next day's round.
+ *
+ * Called by tools whose UI defaults must track the active round
+ * (odds-compare, score-forecast) so pre-tournament visitors see R1
+ * lines instead of R2 by accident.
+ */
+export function getCurrentRound(
+  startDate: number,
+  isLive: boolean,
+): number {
+  if (!isLive) return 1;
+  const daysElapsed = Math.floor(
+    (Date.now() - startDate) / (24 * 60 * 60 * 1000),
+  );
+  return Math.max(1, Math.min(4, daysElapsed + 1));
 }
 
 // ──────────────────────────────────────────────────────────────────
