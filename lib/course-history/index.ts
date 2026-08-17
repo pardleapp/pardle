@@ -67,7 +67,7 @@ const KEY_EVENT_LIST = "course-history:event-list:pga";
 // same (event_fs − tour_avg_fs) delta is applied symmetrically to
 // each round on both sides.
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v12:${slugify(courseName)}`;
+  `course-history:agg-course:v13:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
@@ -556,14 +556,34 @@ export async function getCourseHistoryByCourse(
     if (cached && cached.players) return cached;
   }
 
-  // Find which (event, year) tuples hosted this course. If the
-  // course-index is empty (nothing cached yet) we can't discover
-  // occurrences without fetching every PGA event — the caller
-  // should have hit /api/course-history/courses first, which warms
-  // the index. Also merge any split-personality keys that
-  // canonicalise to the same cleanCourse — a defensive read-time
-  // fold that lets pre-fix cached index blobs still resolve
-  // correctly.
+  // Baseline fetches: we need every HISTORICAL_YEAR loaded. A
+  // February target round's trailing-50 baseline reaches back into
+  // the previous calendar year, so we can't restrict to years that
+  // hosted the target course. On warm cache this is 8 Redis reads;
+  // on cold, ~8 × ~40 event fetches (same fanout the tool always
+  // eventually does when different courses are queried).
+  //
+  // IMPORTANT: we load baselines BEFORE reading the course index.
+  // getCachedEventYearRounds side-effects into the index each time
+  // it fetches a new (event, year) tuple — so kicking baselines
+  // first ensures the current season's events land in the index
+  // before we read it below. Without this ordering, the first
+  // aggregate build after HISTORICAL_YEARS bumps (or after new
+  // events wrap up) reads a stale index and misses the current
+  // year's rounds until the aggregate cache TTL expires.
+  const baselineYears = HISTORICAL_YEARS;
+  const yearBaselineArr = await Promise.all(
+    baselineYears.map((y) => getYearlyPlayerBaselines(y)),
+  );
+  const baselinesByYear = new Map<number, YearBaseline>();
+  for (let i = 0; i < baselineYears.length; i++) {
+    baselinesByYear.set(baselineYears[i], yearBaselineArr[i]);
+  }
+
+  // NOW read the course index — it's been freshened by any 2026
+  // events the baseline load just fetched. Merge any split-
+  // personality keys that canonicalise to the same cleanCourse
+  // (defensive read-time fold for pre-fix cached index blobs).
   const index = await getCourseIndex();
   const occurrences: CourseOccurrence[] = [];
   for (const [key, occs] of Object.entries(index)) {
@@ -586,28 +606,6 @@ export async function getCourseHistoryByCourse(
     }
   }
   if (allRounds.length === 0) return null;
-
-  // Which years does the target event actually have data for? Used
-  // to decide which years' rounds to aggregate on the AT-COURSE side.
-  const yearsWithData = Array.from(
-    new Set(allRounds.map((r) => r.year)),
-  ).sort();
-
-  // Baseline fetches: we need every HISTORICAL_YEAR loaded, not just
-  // yearsWithData. A February target round's trailing-50 baseline
-  // reaches back into the previous calendar year, so we can't
-  // restrict to years that hosted the target course. On warm cache
-  // this is 7 Redis reads; on cold, ~7 × ~40 event fetches (same
-  // fanout the tool always eventually does when different courses
-  // are queried).
-  const baselineYears = HISTORICAL_YEARS;
-  const yearBaselineArr = await Promise.all(
-    baselineYears.map((y) => getYearlyPlayerBaselines(y)),
-  );
-  const baselinesByYear = new Map<number, YearBaseline>();
-  for (let i = 0; i < baselineYears.length; i++) {
-    baselinesByYear.set(baselineYears[i], yearBaselineArr[i]);
-  }
 
   // Event-date lookup: {eventId:year → YYYY-MM-DD start date}. Built
   // from the same cached event list the year-baseline fetches use.
