@@ -34,11 +34,22 @@ interface Row {
   outperformance: number;
   outperformanceOtt: number;
   outperformanceApp: number;
+  currentSkillOttApp: number | null;
+  skillDrift: number | null;
 }
+
+// Rows with |skillDrift| above this threshold get filtered out when
+// hideDrift=1, because the outperformance signal is contaminated by
+// a change in the player's underlying skill (breakout or decline)
+// rather than genuine course fit.
+const DRIFT_THRESHOLD = 1.0;
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const minRounds = Math.max(1, Number(url.searchParams.get("min") ?? 8) || 8);
+  // Default: hide skill-drift rows (breakouts + declines). Client can
+  // opt in to the noisy view by passing hideDrift=0.
+  const hideDrift = url.searchParams.get("hideDrift") !== "0";
   try {
     const courses = await getCuratedCourses();
     // Fetch aggregates in parallel — Redis hits are cheap and
@@ -50,10 +61,19 @@ export async function GET(req: Request) {
       ),
     );
     const rows: Row[] = [];
+    let driftFiltered = 0;
     for (const r of results) {
       if (!r || !r.players) continue;
       for (const p of r.players) {
         if ((p.roundsPlayed ?? 0) < minRounds) continue;
+        if (
+          hideDrift &&
+          p.skillDrift != null &&
+          Math.abs(p.skillDrift) > DRIFT_THRESHOLD
+        ) {
+          driftFiltered++;
+          continue;
+        }
         rows.push({
           dgId: p.dgId,
           name: p.name,
@@ -65,6 +85,8 @@ export async function GET(req: Request) {
           outperformance: p.outperformanceCombined,
           outperformanceOtt: p.outperformanceSgOtt,
           outperformanceApp: p.outperformanceSgApp,
+          currentSkillOttApp: p.currentSkillOttApp,
+          skillDrift: p.skillDrift,
         });
       }
     }
@@ -72,7 +94,10 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ok: true,
       minRounds,
+      hideDrift,
+      driftThreshold: DRIFT_THRESHOLD,
       totalPairs: rows.length,
+      driftFiltered,
       rows,
     });
   } catch (err) {

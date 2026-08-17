@@ -28,6 +28,7 @@ import { Redis } from "@upstash/redis";
 import {
   getHistoricalEventList,
   getHistoricalRounds,
+  getSkillDecompositions,
   type DGHistoricalEvent,
   type DGHistoricalRound,
 } from "@/lib/golf-api/datagolf";
@@ -66,8 +67,21 @@ const KEY_EVENT_LIST = "course-history:event-list:pga";
 // the most recent 50 rounds. Field-strength adjustment kept — the
 // same (event_fs − tour_avg_fs) delta is applied symmetrically to
 // each round on both sides.
+// Shrinkage strength for baseline. K represents the "effective sample
+// size" of a prior belief that the player's baseline SG:OTT+APP is 0
+// (the field-adjusted tour mean). A player with n baseline rounds has
+// their raw baseline pulled toward 0 with weight n / (n + K).
+//   n=50 → 71% own / 29% prior — barely dampened
+//   n=25 → 56% own / 44% prior — moderately dampened
+//   n=15 → 43% own / 57% prior — halved
+// Rationale: small baseline samples (opposite-field DP-Tour regulars,
+// rookies with thin PGA history) produce artificial outperformance
+// signal at co-sanctioned venues. Shrinkage kills those artifacts
+// without touching well-sampled tour regulars.
+const BASELINE_SHRINKAGE_K = 20;
+
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v13:${slugify(courseName)}`;
+  `course-history:agg-course:v14:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
@@ -147,9 +161,11 @@ export interface PlayerCourseStats {
   atCourseSgApp: number;
   /** Sum: how the player has actually ballstruck at this course. */
   atCourseCombined: number;
-  /** Player's current-season SG:OTT baseline. */
+  /** Player's SG:OTT baseline — trailing-N rounds ending on each
+   *  at-course event, shrunk toward 0 with Bayesian weight
+   *  n / (n + BASELINE_SHRINKAGE_K). */
   baselineSgOtt: number;
-  /** Player's current-season SG:APP baseline. */
+  /** Player's SG:APP baseline, shrunk the same way. */
   baselineSgApp: number;
   /** Sum: how the player usually ballstrikes. */
   baselineCombined: number;
@@ -158,6 +174,19 @@ export interface PlayerCourseStats {
   outperformanceSgOtt: number;
   outperformanceSgApp: number;
   outperformanceCombined: number;
+  /** DataGolf's CURRENT (right-now) skill rating SG:OTT+APP for this
+   *  player. Null if we couldn't match them in the skill decomp feed
+   *  (retired players, DP Tour regulars with sparse PGA presence).
+   *  Used by the UI to detect breakouts/declines that inflate the
+   *  outperformance signal — a Feb round's baseline is old, but the
+   *  player's game may have moved since. */
+  currentSkillOttApp: number | null;
+  /** currentSkillOttApp − baselineCombined. Positive = current form
+   *  is meaningfully stronger than the trailing baseline (breakout);
+   *  negative = declining. |skillDrift| > 1.0 SG is a strong signal
+   *  that outperformance is contaminated by a skill change rather
+   *  than genuine course fit. */
+  skillDrift: number | null;
 }
 
 /** Response shape from the course-history endpoint. */
@@ -175,6 +204,50 @@ export interface CourseHistoryResponse {
   /** All PGA events that have used this course in HISTORICAL_YEARS.
    *  Rendered as chips beneath the course-name header on the client. */
   hostingEvents?: string[];
+}
+
+// ── Skill-decomposition cache (current tour form) ──────────────────
+const KEY_SKILL_DECOMP = "course-history:skill-decomp:v1";
+const CACHE_TTL_SKILL = 6 * 60 * 60; // DG refreshes weekly; 6h is plenty
+let skillFetchInFlight: Promise<Map<number, number>> | null = null;
+
+/** DataGolf's current per-player SG:OTT+APP. In-process singleton
+ *  coalesces the many concurrent aggregation calls the specialists
+ *  endpoint kicks off, and Redis caches the parsed map so subsequent
+ *  requests skip the DG hit entirely. Returns empty map on failure —
+ *  drift fields fall back to null. */
+async function getSkillDecompMap(): Promise<Map<number, number>> {
+  if (redis) {
+    const cached = await redis
+      .get<Array<[number, number]>>(KEY_SKILL_DECOMP)
+      .catch(() => null);
+    if (cached && Array.isArray(cached)) return new Map(cached);
+  }
+  if (skillFetchInFlight) return skillFetchInFlight;
+  skillFetchInFlight = (async () => {
+    try {
+      const rows = await getSkillDecompositions();
+      const m = new Map<number, number>();
+      for (const r of rows) {
+        const id = Number(r.dgId);
+        if (!Number.isFinite(id)) continue;
+        m.set(id, (r.sgOtt || 0) + (r.sgApp || 0));
+      }
+      if (redis) {
+        await redis
+          .set(KEY_SKILL_DECOMP, Array.from(m.entries()), {
+            ex: CACHE_TTL_SKILL,
+          })
+          .catch(() => null);
+      }
+      return m;
+    } catch {
+      return new Map<number, number>();
+    } finally {
+      skillFetchInFlight = null;
+    }
+  })();
+  return skillFetchInFlight;
 }
 
 // ── Cached fetchers ────────────────────────────────────────────────
@@ -563,6 +636,9 @@ export async function getCourseHistoryByCourse(
   // on cold, ~8 × ~40 event fetches (same fanout the tool always
   // eventually does when different courses are queried).
   //
+  // Skill map fetched in parallel — same request lifecycle, so it
+  // doesn't add to wall-clock latency.
+  //
   // IMPORTANT: we load baselines BEFORE reading the course index.
   // getCachedEventYearRounds side-effects into the index each time
   // it fetches a new (event, year) tuple — so kicking baselines
@@ -572,9 +648,10 @@ export async function getCourseHistoryByCourse(
   // events wrap up) reads a stale index and misses the current
   // year's rounds until the aggregate cache TTL expires.
   const baselineYears = HISTORICAL_YEARS;
-  const yearBaselineArr = await Promise.all(
-    baselineYears.map((y) => getYearlyPlayerBaselines(y)),
-  );
+  const [yearBaselineArr, skillMap] = await Promise.all([
+    Promise.all(baselineYears.map((y) => getYearlyPlayerBaselines(y))),
+    getSkillDecompMap(),
+  ]);
   const baselinesByYear = new Map<number, YearBaseline>();
   for (let i = 0; i < baselineYears.length; i++) {
     baselinesByYear.set(baselineYears[i], yearBaselineArr[i]);
@@ -794,7 +871,17 @@ export async function getCourseHistoryByCourse(
       if (rounds >= kRounds) break;
     }
     if (rounds <= 0) return null;
-    return { sgOtt: sumOtt / rounds, sgApp: sumApp / rounds, rounds };
+    // Bayesian shrinkage toward 0 (field-adjusted tour mean). Weight
+    // on the player's own sample = rounds / (rounds + K). Small
+    // samples get pulled hard toward 0; well-sampled players barely
+    // move. Kills the low-baseline artifacts at co-sanctioned events
+    // without touching tour regulars.
+    const w = rounds / (rounds + BASELINE_SHRINKAGE_K);
+    return {
+      sgOtt: (sumOtt / rounds) * w,
+      sgApp: (sumApp / rounds) * w,
+      rounds,
+    };
   }
 
   // Per-round baseline lookup is expensive (walks all event
@@ -945,6 +1032,13 @@ export async function getCourseHistoryByCourse(
         bestN = n;
       }
     }
+    const currentSkill = skillMap.get(b.dgId);
+    const currentSkillOttApp =
+      typeof currentSkill === "number" ? currentSkill : null;
+    const skillDrift =
+      currentSkillOttApp != null
+        ? currentSkillOttApp - (baseOtt + baseApp)
+        : null;
     players.push({
       dgId: b.dgId,
       name: b.name,
@@ -960,6 +1054,8 @@ export async function getCourseHistoryByCourse(
       outperformanceSgOtt: atOtt - baseOtt,
       outperformanceSgApp: atApp - baseApp,
       outperformanceCombined: atOtt + atApp - (baseOtt + baseApp),
+      currentSkillOttApp,
+      skillDrift,
     });
   }
 
