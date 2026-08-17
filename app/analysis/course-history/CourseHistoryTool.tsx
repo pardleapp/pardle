@@ -158,6 +158,29 @@ interface FieldResp {
   players?: { dgId?: string | number | null }[];
 }
 
+interface SpecialistRow {
+  dgId: number;
+  name: string;
+  course: string;
+  rounds: number;
+  years: number;
+  atCombined: number;
+  baselineCombined: number;
+  outperformance: number;
+  outperformanceOtt: number;
+  outperformanceApp: number;
+}
+
+interface SpecialistsResp {
+  ok: boolean;
+  error?: string;
+  minRounds?: number;
+  totalPairs?: number;
+  rows?: SpecialistRow[];
+}
+
+type ToolView = "by-course" | "specialists";
+
 // ── Main component ─────────────────────────────────────────────────
 export default function CourseHistoryTool() {
   const [courses, setCourses] = useState<CuratedCourse[] | null>(null);
@@ -177,6 +200,14 @@ export default function CourseHistoryTool() {
   const [activeField, setActiveField] = useState<ActiveField | null>(null);
   const [activeFieldChecked, setActiveFieldChecked] = useState(false);
   const [onlyThisWeek, setOnlyThisWeek] = useState(false);
+
+  // Tab state — "By course" is the original per-venue drill-down;
+  // "Specialists" is a global table of best/worst (player, course)
+  // pairs at a rounds-played threshold.
+  const [view, setView] = useState<ToolView>("by-course");
+  const [specMinRounds, setSpecMinRounds] = useState(8);
+  const [specialists, setSpecialists] = useState<SpecialistsResp | null>(null);
+  const [specialistsLoading, setSpecialistsLoading] = useState(false);
 
   // Load course list. First cold hit can take up to a minute while
   // the server warms the DataGolf/Redis caches, so we show a
@@ -332,6 +363,36 @@ export default function CourseHistoryTool() {
     };
   }, [selectedCourse, data?.ok]);
 
+  // Load global specialists when the Specialists tab activates or the
+  // min-rounds control changes. Cheap in the warm cache path (~1s of
+  // Redis GETs), so re-fetching on every threshold change is fine.
+  useEffect(() => {
+    if (view !== "specialists") return;
+    let cancelled = false;
+    (async () => {
+      setSpecialistsLoading(true);
+      try {
+        const res = await fetch(
+          `/api/course-history/specialists?min=${specMinRounds}`,
+        );
+        const j = (await res.json()) as SpecialistsResp;
+        if (!cancelled) setSpecialists(j);
+      } catch (e) {
+        if (!cancelled) {
+          setSpecialists({
+            ok: false,
+            error: e instanceof Error ? e.message : "fetch failed",
+          });
+        }
+      } finally {
+        if (!cancelled) setSpecialistsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [view, specMinRounds]);
+
   const filteredCourses = useMemo(() => {
     const q = courseQuery.trim().toLowerCase();
     if (!courses) return [];
@@ -398,6 +459,17 @@ export default function CourseHistoryTool() {
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
+      <TabSwitcher view={view} onChange={setView} />
+      {view === "specialists" && (
+        <SpecialistsPanel
+          data={specialists}
+          loading={specialistsLoading}
+          minRounds={specMinRounds}
+          onMinRoundsChange={setSpecMinRounds}
+        />
+      )}
+      {view === "by-course" && (
+        <>
       {/* Setup panel */}
       <div style={panel()}>
         <SectionHeader
@@ -670,7 +742,397 @@ export default function CourseHistoryTool() {
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
+  );
+}
+
+// ── Tab switcher ───────────────────────────────────────────────────
+function TabSwitcher({
+  view,
+  onChange,
+}: {
+  view: ToolView;
+  onChange: (v: ToolView) => void;
+}) {
+  const tabs: { key: ToolView; label: string; sub: string }[] = [
+    {
+      key: "by-course",
+      label: "By course",
+      sub: "Pick a venue, see who fits",
+    },
+    {
+      key: "specialists",
+      label: "Specialists",
+      sub: "Best & worst across every course",
+    },
+  ];
+  return (
+    <div
+      role="tablist"
+      style={{
+        display: "flex",
+        gap: 4,
+        padding: 4,
+        background: T.soft,
+        border: `1px solid ${T.line}`,
+        borderRadius: 12,
+      }}
+    >
+      {tabs.map((t) => {
+        const on = view === t.key;
+        return (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(t.key)}
+            style={{
+              flex: 1,
+              padding: "10px 14px",
+              border: "none",
+              borderRadius: 8,
+              background: on ? "white" : "transparent",
+              color: on ? T.emeraldD : T.muted,
+              boxShadow: on ? "0 1px 2px oklch(0 0 0 / 0.06)" : "none",
+              cursor: "pointer",
+              textAlign: "left",
+              fontFamily: T.fontUi,
+              transition: "background 120ms ease",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 800,
+                letterSpacing: -0.005,
+              }}
+            >
+              {t.label}
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: on ? T.muted : T.dim,
+                fontWeight: 600,
+                marginTop: 2,
+              }}
+            >
+              {t.sub}
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Specialists panel ──────────────────────────────────────────────
+function SpecialistsPanel({
+  data,
+  loading,
+  minRounds,
+  onMinRoundsChange,
+}: {
+  data: SpecialistsResp | null;
+  loading: boolean;
+  minRounds: number;
+  onMinRoundsChange: (v: number) => void;
+}) {
+  const rows = data?.rows ?? [];
+  const total = data?.totalPairs ?? 0;
+
+  const top = useMemo(() => rows.slice(0, 25), [rows]);
+  const bottom = useMemo(() => rows.slice(-25).reverse(), [rows]);
+
+  return (
+    <div
+      style={{
+        ...panel(),
+        border: `1.5px solid ${T.emerald}`,
+        boxShadow: "0 4px 24px oklch(0.4 0.13 155 / 0.10)",
+      }}
+    >
+      <SectionHeader
+        step={1}
+        title="Course specialists"
+        subtitle={
+          total
+            ? `${total.toLocaleString()} (player, course) pairs meeting the minimum-rounds threshold`
+            : "Best and worst course-fit signals across every venue in the archive"
+        }
+        accent
+      />
+
+      <div style={{ display: "grid", gap: 16, marginBottom: 16 }}>
+        <Field
+          label="Minimum rounds at course"
+          help="A specialist signal is only reliable with enough sample. 8 rounds is roughly 2 tournaments' worth of data at the same venue."
+        >
+          <input
+            type="number"
+            min={1}
+            max={40}
+            step={1}
+            value={minRounds}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (Number.isFinite(v) && v >= 1 && v <= 40) {
+                onMinRoundsChange(v);
+              }
+            }}
+            style={{ ...ip(), maxWidth: 120 }}
+          />
+        </Field>
+      </div>
+
+      <div
+        style={{
+          marginBottom: 14,
+          padding: "10px 12px",
+          background: T.soft,
+          border: `1px solid ${T.line}`,
+          borderRadius: 8,
+          fontSize: 12,
+          color: T.muted,
+          fontFamily: T.fontUi,
+          lineHeight: 1.5,
+        }}
+      >
+        <strong style={{ color: T.ink }}>Caveats.</strong> Rows for
+        opposite-field / co-sanctioned events (Renaissance Club Scottish
+        Open, Keene Trace Barbasol, some Latin/Vidanta stops) can show
+        inflated numbers when a player&apos;s baseline is unusually low
+        because most of their PGA-side rounds are majors and playoffs.
+        Look at the <em>baseline sum</em> column — anything below −1.0
+        or above +1.5 for a mid-tier player is a data artifact, not
+        signal.
+      </div>
+
+      {loading && (
+        <div
+          style={{
+            padding: 40,
+            textAlign: "center",
+            color: T.muted,
+            fontFamily: T.fontUi,
+          }}
+        >
+          Loading specialists…
+        </div>
+      )}
+      {!loading && data && !data.ok && (
+        <div
+          style={{
+            padding: 20,
+            background: "oklch(0.97 0.05 40)",
+            border: `1px solid oklch(0.85 0.10 40)`,
+            borderRadius: 8,
+            color: "oklch(0.35 0.15 28)",
+            fontFamily: T.fontUi,
+          }}
+        >
+          {data.error ?? "Couldn't load specialists."}
+        </div>
+      )}
+      {!loading && data?.ok && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(360px, 100%), 1fr))",
+            gap: 16,
+          }}
+        >
+          <SpecialistList
+            title="Best overperformers"
+            subtitle="Where players consistently beat their form"
+            color={T.emerald}
+            rows={top}
+          />
+          <SpecialistList
+            title="Worst drags"
+            subtitle="Where players consistently fall short"
+            color={T.tang}
+            rows={bottom}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SpecialistList({
+  title,
+  subtitle,
+  color,
+  rows,
+}: {
+  title: string;
+  subtitle: string;
+  color: string;
+  rows: SpecialistRow[];
+}) {
+  return (
+    <div
+      style={{
+        border: `1px solid ${T.line}`,
+        borderLeft: `3px solid ${color}`,
+        borderRadius: 10,
+        background: "white",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          padding: "12px 14px",
+          borderBottom: `1px solid ${T.lineSoft}`,
+          background: T.soft,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            color,
+            fontWeight: 800,
+          }}
+        >
+          {title}
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            color: T.muted,
+            fontFamily: T.fontUi,
+            fontWeight: 600,
+            marginTop: 2,
+          }}
+        >
+          {subtitle}
+        </div>
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontFamily: T.fontUi,
+            minWidth: 340,
+          }}
+        >
+          <thead>
+            <tr style={{ background: T.card }}>
+              <SpecTh label="Player" align="left" />
+              <SpecTh label="Course" align="left" />
+              <SpecTh label="Rds" />
+              <SpecTh label="Base" />
+              <SpecTh label="vs" accent color={color} />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr
+                key={`${r.dgId}-${r.course}`}
+                style={{
+                  background: i % 2 === 0 ? "white" : T.soft,
+                }}
+              >
+                <td style={td()}>
+                  <span style={{ fontWeight: 800, color: T.ink }}>
+                    {r.name}
+                  </span>
+                </td>
+                <td
+                  style={{
+                    ...td(),
+                    textAlign: "left",
+                    fontFamily: T.fontUi,
+                    fontWeight: 600,
+                    color: T.muted,
+                    whiteSpace: "normal",
+                    fontSize: 12,
+                  }}
+                >
+                  {r.course}
+                </td>
+                <td style={td(true)}>{r.rounds}</td>
+                <td
+                  style={{
+                    ...td(),
+                    color: T.muted,
+                  }}
+                >
+                  {(r.baselineCombined >= 0 ? "+" : "") +
+                    r.baselineCombined.toFixed(2)}
+                </td>
+                <td
+                  style={{
+                    ...td(),
+                    color,
+                    fontWeight: 800,
+                    background: `${color}0F`,
+                  }}
+                >
+                  {(r.outperformance >= 0 ? "+" : "") +
+                    r.outperformance.toFixed(2)}
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td
+                  colSpan={5}
+                  style={{
+                    padding: 24,
+                    textAlign: "center",
+                    color: T.muted,
+                    fontFamily: T.fontUi,
+                    fontSize: 13,
+                  }}
+                >
+                  No rows.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function SpecTh({
+  label,
+  align = "right",
+  accent = false,
+  color,
+}: {
+  label: string;
+  align?: "left" | "right";
+  accent?: boolean;
+  color?: string;
+}) {
+  return (
+    <th
+      style={{
+        textAlign: align,
+        padding: "8px 10px",
+        borderBottom: `1px solid ${T.line}`,
+        fontSize: 10,
+        fontWeight: 800,
+        letterSpacing: 0.6,
+        textTransform: "uppercase",
+        color: accent && color ? color : T.muted,
+        fontFamily: T.fontUi,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </th>
   );
 }
 
