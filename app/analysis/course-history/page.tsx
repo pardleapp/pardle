@@ -96,11 +96,14 @@ export default function Page() {
           player&apos;s tee-to-green skills. The default ranking is
           <strong> outperformance</strong>: each at-course round&apos;s
           SG minus the player&apos;s{" "}
-          <em>trailing-50-round baseline</em> ending on the day the
-          event started — the form we knew about them entering the
-          week, with no lookahead. Baselines are field-strength
-          adjusted so a round played in a WGC-strength field isn&apos;t
-          penalised against a regular tour week.
+          <em>50 nearest rounds in time</em> — the run-in and the
+          follow-up around each event, so a rising player&apos;s
+          course rounds aren&apos;t scored against a stale
+          pre-breakout baseline. Baselines are field-strength adjusted
+          and Bayesian-shrunk toward tour average; players whose
+          current DG skill has moved more than 1.0 SG from that
+          historical baseline are excluded entirely (breakouts are
+          skill change, not course fit).
         </p>
         <CourseHistoryTool />
       </section>

@@ -89,8 +89,19 @@ const BASELINE_SHRINKAGE_K = 20;
 // optional: consumers should never see numbers we know are wrong.
 const SKILL_DRIFT_THRESHOLD = 1.0;
 
+// v16: symmetric-window baseline (50 rounds nearest to the target
+// event's start date, in either direction). Replaces the trailing-
+// only window that shipped v11-v15. Trailing-only mis-scored rising
+// players — for a mid-career breakout like Ryan Gerard at 2025 PGA,
+// pre-event rounds were mostly stale form, so at-course rounds
+// looked like course fit when much of the signal was general skill
+// improvement. Symmetric ±25 rounds estimates the player's true
+// skill AROUND the event using both the run-in and the follow-up.
+// Appropriate for retrospective analysis (Kalman smoothing vs
+// Kalman filter — same math, different question). Would NOT be
+// appropriate for prospective / betting use.
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v15:${slugify(courseName)}`;
+  `course-history:agg-course:v16:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
@@ -818,19 +829,24 @@ export async function getCourseHistoryByCourse(
   const tourAvgFsOtt = tourFsN > 0 ? tourFsSumOtt / tourFsN : 0;
   const tourAvgFsApp = tourFsN > 0 ? tourFsSumApp / tourFsN : 0;
 
-  /** Trailing-K-rounds baseline ending on the target event's start
-   *  date. Walks all this player's per-event contributions across
-   *  every loaded HISTORICAL_YEAR, sorts them by date DESC, filters
-   *  to events strictly before targetDate and not in excludedEventIds
-   *  (i.e. drop the target course entirely), then accumulates from
-   *  most-recent until we hit K rounds. Each event's contribution is
-   *  field-strength-adjusted the same way the at-course side is, so
-   *  both sides live on a common reference.
+  /** Symmetric-window baseline: the K rounds NEAREST in time to the
+   *  target event's start date, in either direction. Filters out the
+   *  target-course events themselves via excludedEventIds. Each
+   *  event's contribution is field-strength-adjusted so both sides
+   *  live on a common reference.
    *
-   *  Rationale: this replaces v10's year-level LOO baseline, which
-   *  aggregated the whole year around the target event and thus
-   *  leaked future rounds into the "expected form" baseline. */
-  function trailingBaselineFor(
+   *  Why symmetric (not trailing-only): course-history is a
+   *  retrospective analysis — the question is "did this player play
+   *  unusually well at this course over the years", not "predict
+   *  their next round here". A trailing-only baseline mis-scores
+   *  rising players (their pre-event form lags their true skill
+   *  around the event, so at-course rounds look like course fit when
+   *  they're just general improvement). A ±25-round-each-side window
+   *  estimates the player's actual form AROUND the event, using both
+   *  the run-in and the follow-up. Same math as Kalman smoothing
+   *  (both sides) vs Kalman filter (trailing only); appropriate for
+   *  a retrospective view. */
+  function symmetricBaselineFor(
     dgId: number,
     targetDate: string, // YYYY-MM-DD (event R1 start)
     excludedEventIds: Set<number>,
@@ -843,7 +859,17 @@ export async function getCourseHistoryByCourse(
       sumOtt: number;
       sumApp: number;
       rounds: number;
+      absDays: number;
     }
+    // Days between two YYYY-MM-DD strings. Rough — 30 days/month is
+    // fine for sorting by proximity, we don't need calendar-exact.
+    const dayDelta = (a: string, b: string): number => {
+      const parse = (s: string) => {
+        const [y, m, d] = s.split("-").map(Number);
+        return y * 365 + m * 30 + d;
+      };
+      return Math.abs(parse(a) - parse(b));
+    };
     const entries: Entry[] = [];
     for (const [year, yb] of baselinesByYear) {
       const row = yb.get(dgId);
@@ -853,7 +879,9 @@ export async function getCourseHistoryByCourse(
         if (excludedEventIds.has(eid)) continue;
         const date = eventDateByKey.get(fsKey(eid, year));
         if (!date) continue;
-        if (date >= targetDate) continue;
+        // Skip the target event's exact date to avoid measuring the
+        // player against themselves that week.
+        if (date === targetDate) continue;
         entries.push({
           date,
           eventId: eid,
@@ -861,12 +889,12 @@ export async function getCourseHistoryByCourse(
           sumOtt: ev.sumOtt,
           sumApp: ev.sumApp,
           rounds: ev.rounds,
+          absDays: dayDelta(date, targetDate),
         });
       }
     }
-    // Sort DESC (newest first) — lexicographic sort works on
-    // ISO-8601 YYYY-MM-DD.
-    entries.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    // Sort by proximity to targetDate (nearest first, either direction).
+    entries.sort((a, b) => a.absDays - b.absDays);
     let sumOtt = 0;
     let sumApp = 0;
     let rounds = 0;
@@ -900,14 +928,14 @@ export async function getCourseHistoryByCourse(
     string,
     { sgOtt: number; sgApp: number; rounds: number } | null
   >();
-  function cachedTrailingBaseline(
+  function cachedSymmetricBaseline(
     dgId: number,
     targetDate: string,
     excludedEventIds: Set<number>,
   ): { sgOtt: number; sgApp: number; rounds: number } | null {
     const key = `${dgId}:${targetDate}`;
     if (baselineCache.has(key)) return baselineCache.get(key)!;
-    const v = trailingBaselineFor(dgId, targetDate, excludedEventIds, 50);
+    const v = symmetricBaselineFor(dgId, targetDate, excludedEventIds, 50);
     baselineCache.set(key, v);
     return v;
   }
@@ -987,7 +1015,7 @@ export async function getCourseHistoryByCourse(
     const eventDate =
       eventId != null ? eventDateByKey.get(fsKey(eventId, r.year)) : undefined;
     if (eventDate) {
-      const baseline = cachedTrailingBaseline(
+      const baseline = cachedSymmetricBaseline(
         r.dgId,
         eventDate,
         excludedAllYears,
