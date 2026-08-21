@@ -107,10 +107,12 @@ const KEY_YEAR_BASELINE = (year: number) =>
 /** Course index mapping course_name → occurrences (event, year, round
  *  count). Populated incrementally as we fetch event data.
  *  v10 = added second-round aliases for Bay Hill, Torrey Pines,
- *  Country Club of Jackson, Dunes, Riviera. Rebuild once more so
- *  those pairs merge in the index and become queryable under
- *  their canonical names. */
-const KEY_COURSE_INDEX = "course-history:course-index:v10";
+ *  Country Club of Jackson, Dunes, Riviera.
+ *  v11 = rebuild to pick up 2026 events after HISTORICAL_YEARS bump
+ *  (previously-cached index blob was built pre-2026 and never
+ *  self-refreshed, so 2026 events like Truist at Quail Hollow were
+ *  missing entirely from the course-fit archive). */
+const KEY_COURSE_INDEX = "course-history:course-index:v11";
 
 function slugify(s: string): string {
   return s
