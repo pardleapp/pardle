@@ -100,8 +100,12 @@ const SKILL_DRIFT_THRESHOLD = 1.0;
 // Appropriate for retrospective analysis (Kalman smoothing vs
 // Kalman filter — same math, different question). Would NOT be
 // appropriate for prospective / betting use.
+// v17: bumped so every course-fit aggregate rebuilds against the
+// freshly-repopulated course-index (v11) that now includes 2026
+// events. Without this, aggregates cached under v16 keep showing
+// stale yearsCovered / hostingEvents until their 6h TTL expires.
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v16:${slugify(courseName)}`;
+  `course-history:agg-course:v17:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
