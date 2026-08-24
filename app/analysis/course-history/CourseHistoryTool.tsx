@@ -81,6 +81,23 @@ interface PersistenceStats {
   repeatVisitors: number;
   usable: boolean;
 }
+interface TraitBetas {
+  ott: number;
+  app: number;
+}
+interface TraitFitResp {
+  ok: boolean;
+  error?: string;
+  courseName?: string;
+  sample?: number;
+  tour?: TraitBetas;
+  raw?: TraitBetas;
+  shrunk?: TraitBetas;
+  premium?: TraitBetas;
+  shrinkWeight?: number;
+  adjustmentSd?: number;
+  stability?: { ott: number | null; app: number | null; visits: number };
+}
 interface CourseHistoryResp {
   ok: boolean;
   error?: string;
@@ -215,6 +232,7 @@ export default function CourseHistoryTool() {
   const [warming, setWarming] = useState(false);
 
   const [data, setData] = useState<CourseHistoryResp | null>(null);
+  const [traitFit, setTraitFit] = useState<TraitFitResp | null>(null);
   const [loading, setLoading] = useState(false);
   const [archetype, setArchetype] = useState<ArchetypeResp | null>(null);
   const [archetypeLoading, setArchetypeLoading] = useState(false);
@@ -325,6 +343,19 @@ export default function CourseHistoryTool() {
       setLoading(true);
       setData(null);
       setArchetype(null);
+      setTraitFit(null);
+      // Trait fit is independent of the table and much cheaper on a
+      // warm cache, so fire it alongside rather than chaining it.
+      fetch(
+        `/api/course-history/trait-fit?course=${encodeURIComponent(selectedCourse)}`,
+      )
+        .then((r) => r.json())
+        .then((j: TraitFitResp) => {
+          if (!cancelled) setTraitFit(j);
+        })
+        .catch(() => {
+          if (!cancelled) setTraitFit(null);
+        });
       try {
         const res = await fetch(
           `/api/course-history?course=${encodeURIComponent(selectedCourse)}`,
@@ -683,6 +714,7 @@ export default function CourseHistoryTool() {
           }
           accent
         />
+        <TraitFitPanel fit={traitFit} />
         <PersistencePanel persistence={data?.persistence} />
         {data?.hostingEvents && data.hostingEvents.length > 0 && (
           <div
@@ -2165,6 +2197,133 @@ function RankingTable({
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/**
+ * What KIND of player the course rewards — the pooled-across-players
+ * question, which unlike individual course history has real sample
+ * behind it.
+ *
+ * Deliberately states the effect in strokes rather than only as
+ * coefficients. The archive says this is worth about a sixth of a
+ * stroke across four rounds, and a reader who takes it for more than
+ * that will misuse it.
+ */
+function TraitFitPanel({ fit }: { fit: TraitFitResp | null }) {
+  if (!fit?.ok || !fit.premium || !fit.tour) return null;
+  const { premium, tour, sample, adjustmentSd = 0 } = fit;
+  // Ratio of this course's payoff to an average week's. Reads better
+  // than the raw coefficient difference for a non-statistical reader.
+  const ratio = (p: number, t: number) => (t !== 0 ? (t + p) / t : 1);
+  const rows: Array<[string, number, number]> = [
+    ["Driving", premium.ott, ratio(premium.ott, tour.ott)],
+    ["Approach", premium.app, ratio(premium.app, tour.app)],
+  ];
+  const lead = rows[0][1] >= rows[1][1] ? rows[0] : rows[1];
+  const trails = rows[0][1] >= rows[1][1] ? rows[1] : rows[0];
+  const strong = Math.abs(lead[1]) > 0.05;
+  return (
+    <div
+      style={{
+        marginTop: 4,
+        marginBottom: 10,
+        padding: "12px 14px",
+        borderRadius: 10,
+        background: T.card,
+        border: `1px solid ${T.line}`,
+        fontFamily: T.fontUi,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 800,
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+          color: T.ink,
+          marginBottom: 6,
+        }}
+      >
+        What this course rewards
+      </div>
+      <div
+        style={{
+          fontSize: 12.5,
+          lineHeight: 1.55,
+          color: T.muted,
+          marginBottom: 10,
+        }}
+      >
+        {strong ? (
+          <>
+            Pooling every player who has teed it up here, this course pays{" "}
+            <strong style={{ color: T.ink }}>
+              {(lead[2] >= 1 ? lead[2] : 1 / lead[2]).toFixed(2)}&times;{" "}
+              {lead[2] >= 1 ? "more" : "less"}
+            </strong>{" "}
+            than an average week for {lead[0].toLowerCase()} skill, and less
+            unusually for {trails[0].toLowerCase()}.
+          </>
+        ) : (
+          <>
+            Pooling every player who has teed it up here, this course pays
+            close to the tour-average rate for both skills — no strong
+            preference either way.
+          </>
+        )}
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table
+          style={{
+            borderCollapse: "collapse",
+            fontFamily: T.fontMono,
+            fontSize: 12,
+          }}
+        >
+          <thead>
+            <tr style={{ color: T.dim }}>
+              <th style={{ textAlign: "left", padding: "3px 14px 3px 0", fontWeight: 600 }}>
+                Skill
+              </th>
+              <th style={{ textAlign: "right", padding: "3px 14px 3px 0", fontWeight: 600 }}>
+                vs average week
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([label, prem, rat]) => (
+              <tr key={label}>
+                <td style={{ padding: "3px 14px 3px 0", color: T.ink, fontWeight: 700 }}>
+                  {label}
+                </td>
+                <td
+                  style={{
+                    padding: "3px 14px 3px 0",
+                    textAlign: "right",
+                    fontWeight: 800,
+                    color: prem > 0.02 ? T.up : prem < -0.02 ? T.down : T.muted,
+                  }}
+                >
+                  {rat.toFixed(2)}&times;
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ fontSize: 11.5, lineHeight: 1.5, color: T.dim, marginTop: 8 }}>
+        From {sample?.toLocaleString()} player-visits, pulled toward the
+        tour-wide rate so a thinly-played venue can&rsquo;t overstate its
+        case. Worth about{" "}
+        <strong style={{ color: T.muted }}>
+          {(adjustmentSd * 4).toFixed(2)} strokes
+        </strong>{" "}
+        across four rounds for a typical player — a genuine effect, and a
+        small one. It belongs as a tiebreak on top of form, not as a
+        reason to back someone.
+      </div>
     </div>
   );
 }

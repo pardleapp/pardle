@@ -38,7 +38,7 @@ const CARDS: Card[] = [
     href: "/analysis/course-history",
     title: "Course history",
     blurb:
-      "Ballstriking course fit for every PGA event since 2019. Ranked by outperformance vs each player's season SG:OTT+APP baseline.",
+      "What kind of player each PGA venue rewards, and how much of a player's record there is worth trusting. Ranked by what repeats, not by what happened.",
     status: "live",
     Preview: CourseHistoryPreview,
   },
