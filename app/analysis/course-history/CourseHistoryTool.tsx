@@ -173,6 +173,7 @@ interface ForecastResp {
 }
 
 type SortKey =
+  | "courseFit"
   | "adjustedOutperformanceCombined"
   | "outperformanceCombined"
   | "outperformanceSgOtt"
@@ -714,8 +715,11 @@ export default function CourseHistoryTool() {
           }
           accent
         />
-        <TraitFitPanel fit={traitFit} />
-        <PersistencePanel persistence={data?.persistence} />
+        <CourseFitExplainer
+          fit={traitFit}
+          persistence={data?.persistence}
+          players={data?.players}
+        />
         {data?.hostingEvents && data.hostingEvents.length > 0 && (
           <div
             style={{
@@ -786,6 +790,7 @@ export default function CourseHistoryTool() {
               sortDir={sortDir}
               onSort={clickSort}
               forecast={forecast}
+              traitFit={traitFit}
             />
           </>
         )}
@@ -2026,12 +2031,14 @@ function RankingTable({
   sortDir,
   onSort,
   forecast,
+  traitFit,
 }: {
   rows: PlayerCourseStats[];
   sortKey: SortKey;
   sortDir: "asc" | "desc";
   onSort: (k: SortKey) => void;
   forecast: ForecastResp | null;
+  traitFit: TraitFitResp | null;
 }) {
   // Build the name → predicted-residual lookup once per render.
   const predByName = useMemo(() => {
@@ -2051,7 +2058,8 @@ function RankingTable({
     if (
       sortKey !== "predictedOtt" &&
       sortKey !== "modelGap" &&
-      sortKey !== "eventEdge"
+      sortKey !== "eventEdge" &&
+      sortKey !== "courseFit"
     ) {
       return rows;
     }
@@ -2063,6 +2071,11 @@ function RankingTable({
       // same order as predictedOtt but we keep it as a separate key
       // so the column header shows the sort chevron in the right
       // place.
+      if (sortKey === "courseFit") {
+        const fa = fitFor(traitFit, a) ?? 0;
+        const fb = fitFor(traitFit, b) ?? 0;
+        return dir * (fa - fb);
+      }
       if (sortKey === "predictedOtt" || sortKey === "eventEdge") {
         return dir * (pa - pb);
       }
@@ -2071,7 +2084,7 @@ function RankingTable({
       const gb = b.outperformanceSgOtt - pb;
       return dir * (ga - gb);
     });
-  }, [rows, sortKey, sortDir, predByName]);
+  }, [rows, sortKey, sortDir, predByName, traitFit]);
 
   return (
     <div
@@ -2095,8 +2108,9 @@ function RankingTable({
           {showForecast && (
             <tr style={{ background: T.soft }}>
               <GroupTh span={2} label="" />
-              <GroupTh span={7} label="What happened" />
-              <GroupTh span={1} label="What repeats" accent />
+              <GroupTh span={7} label="What happened here" />
+              <GroupTh span={1} label="Repeats?" accent />
+              <GroupTh span={1} label="From their skill" accent />
               <GroupTh span={3} label="Model forecast" accent />
             </tr>
           )}
@@ -2111,6 +2125,7 @@ function RankingTable({
             <Th sortable label="Δ APP" k="outperformanceSgApp" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             <Th sortable label="Outperf. (raw)" k="outperformanceCombined" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             <Th sortable label="Expected" k="adjustedOutperformanceCombined" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent divider />
+            <Th sortable label="Course fit" k="courseFit" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent divider />
             {showForecast && (
               <>
                 <Th sortable label="Pred OTT/rd" k="predictedOtt" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent divider />
@@ -2123,6 +2138,7 @@ function RankingTable({
         <tbody>
           {orderedRows.map((p, i) => {
             const pred = predByName.get(normalisePlayerName(p.name));
+            const fitVal = fitFor(traitFit, p);
             const gap =
               typeof pred === "number"
                 ? p.outperformanceSgOtt - pred
@@ -2154,6 +2170,19 @@ function RankingTable({
                     accent
                     divider
                   />
+                ) : (
+                  <td
+                    style={{
+                      ...td(),
+                      color: T.dim,
+                      borderLeft: `2px solid ${T.line}`,
+                    }}
+                  >
+                    —
+                  </td>
+                )}
+                {typeof fitVal === "number" ? (
+                  <SgCell value={fitVal} sign accent divider />
                 ) : (
                   <td
                     style={{
@@ -2201,6 +2230,147 @@ function RankingTable({
   );
 }
 
+/** Per-player course-fit bonus implied by their skill profile. Same
+ *  arithmetic the server uses; done here so the table can show it
+ *  beside each player without a second round-trip. */
+export function fitFor(
+  fit: TraitFitResp | null,
+  p: Pick<PlayerCourseStats, "baselineSgOtt" | "baselineSgApp">,
+): number | null {
+  if (!fit?.ok || !fit.premium) return null;
+  return fit.premium.ott * p.baselineSgOtt + fit.premium.app * p.baselineSgApp;
+}
+
+/**
+ * The two panels above the table answer DIFFERENT questions and reach
+ * OPPOSITE verdicts, and readers reliably conflate them: told that a
+ * course rewards driving and that nothing repeats, the natural (wrong)
+ * conclusion is "so none of it matters".
+ *
+ * The distinction is player TYPE versus player NAME. "Good drivers do
+ * better here" pools every player into one estimate and holds up.
+ * "This particular player does well here" splits the same rounds into
+ * one tiny estimate each and doesn't. So the two are rendered as an
+ * explicit pair, each carrying its verdict as a chip, with a worked
+ * example naming the player where they disagree most — which lands the
+ * point far harder than either panel does alone.
+ */
+function CourseFitExplainer({
+  fit,
+  persistence,
+  players,
+}: {
+  fit: TraitFitResp | null;
+  persistence?: PersistenceStats | null;
+  players?: PlayerCourseStats[];
+}) {
+  const hasFit = !!fit?.ok && !!fit.premium && !!fit.tour;
+  if (!hasFit && !persistence) return null;
+
+  // Worked example: the player whose record here most overstates what
+  // their actual skill profile says. That gap IS the lesson.
+  let clash: { name: string; record: number; skill: number } | null = null;
+  if (hasFit && players && players.length > 0) {
+    let best: { name: string; record: number; skill: number } | null = null;
+    for (const p of players) {
+      if (p.roundsPlayed < 6) continue;
+      const skill = fitFor(fit, p);
+      if (skill == null) continue;
+      const gap = p.outperformanceCombined - skill;
+      if (!best || gap > best.record - best.skill) {
+        best = { name: p.name, record: p.outperformanceCombined, skill };
+      }
+    }
+    if (best && best.record > 0.4) clash = best;
+  }
+
+  return (
+    <div style={{ marginTop: 6, marginBottom: 14 }}>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 800,
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+          color: T.ink,
+          marginBottom: 8,
+        }}
+      >
+        Two questions. Opposite answers.
+      </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+          gap: 10,
+        }}
+      >
+        <TraitFitPanel fit={fit} />
+        <PersistencePanel persistence={persistence} />
+      </div>
+      {clash && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: "10px 12px",
+            borderRadius: 10,
+            background: T.soft,
+            border: `1px solid ${T.line}`,
+            fontFamily: T.fontUi,
+            fontSize: 12.5,
+            lineHeight: 1.55,
+            color: T.muted,
+          }}
+        >
+          <strong style={{ color: T.ink }}>Where they clash.</strong>{" "}
+          {clash.name} has one of the best records here (
+          <span style={{ fontFamily: T.fontMono, color: T.up, fontWeight: 700 }}>
+            {clash.record >= 0 ? "+" : ""}
+            {clash.record.toFixed(2)}
+          </span>
+          ), but their skill profile says this course is worth{" "}
+          <span
+            style={{
+              fontFamily: T.fontMono,
+              color: clash.skill >= 0 ? T.up : T.down,
+              fontWeight: 700,
+            }}
+          >
+            {clash.skill >= 0 ? "+" : ""}
+            {clash.skill.toFixed(2)}
+          </span>{" "}
+          to them. Go with the second number. The first is the half that
+          doesn&rsquo;t repeat.
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Small verdict chip — the fastest way to stop the two panels being
+ *  read as saying the same thing. */
+function Verdict({ text, good }: { text: string; good: boolean }) {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "2px 8px",
+        borderRadius: 999,
+        fontSize: 10,
+        fontWeight: 800,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        fontFamily: T.fontUi,
+        color: good ? T.emeraldD : T.down,
+        background: good ? T.emeraldTint : "oklch(0.96 0.03 28)",
+        border: `1px solid ${good ? T.emerald : T.down}`,
+      }}
+    >
+      {text}
+    </span>
+  );
+}
+
 /**
  * What KIND of player the course rewards — the pooled-across-players
  * question, which unlike individual course history has real sample
@@ -2238,15 +2408,25 @@ function TraitFitPanel({ fit }: { fit: TraitFitResp | null }) {
     >
       <div
         style={{
-          fontSize: 12,
-          fontWeight: 800,
-          letterSpacing: "0.04em",
-          textTransform: "uppercase",
-          color: T.ink,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
           marginBottom: 6,
         }}
       >
-        What this course rewards
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 800,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+            color: T.ink,
+          }}
+        >
+          What TYPE of player
+        </div>
+        <Verdict text="Use this" good />
       </div>
       <div
         style={{
@@ -2258,19 +2438,20 @@ function TraitFitPanel({ fit }: { fit: TraitFitResp | null }) {
       >
         {strong ? (
           <>
-            Pooling every player who has teed it up here, this course pays{" "}
+            Pooling <strong style={{ color: T.ink }}>every player</strong> who
+            has teed it up here into one estimate: this course pays{" "}
             <strong style={{ color: T.ink }}>
               {(lead[2] >= 1 ? lead[2] : 1 / lead[2]).toFixed(2)}&times;{" "}
               {lead[2] >= 1 ? "more" : "less"}
             </strong>{" "}
-            than an average week for {lead[0].toLowerCase()} skill, and less
-            unusually for {trails[0].toLowerCase()}.
+            than an average week for {lead[0].toLowerCase()} skill. Back the{" "}
+            <strong style={{ color: T.ink }}>type</strong>, not the name.
           </>
         ) : (
           <>
-            Pooling every player who has teed it up here, this course pays
-            close to the tour-average rate for both skills — no strong
-            preference either way.
+            Pooling <strong style={{ color: T.ink }}>every player</strong> who
+            has teed it up here: this venue pays close to the tour-average
+            rate for both skills. No strong preference either way.
           </>
         )}
       </div>
@@ -2381,25 +2562,38 @@ function PersistencePanel({
     <div
       style={{
         marginTop: 4,
-        marginBottom: 14,
+        marginBottom: 0,
         padding: "12px 14px",
         borderRadius: 10,
-        background: T.emeraldTint,
-        border: `1px solid ${T.emerald}`,
+        background: strongest < 0.1 ? T.soft : T.emeraldTint,
+        border: `1px solid ${strongest < 0.1 ? T.down : T.emerald}`,
         fontFamily: T.fontUi,
       }}
     >
       <div
         style={{
-          fontSize: 12,
-          fontWeight: 800,
-          letterSpacing: "0.04em",
-          textTransform: "uppercase",
-          color: T.emeraldD,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
           marginBottom: 6,
         }}
       >
-        How much of this repeats
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 800,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+            color: strongest < 0.1 ? T.ink : T.emeraldD,
+          }}
+        >
+          WHICH player has played well
+        </div>
+        <Verdict
+          text={strongest < 0.1 ? "Don't trust this" : "Handle with care"}
+          good={strongest >= 0.1}
+        />
       </div>
       <div
         style={{
@@ -2409,9 +2603,10 @@ function PersistencePanel({
           marginBottom: 10,
         }}
       >
-        We split each player&rsquo;s trips here into their earlier and later
-        visits and checked whether the two agree. Where they don&rsquo;t, the
-        gap was a hot week rather than course fit. The{" "}
+        Each player gets their <strong style={{ color: T.ink }}>own</strong>{" "}
+        number here, off a handful of visits. We split those into earlier and
+        later trips and checked whether the two agree. Where they don&rsquo;t,
+        the gap was a hot week rather than course fit. The{" "}
         <strong style={{ color: T.ink }}>Expected</strong> column keeps only
         the share of each player&rsquo;s record that this test says should
         recur — so someone with six visits keeps more of their number than
