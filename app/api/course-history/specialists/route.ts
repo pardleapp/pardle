@@ -34,6 +34,13 @@ interface Row {
   outperformance: number;
   outperformanceOtt: number;
   outperformanceApp: number;
+  /** Outperformance kept after the venue's measured persistence is
+   *  applied (see lib/course-history/persistence). This is what the
+   *  table ranks on — the raw number is retained alongside so the
+   *  client can show both. */
+  expected: number;
+  expectedOtt: number;
+  expectedApp: number;
   currentSkillOttApp: number | null;
   skillDrift: number | null;
 }
@@ -67,12 +74,18 @@ export async function GET(req: Request) {
           outperformance: p.outperformanceCombined,
           outperformanceOtt: p.outperformanceSgOtt,
           outperformanceApp: p.outperformanceSgApp,
+          expected: p.adjustedOutperformanceCombined,
+          expectedOtt: p.adjustedOutperformanceSgOtt,
+          expectedApp: p.adjustedOutperformanceSgApp,
           currentSkillOttApp: p.currentSkillOttApp,
           skillDrift: p.skillDrift,
         });
       }
     }
-    rows.sort((a, b) => b.outperformance - a.outperformance);
+    // Rank on what repeats, not on what happened. A raw ranking is
+    // dominated by whoever had one hot week at a venue where that
+    // kind of week doesn't recur.
+    rows.sort((a, b) => b.expected - a.expected);
     return NextResponse.json({
       ok: true,
       minRounds,

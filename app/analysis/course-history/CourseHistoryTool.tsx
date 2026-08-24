@@ -59,6 +59,27 @@ interface PlayerCourseStats {
   outperformanceSgOtt: number;
   outperformanceSgApp: number;
   outperformanceCombined: number;
+  reliabilityOtt?: number;
+  reliabilityApp?: number;
+  adjustedOutperformanceSgOtt?: number;
+  adjustedOutperformanceSgApp?: number;
+  adjustedOutperformanceCombined?: number;
+}
+interface ComponentPersistence {
+  measurable: boolean;
+  noiseVar: number;
+  trueVar: number;
+  testRetest: number | null;
+  testRetestPlayers: number;
+  typicalReliability: number;
+}
+interface PersistenceStats {
+  ott: ComponentPersistence;
+  app: ComponentPersistence;
+  playersUsed: number;
+  medianVisits: number;
+  repeatVisitors: number;
+  usable: boolean;
 }
 interface CourseHistoryResp {
   ok: boolean;
@@ -68,6 +89,7 @@ interface CourseHistoryResp {
   yearsCovered?: number[];
   players?: PlayerCourseStats[];
   hostingEvents?: string[];
+  persistence?: PersistenceStats | null;
 }
 
 interface ArchetypeDim {
@@ -134,6 +156,7 @@ interface ForecastResp {
 }
 
 type SortKey =
+  | "adjustedOutperformanceCombined"
   | "outperformanceCombined"
   | "outperformanceSgOtt"
   | "outperformanceSgApp"
@@ -197,7 +220,9 @@ export default function CourseHistoryTool() {
   const [archetypeLoading, setArchetypeLoading] = useState(false);
   const [forecast, setForecast] = useState<ForecastResp | null>(null);
   const [minRounds, setMinRounds] = useState(4);
-  const [sortKey, setSortKey] = useState<SortKey>("outperformanceCombined");
+  const [sortKey, setSortKey] = useState<SortKey>(
+    "adjustedOutperformanceCombined",
+  );
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
   const [activeField, setActiveField] = useState<ActiveField | null>(null);
   const [activeFieldChecked, setActiveFieldChecked] = useState(false);
@@ -427,6 +452,7 @@ export default function CourseHistoryTool() {
     // predicted/gap are re-sorted inside RankingTable using the
     // forecast lookup (which only exists there).
     const parentHandledKeys: SortKey[] = [
+      "adjustedOutperformanceCombined",
       "outperformanceCombined",
       "outperformanceSgOtt",
       "outperformanceSgApp",
@@ -441,8 +467,8 @@ export default function CourseHistoryTool() {
     const sorted = [...filtered].sort((a, b) => {
       const dir = sortDir === "desc" ? -1 : 1;
       if (sortKey === "name") return dir * a.name.localeCompare(b.name);
-      const av = a[sortKey as keyof PlayerCourseStats] as number;
-      const bv = b[sortKey as keyof PlayerCourseStats] as number;
+      const av = (a[sortKey as keyof PlayerCourseStats] as number) ?? 0;
+      const bv = (b[sortKey as keyof PlayerCourseStats] as number) ?? 0;
       return dir * (av - bv);
     });
     return sorted;
@@ -652,11 +678,12 @@ export default function CourseHistoryTool() {
           }
           subtitle={
             data?.yearsCovered && data.yearsCovered.length > 0
-              ? `${data.yearsCovered[0]}–${data.yearsCovered[data.yearsCovered.length - 1]} · ${data.players?.length ?? 0} players · vs per-year leave-one-out baseline`
+              ? `${data.yearsCovered[0]}–${data.yearsCovered[data.yearsCovered.length - 1]} · ${data.players?.length ?? 0} players · ranked by what repeats, not what happened`
               : "Ranked by outperformance (at-course SG − per-year baseline)"
           }
           accent
         />
+        <PersistencePanel persistence={data?.persistence} />
         {data?.hostingEvents && data.hostingEvents.length > 0 && (
           <div
             style={{
@@ -2036,7 +2063,8 @@ function RankingTable({
           {showForecast && (
             <tr style={{ background: T.soft }}>
               <GroupTh span={2} label="" />
-              <GroupTh span={7} label="Historical" />
+              <GroupTh span={7} label="What happened" />
+              <GroupTh span={1} label="What repeats" accent />
               <GroupTh span={3} label="Model forecast" accent />
             </tr>
           )}
@@ -2049,7 +2077,8 @@ function RankingTable({
             <Th sortable label="Baseline sum" k="baselineCombined" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             <Th sortable label="Δ OTT" k="outperformanceSgOtt" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             <Th sortable label="Δ APP" k="outperformanceSgApp" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-            <Th sortable label="Outperf." k="outperformanceCombined" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent />
+            <Th sortable label="Outperf. (raw)" k="outperformanceCombined" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            <Th sortable label="Expected" k="adjustedOutperformanceCombined" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent divider />
             {showForecast && (
               <>
                 <Th sortable label="Pred OTT/rd" k="predictedOtt" sortKey={sortKey} sortDir={sortDir} onSort={onSort} accent divider />
@@ -2085,7 +2114,25 @@ function RankingTable({
                 <SgCell value={p.baselineCombined} muted />
                 <SgCell value={p.outperformanceSgOtt} sign />
                 <SgCell value={p.outperformanceSgApp} sign />
-                <SgCell value={p.outperformanceCombined} sign accent />
+                <SgCell value={p.outperformanceCombined} sign muted />
+                {typeof p.adjustedOutperformanceCombined === "number" ? (
+                  <SgCell
+                    value={p.adjustedOutperformanceCombined}
+                    sign
+                    accent
+                    divider
+                  />
+                ) : (
+                  <td
+                    style={{
+                      ...td(),
+                      color: T.dim,
+                      borderLeft: `2px solid ${T.line}`,
+                    }}
+                  >
+                    —
+                  </td>
+                )}
                 {showForecast && (
                   <>
                     {typeof pred === "number" ? (
@@ -2118,6 +2165,170 @@ function RankingTable({
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/**
+ * Explains, in plain language, how repeatable course fit is at this
+ * venue and therefore how much of each raw number the table keeps.
+ *
+ * This exists because the raw outperformance column is genuinely
+ * misleading on its own: at most venues driving repeats and approach
+ * barely does, so a raw ranking is topped by whoever had one hot
+ * iron week. Rather than silently applying the correction, we show
+ * the user the measurement it comes from.
+ */
+function PersistencePanel({
+  persistence,
+}: {
+  persistence?: PersistenceStats | null;
+}) {
+  if (!persistence || !persistence.usable) {
+    return (
+      <div
+        style={{
+          marginTop: 4,
+          marginBottom: 14,
+          padding: "10px 12px",
+          borderRadius: 10,
+          background: T.soft,
+          border: `1px solid ${T.line}`,
+          fontFamily: T.fontUi,
+          fontSize: 12.5,
+          lineHeight: 1.5,
+          color: T.muted,
+        }}
+      >
+        <strong style={{ color: T.ink }}>Unadjusted.</strong> This venue
+        doesn&rsquo;t have enough repeat visits to measure how much course
+        fit actually recurs here, so the numbers below are raw
+        differences. Treat them as what happened, not as what to expect.
+      </div>
+    );
+  }
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  const rr = (c: ComponentPersistence) =>
+    c.testRetest == null ? "—" : (c.testRetest >= 0 ? "+" : "") + c.testRetest.toFixed(2);
+  const rows: Array<[string, ComponentPersistence]> = [
+    ["Off the tee", persistence.ott],
+    ["Approach", persistence.app],
+  ];
+  const strongest = Math.max(
+    persistence.ott.typicalReliability,
+    persistence.app.typicalReliability,
+  );
+  return (
+    <div
+      style={{
+        marginTop: 4,
+        marginBottom: 14,
+        padding: "12px 14px",
+        borderRadius: 10,
+        background: T.emeraldTint,
+        border: `1px solid ${T.emerald}`,
+        fontFamily: T.fontUi,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 800,
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+          color: T.emeraldD,
+          marginBottom: 6,
+        }}
+      >
+        How much of this repeats
+      </div>
+      <div
+        style={{
+          fontSize: 12.5,
+          lineHeight: 1.55,
+          color: T.muted,
+          marginBottom: 10,
+        }}
+      >
+        We split each player&rsquo;s trips here into their earlier and later
+        visits and checked whether the two agree. Where they don&rsquo;t, the
+        gap was a hot week rather than course fit. The{" "}
+        <strong style={{ color: T.ink }}>Expected</strong> column keeps only
+        the share of each player&rsquo;s record that this test says should
+        recur — so someone with six visits keeps more of their number than
+        someone with two. A whole week counts as one visit, however well or
+        badly the four rounds inside it went.
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table
+          style={{
+            borderCollapse: "collapse",
+            fontFamily: T.fontMono,
+            fontSize: 12,
+          }}
+        >
+          <thead>
+            <tr style={{ color: T.dim }}>
+              <th style={{ textAlign: "left", padding: "3px 14px 3px 0", fontWeight: 600 }}>
+                Skill
+              </th>
+              <th style={{ textAlign: "right", padding: "3px 14px 3px 0", fontWeight: 600 }}>
+                Repeatability
+              </th>
+              <th style={{ textAlign: "right", padding: "3px 14px 3px 0", fontWeight: 600 }}>
+                Kept at {persistence.medianVisits} visits
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([label, c]) => (
+              <tr key={label}>
+                <td style={{ padding: "3px 14px 3px 0", color: T.ink, fontWeight: 700 }}>
+                  {label}
+                </td>
+                <td style={{ padding: "3px 14px 3px 0", textAlign: "right", color: T.muted }}>
+                  {rr(c)}
+                </td>
+                <td
+                  style={{
+                    padding: "3px 14px 3px 0",
+                    textAlign: "right",
+                    fontWeight: 800,
+                    color:
+                      c.typicalReliability >= 0.25
+                        ? T.emeraldD
+                        : c.typicalReliability >= 0.1
+                          ? T.tang
+                          : T.down,
+                  }}
+                >
+                  {pct(c.typicalReliability)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div
+        style={{
+          fontSize: 11.5,
+          lineHeight: 1.5,
+          color: T.dim,
+          marginTop: 8,
+        }}
+      >
+        Measured on {persistence.playersUsed} players with history here,{" "}
+        {persistence.repeatVisitors} of them on more than one visit.{" "}
+        {strongest < 0.1
+          ? "Almost nothing repeats at this venue — read the raw column as history, not as a signal, and don't let it move a price."
+          : persistence.ott.typicalReliability >
+              persistence.app.typicalReliability * 1.5
+            ? "Driving carries most of what little repeats here; approach records are close to noise."
+            : persistence.app.typicalReliability >
+                persistence.ott.typicalReliability * 1.5
+              ? "Approach carries most of what little repeats here; driving records are close to noise."
+              : "Both skills carry a similar amount of signal here."}
+      </div>
     </div>
   );
 }

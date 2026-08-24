@@ -32,6 +32,12 @@ import {
   type DGHistoricalEvent,
   type DGHistoricalRound,
 } from "@/lib/golf-api/datagolf";
+import {
+  computePersistence,
+  reliabilityFor,
+  type PersistenceStats,
+  type PlayerResiduals,
+} from "./persistence";
 
 const redis = (() => {
   try {
@@ -104,8 +110,13 @@ const SKILL_DRIFT_THRESHOLD = 1.0;
 // freshly-repopulated course-index (v11) that now includes 2026
 // events. Without this, aggregates cached under v16 keep showing
 // stale yearsCovered / hostingEvents until their 6h TTL expires.
+// v18: adds per-venue persistence (see ./persistence) and the
+// reliability-adjusted outperformance columns, and changes the
+// default sort to the adjusted number. Bumped so cached v17 blobs —
+// which have neither field — don't get served to a client that now
+// expects them.
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v17:${slugify(courseName)}`;
+  `course-history:agg-course:v18:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
@@ -213,6 +224,18 @@ export interface PlayerCourseStats {
    *  that outperformance is contaminated by a skill change rather
    *  than genuine course fit. */
   skillDrift: number | null;
+  /** Fraction of this player's raw outperformance that survives the
+   *  venue's measured persistence, given how many rounds they have
+   *  here. 1.0 when the course has no usable estimate. See
+   *  ./persistence for the variance decomposition. */
+  reliabilityOtt: number;
+  reliabilityApp: number;
+  /** Raw outperformance scaled by the reliabilities above — what we
+   *  actually expect to repeat, rather than what happened to occur.
+   *  This is the default sort. */
+  adjustedOutperformanceSgOtt: number;
+  adjustedOutperformanceSgApp: number;
+  adjustedOutperformanceCombined: number;
 }
 
 /** Response shape from the course-history endpoint. */
@@ -230,6 +253,10 @@ export interface CourseHistoryResponse {
   /** All PGA events that have used this course in HISTORICAL_YEARS.
    *  Rendered as chips beneath the course-name header on the client. */
   hostingEvents?: string[];
+  /** How repeatable course fit is at this venue, per SG bucket. Drives
+   *  the adjusted columns and the explainer the client renders above
+   *  the table. Null when the venue has too little history. */
+  persistence?: PersistenceStats | null;
 }
 
 // ── Skill-decomposition cache (current tour form) ──────────────────
@@ -961,6 +988,18 @@ export async function getCourseHistoryByCourse(
     baselineRounds: number; // rounds where we had a per-year baseline
     years: Set<number>;
     courses: Map<string, number>;
+    /** Per-round residual (field-adjusted at-course SG minus the
+     *  baseline that applied to that round), kept so the persistence
+     *  pass can separate real course effect from sampling noise.
+     *  Only rounds where a baseline resolved are recorded, so both
+     *  sides of every entry are on the same reference. */
+    residOtt: number[];
+    residApp: number[];
+    /** Same residuals grouped by visit (event-year), for test-retest.
+     *  Keyed so we can average within a visit before comparing
+     *  across visits — four rounds of one hot week is one
+     *  observation of course fit, not four. */
+    visitResid: Map<string, { ott: number[]; app: number[]; sort: string }>;
   }
   const byPlayer = new Map<number, Bucket>();
   // Map each round to its (eventId, year) so we can look up the
@@ -990,6 +1029,9 @@ export async function getCourseHistoryByCourse(
         baselineRounds: 0,
         years: new Set(),
         courses: new Map(),
+        residOtt: [],
+        residApp: [],
+        visitResid: new Map(),
       };
       byPlayer.set(r.dgId, b);
     }
@@ -1030,6 +1072,22 @@ export async function getCourseHistoryByCourse(
         b.sumBaselineOtt += baseline.sgOtt;
         b.sumBaselineApp += baseline.sgApp;
         b.baselineRounds += 1;
+        // Residual for THIS round against THIS round's baseline. Both
+        // sides carry the same field-strength reference, so the
+        // difference is comparable across events and years.
+        const dOtt = adjOtt - baseline.sgOtt;
+        const dApp = adjApp - baseline.sgApp;
+        b.residOtt.push(dOtt);
+        b.residApp.push(dApp);
+        const visitKey = `${eventId}:${r.year}`;
+        const v = b.visitResid.get(visitKey) ?? {
+          ott: [],
+          app: [],
+          sort: eventDate,
+        };
+        v.ott.push(dOtt);
+        v.app.push(dApp);
+        b.visitResid.set(visitKey, v);
       }
     }
   }
@@ -1052,8 +1110,45 @@ export async function getCourseHistoryByCourse(
     }
   }
 
-  const players: PlayerCourseStats[] = [];
+  // Persistence is estimated on the SAME rows the tool will show —
+  // drift-contaminated players are excluded first, since their
+  // residuals reflect a changed player rather than a course effect
+  // and would inflate the apparent noise. Two passes: decide who
+  // survives, measure the venue, then build rows with the adjustment
+  // applied.
+  const surviving: Bucket[] = [];
   for (const b of byPlayer.values()) {
+    const baseOtt =
+      b.baselineRounds > 0 ? b.sumBaselineOtt / b.baselineRounds : 0;
+    const baseApp =
+      b.baselineRounds > 0 ? b.sumBaselineApp / b.baselineRounds : 0;
+    const currentSkill = skillMap.get(b.dgId);
+    const drift =
+      typeof currentSkill === "number"
+        ? currentSkill - (baseOtt + baseApp)
+        : null;
+    if (drift != null && Math.abs(drift) > SKILL_DRIFT_THRESHOLD) continue;
+    surviving.push(b);
+  }
+
+  const residualInput: PlayerResiduals[] = surviving.map((b) => {
+    const visits = Array.from(b.visitResid.values()).sort((x, y) =>
+      x.sort.localeCompare(y.sort),
+    );
+    const avg = (xs: number[]) =>
+      xs.length ? xs.reduce((a, c) => a + c, 0) / xs.length : 0;
+    return {
+      dgId: b.dgId,
+      ott: b.residOtt,
+      app: b.residApp,
+      visitsOtt: visits.map((v) => avg(v.ott)),
+      visitsApp: visits.map((v) => avg(v.app)),
+    };
+  });
+  const persistence = computePersistence(residualInput);
+
+  const players: PlayerCourseStats[] = [];
+  for (const b of surviving) {
     const atOtt = b.sumAtOtt / b.rounds;
     const atApp = b.sumAtApp / b.rounds;
     // Baseline: mean of the player's per-year leave-one-out
@@ -1082,14 +1177,19 @@ export async function getCourseHistoryByCourse(
       currentSkillOttApp != null
         ? currentSkillOttApp - (baseOtt + baseApp)
         : null;
-    // Drop drift-contaminated rows at the model layer — every consumer
-    // (by-course table, specialists ranking, archetype/forecast) gets
-    // the same clean output. Rows with null drift (players DG hasn't
-    // rated — mostly retired) stay in; there's nothing to compare
-    // against, so we can't call them drift-contaminated.
-    if (skillDrift != null && Math.abs(skillDrift) > SKILL_DRIFT_THRESHOLD) {
-      continue;
-    }
+    // Drift filtering already happened when `surviving` was built.
+    // Reliability keys off VISITS, not rounds — see ./persistence.
+    // A player with six trips here is six observations of course fit;
+    // one player-week is one, however many rounds it contained.
+    const visits = b.visitResid.size;
+    const relOtt = persistence.usable
+      ? reliabilityFor(persistence.ott, visits)
+      : 1;
+    const relApp = persistence.usable
+      ? reliabilityFor(persistence.app, visits)
+      : 1;
+    const rawOtt = atOtt - baseOtt;
+    const rawApp = atApp - baseApp;
     players.push({
       dgId: b.dgId,
       name: b.name,
@@ -1102,17 +1202,28 @@ export async function getCourseHistoryByCourse(
       baselineSgOtt: baseOtt,
       baselineSgApp: baseApp,
       baselineCombined: baseOtt + baseApp,
-      outperformanceSgOtt: atOtt - baseOtt,
-      outperformanceSgApp: atApp - baseApp,
-      outperformanceCombined: atOtt + atApp - (baseOtt + baseApp),
+      outperformanceSgOtt: rawOtt,
+      outperformanceSgApp: rawApp,
+      outperformanceCombined: rawOtt + rawApp,
       currentSkillOttApp,
       skillDrift,
+      reliabilityOtt: relOtt,
+      reliabilityApp: relApp,
+      adjustedOutperformanceSgOtt: rawOtt * relOtt,
+      adjustedOutperformanceSgApp: rawApp * relApp,
+      adjustedOutperformanceCombined: rawOtt * relOtt + rawApp * relApp,
     });
   }
 
-  // Default sort: outperformance descending (best course fit at top).
+  // Default sort: PERSISTENCE-ADJUSTED outperformance descending.
+  // Sorting on the raw number puts whoever had the hottest week at
+  // the top regardless of whether that kind of week repeats at this
+  // venue; the adjusted number ranks on what we expect to recur.
+  // Falls back to raw ordering when the venue has no usable estimate,
+  // since the two are then identical by construction.
   players.sort(
-    (a, b) => b.outperformanceCombined - a.outperformanceCombined,
+    (a, b) =>
+      b.adjustedOutperformanceCombined - a.adjustedOutperformanceCombined,
   );
 
   const yearsCovered = Array.from(
@@ -1138,6 +1249,7 @@ export async function getCourseHistoryByCourse(
     players,
     cachedAt: new Date(0).toISOString(),
     hostingEvents: eventNames,
+    persistence: persistence.usable ? persistence : null,
   };
 
   if (redis) {
