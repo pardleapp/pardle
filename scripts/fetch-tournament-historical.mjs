@@ -49,6 +49,7 @@ import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildPreTournamentSkillMap } from "./lib/pretournament-skill.mjs";
+import { deriveMeta } from "./lib/derive-meta.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
@@ -660,6 +661,8 @@ async function main() {
 
   // Aggregators used for the per-slug meta file at the end.
   const perHoleScoreAccum = {};
+  /** Every per-year payload we write, fed to deriveMeta at the end. */
+  const writtenPayloads = [];
 
   for (const year of yearsToProcess) {
     const dgMeta = dgIds[year];
@@ -882,16 +885,17 @@ async function main() {
   // The tournament-config runtime does the same fallback, so this is
   // a nice-to-have; the runtime picks up meta files whenever they
   // exist and prefers them over the derived version.
-  const derivedHolePars = {};
-  for (const [hStr, acc] of Object.entries(perHoleScoreAccum)) {
-    const h = Number(hStr);
-    if (acc.n === 0) continue;
-    const avg = acc.sum / acc.n;
-    derivedHolePars[h] =
-      avg < 3.6 ? 3 : avg < 4.6 ? 4 : 5;
+  // Derived from the scorecards' own `par` field — NOT from scoring
+  // average, which classifies every reachable par 5 as a par 4. See
+  // ./lib/derive-meta.mjs.
+  const derived = deriveMeta(writtenPayloads, { venueName: VENUE.name });
+  const derivedHolePars = derived.courseHolePars;
+  const derivedCoursePar = derived.coursePar;
+  if (derived.parMismatch) {
+    console.log(
+      `[meta] par changed across years — stated ${derived.parMismatch.statedPar}, holes sum to ${derived.parMismatch.summedPar}; using stated`,
+    );
   }
-  const derivedCoursePar =
-    Object.values(derivedHolePars).reduce((a, b) => a + b, 0) || null;
 
   const metaPath = resolve(OUT_DIR, `${SLUG}-meta.json`);
   // Preserve any hand-edited holeBearings from an existing meta file.
@@ -906,7 +910,7 @@ async function main() {
   }
   const meta = {
     slug: SLUG,
-    eventName: VENUE.name.replace(/ *[-—] .*$/, ""),
+    eventName: derived.eventName,
     venue: VENUE,
     coursePar: derivedCoursePar,
     courseHolePars: derivedHolePars,

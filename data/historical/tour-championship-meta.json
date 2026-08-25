@@ -1,0 +1,52 @@
+{
+  "slug": "tour-championship",
+  "eventName": "TOUR Championship",
+  "venue": {
+    "name": "East Lake Golf Club",
+    "lat": 33.7409,
+    "lon": -84.3103,
+    "tz": "America/New_York"
+  },
+  "coursePar": 70,
+  "courseHolePars": {
+    "1": 4,
+    "2": 3,
+    "3": 4,
+    "4": 4,
+    "5": 4,
+    "6": 5,
+    "7": 4,
+    "8": 4,
+    "9": 3,
+    "10": 4,
+    "11": 3,
+    "12": 4,
+    "13": 4,
+    "14": 4,
+    "15": 3,
+    "16": 4,
+    "17": 4,
+    "18": 5
+  },
+  "holeBearings": {
+    "1": 96.7,
+    "2": 103.9,
+    "3": 268.3,
+    "4": 91.7,
+    "5": 277.3,
+    "6": 104.1,
+    "7": 279.9,
+    "8": 1.5,
+    "9": 294.9,
+    "10": 270.1,
+    "11": 83.6,
+    "12": 266.4,
+    "13": 175.6,
+    "14": 94.6,
+    "15": 345.3,
+    "16": 267.7,
+    "17": 357.6,
+    "18": 100.6
+  },
+  "holeBearingsHint": "Compass bearings (0-360 deg) per hole, tee to green, from OSM way geometry. Disambiguated against the scorecard by par and yardage (East Lakes par-3 course shares hole refs 1-9 in OSM). Hole 17s OSM way is truncated (349yd vs 435 on the card) so its bearing is the least certain of the eighteen."
+}

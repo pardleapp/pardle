@@ -1,6 +1,6 @@
 {
   "slug": "wyndham",
-  "eventName": "Sedgefield Country Club",
+  "eventName": "Wyndham Championship",
   "venue": {
     "name": "Sedgefield Country Club",
     "lat": 36.0103,
@@ -48,5 +48,5 @@
     "17": 311,
     "18": 262
   },
-  "holeBearingsHint": "Compass bearings (0-360\u00b0) per hole, tee \u2192 green. Must be filled in by hand from OSM tee-to-green geometry \u2014 pin coords can't determine bearings because the pin frame is per-hole rotated. Runtime falls back to no wind correction until this is populated."
+  "holeBearingsHint": "Compass bearings (0-360°) per hole, tee → green. Must be filled in by hand from OSM tee-to-green geometry — pin coords can't determine bearings because the pin frame is per-hole rotated. Runtime falls back to no wind correction until this is populated."
 }

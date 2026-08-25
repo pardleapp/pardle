@@ -1,6 +1,6 @@
 {
   "slug": "fedex-stjude",
-  "eventName": "TPC Southwind",
+  "eventName": "FedEx St. Jude Championship",
   "venue": {
     "name": "TPC Southwind",
     "lat": 35.0552,
@@ -29,5 +29,5 @@
     "18": 4
   },
   "holeBearings": {},
-  "holeBearingsHint": "Compass bearings (0-360\u00b0) per hole, tee \u2192 green. Must be filled in by hand from OSM tee-to-green geometry \u2014 pin coords can't determine bearings because the pin frame is per-hole rotated. Runtime falls back to no wind correction until this is populated."
+  "holeBearingsHint": "Compass bearings (0-360°) per hole, tee → green. Must be filled in by hand from OSM tee-to-green geometry — pin coords can't determine bearings because the pin frame is per-hole rotated. Runtime falls back to no wind correction until this is populated."
 }
