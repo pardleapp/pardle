@@ -221,6 +221,32 @@ export default function HoleSetup({
   const maxW = Math.max(...rows.map((r) => Math.abs(r.head ?? 0)), 1);
   const maxS = Math.max(...rows.map((r) => Math.abs(r.dScore ?? 0)), 0.1);
 
+  // Totals are summed from the rendered rows rather than recomputed,
+  // so the bottom line can never disagree with the column above it.
+  // Only holes carrying a value contribute, and the count is surfaced
+  // when it is short of the full eighteen — a course total quietly
+  // missing three holes is worse than no total.
+  const sum = (get: (r: HoleRow) => number | null) => {
+    const vals = rows.map(get).filter((v): v is number => v != null);
+    return vals.length
+      ? { value: vals.reduce((a, b) => a + b, 0), n: vals.length }
+      : null;
+  };
+  const totalPar = sum((r) => r.par);
+  const totalYards = sum((r) => r.yards);
+  const totalDYards = sum((r) => r.dYards);
+  const totalScore = sum((r) => r.score);
+  const totalDScore = sum((r) => r.dScore);
+  // A sum of head/tail components is meaningless — they cancel. What
+  // does mean something is how much of the course pointed which way.
+  const windSplit = rows.reduce(
+    (acc, r) => {
+      if (r.windKind) acc[r.windKind] += 1;
+      return acc;
+    },
+    { into: 0, down: 0, cross: 0 },
+  );
+
   return (
     <div style={{ overflowX: "auto" }}>
       <table
@@ -349,6 +375,112 @@ export default function HoleSetup({
             );
           })}
         </tbody>
+        <tfoot>
+          <tr>
+            <td
+              colSpan={5}
+              style={{ borderTop: `2px solid ${LINE}`, height: 6 }}
+            />
+          </tr>
+          <tr>
+            <td
+              style={{
+                padding: "3px 8px",
+                fontFamily: "var(--font-mono, monospace)",
+                fontWeight: 800,
+                fontSize: 12,
+                color: INK,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {rows.length === 18 ? "Course" : `${rows.length} holes`}
+            </td>
+            <td
+              style={{
+                ...th,
+                fontFamily: "var(--font-mono, monospace)",
+                fontSize: 12,
+                fontWeight: 800,
+                color: INK,
+                textTransform: "none",
+                letterSpacing: 0,
+              }}
+            >
+              {totalPar ? totalPar.value : "—"}
+            </td>
+
+            <td style={{ padding: "3px 8px", textAlign: "right" }}>
+              <span
+                style={{
+                  ...cellBox,
+                  ...tone(
+                    totalDYards ? totalDYards.value / 40 : null,
+                  ),
+                  minWidth: 96,
+                }}
+                title={
+                  totalYards
+                    ? `${totalYards.value.toLocaleString()} yards over ${totalYards.n} holes${totalDYards ? `, ${totalDYards.value >= 0 ? "+" : ""}${Math.round(totalDYards.value)} vs this course's other rounds` : ""}`
+                    : "no per-round yardage"
+                }
+              >
+                {totalYards ? totalYards.value.toLocaleString() : "—"}
+                {totalDYards && Math.abs(totalDYards.value) >= 1 && (
+                  <span style={{ fontSize: 11, opacity: 0.8 }}>
+                    {" "}
+                    {totalDYards.value > 0 ? "+" : ""}
+                    {Math.round(totalDYards.value)}
+                  </span>
+                )}
+              </span>
+            </td>
+
+            <td style={{ padding: "3px 8px", textAlign: "right" }}>
+              <span
+                style={{
+                  ...cellBox,
+                  background: "transparent",
+                  color: MUTED,
+                  fontSize: 11.5,
+                  minWidth: 84,
+                }}
+                title="Holes by wind direction. Head and tail components cancel when summed, so a course total would read as zero however hard it blew."
+              >
+                {windSplit.into + windSplit.down + windSplit.cross === 0
+                  ? "—"
+                  : `${windSplit.into}↑ ${windSplit.down}↓ ${windSplit.cross}→`}
+              </span>
+            </td>
+
+            <td style={{ padding: "3px 8px", textAlign: "right" }}>
+              <span
+                style={{
+                  ...cellBox,
+                  ...tone(
+                    totalDScore ? totalDScore.value / 1.5 : null,
+                  ),
+                  minWidth: 96,
+                }}
+                title={
+                  totalScore
+                    ? `Field averaged ${totalScore.value >= 0 ? "+" : ""}${totalScore.value.toFixed(2)} vs par over ${totalScore.n} holes${totalDScore ? `, ${totalDScore.value >= 0 ? "+" : ""}${totalDScore.value.toFixed(2)} vs this course's other rounds` : ""}`
+                    : "no scoring yet"
+                }
+              >
+                {totalScore
+                  ? `${totalScore.value >= 0 ? "+" : ""}${totalScore.value.toFixed(1)}`
+                  : "—"}
+                {totalDScore && Math.abs(totalDScore.value) >= 0.05 && (
+                  <span style={{ fontSize: 11, opacity: 0.8 }}>
+                    {" "}
+                    {totalDScore.value > 0 ? "+" : ""}
+                    {totalDScore.value.toFixed(1)}
+                  </span>
+                )}
+              </span>
+            </td>
+          </tr>
+        </tfoot>
       </table>
       <p
         style={{
