@@ -3,6 +3,7 @@ import { BRAND } from "@/lib/brand";
 import AuthChip from "../live/auth/AuthChip";
 import MainNav from "../MainNav";
 import CoursePinPreview from "./_previews/CoursePinPreview";
+import HoleScoringPreview from "./_previews/HoleScoringPreview";
 import TeeTimePreview from "./_previews/TeeTimePreview";
 import TeeShotPreview from "./_previews/TeeShotPreview";
 import ScoreForecastPreview from "./_previews/ScoreForecastPreview";
@@ -49,6 +50,14 @@ const CARDS: Card[] = [
       "Every green at a glance with this week's four pin positions. Putt paths and per-round scoring on tap.",
     status: "live",
     Preview: CoursePinPreview,
+  },
+  {
+    href: "/analysis/hole-scoring",
+    title: "Hole scoring analysis",
+    blurb:
+      "What the setup did to each hole — how far back the tees went, where the pin was cut, which way the wind blew, and what the field then shot.",
+    status: "live",
+    Preview: HoleScoringPreview,
   },
   {
     href: "/analysis/tee-time-scoring",

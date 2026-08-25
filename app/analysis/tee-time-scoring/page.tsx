@@ -3,13 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import Chart from "./Chart";
-import Heatmap, { type Cell } from "../course-heatmap/Heatmap";
 import MainNav from "@/app/MainNav";
 import AuthChip from "@/app/live/auth/AuthChip";
 import { BRAND } from "@/lib/brand";
 import type { DailyWeatherView } from "../_components/WeatherStrip";
-import type { CoursePinSheet, CoursePinHole } from "@/lib/golf-api/pgatour";
-import type { HoleBirdieData } from "@/lib/analysis/course-birdies";
 
 export type RoundNum = 1 | 2 | 3 | 4;
 
@@ -65,39 +62,11 @@ interface TournamentsResp {
   tournaments: TournamentOption[];
 }
 
-interface HeatmapResp {
-  ok: boolean;
-  error?: string;
-  eventName?: string;
-  bucketMinutes?: number;
-  cells?: Cell[];
-  generatedAt?: number | null;
-  weatherByRound?: Record<string, DailyWeatherView | null> | null;
-  /** Present when heatmap resolved a live tournament. Used here to
-   *  fetch the pin sheet + birdie history that power the PIN Δ /
-   *  TEE Δ chip columns — same signals as the course-heatmap page. */
-  tournamentId?: string | null;
-  /** Tee-to-green bearings, so the heatmap can resolve each hole's
-   *  wind into head / tail / cross for the selected round. */
-  holeBearings?: Record<number, number> | null;
-}
 
-interface PinsResp {
-  ok: boolean;
-  pins?: CoursePinSheet;
-}
-interface BirdieHistResp {
-  ok: boolean;
-  holes?: Record<string, HoleBirdieData>;
-}
-
-type View = "chart" | "heatmap";
 
 export default function Page() {
   const [tab, setTab] = useState<YearTab>("live");
-  const [view, setView] = useState<View>("chart");
   const [data, setData] = useState<FetchResp | null>(null);
-  const [heat, setHeat] = useState<HeatmapResp | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tournaments, setTournaments] = useState<TournamentOption[]>([]);
   // Which tournament's rows we're looking at. Historical fetch uses
@@ -108,11 +77,6 @@ export default function Page() {
   // Feeds the PIN Δ + TEE Δ chip columns on the heatmap — same source
   // of truth the course-heatmap page uses. Keyed by tournamentId so a
   // year switch triggers a re-fetch (cached 6h server-side).
-  const [pins, setPins] = useState<CoursePinSheet | null>(null);
-  const [pinsForTournament, setPinsForTournament] = useState<string | null>(null);
-  const [birdieHistoryByHole, setBirdieHistoryByHole] = useState<
-    Record<string, HoleBirdieData> | null
-  >(null);
 
   const load = useCallback(async () => {
     try {
@@ -124,33 +88,23 @@ export default function Page() {
           : slug
             ? `?slug=${encodeURIComponent(slug)}&year=${tab}`
             : `?year=${tab}`;
-      if (view === "chart") {
-        const res = await fetch(`/api/analysis/tee-time-scoring${qs}`, {
-          cache: "no-store",
-        });
-        const json = (await res.json()) as FetchResp;
-        setData(json);
-      } else {
-        const res = await fetch(`/api/analysis/course-heatmap${qs}`, {
-          cache: "no-store",
-        });
-        const json = (await res.json()) as HeatmapResp;
-        setHeat(json);
-      }
+      const res = await fetch(`/api/analysis/tee-time-scoring${qs}`, {
+        cache: "no-store",
+      });
+      setData((await res.json()) as FetchResp);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "network error");
     }
-  }, [tab, view, slug]);
+  }, [tab, slug]);
 
   useEffect(() => {
     setData(null);
-    setHeat(null);
     load();
     if (tab !== "live") return;
     const id = setInterval(load, POLL_MS);
     return () => clearInterval(id);
-  }, [load, tab, view]);
+  }, [load, tab]);
 
   // Discover which tournaments have onboarded historicals. Called
   // once on mount — the list is small enough to fetch every time
@@ -207,40 +161,6 @@ export default function Page() {
       : []),
   ];
 
-  // Fetch pin sheet + multi-season birdie history whenever the heatmap
-  // response resolves a tournamentId. Same pipeline the course-heatmap
-  // page uses; server-cached so this is cheap on subsequent tab
-  // switches. Silent-fail — the heatmap still renders without chips.
-  useEffect(() => {
-    if (view !== "heatmap") return;
-    const tid = heat?.tournamentId;
-    if (!tid || tid === pinsForTournament) return;
-    setPinsForTournament(tid);
-    (async () => {
-      try {
-        const res = await fetch(
-          `/api/course-pins?tournamentId=${encodeURIComponent(tid)}`,
-          { cache: "no-store" },
-        );
-        const json = (await res.json()) as PinsResp;
-        if (json.ok && json.pins) setPins(json.pins);
-      } catch {
-        /* pin sheet failure is non-fatal */
-      }
-    })();
-    (async () => {
-      try {
-        const res = await fetch(
-          `/api/course-pin-birdies?tournamentId=${encodeURIComponent(tid)}`,
-          { cache: "no-store" },
-        );
-        const json = (await res.json()) as BirdieHistResp;
-        if (json.ok && json.holes) setBirdieHistoryByHole(json.holes);
-      } catch {
-        /* history overlay is opt-in; failing silently is fine */
-      }
-    })();
-  }, [view, heat?.tournamentId, pinsForTournament]);
 
   return (
     <main className="container container-wide v4-theme pv-theme analysis-full-shell">
@@ -271,70 +191,20 @@ export default function Page() {
           </Link>
         </p>
         <h2 style={{ fontSize: 22, marginBottom: 4 }}>
-          {view === "chart"
-            ? "Skill-adjusted score vs tee time"
-            : "Field scoring by hole and hour"}
+          Skill-adjusted score vs tee time
         </h2>
         <p style={{ fontSize: 13, color: "oklch(0.5 0.02 150)", margin: 0 }}>
-          {view === "chart" ? (
-            <>
-              Every finisher of a round plotted at their tee time, adjusted
-              for pre-tournament skill. Points below zero outperformed
-              baseline, above zero under-performed. Refreshes as new players
-              finish.
-            </>
-          ) : (
-            <>
-              Field-average strokes vs par for every hole across each hour
-              of the day, per-round scoring summary and per-hour weather.
-              Reveals which waves had it easier and which holes bit hardest.
-            </>
-          )}
+          Every finisher of a round plotted at their tee time, adjusted for
+          pre-tournament skill. Points below zero outperformed baseline,
+          above zero under-performed. Refreshes as new players finish.
         </p>
-        <div
-          role="tablist"
-          aria-label="View"
-          style={{
-            display: "flex",
-            gap: 4,
-            marginTop: 12,
-            marginBottom: 4,
-            flexWrap: "wrap",
-          }}
-        >
-          {(
-            [
-              { key: "chart", label: "Tee time vs score" },
-              { key: "heatmap", label: "Scoring by hole/hour" },
-            ] as { key: View; label: string }[]
-          ).map((v) => {
-            const active = view === v.key;
-            return (
-              <button
-                key={v.key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setView(v.key)}
-                style={{
-                  padding: "6px 14px",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  borderRadius: 6,
-                  border: "1px solid oklch(0.85 0.013 95)",
-                  background: active
-                    ? "oklch(0.50 0.13 155)"
-                    : "white",
-                  color: active ? "white" : "oklch(0.3 0.02 150)",
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
-                {v.label}
-              </button>
-            );
-          })}
-        </div>
+        <p style={{ fontSize: 12, color: "oklch(0.55 0.02 150)", marginTop: 8 }}>
+          Looking for how each hole played?{" "}
+          <Link href="/analysis/hole-scoring" style={{ color: "oklch(0.42 0.13 155)" }}>
+            Hole scoring analysis
+          </Link>{" "}
+          covers length, pin and wind per hole.
+        </p>
         {tournaments.length > 0 && (
           <div
             role="tablist"
@@ -444,7 +314,8 @@ export default function Page() {
         <p style={{ marginTop: 20, color: "oklch(0.5 0.16 25)" }}>
           Couldn&apos;t load data: {error}
         </p>
-      ) : view === "chart" ? (
+      ) : (
+
         !data || !data.ok ? (
           <p style={{ marginTop: 20 }}>
             {!data ? "Loading…" : `Couldn't load data: ${data.error}`}
@@ -473,43 +344,6 @@ export default function Page() {
                 : ""}
             </p>
             <Chart rows={data.rows} weatherByRound={data.weatherByRound} />
-          </>
-        )
-      ) : (
-        // view === "heatmap"
-        !heat || !heat.ok ? (
-          <p style={{ marginTop: 20 }}>
-            {!heat ? "Loading…" : `Couldn't load data: ${heat.error}`}
-          </p>
-        ) : !heat.cells || heat.cells.length === 0 ? (
-          <p style={{ marginTop: 20 }}>
-            No completed rounds yet.
-          </p>
-        ) : (
-          <>
-            <p style={{ fontSize: 11, color: "oklch(0.55 0.02 150)", marginTop: 8 }}>
-              {heat.cells.length} cells ·{" "}
-              {heat.generatedAt
-                ? `updated ${new Date(heat.generatedAt).toLocaleTimeString()}`
-                : ""}
-              {" · "}
-              Hole completion times estimated from tee time + ~15 min per hole.
-            </p>
-            <Heatmap
-              cells={heat.cells}
-              bucketMinutes={heat.bucketMinutes ?? 15}
-              weatherByRound={heat.weatherByRound}
-              pinsByHole={
-                pins
-                  ? new Map<number, CoursePinHole>(
-                      pins.holes.map((h) => [h.holeNumber, h]),
-                    )
-                  : undefined
-              }
-              birdieHistoryByHole={birdieHistoryByHole}
-              pinsAvailable={!!pins}
-              holeBearings={heat.holeBearings ?? null}
-            />
           </>
         )
       )}
