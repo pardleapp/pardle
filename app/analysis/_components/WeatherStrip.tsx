@@ -96,17 +96,26 @@ function windTextColour(mph: number | null): string {
   return "oklch(0.2 0.02 150)";
 }
 
-/** Chip background that reads on any cell colour. Dark cells (strong
- *  wind) get a light chip, light cells get a dark one. */
-function chipStyle(windAvg: number | null): {
-  background: string;
-  color: string;
-} {
-  const onDark = windAvg != null && windAvg >= 15;
-  return onDark
-    ? { background: "oklch(1 0 0 / 0.88)", color: "oklch(0.25 0.02 150)" }
-    : { background: "oklch(0.28 0.02 150 / 0.10)", color: "oklch(0.24 0.02 150)" };
-}
+/** Chip styling. Always a SOLID white pill with dark text, never a
+ *  translucent tint of the cell.
+ *
+ *  The first version used a 10% dark overlay on light cells, which
+ *  left the gust and temperature figures barely separated from the
+ *  green behind them — legible in theory, invisible in practice. A
+ *  solid pill reads identically on pale green and on deep red, which
+ *  is the whole point of putting them in pills. */
+const CHIP: React.CSSProperties = {
+  background: "white",
+  color: "oklch(0.24 0.02 150)",
+  border: "1px solid oklch(0.86 0.01 150)",
+  fontSize: 13,
+  fontWeight: 800,
+  padding: "2px 8px",
+  borderRadius: 999,
+  fontVariantNumeric: "tabular-nums",
+  whiteSpace: "nowrap",
+  lineHeight: 1.35,
+};
 
 /** WMO weather code → short label + emoji. Duplicated from
  *  lib/weather/open-meteo.ts because that module is server-only. */
@@ -183,6 +192,15 @@ function bucketize(
           emoji = c.emoji;
           condition = c.condition;
         }
+      } else {
+        // No hourly code in this payload. Inheriting the DAY's emoji
+        // would stamp a rain cloud on every window of a day that saw
+        // one evening shower — which is exactly backwards, since the
+        // point of the strip is showing WHEN it rained. A dry window
+        // with no per-hour code gets no icon; the wind colour and the
+        // pills carry the information.
+        emoji = "";
+        condition = dayCondition || "Dry";
       }
     }
     const avg = (v: number[]) =>
@@ -217,18 +235,18 @@ function DayStat({
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: 1,
-        padding: "4px 10px",
-        borderRadius: 6,
+        gap: 2,
+        padding: "6px 12px",
+        borderRadius: 8,
         background: "oklch(0.97 0.005 95)",
         border: `1px solid ${LINE}`,
-        minWidth: 78,
+        minWidth: 92,
       }}
     >
       <span
         style={{
-          fontSize: 9,
-          fontWeight: 700,
+          fontSize: 10,
+          fontWeight: 800,
           letterSpacing: 0.5,
           textTransform: "uppercase",
           color: MUTED,
@@ -238,7 +256,7 @@ function DayStat({
       </span>
       <span
         style={{
-          fontSize: 14,
+          fontSize: 19,
           fontWeight: 800,
           fontFamily: "var(--font-mono, monospace)",
           color: accent ?? INK,
@@ -298,7 +316,7 @@ export default function WeatherStrip({ day, roundLabel }: Props) {
       >
         <span
           style={{
-            fontSize: 11,
+            fontSize: 12.5,
             fontWeight: 800,
             color: "oklch(0.25 0.02 150)",
             fontFamily: "var(--font-mono, monospace)",
@@ -311,7 +329,7 @@ export default function WeatherStrip({ day, roundLabel }: Props) {
         {day.headline && (
           <span
             style={{
-              fontSize: 11,
+              fontSize: 12,
               color: MUTED,
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -350,7 +368,7 @@ export default function WeatherStrip({ day, roundLabel }: Props) {
           }
         />
         <DayStat
-          label="Rain"
+          label="Rain 6am-8pm"
           value={totalRain >= RAIN_THRESHOLD_IN ? `${totalRain.toFixed(2)}"` : "None"}
           accent={totalRain >= RAIN_THRESHOLD_IN ? RAIN : undefined}
         />
@@ -359,15 +377,14 @@ export default function WeatherStrip({ day, roundLabel }: Props) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: `repeat(${BUCKET_STARTS.length}, minmax(84px, 1fr))`,
-          columnGap: 4,
-          minWidth: 600,
+          gridTemplateColumns: `repeat(${BUCKET_STARTS.length}, minmax(112px, 1fr))`,
+          columnGap: 6,
+          minWidth: 800,
         }}
       >
         {buckets.map((b) => {
           const bg = windColour(b.windAvg);
           const fg = windTextColour(b.windAvg);
-          const chip = chipStyle(b.windAvg);
           const tooltip =
             b.windAvg == null
               ? `${formatRange(b.startHour)}: no data`
@@ -381,109 +398,91 @@ export default function WeatherStrip({ day, roundLabel }: Props) {
               style={{
                 background: bg,
                 color: fg,
-                borderRadius: 6,
-                padding: "6px 5px 6px",
+                borderRadius: 8,
+                padding: "8px 6px 9px",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: 3,
-                lineHeight: 1.15,
+                gap: 5,
                 fontFamily: "var(--font-mono, monospace)",
               }}
             >
               <span
                 style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  opacity: 0.85,
+                  fontSize: 12,
+                  fontWeight: 800,
                   letterSpacing: 0.3,
+                  opacity: 0.95,
                 }}
               >
                 {formatRange(b.startHour)}
               </span>
-              <span
-                style={{ fontSize: 15, lineHeight: 1 }}
-                aria-label={b.condition}
-              >
-                {b.emoji || "—"}
-              </span>
 
               {b.windAvg == null ? (
-                <span style={{ fontSize: 10, opacity: 0.6 }}>—</span>
+                <span style={{ fontSize: 13, opacity: 0.7 }}>no data</span>
               ) : (
                 <>
                   <span
                     style={{
-                      fontSize: 16,
-                      fontWeight: 800,
-                      fontVariantNumeric: "tabular-nums",
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: 5,
+                      lineHeight: 1,
                     }}
                   >
-                    {Math.round(b.windAvg)}
-                    <span style={{ fontSize: 9, fontWeight: 700, opacity: 0.8 }}>
-                      {" "}
+                    <span style={{ fontSize: 20, lineHeight: 1 }} aria-label={b.condition}>
+                      {b.emoji || ""}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 30,
+                        fontWeight: 800,
+                        fontVariantNumeric: "tabular-nums",
+                        letterSpacing: -0.5,
+                      }}
+                    >
+                      {Math.round(b.windAvg)}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 800, opacity: 0.9 }}>
                       mph
                     </span>
                   </span>
+
+                  {/* Gust, temp and rain as solid pills so they hold up
+                      on every cell colour. Wrapped rather than fixed to
+                      one row — a wet window needs three pills and a dry
+                      one needs two. */}
                   <span
                     style={{
-                      ...chip,
-                      fontSize: 10.5,
-                      fontWeight: 800,
-                      padding: "1px 6px",
-                      borderRadius: 999,
-                      fontVariantNumeric: "tabular-nums",
-                      whiteSpace: "nowrap",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 4,
+                      flexWrap: "wrap",
                     }}
                   >
-                    G {Math.round(b.gustPeak ?? b.windAvg)}
+                    <span style={CHIP}>
+                      <span style={{ opacity: 0.6, fontWeight: 700 }}>gust </span>
+                      {Math.round(b.gustPeak ?? b.windAvg)}
+                    </span>
+                    {b.tempAvg != null && (
+                      <span style={CHIP}>{Math.round(b.tempAvg)}&deg;</span>
+                    )}
+                    {b.hasRain && (
+                      <span
+                        style={{
+                          ...CHIP,
+                          background: RAIN_BG,
+                          color: RAIN,
+                          borderColor: RAIN,
+                        }}
+                      >
+                        {b.precipSum.toFixed(2)}&quot;
+                      </span>
+                    )}
                   </span>
                 </>
               )}
-
-              {/* Temp and rain share a footer row so they read as
-                  conditions rather than more wind numbers. */}
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  marginTop: 1,
-                  flexWrap: "wrap",
-                  justifyContent: "center",
-                }}
-              >
-                {b.tempAvg != null && (
-                  <span
-                    style={{
-                      ...chip,
-                      fontSize: 10.5,
-                      fontWeight: 800,
-                      padding: "1px 6px",
-                      borderRadius: 999,
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {Math.round(b.tempAvg)}°
-                  </span>
-                )}
-                {b.hasRain && (
-                  <span
-                    style={{
-                      background: RAIN_BG,
-                      color: RAIN,
-                      fontSize: 10.5,
-                      fontWeight: 800,
-                      padding: "1px 6px",
-                      borderRadius: 999,
-                      fontVariantNumeric: "tabular-nums",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {b.precipSum.toFixed(2)}&quot;
-                  </span>
-                )}
-              </span>
             </div>
           );
         })}
