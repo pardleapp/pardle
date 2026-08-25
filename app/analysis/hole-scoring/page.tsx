@@ -10,7 +10,7 @@
  * from a row of coloured squares.
  *
  * So the order is inverted here. The setup a committee actually
- * changes each morning — length, pin, wind — leads, with scoring as
+ * changes each morning — length and wind — leads, with scoring as
  * the outcome column beside it, and the hour-by-hour grid moves
  * behind a disclosure for when someone wants to see how a hole
  * behaved across the waves.
@@ -224,8 +224,8 @@ export default function Page() {
           }}
         >
           What the setup did to each hole, round by round — how far back the
-          tees went, where the pin was cut, which way the wind blew across
-          it, and what the field then shot.
+          tees went, which way the wind blew across it, and what the field
+          then shot.
         </p>
 
         <Picker

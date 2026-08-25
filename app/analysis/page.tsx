@@ -55,7 +55,7 @@ const CARDS: Card[] = [
     href: "/analysis/hole-scoring",
     title: "Hole scoring analysis",
     blurb:
-      "What the setup did to each hole — how far back the tees went, where the pin was cut, which way the wind blew, and what the field then shot.",
+      "What the setup did to each hole — how far back the tees went, which way the wind blew, and what the field then shot.",
     status: "live",
     Preview: HoleScoringPreview,
   },

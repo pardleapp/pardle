@@ -5,25 +5,22 @@
  * not this week's live numbers, and a card that fetches would be four
  * requests for a thumbnail.
  *
- * Figures are real — East Lake R3 2025, the round where the tees, the
- * pins and the wind all pushed the same way.
+ * Figures are real — East Lake R3 2025.
  */
 
 const ROWS: Array<{
   hole: string;
   length: string;
   dLength: number;
-  pin: string;
-  pinHard: number;
   wind: string;
   windHard: number;
   played: string;
   playedHard: number;
 }> = [
-  { hole: "H1", length: "521", dLength: 1, pin: "open", pinHard: -1, wind: "into 7", windHard: 1, played: "+0.43", playedHard: 1 },
-  { hole: "H5", length: "436", dLength: -1, pin: "open", pinHard: -1, wind: "down 7", windHard: -1, played: "−0.27", playedHard: -1 },
-  { hole: "H9", length: "268", dLength: 1, pin: "open", pinHard: -1, wind: "down 6", windHard: -1, played: "+0.27", playedHard: 1 },
-  { hole: "H15", length: "220", dLength: 1, pin: "tucked", pinHard: 1, wind: "cross 6", windHard: 0, played: "+0.57", playedHard: 1 },
+  { hole: "H1", length: "521", dLength: 1, wind: "into 7", windHard: 1, played: "+0.43", playedHard: 1 },
+  { hole: "H5", length: "436", dLength: -1, wind: "down 7", windHard: -1, played: "−0.27", playedHard: -1 },
+  { hole: "H9", length: "268", dLength: 1, wind: "down 6", windHard: -1, played: "+0.27", playedHard: 1 },
+  { hole: "H15", length: "220", dLength: 1, wind: "cross 6", windHard: 0, played: "+0.57", playedHard: 1 },
 ];
 
 function tone(v: number): { background: string; color: string } {
@@ -63,7 +60,7 @@ export default function HoleScoringPreview() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "26px 1fr 1fr 1fr 1fr",
+          gridTemplateColumns: "28px 1fr 1fr 1fr",
           gap: 4,
           fontFamily: "var(--font-archivo), Archivo, system-ui, sans-serif",
           fontSize: 7.5,
@@ -75,7 +72,6 @@ export default function HoleScoringPreview() {
       >
         <span />
         <span style={{ textAlign: "center" }}>Length</span>
-        <span style={{ textAlign: "center" }}>Pin</span>
         <span style={{ textAlign: "center" }}>Wind</span>
         <span style={{ textAlign: "center" }}>Played</span>
       </div>
@@ -84,7 +80,7 @@ export default function HoleScoringPreview() {
           key={r.hole}
           style={{
             display: "grid",
-            gridTemplateColumns: "26px 1fr 1fr 1fr 1fr",
+            gridTemplateColumns: "28px 1fr 1fr 1fr",
             gap: 4,
             alignItems: "center",
           }}
@@ -100,7 +96,6 @@ export default function HoleScoringPreview() {
             {r.hole}
           </span>
           <span style={{ ...chip, ...tone(r.dLength) }}>{r.length}</span>
-          <span style={{ ...chip, ...tone(r.pinHard) }}>{r.pin}</span>
           <span style={{ ...chip, ...tone(r.windHard) }}>{r.wind}</span>
           <span style={{ ...chip, ...tone(r.playedHard) }}>{r.played}</span>
         </div>
