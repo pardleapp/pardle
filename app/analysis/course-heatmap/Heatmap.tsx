@@ -155,6 +155,48 @@ function pinFlagFor(birdie: HoleBirdieData | undefined): PinFlag | null {
   };
 }
 
+interface RoundLength {
+  round: number;
+  yards: number;
+  holes: number;
+}
+
+/** Total course length per round, summed from the per-hole per-round
+ *  yardages on the pin sheet.
+ *
+ *  Tees move every day and every hole — at East Lake 2025 the 8th
+ *  played 398 yards in R1 and 300 in R4 — so a single "course
+ *  yardage" is fiction. Summing the actual played tees per round
+ *  shows whether the setup as a whole lengthened or shortened, which
+ *  the per-hole tee flags can't express: eight holes moving back 20
+ *  yards and eight moving up 20 leaves every flag quiet and the
+ *  course unchanged, and that is worth being able to see.
+ *
+ *  Rounds with an incomplete hole count are still returned, with
+ *  `holes` so the caller can mark them rather than showing a total
+ *  that silently omits holes. */
+function courseLengthByRound(
+  pinsByHole: Map<number, CoursePinHole> | undefined,
+): RoundLength[] {
+  if (!pinsByHole || pinsByHole.size === 0) return [];
+  const totals = new Map<number, { yards: number; holes: number }>();
+  for (const pin of pinsByHole.values()) {
+    for (const [rStr, y] of Object.entries(pin.yardsByRound ?? {})) {
+      const r = Number(rStr);
+      if (!Number.isFinite(r) || typeof y !== "number" || !Number.isFinite(y)) {
+        continue;
+      }
+      const t = totals.get(r) ?? { yards: 0, holes: 0 };
+      t.yards += y;
+      t.holes += 1;
+      totals.set(r, t);
+    }
+  }
+  return [...totals.entries()]
+    .map(([round, t]) => ({ round, yards: t.yards, holes: t.holes }))
+    .sort((a, b) => a.round - b.round);
+}
+
 /** Compute the tee-movement flag for a hole — the spread of max-min
  *  yardage across the played rounds. Returns null when the spread
  *  is under the threshold or fewer than 2 rounds have data. */
@@ -284,6 +326,14 @@ export default function Heatmap({
   const CELL_W = 68;
   const CELL_H = 36;
 
+  const roundLengths = courseLengthByRound(pinsByHole);
+  const fullRoundLengths = roundLengths.filter((r) => r.holes === 18);
+  const lengthSpread =
+    fullRoundLengths.length >= 2
+      ? Math.max(...fullRoundLengths.map((r) => r.yards)) -
+        Math.min(...fullRoundLengths.map((r) => r.yards))
+      : null;
+
   return (
     <div style={{ marginTop: 12 }}>
       {/* Round filter */}
@@ -311,6 +361,87 @@ export default function Heatmap({
           );
         })}
       </div>
+
+      {/* Course length per round. Sits with the round tabs because it
+          is a property of the SETUP, not of any one hole. */}
+      {roundLengths.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+            marginBottom: 12,
+            padding: "8px 10px",
+            borderRadius: 8,
+            border: "1px solid oklch(0.9 0.008 95)",
+            background: "white",
+          }}
+        >
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 800,
+              letterSpacing: 0.5,
+              textTransform: "uppercase",
+              color: "oklch(0.5 0.02 150)",
+            }}
+          >
+            Course length
+          </span>
+          {roundLengths.map((rl) => {
+            const active = rl.round === effectiveRound;
+            const partial = rl.holes !== 18;
+            return (
+              <span
+                key={rl.round}
+                title={
+                  partial
+                    ? `R${rl.round}: ${rl.yards.toLocaleString()} yds over only ${rl.holes} holes with tee data`
+                    : `R${rl.round} played to ${rl.yards.toLocaleString()} yards`
+                }
+                style={{
+                  display: "inline-flex",
+                  alignItems: "baseline",
+                  gap: 5,
+                  padding: "3px 9px",
+                  borderRadius: 999,
+                  fontFamily: "var(--font-mono, monospace)",
+                  fontVariantNumeric: "tabular-nums",
+                  border: `1px solid ${active ? "oklch(0.25 0.02 150)" : "oklch(0.88 0.01 150)"}`,
+                  background: active ? "oklch(0.25 0.02 150)" : "white",
+                  color: active ? "white" : "oklch(0.3 0.02 150)",
+                }}
+              >
+                <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.75 }}>
+                  R{rl.round}
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 800 }}>
+                  {rl.yards.toLocaleString()}
+                </span>
+                {partial && (
+                  <span style={{ fontSize: 10, opacity: 0.75 }}>
+                    ({rl.holes}h)
+                  </span>
+                )}
+              </span>
+            );
+          })}
+          {lengthSpread != null && (
+            <span
+              style={{
+                fontSize: 11.5,
+                color: "oklch(0.5 0.02 150)",
+                fontFamily: "var(--font-mono, monospace)",
+              }}
+            >
+              {lengthSpread >= TEE_MOVE_THRESHOLD_YARDS
+                ? `${lengthSpread} yd swing across the week`
+                : `${lengthSpread} yd swing — setup held steady`}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Legend */}
       <div
