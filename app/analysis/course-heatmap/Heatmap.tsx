@@ -35,6 +35,82 @@ interface Props {
    *  for the pin-variance flag column. Keyed by hole number as a
    *  string (matches the API response). */
   birdieHistoryByHole?: Record<string, HoleBirdieData> | null;
+  /** Tee-to-green compass bearing per hole, 0-360. When present the
+   *  table gains a WIND column resolving each hole into head / tail /
+   *  cross for the selected round. Null at venues whose meta file has
+   *  no bearings yet. */
+  holeBearings?: Record<number, number> | null;
+}
+
+interface HoleWind {
+  /** Along-hole component. Positive = into the player's face. */
+  head: number;
+  /** Absolute sideways component. */
+  cross: number;
+  /** Which of the two dominates, for labelling. */
+  kind: "into" | "down" | "cross";
+}
+
+/** Resolve a round's wind onto one hole.
+ *
+ *  Wind direction is reported as the bearing the wind comes FROM, so
+ *  the angle between it and the direction of play gives the split:
+ *  cos for the along-hole component, sin for the sideways one. A hole
+ *  is called cross only when the sideways part actually exceeds the
+ *  along-hole part, rather than at some fixed angle — that way "into"
+ *  means the wind is mostly against you, which is what a reader
+ *  assumes it means. */
+function holeWindFor(
+  bearing: number | undefined,
+  windMph: number | null,
+  windFromDeg: number | null,
+): HoleWind | null {
+  if (
+    typeof bearing !== "number" ||
+    windMph == null ||
+    windFromDeg == null ||
+    !Number.isFinite(windMph)
+  ) {
+    return null;
+  }
+  const theta = ((windFromDeg - bearing) * Math.PI) / 180;
+  const head = windMph * Math.cos(theta);
+  const cross = Math.abs(windMph * Math.sin(theta));
+  return {
+    head,
+    cross,
+    kind: cross > Math.abs(head) ? "cross" : head > 0 ? "into" : "down",
+  };
+}
+
+/** Mean wind over a round's daylight hours, as speed + vector-mean
+ *  direction. Averaging degrees arithmetically breaks across the
+ *  0/360 wrap, so the direction is averaged as unit vectors. */
+function roundWind(
+  day: DailyWeatherView | null | undefined,
+): { mph: number; fromDeg: number } | null {
+  const pts = (day?.hourly ?? []).filter(
+    (p) => p.hour >= 7 && p.hour <= 19 && typeof p.windMph === "number",
+  );
+  if (pts.length === 0) return null;
+  let sx = 0;
+  let sy = 0;
+  let n = 0;
+  let speed = 0;
+  for (const p of pts) {
+    speed += p.windMph as number;
+    const deg = (p as { windDirDeg?: number | null }).windDirDeg;
+    if (typeof deg === "number") {
+      sx += Math.sin((deg * Math.PI) / 180);
+      sy += Math.cos((deg * Math.PI) / 180);
+      n += 1;
+    }
+  }
+  if (n === 0) return null;
+  return {
+    mph: speed / pts.length,
+    fromDeg: ((Math.atan2(sx, sy) * 180) / Math.PI + 360) % 360,
+  };
 }
 
 /** Threshold for the pin-variance flag — ABSOLUTE percentage-point
@@ -228,6 +304,7 @@ export default function Heatmap({
   pinsAvailable,
   pinsByHole,
   birdieHistoryByHole,
+  holeBearings,
 }: Props) {
   const [round, setRound] = useState<RoundFilter>("1");
   const [hover, setHover] = useState<Cell | null>(null);
@@ -325,6 +402,10 @@ export default function Heatmap({
   // always-visible horizontal scrollbar for narrower screens.
   const CELL_W = 68;
   const CELL_H = 36;
+
+  const windToday = roundWind(weatherByRound?.[String(effectiveRound)]);
+  const showWind =
+    !!windToday && !!holeBearings && Object.keys(holeBearings).length > 0;
 
   const roundLengths = courseLengthByRound(pinsByHole);
   const fullRoundLengths = roundLengths.filter((r) => r.holes === 18);
@@ -623,6 +704,23 @@ export default function Heatmap({
               >
                 TEE Δ
               </th>
+              {showWind && (
+                <th
+                  style={{
+                    width: 96,
+                    paddingLeft: 4,
+                    textAlign: "left",
+                    fontSize: 10,
+                    fontWeight: 800,
+                    letterSpacing: 0.6,
+                    textTransform: "uppercase",
+                    color: "oklch(0.5 0.02 150)",
+                  }}
+                  title={`R${effectiveRound} wind averaged ${windToday!.mph.toFixed(1)} mph from ${Math.round(windToday!.fromDeg)}°. Each hole is resolved onto its tee-to-green bearing.`}
+                >
+                  Wind
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -889,6 +987,65 @@ export default function Heatmap({
                     </td>
                   );
                 })()}
+                {showWind &&
+                  (() => {
+                    const hw = holeWindFor(
+                      holeBearings?.[h],
+                      windToday!.mph,
+                      windToday!.fromDeg,
+                    );
+                    const label =
+                      hw == null
+                        ? "—"
+                        : hw.kind === "cross"
+                          ? `cross ${Math.round(hw.cross)}`
+                          : `${hw.kind === "into" ? "into" : "down"} ${Math.round(Math.abs(hw.head))}`;
+                    const tone =
+                      hw == null
+                        ? { bg: "transparent", fg: "oklch(0.75 0.008 95)" }
+                        : hw.kind === "into"
+                          ? { bg: "oklch(0.93 0.06 25 / 0.55)", fg: "oklch(0.4 0.15 25)" }
+                          : hw.kind === "down"
+                            ? { bg: "oklch(0.92 0.07 150 / 0.5)", fg: "oklch(0.35 0.12 150)" }
+                            : { bg: "oklch(0.95 0.02 95)", fg: "oklch(0.45 0.02 150)" };
+                    return (
+                      <td
+                        key="wind"
+                        title={
+                          hw == null
+                            ? `H${h} · no bearing for this hole`
+                            : `H${h} plays ${Math.round(holeBearings![h])}°. R${effectiveRound} wind ${windToday!.mph.toFixed(1)} mph from ${Math.round(windToday!.fromDeg)}° — ${hw.head >= 0 ? "into" : "downwind"} ${Math.abs(hw.head).toFixed(1)} mph, cross ${hw.cross.toFixed(1)} mph`
+                        }
+                        style={{
+                          width: 96,
+                          height: CELL_H,
+                          paddingLeft: 4,
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        <div
+                          style={{
+                            background: tone.bg,
+                            color: tone.fg,
+                            fontFamily: "var(--font-mono, monospace)",
+                            fontWeight: 800,
+                            fontSize: 12,
+                            border:
+                              hw == null
+                                ? "1px dashed oklch(0.94 0.008 95)"
+                                : "1px solid oklch(0.88 0.012 95)",
+                            borderRadius: 6,
+                            height: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {label}
+                        </div>
+                      </td>
+                    );
+                  })()}
               </tr>
             ))}
           </tbody>

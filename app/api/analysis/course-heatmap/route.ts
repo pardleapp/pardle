@@ -28,7 +28,10 @@ import { getActiveTournament } from "@/lib/golf-api/pgatour";
 import { getSnapshot, getCachedTournamentPars } from "@/lib/feed/store";
 import { getDailyWeather, type DailyWeather } from "@/lib/weather/open-meteo";
 import { coordsForTournamentId } from "@/lib/weather/course-coords";
-import { listTournamentConfigs } from "@/lib/scoring-model/tournament-config";
+import {
+  listTournamentConfigs,
+  getTournamentConfig,
+} from "@/lib/scoring-model/tournament-config";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -296,6 +299,10 @@ export async function GET(req: Request) {
       const configs = await listTournamentConfigs();
       const cfg = configs.find((c) => c.slug === slug);
       const tournamentId = cfg?.historicalTournamentIds?.[yearNum] ?? null;
+      // Tee-to-green compass bearings, so the client can resolve each
+      // hole's wind as head / tail / cross. Empty for venues whose
+      // meta file has no bearings yet — the column just hides.
+      const holeBearings = cfg?.holeBearings ?? null;
       return NextResponse.json({
         ok: true,
         source: "historical",
@@ -308,6 +315,7 @@ export async function GET(req: Request) {
         cells: hist.cells,
         roundRanges,
         weatherByRound: hist.weatherByRound,
+        holeBearings,
         diag: {
           tallied: hist.tallied,
           noHoles: hist.noHoles,
@@ -324,6 +332,8 @@ export async function GET(req: Request) {
       );
     }
     const tournamentId = active.tournament.id;
+    const liveCfg = await getTournamentConfig(tournamentId).catch(() => null);
+    const holeBearings = liveCfg?.holeBearings ?? null;
 
     const [snapshot, pars, field] = await Promise.all([
       getSnapshot(tournamentId),
@@ -345,6 +355,7 @@ export async function GET(req: Request) {
         cells: [],
         roundRanges: {},
         weatherByRound: null,
+        holeBearings,
         generatedAt: Date.now(),
         diag: { reason: "no-snapshot" },
       });
@@ -461,6 +472,7 @@ export async function GET(req: Request) {
       cells,
       roundRanges,
       weatherByRound,
+      holeBearings,
       diag: { tallied, noTeeInfo, noPar, noScore },
     });
   } catch (err) {

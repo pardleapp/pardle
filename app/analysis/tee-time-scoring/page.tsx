@@ -77,6 +77,9 @@ interface HeatmapResp {
    *  fetch the pin sheet + birdie history that power the PIN Δ /
    *  TEE Δ chip columns — same signals as the course-heatmap page. */
   tournamentId?: string | null;
+  /** Tee-to-green bearings, so the heatmap can resolve each hole's
+   *  wind into head / tail / cross for the selected round. */
+  holeBearings?: Record<number, number> | null;
 }
 
 interface PinsResp {
@@ -505,6 +508,7 @@ export default function Page() {
               }
               birdieHistoryByHole={birdieHistoryByHole}
               pinsAvailable={!!pins}
+              holeBearings={heat.holeBearings ?? null}
             />
           </>
         )

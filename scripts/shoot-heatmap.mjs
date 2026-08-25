@@ -15,7 +15,7 @@ import { build } from "esbuild";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 
-const [cellsPath, pinsPath, out, widthArg] = process.argv.slice(2);
+const [cellsPath, pinsPath, out, widthArg, roundArg, metaPath] = process.argv.slice(2);
 if (!cellsPath || !pinsPath || !out) {
   console.error(
     "usage: node scripts/shoot-heatmap.mjs <cells.json> <pins.json> <out.png> [widthPx]",
@@ -26,6 +26,10 @@ const width = Number(widthArg ?? 1400);
 
 const heat = JSON.parse(await readFile(cellsPath, "utf-8"));
 const pins = JSON.parse(await readFile(pinsPath, "utf-8"));
+const meta = metaPath
+  ? JSON.parse(await readFile(metaPath, "utf-8"))
+  : null;
+const holeBearings = meta?.holeBearings ?? null;
 
 const entry = resolve(ROOT, ".tmp-heatmap-entry.jsx");
 await writeFile(
@@ -43,6 +47,7 @@ createRoot(document.getElementById("root")).render(
     weatherByRound: heat.weatherByRound ?? null,
     pinsByHole,
     pinsAvailable: true,
+    holeBearings: ${JSON.stringify(holeBearings)},
   }),
 );
 `,
@@ -69,7 +74,16 @@ const page = await browser.newPage({
   deviceScaleFactor: 2,
 });
 await page.setContent(html, { waitUntil: "load" });
-await page.waitForTimeout(500);
+await page.waitForTimeout(400);
+const wantRound = roundArg ? String(roundArg) : null;
+if (wantRound) {
+  // Round tabs are plain buttons labelled R1..R4.
+  const btn = page.locator(`button:text-is("R${wantRound}")`).first();
+  if (await btn.count()) {
+    await btn.click();
+    await page.waitForTimeout(350);
+  }
+}
 await mkdir(dirname(resolve(ROOT, out)), { recursive: true });
 // Clip to the top of the component — the course-length panel and the
 // first rows are what we're checking, not the whole grid.
