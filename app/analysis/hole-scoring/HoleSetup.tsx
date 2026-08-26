@@ -114,6 +114,35 @@ export function roundWind(
   };
 }
 
+/** Compass point plus the plain-English name. Sixteen points, because
+ *  eight rounds a 95-degree wind to "east" and a 110-degree wind to
+ *  "east" alike, and the whole reason this is on the page is so a
+ *  reader can line it up against a forecast that quotes ESE. */
+const COMPASS_16 = [
+  ["N", "north"],
+  ["NNE", "north-north-east"],
+  ["NE", "north-east"],
+  ["ENE", "east-north-east"],
+  ["E", "east"],
+  ["ESE", "east-south-east"],
+  ["SE", "south-east"],
+  ["SSE", "south-south-east"],
+  ["S", "south"],
+  ["SSW", "south-south-west"],
+  ["SW", "south-west"],
+  ["WSW", "west-south-west"],
+  ["W", "west"],
+  ["WNW", "west-north-west"],
+  ["NW", "north-west"],
+  ["NNW", "north-north-west"],
+] as const;
+
+export function compassFor(deg: number): { short: string; long: string } {
+  const i = Math.round(((deg % 360) + 360) % 360 / 22.5) % 16;
+  const [short, long] = COMPASS_16[i];
+  return { short, long };
+}
+
 export function buildRows({
   cells,
   round,
@@ -213,6 +242,10 @@ export default function HoleSetup({
 }: Props) {
   const rows = buildRows({ cells, round, pinsByHole, holeBearings, weatherByRound });
   if (rows.length === 0) return null;
+  // The exact figure the per-hole columns were resolved from, stated
+  // rather than left implicit — a reader comparing this against a
+  // forecast needs the direction, not just "into" and "down".
+  const wind = roundWind(weatherByRound?.[String(round)]);
 
   // Normalisers so each column's colour is relative to that column's
   // own spread this round. A 20-yard move and a 4 mph wind swing are
@@ -249,6 +282,61 @@ export default function HoleSetup({
 
   return (
     <div style={{ overflowX: "auto" }}>
+      {wind && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            gap: 8,
+            flexWrap: "wrap",
+            marginBottom: 8,
+            padding: "7px 11px",
+            borderRadius: 8,
+            border: `1px solid ${LINE}`,
+            background: SOFT,
+            fontFamily: "var(--font-archivo), Archivo, system-ui, sans-serif",
+            maxWidth: 760,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 800,
+              letterSpacing: 0.6,
+              textTransform: "uppercase",
+              color: MUTED,
+            }}
+          >
+            Round wind
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-mono, monospace)",
+              fontSize: 14,
+              fontWeight: 800,
+              color: INK,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {Math.round(wind.mph)} mph
+          </span>
+          <span style={{ fontSize: 13, color: INK, fontWeight: 700 }}>
+            from the {compassFor(wind.fromDeg).long}
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-mono, monospace)",
+              fontSize: 12,
+              color: MUTED,
+            }}
+          >
+            {compassFor(wind.fromDeg).short} · {Math.round(wind.fromDeg)}&deg;
+          </span>
+          <span style={{ fontSize: 11.5, color: MUTED }}>
+            daylight average — the figure each hole below is resolved from
+          </span>
+        </div>
+      )}
       <table
         style={{
           borderCollapse: "separate",
@@ -448,7 +536,7 @@ export default function HoleSetup({
               >
                 {windSplit.into + windSplit.down + windSplit.cross === 0
                   ? "—"
-                  : `${windSplit.into}↑ ${windSplit.down}↓ ${windSplit.cross}→`}
+                  : `${wind ? `${compassFor(wind.fromDeg).short} · ` : ""}${windSplit.into}↑ ${windSplit.down}↓ ${windSplit.cross}→`}
               </span>
             </td>
 
