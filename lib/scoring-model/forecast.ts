@@ -503,6 +503,12 @@ function bayesianFormBump(
   sgTotal: number,
   weight: number,
   fieldMeansByRound: Partial<Record<1 | 2 | 3 | 4, number>>,
+  /** Mean edge across the field, so a player's expectation for an
+   *  observed round is set by how much better he is than the field
+   *  he played in — not than the tour. Without it every above-average
+   *  player reads as under-performing and picks up a spurious form
+   *  penalty. */
+  fieldMeanEdge = 0,
 ): number {
   if (!weekRounds || weekRounds.length === 0) return 0;
   let sumOver = 0;
@@ -513,7 +519,7 @@ function bayesianFormBump(
     // Expected for this player in this specific field:
     //   expected_vs_par = field_mean_vs_par − sgTotal
     // A +3 SG player in a −2 vs-par field is expected at −5 vs par.
-    const expectedVsPar = fieldMean - sgTotal;
+    const expectedVsPar = fieldMean - (sgTotal - fieldMeanEdge);
     let over = actualVsPar - expectedVsPar; // negative = over-performing
 
     // Persistence-weight when we have this round's SG decomposition.
@@ -1045,6 +1051,33 @@ export async function runForecast(
     }
     if (n > 0) fieldMeansByRound[r] = sum; // sum of per-hole vs-par = round total vs par
   }
+  // ── Field-strength re-centring ────────────────────────────────
+  // sgTotal is measured against a TOUR-WIDE baseline, not against
+  // the field in front of us. The course model's field forecast,
+  // by contrast, is anchored on what actually got shot at this
+  // venue — by whatever calibre of field historically plays it.
+  // Subtracting a tour-relative edge from a field-anchored baseline
+  // counts the field's strength twice.
+  //
+  // It shows up as a contradiction the model states out loud: at the
+  // 2026 TOUR Championship the field forecast was 68.14 while the
+  // mean of the thirty player projections built from it was 67.03.
+  // Both describe the same thirty players. East Lake makes it
+  // starkest because it hosts nothing but this event, so its entire
+  // historical baseline is elite-field scoring — but the same gap
+  // exists at every venue, equal to that field's mean edge.
+  //
+  // Re-centring on the field mean restores the invariant: a player
+  // is projected by how much better he is THAN THE PLAYERS HE IS
+  // PLAYING AGAINST, and the projections average back to the field
+  // forecast by construction.
+  const edges = players.map((p) => {
+    const defaultCompression = p.sgSource === "event-specific" ? 1.0 : 0.83;
+    return p.sgTotal * (p.compressionFactor ?? defaultCompression);
+  });
+  const fieldMeanEdge =
+    edges.length > 0 ? edges.reduce((a, b) => a + b, 0) / edges.length : 0;
+
   const playerForecasts: PlayerForecast[] = [];
   for (const p of players) {
     // Compression default is source-aware. DataGolf's event-specific
@@ -1062,6 +1095,7 @@ export async function runForecast(
       p.sgTotal,
       formWeight,
       fieldMeansByRound,
+      fieldMeanEdge,
     );
     // Per-round persistence factor for the UI subtitle — 1.0 means
     // the round was category-balanced (behaves like the old model),
@@ -1112,7 +1146,8 @@ export async function runForecast(
 
     // Player expected mean = field mean − compressed edge + form bump
     // (formBump is negative if he's been out-performing).
-    const expectedMean = playerFieldMean - compressedEdge + formBump;
+    const expectedMean =
+      playerFieldMean - (compressedEdge - fieldMeanEdge) + formBump;
     const expectedMedian = expectedMean - skewGap;
 
     // Round-score sigma priority: per-player from historicals →
