@@ -35,6 +35,7 @@ import {
   findLeagueId as findDkLeagueId,
 } from "@/lib/odds-compare/sources/draftkings";
 import { fetchKalshiRoundScoreQuotes } from "@/lib/odds-compare/sources/kalshi";
+import { publicError } from "@/lib/odds-compare/public-error";
 import { fetchPrizePicksRoundScoreQuotes } from "@/lib/odds-compare/sources/prizepicks";
 import { fetchUnderdogRoundScoreQuotes } from "@/lib/odds-compare/sources/underdog";
 import { ingestKey } from "@/lib/odds-compare/ingest-store";
@@ -117,6 +118,7 @@ async function safeFetch(
   }
 }
 
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -189,12 +191,32 @@ export async function GET(req: Request) {
       return { quotes, cooled: false };
     }
 
-    const dkLeaguePromise = findDkLeagueId(tournamentName).catch(() => null);
-    const dkQuotesPromise = (async () => {
-      const id = await dkLeaguePromise;
-      if (id == null) return [];
-      return fetchDkRoundScoreQuotes(id, round);
+    // Three outcomes worth telling apart, because they have three
+    // different fixes: we couldn't reach DK (proxy/credentials), DK
+    // isn't carrying this event (nothing to do), or DK is carrying it
+    // and has posted no round-score lines yet (wait). Collapsing all
+    // three into an empty array — as this did — reports a dead proxy
+    // as "the book hasn't posted lines", which sends the reader to
+    // the sportsbook instead of to the billing page.
+    const dkResultPromise: Promise<
+      | { kind: "ok"; quotes: RoundScoreQuote[] }
+      | { kind: "no-event" }
+      | { kind: "error"; message: string }
+    > = (async () => {
+      try {
+        const id = await findDkLeagueId(tournamentName);
+        if (id == null) return { kind: "no-event" as const };
+        return { kind: "ok" as const, quotes: await fetchDkRoundScoreQuotes(id, round) };
+      } catch (err) {
+        return {
+          kind: "error" as const,
+          message: err instanceof Error ? err.message : "fetch failed",
+        };
+      }
     })();
+    const dkQuotesPromise = dkResultPromise.then((r) =>
+      r.kind === "ok" ? r.quotes : [],
+    );
 
     // Ingested books (FD/Caesars/BetMGM) come off Redis, populated
     // by the home Playwright scraper's POSTs to /api/odds-compare/ingest.
@@ -296,29 +318,53 @@ export async function GET(req: Request) {
     };
     const bookStatus: Record<
       BookKey,
-      { ok: boolean; error?: string; playerCount: number }
+      { ok: boolean; error?: string; detail?: string; playerCount: number }
     > = {
-      draftkings: {
-        ok: dk.ok,
-        error: dk.error ?? (dk.ok ? emptyNote(dk.quotes) : undefined),
-        playerCount: countPlayers(dk.quotes),
-      },
+      draftkings: await (async () => {
+        const r = await dkResultPromise;
+        if (r.kind === "error") {
+          return {
+            ok: false,
+            error: publicError(r.message),
+            detail: r.message,
+            playerCount: 0,
+          };
+        }
+        if (r.kind === "no-event") {
+          return {
+            ok: false,
+            error: "DraftKings isn't carrying this event",
+            playerCount: 0,
+          };
+        }
+        return {
+          ok: dk.ok,
+          error: dk.ok
+            ? emptyNote(dk.quotes)
+            : publicError(dk.error),
+          detail: dk.ok ? undefined : dk.error,
+          playerCount: countPlayers(dk.quotes),
+        };
+      })(),
       fanduel: ingestStatus("fanduel"),
       caesars: ingestStatus("caesars"),
       betmgm: ingestStatus("betmgm"),
       prizepicks: {
         ok: pp.ok,
-        error: pp.ok ? emptyNote(pp.quotes) : pp.error,
+        error: pp.ok ? emptyNote(pp.quotes) : publicError(pp.error),
+        detail: pp.ok ? undefined : pp.error,
         playerCount: countPlayers(pp.quotes),
       },
       underdog: {
         ok: ud.ok,
-        error: ud.ok ? emptyNote(ud.quotes) : ud.error,
+        error: ud.ok ? emptyNote(ud.quotes) : publicError(ud.error),
+        detail: ud.ok ? undefined : ud.error,
         playerCount: countPlayers(ud.quotes),
       },
       kalshi: {
         ok: ks.ok,
-        error: ks.ok ? emptyNote(ks.quotes) : ks.error,
+        error: ks.ok ? emptyNote(ks.quotes) : publicError(ks.error),
+        detail: ks.ok ? undefined : ks.error,
         playerCount: countPlayers(ks.quotes),
       },
     };

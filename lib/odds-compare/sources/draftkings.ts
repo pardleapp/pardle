@@ -114,8 +114,12 @@ interface DKCategoryPayload {
  *  every 30 s hitting this — now it's ~1 fresh scrape per tournament
  *  per day, saving ~50% of DK-related credits.
  *
- *  Falls back to null when no fuzzy match — the aggregator surfaces
- *  that as bookStatus.draftkings.ok=false so we know to look. */
+ *  Returns null when the page loads but no fuzzy match is found —
+ *  a genuine "DK isn't carrying this event". THROWS when the fetch
+ *  itself fails, because that is a different problem with a
+ *  different fix and the caller must be able to tell them apart:
+ *  reporting a dead proxy as "no lines posted" sends the reader
+ *  looking at the sportsbook instead of at our credentials. */
 export async function findLeagueId(tournamentName: string): Promise<number | null> {
   // Cache read.
   const cacheKey = leagueIdCacheKey(tournamentName);
@@ -130,7 +134,13 @@ export async function findLeagueId(tournamentName: string): Promise<number | nul
   const res = await proxiedFetch("https://sportsbook.draftkings.com/leagues/golf", {
     headers: { "User-Agent": UA, Accept: "text/html,*/*" },
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const body = (await res.text()).slice(0, 300);
+    // ScraperAPI answers 403 with its own JSON when the account is
+    // out of credits, so the message is worth surfacing verbatim —
+    // it names the actual fix.
+    throw new Error(`DraftKings league list ${res.status}: ${body}`);
+  }
   const html = await res.text();
   // Match "eventGroupId":41404,"eventGroupName":"FedEx St. Jude Championship"
   const pairRe = /"eventGroupId":(\d+),"eventGroupName":"([^"]+)"/g;

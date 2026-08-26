@@ -249,6 +249,41 @@ export default function CompareTool() {
         </div>
       )}
 
+      {/* When nothing loaded, say WHY on the page rather than only in
+          a tooltip. The failure modes have different fixes and a
+          hover title is invisible on a phone, which is where most of
+          this gets read. */}
+      {data?.bookStatus && (data.rows?.length ?? 0) === 0 && (
+        <div
+          style={{
+            marginTop: 4,
+            padding: "10px 12px",
+            borderRadius: 8,
+            border: `1px solid ${T.line}`,
+            background: "white",
+            fontFamily: T.fontUi,
+            fontSize: 12.5,
+            lineHeight: 1.55,
+            color: T.muted,
+          }}
+        >
+          <strong style={{ color: T.ink }}>No lines to compare yet.</strong>{" "}
+          Why each book is empty:
+          <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+            {BOOKS.map((b) => {
+              const st = data.bookStatus?.[b.key];
+              if (!st || (st.ok && st.playerCount > 0)) return null;
+              return (
+                <li key={b.key} style={{ marginTop: 2 }}>
+                  <strong style={{ color: T.ink }}>{b.label}</strong> —{" "}
+                  {st.error ?? "no lines posted"}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       {/* Error banner */}
       {error && (
         <div
