@@ -43,6 +43,8 @@ interface PlayerForecastResp {
   breakdown: {
     fieldMean: number;
     compressedEdge: number;
+    rawCompressedEdge?: number;
+    fieldMeanEdge?: number;
     formBump: number;
     skewGap: number;
     teeTimeAdjusted?: boolean;
@@ -1750,9 +1752,16 @@ function PlayerHeroCard({
           format={(v) => (v >= 0 ? "+" : "") + v.toFixed(2)}
         />
         <BreakdownStat
-          label="Course edge"
+          label="Edge vs field"
           value={player.breakdown.compressedEdge}
           format={(v) => (v >= 0 ? "+" : "") + v.toFixed(2)}
+          sub={
+            typeof player.breakdown.rawCompressedEdge === "number" &&
+            typeof player.breakdown.fieldMeanEdge === "number" &&
+            Math.abs(player.breakdown.fieldMeanEdge) >= 0.01
+              ? `${player.breakdown.rawCompressedEdge >= 0 ? "+" : ""}${player.breakdown.rawCompressedEdge.toFixed(2)} vs tour, field averages ${player.breakdown.fieldMeanEdge >= 0 ? "+" : ""}${player.breakdown.fieldMeanEdge.toFixed(2)}`
+              : "vs tour baseline"
+          }
         />
         <BreakdownStat
           label="Form"

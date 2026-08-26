@@ -270,7 +270,16 @@ export interface PlayerForecast {
   dgProbs?: DGPlayerProbs;
   breakdown: {
     fieldMean: number;
+    /** Edge actually applied: raw compressed edge minus the field's
+     *  mean, so fieldMean − compressedEdge + formBump reproduces
+     *  expectedMean exactly. */
     compressedEdge: number;
+    /** The tour-relative edge before re-centring, kept so the UI can
+     *  show both and explain the difference. */
+    rawCompressedEdge: number;
+    /** Mean compressed edge across this field — the amount every
+     *  player's raw edge is reduced by. */
+    fieldMeanEdge: number;
     formBump: number;
     skewGap: number;
     /** True when the player's field mean was recomputed with tee-
@@ -1173,7 +1182,10 @@ export async function runForecast(
       name: p.name,
       dgId: p.dgId,
       sgTotal: p.sgTotal,
-      sgTotalAdjusted: compressedEdge - formBump,
+      // The edge actually applied, after re-centring on the field.
+      // Reporting the raw tour-relative edge here would leave the
+      // breakdown unable to reconstruct expectedMean.
+      sgTotalAdjusted: compressedEdge - fieldMeanEdge - formBump,
       formAdjustment: formBump,
       expectedMean,
       expectedMedian,
@@ -1183,7 +1195,9 @@ export async function runForecast(
       dgProbs: p.dgProbs,
       breakdown: {
         fieldMean: playerFieldMean,
-        compressedEdge,
+        compressedEdge: compressedEdge - fieldMeanEdge,
+        rawCompressedEdge: compressedEdge,
+        fieldMeanEdge,
         formBump,
         skewGap,
         teeTimeAdjusted,
