@@ -100,14 +100,24 @@ function dgToFirstLast(name: string): string {
 /** DG live-tournament-stats returns whichever round is currently in
  *  play when you ask for it. We probe R4 → R1 and use the highest
  *  round that actually returns rows — that's the round with fresh
- *  data. Falls back to R1 if all probes fail. */
+ *  data. Falls back to R1 if all probes fail.
+ *
+ *  Gotcha: DG's live-tournament-stats returns the whole field roster
+ *  for EVERY round param even before that round has been played —
+ *  the placeholder rows just have all-null / all-zero SG values. So
+ *  a plain `live_stats.length > 0` check picks R4 whenever the
+ *  tournament is in progress on R1, showing "R4" in the header
+ *  from Thursday morning. Check for real SG data instead. */
 async function findActiveRoundWithData(): Promise<{
   round: number;
   payload: DGLiveResp | null;
 }> {
   for (const r of [4, 3, 2, 1]) {
     const payload = await fetchDgLiveStats(r);
-    if (payload?.live_stats?.length) {
+    const hasRealData = payload?.live_stats?.some(
+      (s) => typeof s.sg_total === "number" && s.sg_total !== 0,
+    );
+    if (hasRealData) {
       return { round: r, payload };
     }
   }
