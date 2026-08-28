@@ -97,31 +97,20 @@ function dgToFirstLast(name: string): string {
   return `${first} ${last}`;
 }
 
-/** DG live-tournament-stats returns whichever round is currently in
- *  play when you ask for it. We probe R4 → R1 and use the highest
- *  round that actually returns rows — that's the round with fresh
- *  data. Falls back to R1 if all probes fail.
+/** Fetch DG live-tournament-stats for a specific round. Wrapper so
+ *  the caller can decide which round to ask for based on ground
+ *  truth (the orchestrator leaderboard) rather than DG's own
+ *  placeholder heuristics.
  *
- *  Gotcha: DG's live-tournament-stats returns the whole field roster
- *  for EVERY round param even before that round has been played —
- *  the placeholder rows just have all-null / all-zero SG values. So
- *  a plain `live_stats.length > 0` check picks R4 whenever the
- *  tournament is in progress on R1, showing "R4" in the header
- *  from Thursday morning. Check for real SG data instead. */
-async function findActiveRoundWithData(): Promise<{
-  round: number;
-  payload: DGLiveResp | null;
-}> {
-  for (const r of [4, 3, 2, 1]) {
-    const payload = await fetchDgLiveStats(r);
-    const hasRealData = payload?.live_stats?.some(
-      (s) => typeof s.sg_total === "number" && s.sg_total !== 0,
-    );
-    if (hasRealData) {
-      return { round: r, payload };
-    }
-  }
-  return { round: 1, payload: null };
+ *  Why: DG's live-stats returns the whole field roster for EVERY
+ *  round param even before that round has been played. Sometimes
+ *  rows come back with non-null sg_total values for future rounds
+ *  too (probably some rollover / carry from a prior payload). Bottom
+ *  line — we can't trust DG's row presence as a "round is live"
+ *  signal. The orchestrator's per-player `currentRound` on the
+ *  leaderboard IS reliable, so we use that upstream. */
+async function fetchDgLiveForRound(round: number): Promise<DGLiveResp | null> {
+  return fetchDgLiveStats(round);
 }
 
 export interface LeaderboardRow {
@@ -252,8 +241,19 @@ export async function GET(req: Request) {
       );
     }
 
-    const { round: activeRound, payload: dgLive } =
-      await findActiveRoundWithData();
+    // Determine the active round from the ORCHESTRATOR's leaderboard
+    // (the authoritative source), not from probing DG live-stats. Take
+    // the highest currentRound seen on any non-terminal player; fall
+    // back to 1 if the field hasn't started or none report a round.
+    const TERMINAL_STATES = new Set([
+      "CUT", "MC", "WD", "DQ", "DNS", "COMPLETE", "FINISHED",
+    ]);
+    const roundNums = leaderboard
+      .filter((r) => !TERMINAL_STATES.has(r.playerState))
+      .map((r) => r.currentRound)
+      .filter((n): n is number => typeof n === "number" && n >= 1 && n <= 4);
+    const activeRound = roundNums.length ? Math.max(...roundNums) : 1;
+    const dgLive = await fetchDgLiveForRound(activeRound);
     const dgRows = dgLive?.live_stats ?? [];
     const dgByName = new Map<string, DGLiveRow>();
     for (const r of dgRows) {
