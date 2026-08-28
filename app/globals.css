@@ -29761,8 +29761,9 @@ body[data-chat-open] .addbet-fab {
     64px          /* pos */
     56px          /* avatar */
     minmax(150px, 190px) /* name */
-    96px          /* today — chip needs room */
-    64px          /* thru */
+    72px          /* tot — cumulative to-par chip */
+    72px          /* today — round to-par chip */
+    56px          /* thru */
     minmax(0, 1fr)   /* latest */
     58px 58px 58px 58px 78px; /* 5x SG (TOT chip needs room) */
   align-items: center;
@@ -29787,6 +29788,7 @@ body[data-chat-open] .addbet-fab {
 .feed-v4 .v4-headings > span { padding: 0 4px; }
 .feed-v4 .v4-h-pos { text-align: left; }
 .feed-v4 .v4-h-total,
+.feed-v4 .v4-h-today,
 .feed-v4 .v4-h-thru { text-align: right; }
 .feed-v4 .v4-h-sg { text-align: right; }
 
@@ -30025,6 +30027,43 @@ body[data-chat-open] .addbet-fab {
   background: oklch(0.94 0.008 95);
   color: oklch(0.32 0.03 155);
   box-shadow: 0 0 0 1px oklch(0.88 0.008 95);
+}
+/* Today's round-score chip — same colour system as total chip but
+ * shorter, less shouty. Total remains the primary at 22px; today
+ * sits alongside at 15px so the eye lands on the tournament total
+ * first, then reads today's round beside it. */
+.feed-v4 .v4-row > .v4-today {
+  font-family: "IBM Plex Mono", var(--font-mono, monospace), monospace;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  justify-self: end;
+  color: oklch(0.32 0.03 155);
+}
+.feed-v4 .v4-row > .v4-today.v4-total-under {
+  background: oklch(0.94 0.06 155);
+  color: oklch(0.34 0.13 155);
+  box-shadow: 0 0 0 1px oklch(0.85 0.08 155);
+  text-shadow: none;
+}
+.feed-v4 .v4-row > .v4-today.v4-total-over {
+  background: oklch(0.94 0.06 25);
+  color: oklch(0.38 0.13 25);
+  box-shadow: 0 0 0 1px oklch(0.85 0.09 25);
+  text-shadow: none;
+}
+.feed-v4 .v4-row > .v4-today.v4-total-even {
+  background: transparent;
+  color: oklch(0.55 0.02 150);
+  box-shadow: none;
 }
 .feed-v4 .v4-thru {
   font-family: "IBM Plex Mono", var(--font-mono, monospace), monospace;
@@ -30531,18 +30570,19 @@ body[data-chat-open] .addbet-fab {
   .feed-v4 .v4-headings,
   .feed-v4 .v4-row {
     grid-template-columns:
-      40px                    /* pos */
-      44px                    /* avatar */
+      38px                    /* pos */
+      40px                    /* avatar */
       minmax(0, 1fr)          /* name */
-      60px                    /* today */
-      44px;                   /* thru */
-    column-gap: 6px;
+      54px                    /* tot */
+      48px                    /* today */
+      40px;                   /* thru */
+    column-gap: 5px;
     min-width: 0;
   }
   .feed-v4 .v4-row {
     grid-template-areas:
-      "pos avatar name today thru"
-      "latest latest latest latest latest";
+      "pos avatar name tot today thru"
+      "latest latest latest latest latest latest";
     row-gap: 6px;
     padding: 10px 12px;
     min-height: 0;
@@ -30550,7 +30590,8 @@ body[data-chat-open] .addbet-fab {
   .feed-v4 .v4-row > .v4-pos { grid-area: pos; }
   .feed-v4 .v4-row > .v4-avatar { grid-area: avatar; }
   .feed-v4 .v4-row > .v4-name { grid-area: name; }
-  .feed-v4 .v4-row > .v4-total { grid-area: today; }
+  .feed-v4 .v4-row > .v4-total { grid-area: tot; }
+  .feed-v4 .v4-row > .v4-today { grid-area: today; }
   .feed-v4 .v4-row > .v4-thru { grid-area: thru; }
   .feed-v4 .v4-row > .v4-latest { grid-area: latest; }
 
@@ -30562,11 +30603,17 @@ body[data-chat-open] .addbet-fab {
 
   /* Pill sizes — tighter than desktop, one clean rhythm */
   .feed-v4 .v4-row > .v4-total {
-    font-size: 18px;
-    min-width: 52px;
-    padding: 5px 8px;
+    font-size: 17px;
+    min-width: 48px;
+    padding: 5px 7px;
     border-radius: 7px;
     letter-spacing: -0.4px;
+  }
+  .feed-v4 .v4-row > .v4-today {
+    font-size: 12.5px;
+    min-width: 40px;
+    padding: 3px 6px;
+    border-radius: 5px;
   }
   .feed-v4 .v4-pos {
     font-size: 13px;

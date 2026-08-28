@@ -288,7 +288,8 @@ export default function LeaderboardFeed() {
             <span className="v4-h-pos">POS</span>
             <span />
             <span className="v4-h-name">PLAYER</span>
-            <span className="v4-h-total">TODAY</span>
+            <span className="v4-h-total">TOT</span>
+            <span className="v4-h-today">TODAY</span>
             <span className="v4-h-thru">THRU</span>
             <span className="v4-h-latest">LATEST</span>
             <span className="v4-h-sg" title="SG: off the tee">OTT</span>

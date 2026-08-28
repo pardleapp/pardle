@@ -296,6 +296,8 @@ async function handle(req: Request) {
         total: r.total,
         thru: r.thru,
         playerState: r.playerState,
+        score: r.score,
+        currentRound: r.currentRound,
       }));
       if (bundle.leaderboard.length > 0) {
         await cacheLeaderboard(tournament.id, bundle.leaderboard);

@@ -173,6 +173,8 @@ export async function pollAndDiff(
       total: r.total,
       thru: r.thru,
       playerState: r.playerState,
+      score: r.score,
+      currentRound: r.currentRound,
     })),
   );
 

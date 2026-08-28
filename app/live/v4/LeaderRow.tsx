@@ -477,6 +477,9 @@ export default function LeaderRow({
         <span className={`v4-total ${totalClass(row.total)}`}>
           {row.total?.replace(/^-/, "−") || "—"}
         </span>
+        <span className={`v4-today ${totalClass(row.score)}`}>
+          {row.score?.replace(/^-/, "−") || "—"}
+        </span>
         <span className="v4-thru">{row.thru || "—"}</span>
         {latest ? (
           <EventInline

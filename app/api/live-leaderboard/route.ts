@@ -128,7 +128,12 @@ export interface LeaderboardRow {
   playerId: string;
   playerName: string;
   position: string;
+  /** Cumulative to-par across all rounds played. */
   total: string;
+  /** Today's round-to-par (empty when between rounds / pre-tee). */
+  score: string;
+  /** Round the player is currently on (1-4), null when unknown. */
+  currentRound: number | null;
   thru: string;
   playerState: string;
   /** SG breakdown for the current round — null when DG lookup failed. */
@@ -287,6 +292,8 @@ export async function GET(req: Request) {
         playerName: lb.displayName,
         position: lb.position,
         total: lb.total,
+        score: lb.score ?? "",
+        currentRound: lb.currentRound ?? null,
         thru: lb.thru,
         playerState: lb.playerState,
         sg,

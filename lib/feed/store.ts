@@ -479,9 +479,16 @@ export interface CachedLeaderboardRow {
   playerId: string;
   displayName: string;
   position: string;
+  /** Overall to-par (across all rounds played). */
   total: string;
   thru: string;
   playerState: string;
+  /** Today's round-to-par (mirrors PGA `score` field), empty when
+   *  between rounds / hasn't teed off. */
+  score?: string;
+  /** 1-4 for the round the player is currently on. Null when the
+   *  orchestrator doesn't publish it (very early or WD/DQ). */
+  currentRound?: number | null;
 }
 
 export async function cacheLeaderboard(
