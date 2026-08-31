@@ -8,6 +8,10 @@
     {
       "path": "/api/feed",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/sharpsports/reconcile",
+      "schedule": "0 9 * * *"
     }
   ]
 }
