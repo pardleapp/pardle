@@ -298,6 +298,7 @@ export default function Page() {
               pinsByHole={pinsByHole}
               holeBearings={heat.holeBearings ?? null}
               weatherByRound={heat.weatherByRound ?? null}
+              birdieHistoryByHole={birdieHistoryByHole}
             />
 
             <div style={{ marginTop: 18 }}>

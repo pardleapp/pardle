@@ -20,6 +20,11 @@
  */
 
 import type { HoleRow } from "./HoleSetup";
+import type { CoursePinHole } from "@/lib/golf-api/pgatour";
+import type {
+  HoleBirdieData,
+  PinCluster,
+} from "@/lib/analysis/course-birdies";
 
 /** Rough coefficients for translating setup deltas into an expected
  *  scoring delta on tour. Numbers are conservative — well within the
@@ -70,6 +75,36 @@ export interface Takeaway {
   detail: string;
   /** Higher = surface earlier. Roughly the |surprise| in strokes. */
   severity: number;
+  /** Set when today's pin sits in a historical cluster whose scoring
+   *  meaningfully explains the surprise — points the reader at the
+   *  pin-history modal on the Pin analysis tool. */
+  pinInsight?: PinInsight;
+}
+
+/** Attached to a takeaway when today's pin sits in a historical
+ *  cluster on the green whose scoring materially explains the
+ *  surprise. Rendered as a "View pin history →" chip that deep-links
+ *  to the Pin analysis modal for that hole. */
+export interface PinInsight {
+  clusterId: string;
+  /** Number of historical pin observations in the cluster (i.e. how
+   *  many times the tour has cut a pin in this spot). Drives the
+   *  "3 pins across N years" sample-size line. */
+  pinCount: number;
+  /** Cluster's historical avg strokes-vs-par. */
+  clusterAvgVsPar: number;
+  /** Whole-green historical avg strokes-vs-par (for context). */
+  greenAvgVsPar: number;
+  /** clusterAvgVsPar − greenAvgVsPar. Positive = this pin position is
+   *  historically harder than the average pin on this green;
+   *  negative = easier. */
+  clusterDelta: number;
+  /** Cluster's historical birdie rate (0..1). */
+  clusterBirdieRate: number;
+  /** Cluster's historical bogey rate (0..1). */
+  clusterBogeyRate: number;
+  /** One-line sentence to surface on the chip. */
+  headline: string;
 }
 
 /** Render a signed delta as "+0.42" / "−0.18" with Unicode minus. */
@@ -77,6 +112,100 @@ function fmtDelta(x: number, digits = 2): string {
   if (!Number.isFinite(x)) return "—";
   const s = x.toFixed(digits);
   return x > 0 ? `+${s}` : s.replace(/^-/, "−");
+}
+
+/** Minimum absolute cluster-vs-green difference in avg strokes-vs-par
+ *  before we bother mentioning the pin cluster on a takeaway. Anything
+ *  under this is noise and adds nothing to the chip. */
+const PIN_INSIGHT_MIN_ABS_DELTA = 0.08;
+
+/** Minimum pins-in-cluster before we trust the sample enough to speak
+ *  about it. 3 pins ≈ three tour rounds using this spot — enough of a
+ *  signal to attribute the day's scoring to it. */
+const PIN_INSIGHT_MIN_PINS = 3;
+
+/** Find the historical pin cluster whose centroid this round's pin
+ *  falls into. Returns the FIRST containing cluster (i.e. today's pin
+ *  sits within `radius` of the centroid) — or, if no cluster contains
+ *  it, the nearest cluster within a small tolerance (2× the cluster's
+ *  own radius). That covers the case where a pin is a fresh position
+ *  that shades toward a historical neighbourhood without being dead
+ *  inside it. Returns null when there's no reasonable match. */
+export function matchClusterForPin(
+  pin: { x: number; y: number } | null | undefined,
+  clusters: readonly PinCluster[] | undefined,
+): PinCluster | null {
+  if (!pin || !clusters || clusters.length === 0) return null;
+  let containing: PinCluster | null = null;
+  let containingDist = Infinity;
+  let nearest: PinCluster | null = null;
+  let nearestScore = Infinity;
+  for (const c of clusters) {
+    const dx = pin.x - c.centroid.x;
+    const dy = pin.y - c.centroid.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist <= Math.max(c.radius, 0.04) && dist < containingDist) {
+      containing = c;
+      containingDist = dist;
+    }
+    const tolerance = Math.max(c.radius * 2, 0.08);
+    if (dist <= tolerance) {
+      const score = dist / Math.max(c.radius, 0.02);
+      if (score < nearestScore) {
+        nearest = c;
+        nearestScore = score;
+      }
+    }
+  }
+  return containing ?? nearest;
+}
+
+/** Build a PinInsight for a hole when today's pin sits in a cluster
+ *  whose scoring materially explains the round's scoring surprise —
+ *  same direction as `dScore`, magnitude >= threshold, backed by a
+ *  believable sample. Returns null when nothing worth surfacing. */
+export function buildPinInsight(
+  hole: number,
+  round: number,
+  dScore: number,
+  history: HoleBirdieData | undefined,
+  pin: CoursePinHole | undefined,
+): PinInsight | null {
+  if (!history || !pin) return null;
+  const clusters = history.clusters;
+  if (!clusters?.length) return null;
+  const todayPin = pin.pinByRound?.[round];
+  if (!todayPin) return null;
+  const matched = matchClusterForPin(todayPin, clusters);
+  if (!matched || matched.pinCount < PIN_INSIGHT_MIN_PINS) return null;
+
+  const greenAvg = history.overall?.avgVsPar;
+  if (typeof greenAvg !== "number" || !Number.isFinite(greenAvg)) return null;
+  const clusterAvg = matched.avgVsPar;
+  const clusterDelta = clusterAvg - greenAvg;
+
+  if (Math.abs(clusterDelta) < PIN_INSIGHT_MIN_ABS_DELTA) return null;
+  // Must move the score in the same direction as today's surprise —
+  // a "hard" cluster only explains a hard day.
+  if (Math.sign(clusterDelta) !== Math.sign(dScore)) return null;
+
+  const isHarder = clusterDelta > 0;
+  const birdiePct = Math.round(matched.rate * 100);
+  const bogeyPct = Math.round(matched.bogeyRate * 100);
+  const headline = isHarder
+    ? `Historically a tough pin here — ${bogeyPct}% bogey, ${birdiePct}% birdie across ${matched.pinCount} past pins.`
+    : `Historically a scoring pin here — ${birdiePct}% birdie, ${bogeyPct}% bogey across ${matched.pinCount} past pins.`;
+
+  return {
+    clusterId: matched.clusterId,
+    pinCount: matched.pinCount,
+    clusterAvgVsPar: clusterAvg,
+    greenAvgVsPar: greenAvg,
+    clusterDelta,
+    clusterBirdieRate: matched.rate,
+    clusterBogeyRate: matched.bogeyRate,
+    headline,
+  };
 }
 
 /** Compass-agnostic wind describer — "into a 12 mph wind",
@@ -106,10 +235,27 @@ function yardsPhrase(row: HoleRow): string | null {
 }
 
 /** Main entry point. Returns takeaways ranked by severity, capped at
- *  the supplied limit (default 4 — mobile screen real estate). */
+ *  the supplied limit (default 4 — mobile screen real estate).
+ *
+ *  Optional pin-history context: when `birdieHistoryByHole` and
+ *  `pinsByHole` are supplied, and `round` names which round today's
+ *  pin belongs to, we look up the historical cluster that today's
+ *  pin sits in and — if that cluster's scoring materially explains
+ *  the surprise — attach a `pinInsight` so the panel can deep-link
+ *  the reader to the Pin analysis modal for the hole. */
 export function deriveTakeaways(
   rows: HoleRow[],
-  { limit = 4 }: { limit?: number } = {},
+  {
+    limit = 4,
+    round,
+    pinsByHole,
+    birdieHistoryByHole,
+  }: {
+    limit?: number;
+    round?: number;
+    pinsByHole?: Record<number, CoursePinHole>;
+    birdieHistoryByHole?: Record<string, HoleBirdieData> | null;
+  } = {},
 ): Takeaway[] {
   const found: Takeaway[] = [];
 
@@ -233,5 +379,21 @@ export function deriveTakeaways(
     out.push(t);
     if (out.length >= limit) break;
   }
+
+  if (round != null && (pinsByHole || birdieHistoryByHole)) {
+    for (const t of out) {
+      const rowScore = rows.find((r) => r.hole === t.hole)?.dScore;
+      if (rowScore == null || !Number.isFinite(rowScore)) continue;
+      const insight = buildPinInsight(
+        t.hole,
+        round,
+        rowScore,
+        birdieHistoryByHole?.[String(t.hole)],
+        pinsByHole?.[t.hole],
+      );
+      if (insight) t.pinInsight = insight;
+    }
+  }
+
   return out;
 }

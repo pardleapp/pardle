@@ -96,7 +96,18 @@ export default function Page() {
   const [pinsForTournament, setPinsForTournament] = useState<string | null>(null);
   const [putts, setPutts] = useState<TournamentPuttSheet | null>(null);
   const [puttsLoading, setPuttsLoading] = useState(false);
-  const [openHole, setOpenHole] = useState<number | null>(null);
+  const [openHole, setOpenHole] = useState<number | null>(() => {
+    // Deep-link support: /analysis/course-heatmap?hole=8 opens the pin
+    // modal for that hole on mount. Used by the hole-scoring
+    // takeaways when the day's pin cluster explains a scoring
+    // surprise — the reader lands here already looking at the right
+    // green rather than hunting through 18 cards.
+    if (typeof window === "undefined") return null;
+    const raw = new URLSearchParams(window.location.search).get("hole");
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isInteger(n) && n >= 1 && n <= 18 ? n : null;
+  });
   const [birdieHistoryByHole, setBirdieHistoryByHole] = useState<Record<
     string,
     HoleBirdieData
