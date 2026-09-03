@@ -20,6 +20,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import Heatmap, { type Cell } from "../course-heatmap/Heatmap";
 import HoleSetup from "./HoleSetup";
+import Takeaways from "./TakeawaysPanel";
 import WeatherStrip, {
   type DailyWeatherView,
 } from "../_components/WeatherStrip";
@@ -289,6 +290,14 @@ export default function Page() {
             <WeatherStrip
               day={heat.weatherByRound?.[String(effectiveRound)] ?? null}
               roundLabel={`R${effectiveRound} weather`}
+            />
+
+            <Takeaways
+              cells={cells}
+              round={effectiveRound}
+              pinsByHole={pinsByHole}
+              holeBearings={heat.holeBearings ?? null}
+              weatherByRound={heat.weatherByRound ?? null}
             />
 
             <div style={{ marginTop: 18 }}>

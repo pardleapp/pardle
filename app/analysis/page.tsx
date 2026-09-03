@@ -45,9 +45,9 @@ const CARDS: Card[] = [
   },
   {
     href: "/analysis/course-heatmap",
-    title: "Course & pin guide",
+    title: "Pin analysis",
     blurb:
-      "Every green at a glance with this week's four pin positions. Putt paths and per-round scoring on tap.",
+      "Scores, birdie and bogey rates for every pin. Every green at a glance with this week's four pin positions.",
     status: "live",
     Preview: CoursePinPreview,
   },
@@ -61,7 +61,7 @@ const CARDS: Card[] = [
   },
   {
     href: "/analysis/tee-time-scoring",
-    title: "Tee time vs skill-adjusted score",
+    title: "Scoring by tee time",
     blurb:
       "See which waves had it easier — round score minus pre-tournament skill, plotted against tee time.",
     status: "live",
