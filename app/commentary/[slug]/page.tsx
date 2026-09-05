@@ -9,6 +9,7 @@ import ArticleR2Preview from "./_articles/ArticleR2Preview";
 import ArticleR2ScoringForecast from "./_articles/ArticleR2ScoringForecast";
 import ArticleSchefflerR3Dynamics from "./_articles/ArticleSchefflerR3Dynamics";
 import ArticleLebiodaBet from "./_articles/ArticleLebiodaBet";
+import ArticleSixPercentRule from "./_articles/ArticleSixPercentRule";
 
 interface Article {
   slug: string;
@@ -29,6 +30,14 @@ const LEBIODA_ARTICLE: Article = {
 };
 
 const ARTICLES: Record<string, Article> = {
+  "six-percent-rule": {
+    slug: "six-percent-rule",
+    title: "The six percent rule",
+    dek: "Jeremy Paul is tied second at 11 under and rated 65th of the 70 players left. Across 14,575 player-events, almost none of a hot 36 holes carries into Saturday — which makes his round-3 line the biggest edge on the board.",
+    date: "2026-09-05",
+    tag: "R3 bet",
+    Body: ArticleSixPercentRule,
+  },
   "why-we-bet-£1149-on-hank-lebioda": LEBIODA_ARTICLE,
   // Legacy slug from initial publish — kept so any early share
   // link still resolves to the same article.

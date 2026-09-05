@@ -30,6 +30,13 @@ interface Article {
 // now lives at /).
 const ARTICLES: Article[] = [
   {
+    slug: "six-percent-rule",
+    title: "The six percent rule",
+    dek: "Jeremy Paul is tied second at 11 under and rated 65th of the 70 players left. Across 14,575 player-events, almost none of a hot 36 holes carries into Saturday — which makes his round-3 line the biggest edge on the board.",
+    date: "2026-09-05",
+    tag: "R3 bet",
+  },
+  {
     slug: "why-we-bet-£1149-on-hank-lebioda",
     title: "Why we bet £1,149 on Hank Lebioda",
     dek: "The market has him at 60%. Our model has him at 75%. That's the biggest edge we've seen this week — here's exactly how we got there.",
