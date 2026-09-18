@@ -1,6 +1,6 @@
 # Base image with Playwright + Chromium pre-installed. Saves us
 # apt-getting ~500 MB of system deps on every build.
-FROM mcr.microsoft.com/playwright:v1.48.0-jammy
+FROM mcr.microsoft.com/playwright:v1.61.1-jammy
 
 WORKDIR /app
 

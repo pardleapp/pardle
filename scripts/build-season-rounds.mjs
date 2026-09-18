@@ -23,6 +23,25 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Load .env.local — same pattern the other scripts use.
+async function loadEnvFile(path) {
+  try {
+    const text = await readFile(path, "utf-8");
+    for (const raw of text.split("\n")) {
+      const line = raw.trim();
+      if (!line || line.startsWith("#")) continue;
+      const eq = line.indexOf("=");
+      if (eq === -1) continue;
+      const k = line.slice(0, eq).trim();
+      const v = line.slice(eq + 1).trim().replace(/^['"]|['"]$/g, "");
+      if (!process.env[k]) process.env[k] = v;
+    }
+  } catch {
+    /* env file absent */
+  }
+}
+await loadEnvFile(resolve(__dirname, "..", ".env.local"));
 const OUT_PATH = resolve(
   __dirname,
   "..",
@@ -32,8 +51,14 @@ const OUT_PATH = resolve(
 );
 
 const TOUR = "pga";
-const SEASON = 2026;
-const KEEP_EVENTS_PER_PLAYER = 8;
+const SEASONS = [2025, 2026];
+// Bumped from 8 → 60 so a full ~2-season history fits per player.
+// The investigation script (scripts/investigate-tee-sg.mjs) needs
+// the raw shared-event overlap between pairs to be big enough that
+// per-pair Pearson correlations aren't noise. Downstream consumers
+// (recent-form chip, etc.) only read the newest few entries so
+// growing the tail is safe.
+const KEEP_EVENTS_PER_PLAYER = 60;
 
 const DG_KEY = process.env.DATAGOLF_API_KEY || process.env.DATAGOLF;
 if (!DG_KEY) {
@@ -70,111 +95,116 @@ function flipName(s) {
 }
 
 async function main() {
-  console.log("[build-season-rounds] fetching event list…");
-  const events = await dg(`/historical-raw-data/event-list?tour=${TOUR}`);
-  const inSeason = events
-    .filter((e) => e.calendar_year === SEASON && e.sg_categories === "yes")
-    .sort((a, b) => (a.date < b.date ? 1 : -1));
-  console.log(
-    `[build-season-rounds] ${inSeason.length} events with SG data for ${SEASON}`,
-  );
-
-  // playerKey → { name, rounds: [...] }
+  // playerKey → { name, rounds: [...], events: [...] }
   const byPlayer = new Map();
 
-  for (const ev of inSeason) {
+  for (const season of SEASONS) {
+    console.log(`[build-season-rounds] fetching event list for ${season}…`);
+    const events = await dg(`/historical-raw-data/event-list?tour=${TOUR}`);
+    const inSeason = events
+      .filter((e) => e.calendar_year === season && e.sg_categories === "yes")
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
     console.log(
-      `[build-season-rounds] fetching ${ev.event_name} (${ev.date})…`,
+      `[build-season-rounds] ${season}: ${inSeason.length} events with SG data`,
     );
-    let payload;
-    try {
-      payload = await dg(
-        `/historical-raw-data/rounds?tour=${TOUR}&event_id=${ev.event_id}&year=${SEASON}`,
+
+    for (const ev of inSeason) {
+      console.log(
+        `[build-season-rounds] ${season} · ${ev.event_name} (${ev.date})…`,
       );
-    } catch (err) {
-      console.warn(`[build-season-rounds] skip ${ev.event_name}: ${err.message}`);
-      continue;
-    }
-    if (!payload || !Array.isArray(payload.scores)) continue;
-    for (const row of payload.scores) {
-      const displayName = flipName(row.player_name);
-      const key = normaliseName(displayName);
-      if (!key) continue;
-      let entry = byPlayer.get(key);
-      if (!entry) {
-        entry = { name: displayName, rounds: [], events: [] };
-        byPlayer.set(key, entry);
+      let payload;
+      try {
+        payload = await dg(
+          `/historical-raw-data/rounds?tour=${TOUR}&event_id=${ev.event_id}&year=${season}`,
+        );
+      } catch (err) {
+        console.warn(
+          `[build-season-rounds] skip ${ev.event_name}: ${err.message}`,
+        );
+        continue;
       }
-      // Per-event finish + SG decomposition aggregate.
-      const evRounds = [];
-      for (let r = 1; r <= 4; r++) {
-        const rd = row[`round_${r}`];
-        if (!rd) continue;
-        if (
-          typeof rd.score !== "number" ||
-          typeof rd.course_par !== "number"
-        ) {
-          continue;
+      if (!payload || !Array.isArray(payload.scores)) continue;
+      for (const row of payload.scores) {
+        const displayName = flipName(row.player_name);
+        const key = normaliseName(displayName);
+        if (!key) continue;
+        let entry = byPlayer.get(key);
+        if (!entry) {
+          entry = { name: displayName, rounds: [], events: [] };
+          byPlayer.set(key, entry);
         }
-        const roundEntry = {
-          season: SEASON,
-          tournament: ev.event_name,
-          date: ev.date,
-          eventId: ev.event_id,
-          round: r,
-          coursePar: rd.course_par,
-          score: rd.score,
-          vsPar: rd.score - rd.course_par,
-          eagles: rd.eagles_or_better ?? 0,
-          birdies: rd.birdies ?? 0,
-          doubles: rd.doubles_or_worse ?? 0,
-          sgTotal: rd.sg_total ?? null,
-          sgOtt: rd.sg_ott ?? null,
-          sgApp: rd.sg_app ?? null,
-          sgArg: rd.sg_arg ?? null,
-          sgPutt: rd.sg_putt ?? null,
-        };
-        entry.rounds.push(roundEntry);
-        evRounds.push(roundEntry);
-      }
-      if (evRounds.length > 0) {
-        const sumNum = (key) =>
-          evRounds.reduce(
-            (acc, x) => acc + (typeof x[key] === "number" ? x[key] : 0),
-            0,
-          );
-        const sgRounds = evRounds.filter((x) => x.sgTotal != null);
-        const totalScore = evRounds.reduce((acc, x) => acc + x.score, 0);
-        const totalPar = evRounds.reduce((acc, x) => acc + x.coursePar, 0);
-        entry.events.push({
-          season: SEASON,
-          tournament: ev.event_name,
-          date: ev.date,
-          eventId: ev.event_id,
-          finText: String(row.fin_text ?? "").trim() || null,
-          roundsPlayed: evRounds.length,
-          totalScore,
-          totalToPar: totalScore - totalPar,
-          sgTotal: sgRounds.length > 0 ? sumNum("sgTotal") : null,
-          sgOtt: sgRounds.length > 0 ? sumNum("sgOtt") : null,
-          sgApp: sgRounds.length > 0 ? sumNum("sgApp") : null,
-          sgArg: sgRounds.length > 0 ? sumNum("sgArg") : null,
-          sgPutt: sgRounds.length > 0 ? sumNum("sgPutt") : null,
-        });
+        // Per-event finish + SG decomposition aggregate.
+        const evRounds = [];
+        for (let r = 1; r <= 4; r++) {
+          const rd = row[`round_${r}`];
+          if (!rd) continue;
+          if (
+            typeof rd.score !== "number" ||
+            typeof rd.course_par !== "number"
+          ) {
+            continue;
+          }
+          const roundEntry = {
+            season,
+            tournament: ev.event_name,
+            date: ev.date,
+            eventId: ev.event_id,
+            round: r,
+            coursePar: rd.course_par,
+            score: rd.score,
+            vsPar: rd.score - rd.course_par,
+            eagles: rd.eagles_or_better ?? 0,
+            birdies: rd.birdies ?? 0,
+            doubles: rd.doubles_or_worse ?? 0,
+            sgTotal: rd.sg_total ?? null,
+            sgOtt: rd.sg_ott ?? null,
+            sgApp: rd.sg_app ?? null,
+            sgArg: rd.sg_arg ?? null,
+            sgPutt: rd.sg_putt ?? null,
+          };
+          entry.rounds.push(roundEntry);
+          evRounds.push(roundEntry);
+        }
+        if (evRounds.length > 0) {
+          const sumNum = (key) =>
+            evRounds.reduce(
+              (acc, x) => acc + (typeof x[key] === "number" ? x[key] : 0),
+              0,
+            );
+          const sgRounds = evRounds.filter((x) => x.sgTotal != null);
+          const totalScore = evRounds.reduce((acc, x) => acc + x.score, 0);
+          const totalPar = evRounds.reduce((acc, x) => acc + x.coursePar, 0);
+          entry.events.push({
+            season,
+            tournament: ev.event_name,
+            date: ev.date,
+            eventId: ev.event_id,
+            finText: String(row.fin_text ?? "").trim() || null,
+            roundsPlayed: evRounds.length,
+            totalScore,
+            totalToPar: totalScore - totalPar,
+            sgTotal: sgRounds.length > 0 ? sumNum("sgTotal") : null,
+            sgOtt: sgRounds.length > 0 ? sumNum("sgOtt") : null,
+            sgApp: sgRounds.length > 0 ? sumNum("sgApp") : null,
+            sgArg: sgRounds.length > 0 ? sumNum("sgArg") : null,
+            sgPutt: sgRounds.length > 0 ? sumNum("sgPutt") : null,
+          });
+        }
       }
     }
   }
 
-  // Sort each player's rounds newest-first, trim to last ~8 events
-  // worth of rounds. Use eventId distinct-count as the cap.
+  // Sort each player's rounds newest-first, trim to last N events'
+  // worth of rounds. DataGolf's event_id is only unique WITHIN a
+  // season (event 100 in 2025 ≠ event 100 in 2026), so uniqueness
+  // is keyed on (season, eventId).
   for (const entry of byPlayer.values()) {
     entry.rounds.sort((a, b) => (a.date < b.date ? 1 : -1));
     const seenEvents = new Set();
     entry.rounds = entry.rounds.filter((r) => {
-      seenEvents.add(r.eventId);
+      seenEvents.add(`${r.season}:${r.eventId}`);
       return seenEvents.size <= KEEP_EVENTS_PER_PLAYER;
     });
-    // Same trim on the per-event list (newest first, keep last N).
     entry.events.sort((a, b) => (a.date < b.date ? 1 : -1));
     entry.events = entry.events.slice(0, KEEP_EVENTS_PER_PLAYER);
   }

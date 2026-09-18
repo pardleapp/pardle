@@ -79,8 +79,15 @@ const browser = await chromium.launch({
   headless: true,
   args: ["--disable-gpu", "--no-sandbox"],
 });
+// Tall viewport so the widget's virtual-scrolling leaderboard
+// renders EVERY row of the field into the DOM at once. With the
+// old 1000px height, only the top ~25 rows were visible to the
+// scanner, so anyone outside the top of the leaderboard (T50+)
+// was silently invisible — their shots never emitted, no orphan
+// warnings, nothing. 8000px comfortably fits ~200 rows at typical
+// leaderboard row heights.
 const ctx = await browser.newContext({
-  viewport: { width: 1600, height: 1000 },
+  viewport: { width: 1600, height: 8000 },
   userAgent:
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
     "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",

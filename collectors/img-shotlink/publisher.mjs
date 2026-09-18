@@ -40,7 +40,12 @@ export function createPublisher({
   // the main app maintains at `feed:leaderboard:{tournamentId}`.
   let nameToId = new Map();
   let nameMapFetchedAt = 0;
-  let currentRound = null;
+  // Manual override for the active round — set via CURRENT_ROUND env
+  // when spinning up a Machine. Overrides the max-in-pars heuristic
+  // which always resolves to 4 (PGA Tour publishes pars for all
+  // rounds up-front). TODO: auto-detect from snapshot's thru/holes.
+  const currentRoundOverride = Number(process.env.CURRENT_ROUND) || null;
+  let currentRound = currentRoundOverride;
   let pars = {};
 
   async function refreshMapsIfStale() {
@@ -65,10 +70,13 @@ export function createPublisher({
       }
       if (parsRaw && typeof parsRaw === "object") {
         pars = parsRaw;
-        // Round from the presence of scored holes on any player,
-        // roughly. We infer from the highest round with any pars.
-        const rounds = Object.keys(pars).map(Number).filter(Number.isFinite);
-        if (rounds.length > 0) currentRound = Math.max(...rounds);
+        // Env override always wins. Without it, fall back to the
+        // max-round-in-pars heuristic (crude — will resolve to 4 once
+        // PGA Tour publishes all four rounds' pars).
+        if (!currentRoundOverride) {
+          const rounds = Object.keys(pars).map(Number).filter(Number.isFinite);
+          if (rounds.length > 0) currentRound = Math.max(...rounds);
+        }
       }
       nameMapFetchedAt = Date.now();
     } catch (err) {
@@ -79,7 +87,15 @@ export function createPublisher({
   }
 
   function normaliseName(s) {
-    return (s || "").toLowerCase().replace(/[^a-z]/g, "");
+    // Order-invariant: split into alpha tokens, sort, rejoin.
+    // "Matt Fitzpatrick" and "Fitzpatrick, Matt" both collapse to
+    // "fitzpatrickmatt" so LAST-FIRST vs FIRST-LAST resolves cleanly.
+    return (s || "")
+      .toLowerCase()
+      .split(/[^a-z]+/)
+      .filter(Boolean)
+      .sort()
+      .join("");
   }
 
   // Dedup ring — we emit at most one FeedEvent per (player, hole,
@@ -95,6 +111,12 @@ export function createPublisher({
     }
     return true;
   }
+
+  // Per-player last-known landing surface + hole. Distinguishes "shot
+  // 3 from the bunker onto the green" from "shot 3 putt on the green"
+  // — both look identical from just the current shot's data (surface
+  // is where it LANDED, not where it started).
+  const lastLandingByPlayer = new Map();
 
   async function pushToRedis(event) {
     try {
@@ -157,6 +179,11 @@ export function createPublisher({
       if (isTerminalShot) {
         const key = `shot:${playerId}:${round}:${imgShot.hole}:${imgShot.shotNum}`;
         if (!shouldEmit(key)) return null;
+        // Look up previous landing — if the player was on the green
+        // going into this shot, it's a putt regardless of distance.
+        const prev = lastLandingByPlayer.get(playerId);
+        const startedOnGreen =
+          prev && prev.hole === imgShot.hole && /green/i.test(prev.surface || "");
         const event = translateImgShot({
           tournamentId,
           tournamentName,
@@ -170,8 +197,14 @@ export function createPublisher({
           surface: imgShot.surface,
           toPin: imgShot.toPin,
           par,
+          startedOnGreen,
         });
         if (event) await pushToRedis(event);
+        // Remember this landing for the NEXT shot's from-surface lookup.
+        lastLandingByPlayer.set(playerId, {
+          hole: imgShot.hole,
+          surface: imgShot.surface,
+        });
         return event;
       }
 
