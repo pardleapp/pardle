@@ -1,0 +1,52 @@
+{
+  "slug": "bank-of-utah",
+  "eventName": "Bank of Utah Championship",
+  "venue": {
+    "name": "Black Desert Resort",
+    "lat": 37.1567,
+    "lon": -113.6507,
+    "tz": "America/Denver"
+  },
+  "coursePar": 71,
+  "courseHolePars": {
+    "1": 4,
+    "2": 4,
+    "3": 3,
+    "4": 4,
+    "5": 4,
+    "6": 4,
+    "7": 5,
+    "8": 3,
+    "9": 5,
+    "10": 4,
+    "11": 4,
+    "12": 4,
+    "13": 4,
+    "14": 4,
+    "15": 3,
+    "16": 4,
+    "17": 3,
+    "18": 5
+  },
+  "holeBearings": {
+    "1": 213,
+    "2": 126.7,
+    "3": 186.6,
+    "4": 181.3,
+    "5": 179.8,
+    "6": 322.7,
+    "7": 35.2,
+    "8": 3.5,
+    "9": 335,
+    "10": 252.3,
+    "11": 173,
+    "12": 199.8,
+    "13": 7.8,
+    "14": 12.1,
+    "15": 339.3,
+    "16": 348,
+    "17": 72.2,
+    "18": 116.6
+  },
+  "holeBearingsHint": "Compass bearings (0-360 deg) per hole, tee to green. Holes 1-4 and 7-18 from OSM golf=hole ways (Black Desert ids 1180722xxx/1186230xxx; the neighbouring course's 1548034xxx ways share refs and were excluded). Holes 5-6 have no hole way in OSM and were taken from tee/green polygon centroids (5: 314yd vs ~315 card, 6: 426yd vs ~445 card). The routing chains tee-to-green for all 18 holes. Hole 3's OSM way is short (132yd vs ~185 card), probably a forward tee, so its bearing is the least certain."
+}

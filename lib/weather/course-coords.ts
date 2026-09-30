@@ -41,12 +41,27 @@ const BY_COURSE: Record<string, CourseCoords> = {
     tz: "America/Chicago",
     displayName: "TPC Southwind",
   },
+  "East Lake Golf Club": {
+    lat: 33.7409,
+    lon: -84.3103,
+    tz: "America/New_York",
+    displayName: "East Lake Golf Club",
+  },
+  // OSM golf_course polygon centroid. DataGolf's schedule coord
+  // (37.168, -113.653) sits ~1.3 km north of the course.
+  "Black Desert Resort": {
+    lat: 37.1567,
+    lon: -113.6507,
+    tz: "America/Denver",
+    displayName: "Black Desert Resort",
+  },
 };
 
 /** By PGA orchestrator tournament id (e.g. R2026525). Same coords
  *  as the course entry above but keyed for the live path. Suffix
  *  525 = 3M Open, 524 = Rocket Classic, 013 = Wyndham Championship,
- *  027 = FedEx St. Jude Championship. */
+ *  027 = FedEx St. Jude Championship, 060 = TOUR Championship,
+ *  554 = Bank of Utah Championship. */
 const BY_TOURNAMENT_ID: Record<string, CourseCoords> = {
   // 3M Open — TPC Twin Cities
   R2023525: BY_COURSE["TPC Twin Cities"],
@@ -68,6 +83,15 @@ const BY_TOURNAMENT_ID: Record<string, CourseCoords> = {
   R2024027: BY_COURSE["TPC Southwind"],
   R2025027: BY_COURSE["TPC Southwind"],
   R2026027: BY_COURSE["TPC Southwind"],
+  // TOUR Championship — East Lake Golf Club
+  R2023060: BY_COURSE["East Lake Golf Club"],
+  R2024060: BY_COURSE["East Lake Golf Club"],
+  R2025060: BY_COURSE["East Lake Golf Club"],
+  R2026060: BY_COURSE["East Lake Golf Club"],
+  // Bank of Utah Championship (Black Desert Championship in 2024)
+  R2024554: BY_COURSE["Black Desert Resort"],
+  R2025554: BY_COURSE["Black Desert Resort"],
+  R2026554: BY_COURSE["Black Desert Resort"],
 };
 
 export function coordsForCourse(name: string | null | undefined): CourseCoords | null {

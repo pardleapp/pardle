@@ -863,6 +863,7 @@ async function main() {
     const outPath = resolve(OUT_DIR, `${SLUG}-${year}.json`);
     await writeFile(outPath, JSON.stringify(payload, null, 2) + "\n");
     console.log(`[write] ${outPath} — ${players.length} players`);
+    writtenPayloads.push(payload);
 
     // Feed the meta aggregator: per-hole average score across all
     // ingested rounds. Used to derive courseHolePars post-loop.
