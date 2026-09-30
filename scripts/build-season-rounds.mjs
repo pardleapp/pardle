@@ -70,13 +70,35 @@ if (!DG_KEY) {
 
 const DG_BASE = "https://feeds.datagolf.com";
 
+// DataGolf suspends the key for 5 minutes after 45 requests in a
+// minute. Unpaced, this script trips that ~45 events in and used to
+// skip every event after it — the 2026-09-29 cron committed a file
+// with the BMW Championship silently missing. Pace under the limit,
+// sit out a suspension, and never write a partial file.
+const MIN_GAP_MS = 1500;
+const SUSPENSION_WAIT_MS = 5 * 60 * 1000 + 15_000;
+const MAX_429_RETRIES = 2;
+let lastRequestAt = 0;
+
 async function dg(path) {
   const url = `${DG_BASE}${path}${path.includes("?") ? "&" : "?"}file_format=json&key=${DG_KEY}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`DataGolf ${path} → ${res.status} ${await res.text()}`);
+  for (let attempt = 0; ; attempt++) {
+    const wait = lastRequestAt + MIN_GAP_MS - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastRequestAt = Date.now();
+    const res = await fetch(url);
+    if (res.status === 429 && attempt < MAX_429_RETRIES) {
+      console.warn(`[build-season-rounds] 429 on ${path}; waiting out the suspension`);
+      await new Promise((r) => setTimeout(r, SUSPENSION_WAIT_MS));
+      continue;
+    }
+    if (!res.ok) {
+      const err = new Error(`DataGolf ${path} → ${res.status} ${await res.text()}`);
+      err.status = res.status;
+      throw err;
+    }
+    return res.json();
   }
-  return res.json();
 }
 
 function normaliseName(s) {
@@ -118,6 +140,11 @@ async function main() {
           `/historical-raw-data/rounds?tour=${TOUR}&event_id=${ev.event_id}&year=${season}`,
         );
       } catch (err) {
+        if (err.status === 429) {
+          throw new Error(
+            `still rate-limited on ${ev.event_name} after retries — not writing a partial file`,
+          );
+        }
         console.warn(
           `[build-season-rounds] skip ${ev.event_name}: ${err.message}`,
         );
