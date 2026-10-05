@@ -104,6 +104,9 @@ export interface PersistenceStats {
   /** False when the sample is too thin to estimate anything — callers
    *  should fall back to showing raw numbers and saying so. */
   usable: boolean;
+  /** Set when the reliability applied is a share backtested across the
+   *  whole tour rather than this venue's estimate (DP World Tour). */
+  calibrated?: { share: number; visits: number };
 }
 
 /** Minimum players before a variance decomposition is worth doing.

@@ -81,6 +81,9 @@ interface PersistenceStats {
   medianVisits: number;
   repeatVisitors: number;
   usable: boolean;
+  /** Set when "kept" is a share backtested across the whole tour
+   *  rather than this venue's own estimate (DP World Tour). */
+  calibrated?: { share: number; visits: number };
 }
 interface TraitBetas {
   ott: number;
@@ -2604,15 +2607,32 @@ function PersistencePanel({
           marginBottom: 10,
         }}
       >
-        Each player gets their <strong style={{ color: T.ink }}>own</strong>{" "}
-        number here, off a handful of visits. We split those into earlier and
-        later trips and checked whether the two agree. Where they don&rsquo;t,
-        the gap was a hot week rather than course fit. The{" "}
-        <strong style={{ color: T.ink }}>Expected</strong> column keeps only
-        the share of each player&rsquo;s record that this test says should
-        recur — so someone with six visits keeps more of their number than
-        someone with two. A whole week counts as one visit, however well or
-        badly the four rounds inside it went.
+        {persistence.calibrated ? (
+          <>
+            Each player gets their <strong style={{ color: T.ink }}>own</strong>{" "}
+            number here, measured against their own usual level. We tested
+            how much of that carries forward: across{" "}
+            {persistence.calibrated.visits.toLocaleString()} repeat visits to
+            DP World Tour courses, about{" "}
+            {Math.round(persistence.calibrated.share * 100)}% of a
+            player&rsquo;s past edge at a course showed up on the next visit.
+            The <strong style={{ color: T.ink }}>Expected</strong> column
+            keeps that share. Repeatability is this course&rsquo;s own
+            early-vs-late visit check, shown for reference.
+          </>
+        ) : (
+          <>
+            Each player gets their <strong style={{ color: T.ink }}>own</strong>{" "}
+            number here, off a handful of visits. We split those into earlier and
+            later trips and checked whether the two agree. Where they don&rsquo;t,
+            the gap was a hot week rather than course fit. The{" "}
+            <strong style={{ color: T.ink }}>Expected</strong> column keeps only
+            the share of each player&rsquo;s record that this test says should
+            recur — so someone with six visits keeps more of their number than
+            someone with two. A whole week counts as one visit, however well or
+            badly the four rounds inside it went.
+          </>
+        )}
       </div>
       <div style={{ overflowX: "auto" }}>
         <table

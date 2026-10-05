@@ -17,11 +17,8 @@
  */
 import "server-only";
 import history from "@/data/dpwt/sg-history.json";
-import {
-  computePersistence,
-  reliabilityFor,
-  type PlayerResiduals,
-} from "@/lib/course-history/persistence";
+import skillPriors from "@/data/dpwt/skill-priors.json";
+import { computePersistence, type PlayerResiduals } from "@/lib/course-history/persistence";
 import type {
   CourseHistoryResponse,
   CuratedCourse,
@@ -35,6 +32,17 @@ interface History {
   rounds: Array<[string, number, number, number, number]>;
 }
 const H = history as unknown as History;
+
+interface SkillPriors {
+  map: { ott: { a: number; b: number }; app: { a: number; b: number } };
+  carryForward: { value: number; se: number; n: number };
+  priors: Record<string, Record<string, [number, number] | null>>;
+}
+const SP = skillPriors as unknown as SkillPriors;
+/** Backtested share of a player's past course edge that shows up on his
+ *  next visit (scripts/backtest-course-fit.mjs). Replaces the per-venue
+ *  persistence estimate, which on two seasons kept 2-4x too much. */
+const CARRY = SP.carryForward.value;
 
 const BASELINE_ROUNDS = 50;
 const BASELINE_SHRINKAGE_K = 20;
@@ -163,9 +171,16 @@ export async function getDpwtCourseHistory(course: string): Promise<CourseHistor
   const fs = fieldStrength();
   const skill = await currentSkill();
 
-  function baselineFor(key: string, targetDate: string) {
+  // Small samples are shrunk toward the player's own skill prior (his
+  // DataGolf SG: Total over the previous year, mapped to OTT/APP), not
+  // toward an average player: shrinking an elite low-volume player
+  // toward zero made him look like he outperforms everywhere.
+  function baselineFor(key: string, targetEv: number) {
+    const targetDate = H.events[targetEv].date;
+    const p = SP.priors[key]?.[String(targetEv)] ?? null;
+    const prior = p ? { ott: p[0], app: p[1] } : { ott: SP.map.ott.a, app: SP.map.app.a };
     const evs = players.get(key);
-    if (!evs) return null;
+    if (!evs) return prior;
     const entries = [...evs]
       .filter(([ev]) => !atEvents.has(ev) && H.events[ev].date !== targetDate)
       .map(([ev, a]) => ({ ev, a, d: Math.abs(dayNum(H.events[ev].date) - dayNum(targetDate)) }))
@@ -178,9 +193,8 @@ export async function getDpwtCourseHistory(course: string): Promise<CourseHistor
       n += e.a.n;
       if (n >= BASELINE_ROUNDS) break;
     }
-    if (!n) return null;
-    const w = n / (n + BASELINE_SHRINKAGE_K);
-    return { ott: (ott / n) * w, app: (app / n) * w };
+    const k = BASELINE_SHRINKAGE_K;
+    return { ott: (ott + k * prior.ott) / (n + k), app: (app + k * prior.app) / (n + k) };
   }
 
   interface Bucket {
@@ -195,7 +209,7 @@ export async function getDpwtCourseHistory(course: string): Promise<CourseHistor
     const aOtt = ott + f.ott, aApp = app + f.app;
     const b: Bucket = buckets.get(key) ?? { key, atOtt: 0, atApp: 0, baseOtt: 0, baseApp: 0, rounds: 0, baseRounds: 0, years: new Set(), residOtt: [], residApp: [], visits: new Map() };
     b.atOtt += aOtt; b.atApp += aApp; b.rounds += 1; b.years.add(yearOf(e.date));
-    const base = baselineFor(key, e.date);
+    const base = baselineFor(key, ev);
     if (base) {
       b.baseOtt += base.ott; b.baseApp += base.app; b.baseRounds += 1;
       b.residOtt.push(aOtt - base.ott); b.residApp.push(aApp - base.app);
@@ -240,8 +254,8 @@ export async function getDpwtCourseHistory(course: string): Promise<CourseHistor
     const baseApp = b.baseRounds ? b.baseApp / b.baseRounds : 0;
     const dg = H.players[b.key]?.dgId;
     const s = dg != null ? skill.get(dg) : undefined;
-    const relOtt = persistence.usable ? reliabilityFor(persistence.ott, b.visits.size) : 1;
-    const relApp = persistence.usable ? reliabilityFor(persistence.app, b.visits.size) : 1;
+    const relOtt = CARRY;
+    const relApp = CARRY;
     const rawOtt = atOtt - baseOtt, rawApp = atApp - baseApp;
     return {
       dgId: idFor(b.key),
@@ -277,6 +291,14 @@ export async function getDpwtCourseHistory(course: string): Promise<CourseHistor
     players: out,
     cachedAt: new Date().toISOString(),
     hostingEvents: hosting,
-    persistence: persistence.usable ? persistence : null,
+    // The panel's "kept" figures show the share Expected actually keeps.
+    persistence: persistence.usable
+      ? {
+          ...persistence,
+          calibrated: { share: CARRY, visits: SP.carryForward.n },
+          ott: { ...persistence.ott, typicalReliability: CARRY },
+          app: { ...persistence.app, typicalReliability: CARRY },
+        }
+      : null,
   };
 }

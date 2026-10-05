@@ -1,0 +1,143 @@
+{
+ "generatedAt": "2026-10-05T22:27:35.445Z",
+ "results": [
+  {
+   "label": "DP World Tour (IMG SG, 2024-26)",
+   "rounds": 36786,
+   "players": 1370,
+   "priorMap": {
+    "a": -0.032,
+    "b": 0.53,
+    "n": 1937,
+    "r": 0.667
+   },
+   "zero": {
+    "all": {
+     "n": 2330,
+     "slope": 0.149,
+     "se": 0.023,
+     "r": 0.134
+    },
+    "prior1": {
+     "n": 1871,
+     "slope": 0.147,
+     "se": 0.024,
+     "r": 0.138
+    },
+    "prior2": {
+     "n": 399,
+     "slope": 0.14,
+     "se": 0.068,
+     "r": 0.103
+    },
+    "prior3plus": {
+     "n": 60,
+     "slope": 0.348,
+     "se": 0.221,
+     "r": 0.203
+    },
+    "lowVolumeBaselineBias": -0.315,
+    "lowVolumeBaselineRmse": 1.489,
+    "lowVolumeN": 6354
+   },
+   "skill": {
+    "all": {
+     "n": 2330,
+     "slope": 0.128,
+     "se": 0.023,
+     "r": 0.116
+    },
+    "prior1": {
+     "n": 1871,
+     "slope": 0.128,
+     "se": 0.024,
+     "r": 0.12
+    },
+    "prior2": {
+     "n": 399,
+     "slope": 0.11,
+     "se": 0.069,
+     "r": 0.08
+    },
+    "prior3plus": {
+     "n": 60,
+     "slope": 0.296,
+     "se": 0.225,
+     "r": 0.17
+    },
+    "lowVolumeBaselineBias": -0.283,
+    "lowVolumeBaselineRmse": 1.472,
+    "lowVolumeN": 6354
+   }
+  },
+  {
+   "label": "PGA Tour (DG SG, 2018-26)",
+   "rounds": 129898,
+   "players": 1743,
+   "priorMap": {
+    "a": -0.117,
+    "b": 0.708,
+    "n": 11140,
+    "r": 0.743
+   },
+   "zero": {
+    "all": {
+     "n": 18545,
+     "slope": 0.097,
+     "se": 0.009,
+     "r": 0.077
+    },
+    "prior1": {
+     "n": 8837,
+     "slope": 0.07,
+     "se": 0.011,
+     "r": 0.067
+    },
+    "prior2": {
+     "n": 4785,
+     "slope": 0.143,
+     "se": 0.021,
+     "r": 0.096
+    },
+    "prior3plus": {
+     "n": 4923,
+     "slope": 0.182,
+     "se": 0.027,
+     "r": 0.094
+    },
+    "lowVolumeBaselineBias": -0.571,
+    "lowVolumeBaselineRmse": 1.696,
+    "lowVolumeN": 10594
+   },
+   "skill": {
+    "all": {
+     "n": 18545,
+     "slope": 0.057,
+     "se": 0.009,
+     "r": 0.046
+    },
+    "prior1": {
+     "n": 8837,
+     "slope": 0.035,
+     "se": 0.011,
+     "r": 0.034
+    },
+    "prior2": {
+     "n": 4785,
+     "slope": 0.1,
+     "se": 0.022,
+     "r": 0.067
+    },
+    "prior3plus": {
+     "n": 4923,
+     "slope": 0.126,
+     "se": 0.028,
+     "r": 0.064
+    },
+    "lowVolumeBaselineBias": -0.46,
+    "lowVolumeBaselineRmse": 1.653,
+    "lowVolumeN": 10594
+   }
+  }
+ ]
+}
