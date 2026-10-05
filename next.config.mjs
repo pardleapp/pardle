@@ -20,6 +20,9 @@ const nextConfig = {
     // empty even though the JSON files existed on disk locally.
     "/api/course-pin-birdies/**": ["./data/historical/*.json"],
     "/api/course-pins/**": ["./data/historical/*.json"],
+    // DP World Tour tools: per-edition files, venue meta, IMG query
+    // texts — all read with fs at request time.
+    "/api/dpwt/**": ["./data/dpwt/**/*.json"],
   },
 };
 

@@ -15,7 +15,7 @@ import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { assembleHoleFit } from "./coefficients";
-import { getTournamentConfig } from "./tournament-config";
+import { getTournamentConfig, tourOfTournamentId, type Tour } from "./tournament-config";
 import type {
   FitRow,
   HoleFit,
@@ -52,11 +52,12 @@ interface HistoricalEvent {
 async function loadHistorical(
   eventCode: string,
   year: number,
+  tour: Tour = "pga",
 ): Promise<HistoricalEvent | null> {
   const p = path.join(
     process.cwd(),
     "data",
-    "historical",
+    ...(tour === "dpwt" ? ["dpwt", "historical"] : ["historical"]),
     `${eventCode}-${year}.json`,
   );
   try {
@@ -177,7 +178,8 @@ async function fetchBirdies(
   tournamentId: string,
   originUrl: string,
 ): Promise<BirdiesResponse | null> {
-  const url = `${originUrl.replace(/\/$/, "")}/api/course-pin-birdies?tournamentId=${encodeURIComponent(tournamentId)}`;
+  const prefix = tourOfTournamentId(tournamentId) === "dpwt" ? "/api/dpwt" : "/api";
+  const url = `${originUrl.replace(/\/$/, "")}${prefix}/course-pin-birdies?tournamentId=${encodeURIComponent(tournamentId)}`;
   try {
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) {
@@ -216,7 +218,7 @@ export async function getScoringModel(
   // Load historical events in parallel.
   const events = (
     await Promise.all(
-      cfg.historicalYears.map((y) => loadHistorical(cfg.slug, y)),
+      cfg.historicalYears.map((y) => loadHistorical(cfg.slug, y, tourOfTournamentId(tournamentId))),
     )
   ).filter((e): e is HistoricalEvent => e != null);
 

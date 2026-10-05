@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { apiFor, type AnalysisTour } from "../_lib/tour";
 
 // ── Design tokens (match ForecastTool) ─────────────────────────────
 const T = {
@@ -225,7 +226,7 @@ interface SpecialistsResp {
 type ToolView = "by-course" | "specialists";
 
 // ── Main component ─────────────────────────────────────────────────
-export default function CourseHistoryTool() {
+export default function CourseHistoryTool({ tour = "pga" }: { tour?: AnalysisTour }) {
   const [courses, setCourses] = useState<CuratedCourse[] | null>(null);
   const [courseQuery, setCourseQuery] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
@@ -264,7 +265,7 @@ export default function CourseHistoryTool() {
     (async () => {
       setWarming(true);
       try {
-        const res = await fetch("/api/course-history/courses");
+        const res = await fetch(apiFor(tour, "/api/course-history/courses"));
         const j = (await res.json()) as {
           ok?: boolean;
           courses?: CuratedCourse[];
@@ -314,7 +315,7 @@ export default function CourseHistoryTool() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/scoring-model/field", {
+        const res = await fetch(apiFor(tour, "/api/scoring-model/field"), {
           cache: "no-store",
         });
         const j = (await res.json()) as FieldResp;
@@ -348,7 +349,7 @@ export default function CourseHistoryTool() {
       // Trait fit is independent of the table and much cheaper on a
       // warm cache, so fire it alongside rather than chaining it.
       fetch(
-        `/api/course-history/trait-fit?course=${encodeURIComponent(selectedCourse)}`,
+        apiFor(tour, `/api/course-history/trait-fit?course=${encodeURIComponent(selectedCourse)}`),
       )
         .then((r) => r.json())
         .then((j: TraitFitResp) => {
@@ -359,7 +360,7 @@ export default function CourseHistoryTool() {
         });
       try {
         const res = await fetch(
-          `/api/course-history?course=${encodeURIComponent(selectedCourse)}`,
+          apiFor(tour, `/api/course-history?course=${encodeURIComponent(selectedCourse)}`),
         );
         const j = (await res.json()) as CourseHistoryResp;
         if (!cancelled) setData(j);
@@ -392,10 +393,10 @@ export default function CourseHistoryTool() {
       try {
         const [aRes, fRes] = await Promise.all([
           fetch(
-            `/api/course-history/archetype?course=${encodeURIComponent(selectedCourse)}`,
+            apiFor(tour, `/api/course-history/archetype?course=${encodeURIComponent(selectedCourse)}`),
           ),
           fetch(
-            `/api/course-history/forecast?course=${encodeURIComponent(selectedCourse)}`,
+            apiFor(tour, `/api/course-history/forecast?course=${encodeURIComponent(selectedCourse)}`),
           ),
         ]);
         const [a, f] = await Promise.all([
@@ -433,7 +434,7 @@ export default function CourseHistoryTool() {
       setSpecialistsLoading(true);
       try {
         const res = await fetch(
-          `/api/course-history/specialists?min=${specMinRounds}`,
+          apiFor(tour, `/api/course-history/specialists?min=${specMinRounds}`),
         );
         const j = (await res.json()) as SpecialistsResp;
         if (!cancelled) setSpecialists(j);

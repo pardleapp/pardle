@@ -3,6 +3,7 @@ import MainNav from "@/app/MainNav";
 import AuthChip from "@/app/live/auth/AuthChip";
 import { BRAND } from "@/lib/brand";
 import CourseHistoryTool from "./CourseHistoryTool";
+import { hrefFor, parseTour } from "../_lib/tour";
 
 export const metadata = {
   title: `Course history — ${BRAND.name}`,
@@ -14,7 +15,8 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const tour = parseTour((await searchParams).tour);
   return (
     <main className="container container-wide v4-theme pv-theme">
       {/* Hide the empty top ribbon on mobile — same treatment the
@@ -52,7 +54,7 @@ export default function Page() {
           }}
         >
           <Link
-            href="/analysis"
+            href={hrefFor(tour, "/analysis")}
             style={{
               fontSize: 12,
               color: "oklch(0.50 0.13 155)",
@@ -83,12 +85,23 @@ export default function Page() {
             maxWidth: 900,
           }}
         >
-          Ballstriking course fit for every PGA Tour venue since 2019
-          (this season included). Rounds are grouped by{" "}
-          <strong>course</strong>, not event — so a rotating tournament
-          like The Open Championship gets split cleanly by venue (Royal
-          Troon vs St Andrews vs Royal Portrush) instead of being mashed
-          into one meaningless aggregate.
+          {tour === "dpwt" ? (
+            <>
+              Ballstriking course fit for every DP World Tour venue with
+              shot-by-shot tracking since 2022. Rounds are grouped by{" "}
+              <strong>course</strong>, not event, so a tournament that
+              moves venue is split cleanly by course.
+            </>
+          ) : (
+            <>
+              Ballstriking course fit for every PGA Tour venue since 2019
+              (this season included). Rounds are grouped by{" "}
+              <strong>course</strong>, not event — so a rotating tournament
+              like The Open Championship gets split cleanly by venue (Royal
+              Troon vs St Andrews vs Royal Portrush) instead of being mashed
+              into one meaningless aggregate.
+            </>
+          )}
           <br />
           <br />
           We look only at SG:OTT and SG:APP — the two buckets that
@@ -101,11 +114,11 @@ export default function Page() {
           course rounds aren&apos;t scored against a stale
           pre-breakout baseline. Baselines are field-strength adjusted
           and Bayesian-shrunk toward tour average; players whose
-          current DG skill has moved more than 1.0 SG from that
+          current skill rating has moved more than 1.0 SG from that
           historical baseline are excluded entirely (breakouts are
           skill change, not course fit).
         </p>
-        <CourseHistoryTool />
+        <CourseHistoryTool tour={tour} />
       </section>
     </main>
   );

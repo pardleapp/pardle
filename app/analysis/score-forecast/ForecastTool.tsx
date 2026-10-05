@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { apiFor, type AnalysisTour } from "../_lib/tour";
 
 // ── Types mirroring the API contracts ──────────────────────────────
 type Round = 1 | 2 | 3 | 4;
@@ -227,7 +228,7 @@ function hhmmToHour(hhmm: string): number | null {
 
 
 // ── Component ──────────────────────────────────────────────────────
-export default function ForecastTool() {
+export default function ForecastTool({ tour = "pga" }: { tour?: AnalysisTour }) {
   const [field, setField] = useState<FieldResp | null>(null);
   const [targetRound, setTargetRound] = useState<Round>(4);
   const [conditions, setConditions] = useState<ConditionsPreset>(
@@ -262,7 +263,7 @@ export default function ForecastTool() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/scoring-model/field");
+        const res = await fetch(apiFor(tour, "/api/scoring-model/field"));
         const json = (await res.json()) as FieldResp;
         setField(json);
       } catch {
@@ -378,7 +379,7 @@ export default function ForecastTool() {
         .filter(Boolean);
       if (parsedPlayers.length) body.players = parsedPlayers;
 
-      const res = await fetch("/api/scoring-model/forecast", {
+      const res = await fetch(apiFor(tour, "/api/scoring-model/forecast"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),

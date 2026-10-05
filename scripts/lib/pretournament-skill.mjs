@@ -85,20 +85,27 @@ async function dgFetch(path, { attempt = 0 } = {}) {
   return res.json();
 }
 
-let cachedEventList = null;
-/** Fetch DG's PGA event list once per process. Each entry looks
- *  like { calendar_year, event_id, event_name, date, ... }. `date`
- *  is the event start date (YYYY-MM-DD). */
+const cachedEventLists = new Map();
+/** Fetch DG's event list for a tour once per process. Each entry
+ *  looks like { calendar_year, event_id, event_name, date, ... }.
+ *  `date` is the event start date (YYYY-MM-DD). */
+export async function loadDgEventList(tour = "pga") {
+  if (!cachedEventLists.has(tour)) {
+    cachedEventLists.set(tour, await dgFetch(`/historical-raw-data/event-list?tour=${tour}`));
+  }
+  return cachedEventLists.get(tour);
+}
+
 export async function loadDgPgaEventList() {
-  if (cachedEventList) return cachedEventList;
-  cachedEventList = await dgFetch("/historical-raw-data/event-list?tour=pga");
-  return cachedEventList;
+  return loadDgEventList("pga");
 }
 
 /** Per-event round bundle, cached to disk. DG returns one entry
  *  per player containing round_1..round_4 SG blobs — we normalise
- *  into a flat list of {dg_id, round, date, sg_total}. */
-async function loadEventRounds(eventId, year) {
+ *  into a flat list of {dg_id, round, date, sg_total}. DP World ids
+ *  (2025134) can't collide with PGA ids (13), so one cache dir serves
+ *  both tours. */
+async function loadEventRounds(eventId, year, tour = "pga") {
   const cachePath = resolve(CACHE_DIR, `${eventId}-${year}.json`);
   if (existsSync(cachePath)) {
     try {
@@ -108,7 +115,7 @@ async function loadEventRounds(eventId, year) {
     }
   }
   const data = await dgFetch(
-    `/historical-raw-data/rounds?tour=pga&event_id=${eventId}&year=${year}`,
+    `/historical-raw-data/rounds?tour=${tour}&event_id=${eventId}&year=${year}`,
   );
   const flat = [];
   for (const row of data?.scores ?? []) {
@@ -150,29 +157,35 @@ function shiftDate(dateStr, days) {
  * @param {string} r1Date YYYY-MM-DD of the tournament's Round 1.
  * @param {object} [opts]
  * @param {(msg: string) => void} [opts.log]
+ * @param {string[]} [opts.tours] DG tours to pool. DG's sg_total is
+ *   field-strength adjusted onto one scale, so DP World players can
+ *   pool euro + pga rounds. Default ["pga"].
  * @returns {Promise<Record<string, {mean: number, n: number}>>}
  */
 export async function buildPreTournamentSkillMap(r1Date, opts = {}) {
   const log = opts.log ?? (() => {});
+  const tours = opts.tours ?? ["pga"];
   const windowStart = shiftDate(r1Date, -WINDOW_DAYS);
-  const eventList = await loadDgPgaEventList();
   // Any event whose completion date is in [windowStart, r1Date) —
   // strictly less than r1Date so we never leak the target week
   // into its own baseline.
-  const inWindow = eventList.filter((e) => {
-    const d = e.date;
-    if (typeof d !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
-    return d >= windowStart && d < r1Date;
-  });
+  const inWindow = [];
+  for (const tour of tours) {
+    for (const e of await loadDgEventList(tour)) {
+      const d = e.date;
+      if (typeof d !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+      if (d >= windowStart && d < r1Date) inWindow.push({ ...e, tour });
+    }
+  }
   log(
-    `[skill] ${inWindow.length} PGA events in trailing 12mo window ${windowStart} → ${r1Date}`,
+    `[skill] ${inWindow.length} ${tours.join("+")} events in trailing 12mo window ${windowStart} → ${r1Date}`,
   );
   // Aggregate per player.
   const byPlayer = new Map(); // dgId → { sum, n }
   for (const ev of inWindow) {
     let rounds;
     try {
-      rounds = await loadEventRounds(ev.event_id, ev.calendar_year);
+      rounds = await loadEventRounds(ev.event_id, ev.calendar_year, ev.tour);
     } catch (err) {
       log(`[skill] skip ${ev.event_id}/${ev.calendar_year}: ${err.message}`);
       continue;

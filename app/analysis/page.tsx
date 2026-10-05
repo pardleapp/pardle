@@ -9,6 +9,7 @@ import TeeShotPreview from "./_previews/TeeShotPreview";
 import ScoreForecastPreview from "./_previews/ScoreForecastPreview";
 import CourseHistoryPreview from "./_previews/CourseHistoryPreview";
 import OddsComparePreview from "./_previews/OddsComparePreview";
+import { hrefFor, parseTour, type AnalysisTour } from "./_lib/tour";
 
 export const metadata = {
   title: `Tools — ${BRAND.name}`,
@@ -20,6 +21,11 @@ export const dynamic = "force-dynamic";
 
 interface Card {
   href: string;
+  /** Tours the tool runs on. DP World Tour versions are the same pages
+   *  opened with ?tour=dpwt. */
+  tours: AnalysisTour[];
+  /** Blurb override for the DP World Tour tab. */
+  dpwtBlurb?: string;
   title: string;
   blurb: string;
   status: "live" | "coming-soon";
@@ -29,6 +35,9 @@ interface Card {
 const CARDS: Card[] = [
   {
     href: "/analysis/score-forecast",
+    tours: ["pga", "dpwt"],
+    dpwtBlurb:
+      "Project field and per-player round scores. Hole-by-hole wind, daily course setup, level shift, persistence-weighted form.",
     title: "Round score forecast",
     blurb:
       "Project field and per-player round scores. HRRR wind, level shift, persistence-weighted form.",
@@ -37,6 +46,9 @@ const CARDS: Card[] = [
   },
   {
     href: "/analysis/course-history",
+    tours: ["pga", "dpwt"],
+    dpwtBlurb:
+      "What kind of player each DP World Tour venue rewards, and how much of a player's record there is worth trusting. Ranked by what repeats, not by what happened.",
     title: "Course history",
     blurb:
       "What kind of player each PGA venue rewards, and how much of a player's record there is worth trusting. Ranked by what repeats, not by what happened.",
@@ -45,6 +57,7 @@ const CARDS: Card[] = [
   },
   {
     href: "/analysis/course-heatmap",
+    tours: ["pga", "dpwt"],
     title: "Pin analysis",
     blurb:
       "Scores, birdie and bogey rates for every pin. Every green at a glance with this week's four pin positions.",
@@ -53,6 +66,7 @@ const CARDS: Card[] = [
   },
   {
     href: "/analysis/hole-scoring",
+    tours: ["pga", "dpwt"],
     title: "Hole scoring analysis",
     blurb:
       "What the setup did to each hole — how far back the tees went, which way the wind blew, and what the field then shot.",
@@ -61,6 +75,7 @@ const CARDS: Card[] = [
   },
   {
     href: "/analysis/tee-time-scoring",
+    tours: ["pga", "dpwt"],
     title: "Scoring by tee time",
     blurb:
       "See which waves had it easier — round score minus pre-tournament skill, plotted against tee time.",
@@ -69,6 +84,7 @@ const CARDS: Card[] = [
   },
   {
     href: "/analysis/tee-shots",
+    tours: ["pga"],
     title: "Off-the-tee shot shape",
     blurb:
       "Every player's driver ball flight — average shape, dispersion cloud, closest matches in the field.",
@@ -77,6 +93,7 @@ const CARDS: Card[] = [
   },
   {
     href: "/analysis/odds-compare",
+    tours: ["pga"],
     title: "Round-score odds compare",
     blurb:
       "Live over/under pricing on this week's field, side-by-side across the books that post it. Best price per side is highlighted.",
@@ -85,7 +102,18 @@ const CARDS: Card[] = [
   },
 ];
 
-export default function AnalysisIndex() {
+const TOUR_TABS: Array<{ id: AnalysisTour; label: string }> = [
+  { id: "pga", label: "PGA Tour" },
+  { id: "dpwt", label: "DP World Tour" },
+];
+
+export default async function AnalysisIndex({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const tour = parseTour((await searchParams).tour);
+  const cards = CARDS.filter((c) => c.tours.includes(tour));
   return (
     <main className="container container-wide v4-theme pv-theme">
       {/*
@@ -160,6 +188,40 @@ export default function AnalysisIndex() {
           Deep-dive views on how a tournament&apos;s playing. Numbers-
           heavy; refreshes as rounds complete.
         </p>
+        <div
+          role="tablist"
+          aria-label="Tour"
+          style={{ display: "flex", gap: 6, margin: "0 0 18px", flexWrap: "wrap" }}
+        >
+          {TOUR_TABS.map((t) => {
+            const active = t.id === tour;
+            return (
+              <Link
+                key={t.id}
+                role="tab"
+                aria-selected={active}
+                href={t.id === "pga" ? "/analysis" : "/analysis?tour=dpwt"}
+                style={{
+                  padding: "10px 16px",
+                  minHeight: 44,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  borderRadius: 8,
+                  textDecoration: "none",
+                  border: "1px solid oklch(0.85 0.013 95)",
+                  background: active ? "oklch(0.25 0.02 150)" : "white",
+                  color: active ? "white" : "oklch(0.3 0.02 150)",
+                  fontFamily:
+                    "var(--font-archivo), 'Archivo', system-ui, sans-serif",
+                }}
+              >
+                {t.label}
+              </Link>
+            );
+          })}
+        </div>
         <ul
           style={{
             listStyle: "none",
@@ -171,7 +233,7 @@ export default function AnalysisIndex() {
               "repeat(auto-fit, minmax(min(400px, 100%), 1fr))",
           }}
         >
-          {CARDS.map((card) => {
+          {cards.map((card) => {
             const isLive = card.status === "live";
             const Preview = card.Preview;
             const CardEl = (
@@ -242,7 +304,7 @@ export default function AnalysisIndex() {
                         "var(--font-archivo), 'Archivo', system-ui, sans-serif",
                     }}
                   >
-                    {card.blurb}
+                    {tour === "dpwt" ? card.dpwtBlurb ?? card.blurb : card.blurb}
                   </p>
                 </div>
               </article>
@@ -251,7 +313,7 @@ export default function AnalysisIndex() {
               <li key={card.href}>
                 {isLive ? (
                   <Link
-                    href={card.href}
+                    href={hrefFor(tour, card.href)}
                     style={{
                       textDecoration: "none",
                       color: "inherit",

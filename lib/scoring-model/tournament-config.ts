@@ -72,6 +72,8 @@ interface HistoricalJson {
   dgEventId?: number;
   dgEventName?: string;
   pgaTournamentId?: string;
+  /** DP World Tour files carry their id here ("D2025134"). */
+  tournamentId?: string;
   venue?: HistoricalVenue;
   roundDates?: Record<string, string> | null;
   weatherByRound?: Record<string, unknown>;
@@ -141,12 +143,22 @@ export interface TournamentConfig {
 
 // ── In-memory cache ───────────────────────────────────────────────
 
-const HISTORICAL_DIR = path.join(process.cwd(), "data", "historical");
-const LIVE_META_FILE = path.join(HISTORICAL_DIR, "_live-tournaments.json");
+export type Tour = "pga" | "dpwt";
 
-let cachedConfigsBySlug: Map<string, TournamentConfig> | null = null;
-let cachedConfigsByTournamentId: Map<string, TournamentConfig> | null = null;
-let cacheLoadedAt = 0;
+/** PGA files live in data/historical; DP World Tour files (built by
+ *  scripts/fetch-dpwt-historical.mjs, same shape) in
+ *  data/dpwt/historical. Each tour gets its own cache. */
+const HISTORICAL_DIRS: Record<Tour, string> = {
+  pga: path.join(process.cwd(), "data", "historical"),
+  dpwt: path.join(process.cwd(), "data", "dpwt", "historical"),
+};
+
+interface ConfigCache {
+  bySlug: Map<string, TournamentConfig>;
+  byId: Map<string, TournamentConfig>;
+  loadedAt: number;
+}
+const caches: Partial<Record<Tour, ConfigCache>> = {};
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min — cheap to rebuild if files change
 
 function computeMedian(values: number[]): number {
@@ -158,24 +170,24 @@ function computeMedian(values: number[]): number {
     : sorted[mid];
 }
 
-async function loadAll(): Promise<void> {
-  if (
-    cachedConfigsBySlug &&
-    Date.now() - cacheLoadedAt < CACHE_TTL_MS
-  ) {
-    return;
-  }
+async function loadAll(tour: Tour = "pga"): Promise<ConfigCache> {
+  const cached = caches[tour];
+  if (cached && Date.now() - cached.loadedAt < CACHE_TTL_MS) return cached;
+  const HISTORICAL_DIR = HISTORICAL_DIRS[tour];
+  const LIVE_META_FILE = path.join(HISTORICAL_DIR, "_live-tournaments.json");
   const bySlug = new Map<string, TournamentConfig>();
   const byId = new Map<string, TournamentConfig>();
+  const done = (): ConfigCache => {
+    const c = { bySlug, byId, loadedAt: Date.now() };
+    caches[tour] = c;
+    return c;
+  };
   let entries: string[];
   try {
     entries = await readdir(HISTORICAL_DIR);
   } catch {
     // No historical dir → no configs; every lookup returns null.
-    cachedConfigsBySlug = bySlug;
-    cachedConfigsByTournamentId = byId;
-    cacheLoadedAt = Date.now();
-    return;
+    return done();
   }
 
   // Group files by slug.
@@ -239,7 +251,7 @@ async function loadAll(): Promise<void> {
     // year → pgaTournamentId
     const yearIds: Record<number, string> = {};
     for (const l of loaded) {
-      const id = l.data.pgaTournamentId;
+      const id = l.data.pgaTournamentId ?? l.data.tournamentId;
       if (typeof id === "string" && id) yearIds[l.year] = id;
     }
 
@@ -604,26 +616,32 @@ async function loadAll(): Promise<void> {
     }
   }
 
-  cachedConfigsBySlug = bySlug;
-  cachedConfigsByTournamentId = byId;
-  cacheLoadedAt = Date.now();
+  return done();
 }
 
 // ── Public API ────────────────────────────────────────────────────
 
 /** Return config for a given live/historical tournamentId, or null
- *  if no historical data exists for that venue yet. */
+ *  if no historical data exists for that venue yet. DP World Tour ids
+ *  ("D2026139") resolve against the DP World store. */
 export async function getTournamentConfig(
   tournamentId: string | null | undefined,
 ): Promise<TournamentConfig | null> {
   if (!tournamentId) return null;
-  await loadAll();
-  return cachedConfigsByTournamentId?.get(tournamentId) ?? null;
+  const c = await loadAll(tourOfTournamentId(tournamentId));
+  return c.byId.get(tournamentId) ?? null;
 }
 
-/** All known tournament slugs. Used by course-pin-birdies and the
- *  onboarding script for family enumeration. */
-export async function listTournamentConfigs(): Promise<TournamentConfig[]> {
-  await loadAll();
-  return [...(cachedConfigsBySlug?.values() ?? [])];
+/** All known tournament slugs for a tour. Used by course-pin-birdies
+ *  and the onboarding script for family enumeration. */
+export async function listTournamentConfigs(
+  tour: Tour = "pga",
+): Promise<TournamentConfig[]> {
+  return [...(await loadAll(tour)).bySlug.values()];
+}
+
+/** PGA ids look like "R2026527"; DP World Tour ids are the Tour's
+ *  EventId prefixed with "D" ("D2026139"). */
+export function tourOfTournamentId(id: string): Tour {
+  return /^D\d{7}$/.test(id) ? "dpwt" : "pga";
 }

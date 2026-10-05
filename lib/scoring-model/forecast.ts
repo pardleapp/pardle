@@ -13,14 +13,31 @@
 import "server-only";
 import { projectHoleAvgToPar, pinSpecificResidual } from "./project";
 import { getScoringModel } from "./loader";
-import { getTournamentConfig } from "./tournament-config";
+import {
+  getTournamentConfig,
+  tourOfTournamentId,
+  type TournamentConfig,
+} from "./tournament-config";
 import {
   getHrrrHourlyWind,
   summariseHrrrDay,
   windAtHour,
   type HourlyWind,
 } from "./hrrr-hourly";
-import { coordsForTournamentId } from "@/lib/weather/course-coords";
+import { coordsForTournamentId, type CourseCoords } from "@/lib/weather/course-coords";
+import { getDpwtPinSheet } from "@/lib/dpwt/pins";
+
+/** PGA venues are in the hand-kept coords table; DP World Tour venues
+ *  carry their coords in the historical files (via the config). */
+function coordsFor(tournamentId: string, cfg: TournamentConfig | null): CourseCoords | null {
+  const known = coordsForTournamentId(tournamentId);
+  if (known) return known;
+  const v = cfg?.venue;
+  if (v && typeof v.lat === "number" && typeof v.lon === "number" && v.tz) {
+    return { lat: v.lat, lon: v.lon, tz: v.tz, displayName: v.name ?? "" };
+  }
+  return null;
+}
 import { getDailyWeather } from "@/lib/weather/open-meteo";
 import type {
   HoleFit,
@@ -649,14 +666,14 @@ export async function runForecast(
     return {
       ok: false,
       error:
-        "This course is new on the PGA Tour schedule for us — round-score predictions will be available once we've collected a season of history.",
+        "This course is new on the schedule for us — round-score predictions will be available once we've collected a season of history.",
       newVenue: true,
     };
   }
   const par = cfg.coursePar;
   const pars = cfg.courseHolePars;
   const bearings = cfg.holeBearings;
-  const coords = coordsForTournamentId(tournamentId);
+  const coords = coordsFor(tournamentId, cfg);
 
   const coeffs = await getScoringModel(tournamentId, originUrl);
   if (!coeffs) {
@@ -1274,6 +1291,12 @@ async function fetchPinSheet(
   tournamentId: string,
   _originUrl: string,
 ): Promise<PinSheetShape | null> {
+  if (tourOfTournamentId(tournamentId) === "dpwt") {
+    // DP World Tour: daily yardage + pins from the Tour's shot tracker,
+    // already projected into the same green frame the fit used.
+    const sheet = await getDpwtPinSheet(tournamentId);
+    return sheet ? (sheet as unknown as PinSheetShape) : null;
+  }
   const url = "https://orchestrator.pgatour.com/graphql";
   const query = `{
     courseStats(tournamentId:"${tournamentId}") {
@@ -1384,7 +1407,8 @@ export async function fetchPriorRoundObservations(
   originUrl: string,
   targetRound: 1 | 2 | 3 | 4,
 ): Promise<Partial<Record<1 | 2 | 3 | 4, PriorRoundObservation>>> {
-  const url = `${originUrl.replace(/\/$/, "")}/api/course-pins?tournamentId=${encodeURIComponent(tournamentId)}`;
+  const prefix = tourOfTournamentId(tournamentId) === "dpwt" ? "/api/dpwt" : "/api";
+  const url = `${originUrl.replace(/\/$/, "")}${prefix}/course-pins?tournamentId=${encodeURIComponent(tournamentId)}`;
   try {
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) return {};
@@ -1407,11 +1431,11 @@ export async function fetchPriorRoundObservations(
     // history the tee-time-scoring API already pulls. Round dates
     // come from the dynamic tournament-config (populated by the
     // fetch script per tour week).
-    const coords = coordsForTournamentId(tournamentId);
+    const cfgForDates = await getTournamentConfig(tournamentId);
+    const coords = coordsFor(tournamentId, cfgForDates);
     const dailyByRound: Partial<
       Record<1 | 2 | 3 | 4, { windMph: number; windDirDeg: number }>
     > = {};
-    const cfgForDates = await getTournamentConfig(tournamentId);
     if (coords) {
       const dates: Record<1 | 2 | 3 | 4, string> = {
         1: "", 2: "", 3: "", 4: "",

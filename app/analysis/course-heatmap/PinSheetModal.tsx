@@ -1713,7 +1713,7 @@ export default function PinSheetModal({
                   ? "bogey-or-worse rate"
                   : "scoring avg vs par";
             if (!showHistory) {
-              return "Hover any pin to see the field's scoring average for that round. Pin coordinates + green diagram from PGA Tour's own broadcast feed. Rounds without a coloured dot haven't been posted yet (or the round hasn't been played).";
+              return "Hover any pin to see the field's scoring average for that round. Pin positions come from the tour's own shot tracking. Rounds without a coloured dot haven't been posted yet (or the round hasn't been played).";
             }
             if (seasonFilter != null) {
               return `Only ${seasonFilter} pin positions shown. Each dot is one round of that year, coloured by the field's ${metricPhrase} for that round. Switch to All seasons for the multi-year cluster view.`;

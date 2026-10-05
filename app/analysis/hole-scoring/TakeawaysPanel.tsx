@@ -20,6 +20,8 @@ import type { HoleBirdieData } from "@/lib/analysis/course-birdies";
 import type { DailyWeatherView } from "../_components/WeatherStrip";
 import type { Cell } from "./HoleSetup";
 
+import { hrefFor, type AnalysisTour } from "../_lib/tour";
+
 interface Props {
   cells: Cell[];
   round: number;
@@ -33,6 +35,7 @@ interface Props {
   birdieHistoryByHole?: Record<string, HoleBirdieData> | null;
   onHoleClick?: (hole: number) => void;
   limit?: number;
+  tour?: AnalysisTour;
 }
 
 // Colour + emoji-free icon per takeaway kind. Icons stay as inline
@@ -90,6 +93,7 @@ export default function Takeaways({
   birdieHistoryByHole,
   onHoleClick,
   limit = 4,
+  tour = "pga",
 }: Props) {
   const rows = buildRows({
     cells,
@@ -210,7 +214,7 @@ export default function Takeaways({
                 </button>
                 {insight && (
                   <a
-                    href={`/analysis/course-heatmap?hole=${t.hole}`}
+                    href={hrefFor(tour, `/analysis/course-heatmap?hole=${t.hole}`)}
                     style={{
                       display: "flex",
                       alignItems: "center",

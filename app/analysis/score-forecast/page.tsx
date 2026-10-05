@@ -3,6 +3,7 @@ import MainNav from "@/app/MainNav";
 import AuthChip from "@/app/live/auth/AuthChip";
 import { BRAND } from "@/lib/brand";
 import ForecastTool from "./ForecastTool";
+import { hrefFor, parseTour } from "../_lib/tour";
 
 export const metadata = {
   title: `Round score forecast — ${BRAND.name}`,
@@ -14,7 +15,8 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const tour = parseTour((await searchParams).tour);
   return (
     <main className="container container-wide v4-theme pv-theme">
       {/*
@@ -62,7 +64,7 @@ export default function Page() {
           }}
         >
           <Link
-            href="/analysis"
+            href={hrefFor(tour, "/analysis")}
             style={{
               fontSize: 12,
               color: "oklch(0.50 0.13 155)",
@@ -125,7 +127,7 @@ export default function Page() {
             See how the model works →
           </Link>
         </p>
-        <ForecastTool />
+        <ForecastTool tour={tour} />
       </section>
     </main>
   );
