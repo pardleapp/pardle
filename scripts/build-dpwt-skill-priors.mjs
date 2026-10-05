@@ -89,7 +89,7 @@ for (const [key, rs] of byPlayer) {
 }
 const bt = JSON.parse(await readFile(resolve(ROOT, "data", "course-fit-backtest.json"), "utf-8"));
 const dp = bt.results.find((r) => r.label.startsWith("DP World"));
-const carry = dp?.skill?.all;
+const carry = dp?.skillSym?.all;
 await writeFile(resolve(ROOT, "data", "dpwt", "skill-priors.json"), JSON.stringify({
   generatedAt: new Date().toISOString(),
   map: { ott: { a: +fo.a.toFixed(4), b: +fo.b.toFixed(4) }, app: { a: +fa.a.toFixed(4), b: +fa.b.toFixed(4) } },

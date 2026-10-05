@@ -292,13 +292,11 @@ export async function getDpwtCourseHistory(course: string): Promise<CourseHistor
     cachedAt: new Date().toISOString(),
     hostingEvents: hosting,
     // The panel's "kept" figures show the share Expected actually keeps.
-    persistence: persistence.usable
-      ? {
-          ...persistence,
-          calibrated: { share: CARRY, visits: SP.carryForward.n },
-          ott: { ...persistence.ott, typicalReliability: CARRY },
-          app: { ...persistence.app, typicalReliability: CARRY },
-        }
-      : null,
+    persistence: {
+      ...persistence,
+      calibrated: { scope: "DP World Tour", visits: SP.carryForward.n, steps: [{ visits: 1, share: CARRY }] },
+      ott: { ...persistence.ott, typicalReliability: CARRY },
+      app: { ...persistence.app, typicalReliability: CARRY },
+    },
   };
 }

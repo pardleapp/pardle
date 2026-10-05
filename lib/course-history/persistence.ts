@@ -105,8 +105,11 @@ export interface PersistenceStats {
    *  should fall back to showing raw numbers and saying so. */
   usable: boolean;
   /** Set when the reliability applied is a share backtested across the
-   *  whole tour rather than this venue's estimate (DP World Tour). */
-  calibrated?: { share: number; visits: number };
+   *  whole tour (scripts/backtest-course-fit.mjs) rather than this
+   *  venue's own estimate. `steps` = share kept by number of visits
+   *  (last step applies to that many or more); `visits` = repeat visits
+   *  the backtest measured. */
+  calibrated?: { scope: string; visits: number; steps: Array<{ visits: number; share: number }> };
 }
 
 /** Minimum players before a variance decomposition is worth doing.

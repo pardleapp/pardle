@@ -83,7 +83,7 @@ interface PersistenceStats {
   usable: boolean;
   /** Set when "kept" is a share backtested across the whole tour
    *  rather than this venue's own estimate (DP World Tour). */
-  calibrated?: { share: number; visits: number };
+  calibrated?: { scope: string; visits: number; steps: Array<{ visits: number; share: number }> };
 }
 interface TraitBetas {
   ott: number;
@@ -2523,12 +2523,27 @@ function TraitFitPanel({ fit }: { fit: TraitFitResp | null }) {
  * iron week. Rather than silently applying the correction, we show
  * the user the measurement it comes from.
  */
+/** "about 13%" or "about 4% after one visit, 11% after two and 13%
+ *  after three or more". */
+function calibratedShareText(steps: Array<{ visits: number; share: number }>): string {
+  const pc = (x: number) => `${Math.round(x * 100)}%`;
+  const distinct = new Set(steps.map((s) => pc(s.share)));
+  if (steps.length <= 1 || distinct.size === 1) return `about ${pc(steps[0]?.share ?? 0)}`;
+  const words = ["", "one", "two", "three", "four", "five"];
+  const parts = steps.map((s, i) => {
+    const n = words[s.visits] ?? String(s.visits);
+    const last = i === steps.length - 1;
+    return `${pc(s.share)} after ${n}${last ? " or more" : ""}`;
+  });
+  return `about ${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`.replace(" after one", " after one visit");
+}
+
 function PersistencePanel({
   persistence,
 }: {
   persistence?: PersistenceStats | null;
 }) {
-  if (!persistence || !persistence.usable) {
+  if (!persistence || (!persistence.usable && !persistence.calibrated)) {
     return (
       <div
         style={{
@@ -2612,9 +2627,9 @@ function PersistencePanel({
             Each player gets their <strong style={{ color: T.ink }}>own</strong>{" "}
             number here, measured against their own usual level. We tested
             how much of that carries forward: across{" "}
-            {persistence.calibrated.visits.toLocaleString()} repeat visits to
-            DP World Tour courses, about{" "}
-            {Math.round(persistence.calibrated.share * 100)}% of a
+            {persistence.calibrated.visits.toLocaleString()} repeat visits to{" "}
+            {persistence.calibrated.scope} courses,{" "}
+            {calibratedShareText(persistence.calibrated.steps)} of a
             player&rsquo;s past edge at a course showed up on the next visit.
             The <strong style={{ color: T.ink }}>Expected</strong> column
             keeps that share. Repeatability is this course&rsquo;s own
@@ -2694,7 +2709,9 @@ function PersistencePanel({
       >
         Measured on {persistence.playersUsed} players with history here,{" "}
         {persistence.repeatVisitors} of them on more than one visit.{" "}
-        {strongest < 0.1
+        {persistence.calibrated
+          ? "The share kept is measured across the whole tour, so it applies the same way at every course; most of any one player's record here is a hot or cold week, not course fit."
+          : strongest < 0.1
           ? "Almost nothing repeats at this venue — read the raw column as history, not as a signal, and don't let it move a price."
           : persistence.ott.typicalReliability >
               persistence.app.typicalReliability * 1.5

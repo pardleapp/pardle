@@ -53,7 +53,7 @@ const KEY_TOUR_STATS = "course-history:tour-stats:v1";
 // extremes) and excludes landing side + aim direction as
 // non-course-fit dimensions. Bumped to invalidate v2/v1.
 const KEY_ARCHETYPE = (courseName: string) =>
-  `course-history:archetype:v3:${slugify(courseName)}`;
+  `course-history:archetype:v4:${slugify(courseName)}`; // v4: skill-prior baselines
 
 /** Minimum tee shots a player needs before we trust their profile. */
 const MIN_SHOTS_PER_PLAYER = 100;

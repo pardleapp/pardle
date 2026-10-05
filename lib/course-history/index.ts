@@ -33,9 +33,9 @@ import {
   type DGHistoricalRound,
 } from "@/lib/golf-api/datagolf";
 import { withComputedSgEvents } from "@/lib/golf-api/computed-sg";
+import skillPriorsPga from "@/data/course-history/skill-priors-pga.json";
 import {
   computePersistence,
-  reliabilityFor,
   type PersistenceStats,
   type PlayerResiduals,
 } from "./persistence";
@@ -87,6 +87,30 @@ const KEY_EVENT_LIST = "course-history:event-list:pga";
 // without touching well-sampled tour regulars.
 const BASELINE_SHRINKAGE_K = 20;
 
+// Shrinkage target + carry-forward, from the course-fit backtest
+// (scripts/backtest-course-fit.mjs, scripts/build-pga-skill-priors.mjs).
+// Baselines shrink toward the player's own skill prior (his DataGolf
+// SG: Total over the previous 365 days, mapped to OTT/APP), not toward
+// zero: zero understated elite players with few rounds, so they looked
+// like they outperformed everywhere. The share of a course edge kept in
+// "Expected" is the measured carry-forward by number of visits
+// (18.5k repeat visits, 2018-26); the per-venue persistence estimate it
+// replaces kept 2-4x too much.
+interface SkillPriorsFile {
+  map: { ott: { a: number; b: number }; app: { a: number; b: number } };
+  carryForward: { byVisits: Record<string, number>; n: number };
+  priors: Record<string, Record<string, [number, number]>>;
+}
+const PRIORS = skillPriorsPga as unknown as SkillPriorsFile;
+function skillPrior(dgId: number, date: string): { ott: number; app: number } {
+  const p = PRIORS.priors[String(dgId)]?.[date];
+  return p ? { ott: p[0], app: p[1] } : { ott: PRIORS.map.ott.a, app: PRIORS.map.app.a };
+}
+function carryForward(visits: number): number {
+  const by = PRIORS.carryForward.byVisits;
+  return visits >= 3 ? by["3"] : visits === 2 ? by["2"] : by["1"];
+}
+
 // Skill-drift threshold applied at the MODEL layer. When the player's
 // current DG skill diverges from their historical baseline by more
 // than this many SG (breakout or decline), the outperformance number
@@ -119,8 +143,10 @@ const SKILL_DRIFT_THRESHOLD = 1.0;
 // v19 / year-baseline v2: events with SG computed from ShotLink shots
 // (lib/golf-api/computed-sg) now count, so cached aggregates and
 // per-year baselines built without them are dropped.
+// v20: baselines shrink toward each player's skill prior and Expected
+// keeps the backtested carry-forward share.
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v19:${slugify(courseName)}`;
+  `course-history:agg-course:v20:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
   `course-history:year-baseline:v2:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
@@ -948,16 +974,14 @@ export async function getCourseHistoryByCourse(
       rounds += e.rounds;
       if (rounds >= kRounds) break;
     }
-    if (rounds <= 0) return null;
-    // Bayesian shrinkage toward 0 (field-adjusted tour mean). Weight
-    // on the player's own sample = rounds / (rounds + K). Small
-    // samples get pulled hard toward 0; well-sampled players barely
-    // move. Kills the low-baseline artifacts at co-sanctioned events
-    // without touching tour regulars.
-    const w = rounds / (rounds + BASELINE_SHRINKAGE_K);
+    // Bayesian shrinkage toward the player's own skill prior (see
+    // skillPrior). Weight on his own sample = rounds / (rounds + K):
+    // thin samples lean on the prior, well-sampled players barely move.
+    const prior = skillPrior(dgId, targetDate);
+    const k = BASELINE_SHRINKAGE_K;
     return {
-      sgOtt: (sumOtt / rounds) * w,
-      sgApp: (sumApp / rounds) * w,
+      sgOtt: (sumOtt + k * prior.ott) / (rounds + k),
+      sgApp: (sumApp + k * prior.app) / (rounds + k),
       rounds,
     };
   }
@@ -1190,12 +1214,8 @@ export async function getCourseHistoryByCourse(
     // A player with six trips here is six observations of course fit;
     // one player-week is one, however many rounds it contained.
     const visits = b.visitResid.size;
-    const relOtt = persistence.usable
-      ? reliabilityFor(persistence.ott, visits)
-      : 1;
-    const relApp = persistence.usable
-      ? reliabilityFor(persistence.app, visits)
-      : 1;
+    const relOtt = carryForward(visits);
+    const relApp = carryForward(visits);
     const rawOtt = atOtt - baseOtt;
     const rawApp = atApp - baseApp;
     players.push({
@@ -1257,7 +1277,17 @@ export async function getCourseHistoryByCourse(
     players,
     cachedAt: new Date(0).toISOString(),
     hostingEvents: eventNames,
-    persistence: persistence.usable ? persistence : null,
+    // The panel's "kept" figures show the share Expected actually keeps.
+    persistence: {
+      ...persistence,
+      calibrated: {
+        scope: "PGA Tour",
+        visits: PRIORS.carryForward.n,
+        steps: [1, 2, 3].map((v) => ({ visits: v, share: carryForward(v) })),
+      },
+      ott: { ...persistence.ott, typicalReliability: carryForward(persistence.medianVisits) },
+      app: { ...persistence.app, typicalReliability: carryForward(persistence.medianVisits) },
+    },
   };
 
   if (redis) {

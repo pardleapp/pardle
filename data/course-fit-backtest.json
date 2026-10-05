@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-05T22:27:35.445Z",
+ "generatedAt": "2026-10-05T22:38:09.516Z",
  "results": [
   {
    "label": "DP World Tour (IMG SG, 2024-26)",
@@ -68,6 +68,35 @@
     "lowVolumeBaselineBias": -0.283,
     "lowVolumeBaselineRmse": 1.472,
     "lowVolumeN": 6354
+   },
+   "skillSym": {
+    "all": {
+     "n": 2330,
+     "slope": 0.135,
+     "se": 0.023,
+     "r": 0.12
+    },
+    "prior1": {
+     "n": 1871,
+     "slope": 0.137,
+     "se": 0.025,
+     "r": 0.127
+    },
+    "prior2": {
+     "n": 399,
+     "slope": 0.106,
+     "se": 0.07,
+     "r": 0.076
+    },
+    "prior3plus": {
+     "n": 60,
+     "slope": 0.294,
+     "se": 0.233,
+     "r": 0.164
+    },
+    "lowVolumeBaselineBias": null,
+    "lowVolumeBaselineRmse": null,
+    "lowVolumeN": null
    }
   },
   {
@@ -137,6 +166,35 @@
     "lowVolumeBaselineBias": -0.46,
     "lowVolumeBaselineRmse": 1.653,
     "lowVolumeN": 10594
+   },
+   "skillSym": {
+    "all": {
+     "n": 18545,
+     "slope": 0.064,
+     "se": 0.009,
+     "r": 0.05
+    },
+    "prior1": {
+     "n": 8837,
+     "slope": 0.042,
+     "se": 0.011,
+     "r": 0.04
+    },
+    "prior2": {
+     "n": 4785,
+     "slope": 0.107,
+     "se": 0.022,
+     "r": 0.069
+    },
+    "prior3plus": {
+     "n": 4923,
+     "slope": 0.13,
+     "se": 0.029,
+     "r": 0.065
+    },
+    "lowVolumeBaselineBias": null,
+    "lowVolumeBaselineRmse": null,
+    "lowVolumeN": null
    }
   }
  ]

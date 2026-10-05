@@ -147,7 +147,16 @@ function run(label, rounds) {
   const byPC = new Map();
   for (const v of visits.values()) (byPC.get(`${v.player}|${v.course}`) ?? byPC.set(`${v.player}|${v.course}`, []).get(`${v.player}|${v.course}`)).push(v);
 
-  const out = { zero: [], skill: [] };
+  /** Mean of the 50 rounds nearest t (either side), other courses only,
+   *  restricted to rounds before `before`. */
+  function nearestBaseline(player, t, courseExcl, before) {
+    const arr = byPlayer.get(player).filter((r) => r.course !== courseExcl && day(r.date) < before && day(r.date) !== t);
+    arr.sort((a, b) => Math.abs(day(a.date) - t) - Math.abs(day(b.date) - t));
+    let s = 0, n = 0;
+    for (const r of arr) { if (n >= BASE_N) break; s += r.ott + r.app + fs(r.event); n++; }
+    return { mean: n ? s / n : 0, n };
+  }
+  const out = { zero: [], skill: [], skillSym: [] };
   const baseErr = { zero: [], skill: [] };
   for (const vs of byPC.values()) {
     vs.sort((a, b) => a.date.localeCompare(b.date));
@@ -168,6 +177,20 @@ function run(label, rounds) {
         for (let j = 0; j < k; j++) { s += vs[j].res[kind] * vs[j].n; n += vs[j].n; }
         out[kind].push({ pred: s / n, actual: vs[k].res[kind], prior: k, rounds: vs[k].n });
       }
+      // "skillSym": earlier visits scored the way the tool scores them —
+      // baseline = the 50 rounds nearest each earlier visit in EITHER
+      // direction (skill-prior shrink) — but only from rounds before the
+      // visit being predicted, so nothing leaks.
+      const cutoff = day(vs[k].date);
+      let s = 0, n = 0;
+      for (let j = 0; j < k; j++) {
+        const sym = nearestBaseline(vs[j].player, day(vs[j].date), vs[j].course, cutoff);
+        const w = sym.n / (sym.n + K);
+        const base = sym.mean * w + priorFor(vs[j].dgId, day(vs[j].date)) * (1 - w);
+        s += (vs[j].sum / vs[j].n - base) * vs[j].n;
+        n += vs[j].n;
+      }
+      out.skillSym.push({ pred: s / n, actual: vs[k].res.skill, prior: k, rounds: vs[k].n });
     }
   }
   const stat = (rows) => {
@@ -176,16 +199,16 @@ function run(label, rounds) {
     return { n: f.n, slope: +f.b.toFixed(3), se: +f.se.toFixed(3), r: +f.r.toFixed(3) };
   };
   const res = { label, rounds: rounds.length, players: byPlayer.size, priorMap: { a: +map.a.toFixed(3), b: +map.b.toFixed(3), n: map.n, r: +map.r.toFixed(3) } };
-  for (const kind of ["zero", "skill"]) {
+  for (const kind of ["zero", "skill", "skillSym"]) {
     const rows = out[kind];
     res[kind] = {
       all: stat(rows),
       prior1: stat(rows.filter((r) => r.prior === 1)),
       prior2: stat(rows.filter((r) => r.prior === 2)),
       prior3plus: stat(rows.filter((r) => r.prior >= 3)),
-      lowVolumeBaselineBias: baseErr[kind].length ? +(baseErr[kind].reduce((a, b) => a + b, 0) / baseErr[kind].length).toFixed(3) : null,
-      lowVolumeBaselineRmse: baseErr[kind].length ? +Math.sqrt(baseErr[kind].reduce((a, b) => a + b * b, 0) / baseErr[kind].length).toFixed(3) : null,
-      lowVolumeN: baseErr[kind].length,
+      lowVolumeBaselineBias: baseErr[kind]?.length ? +(baseErr[kind].reduce((a, b) => a + b, 0) / baseErr[kind].length).toFixed(3) : null,
+      lowVolumeBaselineRmse: baseErr[kind]?.length ? +Math.sqrt(baseErr[kind].reduce((a, b) => a + b * b, 0) / baseErr[kind].length).toFixed(3) : null,
+      lowVolumeN: baseErr[kind]?.length ?? null,
     };
   }
   return res;
