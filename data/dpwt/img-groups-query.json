@@ -1,0 +1,5 @@
+{
+ "operationName": "GroupsGetGolfTournamentGroups",
+ "query": "\n  query GroupsGetGolfTournamentGroups($input: GetGolfTournamentGroupsInput!) {\n    getGolfTournamentGroups(input: $input) {\n      roundNums\n      groups {\n        ...groupsGetGolfTournamentGroupsFieldsQuery\n      }\n    }\n  }\n  fragment groupsGetGolfTournamentGroupsFieldsQuery on GolfGroup {\n    id\n    groupNo\n    hole\n    status\n    l1Course\n    courseId\n    startTime {\n      time\n    }\n    teams {\n      teamId\n      players {\n        id\n        lastName\n        firstName\n      }\n      roundScores {\n        courseId\n        startHole\n        toParToday {\n          value\n        }\n        holesThrough {\n          value\n        }\n      }\n      toPar {\n        value\n      }\n      tournamentPosition {\n        value\n        displayValue\n        format\n      }\n      status\n      currentHole\n    }\n  }\n",
+ "queryHash": "173658868"
+}

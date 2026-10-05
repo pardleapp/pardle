@@ -99,7 +99,8 @@ export async function GET(req: Request) {
     }
     const rounds: PlayerRound[] = [];
     for (const r of [1, 2, 3, 4]) {
-      const st = await getLiveRound(active.dpwtEventId, r, meta);
+      if (!active.imgEventId) break;
+      const st = await getLiveRound(active.imgEventId, r, meta);
       for (const [pid, hs] of st.holes) {
         const tee = st.tee.get(pid);
         const mins = teeToMinutes(tee?.teetime);

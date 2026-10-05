@@ -9,7 +9,7 @@
 import { NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { dpwtHoleByHole, dpwtLeaderboard, dpwtTeeMap, getDpwtActive, loadDpwtMeta } from "@/lib/dpwt/data";
+import { getDpwtActive, imgLeaderboard, imgRoundHoles, imgRoundTees, loadDpwtMeta, normName } from "@/lib/dpwt/data";
 import { getDpwtField } from "@/lib/dpwt/live";
 import { listTournamentConfigs } from "@/lib/scoring-model/tournament-config";
 
@@ -57,7 +57,7 @@ async function imgRoundSg(imgEventId: number) {
     for (const blk of blocks) for (const sc of blk.subCats ?? []) for (const rk of sc.rankings ?? []) {
       const pl = rk.players?.[0];
       if (!pl) continue;
-      const key = `${pl.firstName} ${pl.lastName}`.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z]/g, "");
+      const key = normName(`${pl.firstName} ${pl.lastName}`);
       const e = raw.get(key) ?? {};
       for (const rr of rk.rounds ?? []) (e[rr.round] ??= {})[sc.subCat] = rr.total;
       raw.set(key, e);
@@ -83,41 +83,42 @@ export async function GET() {
   const key = process.env.DATAGOLF_API_KEY || process.env.DATAGOLF || "";
   const [field, lb, pre, sgByName] = await Promise.all([
     getDpwtField(),
-    dpwtLeaderboard(active.dpwtEventId),
+    active.imgEventId ? imgLeaderboard(active.imgEventId) : Promise.resolve(new Map()),
     fetch(`${DG}/preds/pre-tournament?tour=euro&odds_format=percent&file_format=json&key=${key}`, { next: { revalidate: 1800 } } as RequestInit)
       .then((r) => (r.ok ? (r.json() as Promise<{ baseline?: PreRow[] }>) : null)).catch(() => null),
     active.imgEventId ? imgRoundSg(active.imgEventId) : Promise.resolve(new Map()),
   ]);
   const probs = new Map((pre?.baseline ?? []).map((p) => [p.dg_id, p]));
-  const lbById = new Map((lb?.Players ?? []).map((p) => [p.PlayerId, p]));
   const pars = meta?.courseHolePars ?? {};
-  const hbh: Record<number, Map<number, number>> = {};
-  const tees: Record<number, Map<number, { teetime: string }>> = {};
+  // Completed rounds (vs par) and tee times per round, keyed by name.
+  const hbh: Record<number, Map<string, number>> = {};
+  const tees: Record<number, Map<string, { teetime: string }>> = {};
   for (const r of [1, 2, 3, 4]) {
-    const [h, t] = await Promise.all([dpwtHoleByHole(active.dpwtEventId, r), dpwtTeeMap(active.dpwtEventId, r)]);
+    const [h, t] = active.imgEventId
+      ? await Promise.all([imgRoundHoles(active.imgEventId, r), imgRoundTees(active.imgEventId, r)])
+      : [new Map<string, { name: string; holes: Record<number, number> }>(), new Map<string, { teetime: string; startHole: number }>()];
     tees[r] = t;
-    const done = new Map<number, number>();
-    for (const p of h?.Players ?? []) {
-      const holes = (p.Holes ?? []).filter((x) => typeof x.Strokes === "number" && x.Strokes > 0);
-      if (holes.length === 18) done.set(p.PlayerId, holes.reduce((a, x) => a + (x.Strokes as number) - (pars[String(x.HoleNo)] ?? 4), 0));
+    const done = new Map<string, number>();
+    for (const [key, p] of h) {
+      const holes = Object.entries(p.holes);
+      if (holes.length === 18) done.set(key, holes.reduce((a, [hole, st]) => a + st - (pars[hole] ?? 4), 0));
     }
     hbh[r] = done;
   }
-  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z]/g, "");
   const players = [...field.values()].map((f) => {
-    const l = lbById.get(f.dpwtId);
+    const l = lb.get(f.key);
     const weekRounds: number[] = [];
     const weekRoundsSg: Array<{ sgOtt?: number; sgApp?: number; sgArg?: number; sgPutt?: number } | null> = [];
-    const sg = sgByName.get(norm(f.name));
+    const sg = sgByName.get(f.key);
     for (const r of [1, 2, 3, 4]) {
-      const v = hbh[r].get(f.dpwtId);
+      const v = hbh[r].get(f.key);
       if (v == null) continue;
       weekRounds.push(v);
       weekRoundsSg.push(sg?.[r] ?? null);
     }
     const teeTimes: Record<number, string> = {};
     for (const r of [1, 2, 3, 4]) {
-      const t = tees[r].get(f.dpwtId)?.teetime;
+      const t = tees[r].get(f.key)?.teetime;
       if (t) teeTimes[r] = t.slice(0, 5);
     }
     const pr = probs.get(f.dgId);
@@ -127,10 +128,10 @@ export async function GET() {
       name: f.name,
       sgTotal: f.skill,
       sgSource: f.skill != null ? "event-specific" : null,
-      position: l?.PositionDesc ?? "--",
-      total: l ? (l.ScoreToPar === 0 ? "E" : l.ScoreToPar > 0 ? `+${l.ScoreToPar}` : String(l.ScoreToPar)) : "E",
-      thru: l ? String(l.HolesPlayed ?? "-") : "-",
-      playerState: l?.MissedCut ? "CUT" : "ACTIVE",
+      position: l?.position ?? "--",
+      total: l?.toPar == null ? "E" : l.toPar === 0 ? "E" : l.toPar > 0 ? `+${l.toPar}` : String(l.toPar),
+      thru: l?.thru != null ? String(l.thru) : "-",
+      playerState: l?.cut ? "CUT" : "ACTIVE",
       weekRounds,
       weekRoundsSg,
       teeTimes,

@@ -199,6 +199,109 @@ export async function dpwtTeeMap(eventId: number, round: number) {
   return out;
 }
 
+// ── live: IMG Arena scoring ────────────────────────────────────────
+//
+// The Tour's sportdata API (above) is behind Akamai, which blocks
+// Vercel's datacenter IPs (403 from production, fine from a home IP).
+// IMG Arena serves the same live scoring and is reachable, so the live
+// routes read IMG. IMG only accepts the widget's own query texts
+// (data/dpwt/img-*-query.json, exact whitespace) and the variables in
+// alphabetical key order.
+
+interface ImgQuery { operationName: string; query: string; queryHash?: string | null }
+const imgQueries = new Map<string, ImgQuery>();
+async function imgQuery(name: string): Promise<ImgQuery | null> {
+  if (!imgQueries.has(name)) {
+    const q = await readJson<ImgQuery>(path.join(DIR, `img-${name}-query.json`));
+    if (!q) return null;
+    imgQueries.set(name, q);
+  }
+  return imgQueries.get(name)!;
+}
+const sortedKeys = (o: Record<string, unknown>) =>
+  Object.fromEntries(Object.keys(o).sort().map((k) => [k, o[k]]));
+
+async function imgPost<T>(eventId: number, name: string, input: Record<string, unknown>, revalidate = 20): Promise<T | null> {
+  const q = await imgQuery(name);
+  if (!q) return null;
+  return getLive<T>(
+    IMG,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json", operator: "europeantour", sport: "GOLF", "event-id": String(eventId),
+        "gql-op-name": q.operationName, "ec-version": "6.0.129", "x-request-from": "6.0.129",
+        ...(q.queryHash ? { "query-hash": q.queryHash } : {}),
+        "normalise-response": "true",
+        origin: "https://europeantour.apps.srarena.io", referer: "https://europeantour.apps.srarena.io/",
+      },
+      body: JSON.stringify({ operationName: q.operationName, query: q.query, variables: { input: sortedKeys(input) } }),
+    },
+    revalidate,
+  );
+}
+
+export const playerKey = (first: string, last: string) => normName(`${first} ${last}`);
+
+interface ImgTeam {
+  players?: Array<{ id: number; firstName: string; lastName: string }>;
+  roundScores?: Array<{ roundNo?: number; startHole?: number; holes?: Array<{ holeNumber: number; holeStrokes: number | null }> }>;
+}
+
+/** Every player's hole scores for a round: key -> hole -> strokes. */
+export async function imgRoundHoles(imgEventId: number, round: number) {
+  const j = await imgPost<{ data?: { getGolfTournamentGroups?: { groups?: Array<{ teams?: ImgTeam[] }> } } }>(
+    imgEventId, "holes", { roundNums: [round], tournamentId: imgEventId });
+  const out = new Map<string, { name: string; holes: Record<number, number> }>();
+  for (const g of j?.data?.getGolfTournamentGroups?.groups ?? []) for (const t of g.teams ?? []) {
+    const p = t.players?.[0];
+    if (!p) continue;
+    const rs = (t.roundScores ?? []).find((x) => x.roundNo === round) ?? (t.roundScores ?? [])[0];
+    const holes: Record<number, number> = {};
+    for (const h of rs?.holes ?? []) if (typeof h.holeStrokes === "number" && h.holeStrokes > 0) holes[h.holeNumber] = h.holeStrokes;
+    if (Object.keys(holes).length) out.set(playerKey(p.firstName, p.lastName), { name: `${p.firstName} ${p.lastName}`, holes });
+  }
+  return out;
+}
+
+/** Tee time ("HH:MM" local) and start hole per player for a round. */
+export async function imgRoundTees(imgEventId: number, round: number) {
+  const j = await imgPost<{ data?: { getGolfTournamentGroups?: { groups?: Array<{ startTime?: { time?: string }; teams?: ImgTeam[] }> } } }>(
+    imgEventId, "groups", { roundNums: [round], tournamentId: imgEventId }, 300);
+  const out = new Map<string, { teetime: string; startHole: number }>();
+  for (const g of j?.data?.getGolfTournamentGroups?.groups ?? []) {
+    const m = g.startTime?.time?.match(/T(\d{2}):(\d{2})/);
+    if (!m) continue;
+    for (const t of g.teams ?? []) {
+      const p = t.players?.[0];
+      if (!p) continue;
+      out.set(playerKey(p.firstName, p.lastName), { teetime: `${m[1]}:${m[2]}`, startHole: t.roundScores?.[0]?.startHole ?? 1 });
+    }
+  }
+  return out;
+}
+
+/** Live leaderboard: key -> position / to-par / holes thru / status. */
+export async function imgLeaderboard(imgEventId: number) {
+  const j = await imgPost<{ data?: { getGolfTournamentLeaderboard?: { standingsFeed?: { standings?: Array<{
+    players?: Array<{ firstName: string; lastName: string }>; status?: string; position?: { displayValue?: string };
+    toPar?: number | null; holesThrough?: number | null;
+  }> } } } }>(imgEventId, "leaderboard", { first: 250, tournamentId: imgEventId });
+  const out = new Map<string, { position: string; toPar: number | null; thru: number | null; cut: boolean }>();
+  for (const s of j?.data?.getGolfTournamentLeaderboard?.standingsFeed?.standings ?? []) {
+    const p = s.players?.[0];
+    if (!p) continue;
+    out.set(playerKey(p.firstName, p.lastName), {
+      position: s.position?.displayValue ?? "--",
+      toPar: s.toPar ?? null,
+      thru: s.holesThrough ?? null,
+      // IMG marks players who made the cut "Uncut", so match exactly.
+      cut: /^(cut|mc|missed ?cut|wd|withdrawn|dq|disqualified|retired)$/i.test((s.status ?? "").trim()),
+    });
+  }
+  return out;
+}
+
 // ── live: IMG Arena course setup (daily yardage + pins) ────────────
 
 let imgEvents: Record<string, { courseInfoHash?: string }> | null = null;

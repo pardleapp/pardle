@@ -17,8 +17,8 @@ import {
 } from "@/lib/analysis/course-birdies";
 import { listTournamentConfigs } from "@/lib/scoring-model/tournament-config";
 import {
-  dpwtHoleByHole,
   getDpwtActive,
+  imgRoundHoles,
   greenSvgDataUrl,
   imgLiveCourseRounds,
   loadDpwtHistorical,
@@ -132,15 +132,15 @@ async function liveEdition(slug: string, meta: DpwtMeta): Promise<EditionData | 
   const counts: PerHoleRoundCounts = new Map();
   const acc = new Map<string, { sum: number; n: number }>();
   for (const r of [1, 2, 3, 4]) {
-    const hbh = await dpwtHoleByHole(live.dpwtEventId, r);
-    for (const p of hbh?.Players ?? []) {
-      for (const h of p.Holes ?? []) {
-        if (typeof h.Strokes !== "number" || h.Strokes <= 0) continue;
-        const par = meta.courseHolePars[String(h.HoleNo)];
-        tallyPlayerHole(counts, h.HoleNo, r, h.Strokes, par);
-        const k = `${h.HoleNo}:${r}`;
+    if (!live.imgEventId) break;
+    const scores = await imgRoundHoles(live.imgEventId, r);
+    for (const p of scores.values()) {
+      for (const [hStr, strokes] of Object.entries(p.holes)) {
+        const hole = Number(hStr);
+        tallyPlayerHole(counts, hole, r, strokes, meta.courseHolePars[hStr]);
+        const k = `${hole}:${r}`;
         const a = acc.get(k) ?? { sum: 0, n: 0 };
-        a.sum += h.Strokes;
+        a.sum += strokes;
         a.n += 1;
         acc.set(k, a);
       }

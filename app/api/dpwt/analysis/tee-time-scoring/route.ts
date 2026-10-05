@@ -97,7 +97,8 @@ export async function GET(req: Request) {
     const [field, histAvg] = await Promise.all([getDpwtField(), historicalHoleAvgVsPar(slug, cfg.historicalYears)]);
     const rows: OutRow[] = [];
     for (const r of [1, 2, 3, 4] as RoundNum[]) {
-      const st = await getLiveRound(active.dpwtEventId, r, meta);
+      if (!active.imgEventId) break;
+      const st = await getLiveRound(active.imgEventId, r, meta);
       if (!st.tee.size && !st.holes.size) continue;
       for (const [pid, tee] of st.tee) {
         const fp = field.get(pid);

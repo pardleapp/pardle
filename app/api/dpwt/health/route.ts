@@ -43,6 +43,8 @@ export async function GET() {
       } } }),
     }),
   ]);
-  const ok = [sportdata, imgCourse, imgStats].every((p) => p.status === 200 && (p.bytes ?? 0) > 100);
-  return NextResponse.json({ ok, sportdata, imgCourse, imgStats });
+  // Live routes read IMG only; the Tour's sportdata API is reported for
+  // reference (Akamai blocks it from Vercel's IPs).
+  const ok = [imgCourse, imgStats].every((p) => p.status === 200 && (p.bytes ?? 0) > 100);
+  return NextResponse.json({ ok, imgCourse, imgStats, sportdataReference: sportdata });
 }
