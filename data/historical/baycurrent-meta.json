@@ -1,0 +1,52 @@
+{
+  "slug": "baycurrent",
+  "eventName": "Baycurrent Classic",
+  "venue": {
+    "name": "Yokohama Country Club",
+    "lat": 35.4465,
+    "lon": 139.5435,
+    "tz": "Asia/Tokyo"
+  },
+  "coursePar": 71,
+  "courseHolePars": {
+    "1": 4,
+    "2": 4,
+    "3": 3,
+    "4": 5,
+    "5": 4,
+    "6": 5,
+    "7": 3,
+    "8": 4,
+    "9": 4,
+    "10": 4,
+    "11": 4,
+    "12": 4,
+    "13": 4,
+    "14": 4,
+    "15": 4,
+    "16": 3,
+    "17": 4,
+    "18": 4
+  },
+  "holeBearings": {
+    "1": 167.7,
+    "2": 353.8,
+    "3": 185.1,
+    "4": 303,
+    "5": 11.7,
+    "6": 197.9,
+    "7": 73.5,
+    "8": 19.8,
+    "9": 138.3,
+    "10": 314.3,
+    "11": 315.4,
+    "12": 218,
+    "13": 168.2,
+    "14": 17,
+    "15": 111.6,
+    "16": 123.6,
+    "17": 172.4,
+    "18": 351.8
+  },
+  "holeBearingsHint": "Compass bearings (0-360 deg) per hole, tee to green, from OSM golf=hole ways. Tournament composite routing (7,315 yd, par 71): holes 1-9 = West 10-18, holes 10-16 = West 1 and 4-9 (West 2-3 skipped), holes 17-18 = East 17-18. Mapping chains tee-to-green and matches card pars/yardages; West 18 is tagged par 5 in OSM but plays par 4. Holes 11-12 (West 4-5) use different tees from OSM's ways (card 470-530 / 444-459 vs OSM 415 / 516 straight-line), so their bearings are the least certain."
+}

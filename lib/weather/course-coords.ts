@@ -55,13 +55,22 @@ const BY_COURSE: Record<string, CourseCoords> = {
     tz: "America/Denver",
     displayName: "Black Desert Resort",
   },
+  // Centroid of the West course hole ways in OSM, where 16 of the 18
+  // tournament holes are. DataGolf's schedule coord (35.446, 139.549)
+  // sits ~500 m east, between the two courses.
+  "Yokohama Country Club": {
+    lat: 35.4465,
+    lon: 139.5435,
+    tz: "Asia/Tokyo",
+    displayName: "Yokohama Country Club",
+  },
 };
 
 /** By PGA orchestrator tournament id (e.g. R2026525). Same coords
  *  as the course entry above but keyed for the live path. Suffix
  *  525 = 3M Open, 524 = Rocket Classic, 013 = Wyndham Championship,
  *  027 = FedEx St. Jude Championship, 060 = TOUR Championship,
- *  554 = Bank of Utah Championship. */
+ *  554 = Bank of Utah Championship, 527 = Baycurrent Classic. */
 const BY_TOURNAMENT_ID: Record<string, CourseCoords> = {
   // 3M Open — TPC Twin Cities
   R2023525: BY_COURSE["TPC Twin Cities"],
@@ -92,6 +101,10 @@ const BY_TOURNAMENT_ID: Record<string, CourseCoords> = {
   R2024554: BY_COURSE["Black Desert Resort"],
   R2025554: BY_COURSE["Black Desert Resort"],
   R2026554: BY_COURSE["Black Desert Resort"],
+  // Baycurrent Classic — Yokohama CC. 527 was the ZOZO at Narashino
+  // through 2024, so only 2025 onward map here.
+  R2025527: BY_COURSE["Yokohama Country Club"],
+  R2026527: BY_COURSE["Yokohama Country Club"],
 };
 
 export function coordsForCourse(name: string | null | undefined): CourseCoords | null {
