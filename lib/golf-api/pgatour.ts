@@ -295,6 +295,30 @@ export async function getLeaderboard(
     }));
 }
 
+/** Pre-tournament roster as leaderboard-shaped rows. leaderboardV2
+ *  returns zero players until tee times post (usually Tuesday or
+ *  Wednesday), while `field` lists the entries as soon as the field
+ *  is set. */
+export async function getFieldRoster(
+  tournamentId: string,
+): Promise<PGALeaderboardRow[]> {
+  const data = await gql<{
+    field: { players: ({ id?: string; displayName?: string } | null)[] } | null;
+  }>(`{ field(id: "${tournamentId}") { players { id displayName } } }`);
+  return (data?.field?.players ?? [])
+    .filter((p): p is { id: string; displayName: string } => !!p?.id && !!p.displayName)
+    .map((p) => ({
+      playerId: p.id,
+      displayName: p.displayName,
+      position: "--",
+      total: "E",
+      thru: "-",
+      score: "E",
+      currentRound: null,
+      playerState: "ACTIVE",
+    }));
+}
+
 // ──────────────────────────────────────────────────────────────────
 // Scorecards (per-hole detail + play-by-play)
 // ──────────────────────────────────────────────────────────────────

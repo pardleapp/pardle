@@ -56,18 +56,26 @@ export async function getHrrrHourlyWind(
   // past_days ("mutually exclusive"). The start_date/end_date already
   // pins the exact window we want; past_days isn't needed and 400s
   // the request silently, causing every wind lookup to fall back to 0.
-  const url =
+  const base =
     `https://api.open-meteo.com/v1/forecast` +
     `?latitude=${lat}&longitude=${lon}` +
     `&hourly=wind_speed_10m,wind_direction_10m` +
     `&wind_speed_unit=mph` +
     `&start_date=${date}&end_date=${date}` +
-    `&timezone=${encodeURIComponent(timezone)}` +
-    `&models=gfs_hrrr`;
+    `&timezone=${encodeURIComponent(timezone)}`;
+  const url = base + `&models=gfs_hrrr`;
 
   let payload: OpenMeteoHrrrResp | null = null;
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    let res = await fetch(url, { cache: "no-store" });
+    // HRRR only covers the continental US. Elsewhere (e.g. the
+    // Baycurrent in Japan) Open-Meteo 400s with "No data is available
+    // for this location", and the forecast would fall back to zero
+    // wind. Retry on Open-Meteo's default model, which picks the best
+    // regional model for the location.
+    if (res.status === 400) {
+      res = await fetch(base, { cache: "no-store" });
+    }
     if (!res.ok) {
       console.warn(`[hrrr] ${res.status}: ${url}`);
       cache.set(cacheKey, { ts: now, data: [] });

@@ -221,11 +221,14 @@ async function buildHistoricalCells(slug: string, year: number) {
 async function fetchLiveWeatherByRoundLocal(
   tournamentId: string | null,
   fieldRows: { teetimes?: { round_num?: number; teetime?: string }[] }[],
+  configDates: Record<string, string> | null,
 ): Promise<Record<string, DailyWeather | null> | null> {
   const coords = coordsForTournamentId(tournamentId);
   if (!coords) return null;
-  let earliest: string | null = null;
-  for (const f of fieldRows) {
+  // Onboarded round dates win; DG's R1 tee times aren't published
+  // until the week of the event.
+  let earliest: string | null = configDates?.["1"] ?? null;
+  for (const f of earliest ? [] : fieldRows) {
     for (const t of f.teetimes ?? []) {
       if (t.round_num !== 1 || !t.teetime) continue;
       const day = t.teetime.slice(0, 10);
@@ -461,6 +464,7 @@ export async function GET(req: Request) {
     const weatherByRound = await fetchLiveWeatherByRoundLocal(
       tournamentId,
       field.field ?? [],
+      liveCfg?.liveRoundDates ?? null,
     );
 
     return NextResponse.json({

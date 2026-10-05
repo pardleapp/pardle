@@ -14,6 +14,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
   getActiveTournament,
+  getFieldRoster,
   getLeaderboard,
   getScorecards,
   type PGAScorecard,
@@ -222,7 +223,7 @@ export async function GET() {
   }
 
   const [
-    leaderboard,
+    leaderboardRows,
     dgTeeTimes,
     pgaToDg,
     dgSkillByDgId,
@@ -246,6 +247,12 @@ export async function GET() {
     // render both.
     getPreTournamentProbs("pga").catch(() => []),
   ]);
+  // Early in tournament week the leaderboard is empty, which left the
+  // player picker blank until tee times posted.
+  const leaderboard =
+    leaderboardRows.length > 0
+      ? leaderboardRows
+      : await getFieldRoster(tournamentId).catch(() => []);
   const dgProbsByDgId = new Map<number, typeof dgPreProbs[number]>();
   for (const p of dgPreProbs) {
     const n = Number(p.dgId);

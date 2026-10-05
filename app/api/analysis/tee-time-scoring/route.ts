@@ -305,12 +305,21 @@ const HARDCODED_ROUND_DATES: Record<string, Record<1 | 2 | 3 | 4, string>> = {
 async function fetchLiveWeatherByRound(
   activeTournamentId: string | null,
   fieldRows: { teetimes?: { round_num?: number; teetime?: string }[] }[],
+  configDates: Record<string, string> | null,
 ): Promise<Record<string, DailyWeather | null> | null> {
   const coords = coordsForTournamentId(activeTournamentId);
   if (!coords) return null;
+  // Config dates first: before the field's tee times are published,
+  // deriveRoundDates falls back to "R3 = today", which pre-week shows
+  // the previous weekend's weather.
+  const fromConfig =
+    configDates?.["1"] && configDates["2"] && configDates["3"] && configDates["4"]
+      ? { 1: configDates["1"], 2: configDates["2"], 3: configDates["3"], 4: configDates["4"] }
+      : null;
   const dates =
-    (activeTournamentId && HARDCODED_ROUND_DATES[activeTournamentId]) ||
-    deriveRoundDates(fieldRows);
+    fromConfig ??
+    ((activeTournamentId && HARDCODED_ROUND_DATES[activeTournamentId]) ||
+      deriveRoundDates(fieldRows));
   const flat = [dates[1], dates[2], dates[3], dates[4]];
   const daily = await getDailyWeather(coords.lat, coords.lon, flat, coords.tz);
   const byDate = new Map(daily.map((d) => [d.date, d]));
@@ -519,7 +528,7 @@ export async function GET(req: Request) {
       activeTournamentId
         ? getCoursePins(activeTournamentId).catch(() => null)
         : Promise.resolve(null),
-      fetchLiveWeatherByRound(activeTournamentId, fieldRows),
+      fetchLiveWeatherByRound(activeTournamentId, fieldRows, roundDates),
     ]);
     // Upgrade the FORECAST rounds' wind (any round dated ≥ today) to
     // HRRR resolution. The default Open-Meteo GFS blend is fine for
