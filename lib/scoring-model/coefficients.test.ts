@@ -113,6 +113,23 @@ describe("assembleHoleFit", () => {
     expect(assembleHoleFit(rows, {})).toBeNull();
   });
 
+  it("falls back to the weighted hole mean for a single past edition", () => {
+    // One pin per round, 4 rounds: too few rows for the regression.
+    const rows: FitRow[] = [1, 2, 3, 4].map((round, i) => ({
+      clusterIdx: i, round,
+      yards: 400 + i * 10, headwind: i - 2,
+      avgVsPar: [0.2, 0.0, 0.1, 0.3][i], total: i === 3 ? 200 : 100,
+    }));
+    const fit = assembleHoleFit(rows, {});
+    expect(fit).not.toBeNull();
+    expect(fit!.bYards).toBe(0);
+    expect(fit!.bHead).toBe(0);
+    // (0.2 + 0.0 + 0.1) × 100 + 0.3 × 200 over 500 total weight
+    expect(fit!.histMeanAvgVsPar).toBeCloseTo(0.18, 6);
+    for (const v of Object.values(fit!.clusterResiduals)) expect(v).toBe(0);
+    expect(fit!.historicalPins).toEqual([]);
+  });
+
   it("computes per-round baselines when rounds have ≥3 rows", () => {
     // Mix of R1 and R3 rows with distinct avg-vs-par means.
     const yardsList = [380, 400, 420, 440, 380, 400, 420, 440];

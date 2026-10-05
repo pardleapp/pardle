@@ -117,6 +117,19 @@ function fitPerHoleYardsOnly(
   };
 }
 
+function fitMeanOnly(
+  rows: FitRow[],
+): { bYards: number; bHead: number; intercept: number } {
+  let w = 0;
+  let s = 0;
+  for (const r of rows) {
+    const wi = Math.max(1, r.total);
+    w += wi;
+    s += r.avgVsPar * wi;
+  }
+  return { bYards: 0, bHead: 0, intercept: s / w };
+}
+
 /** Given a fit + the fit rows + centroid coords per cluster, return
  *  a complete HoleFit including cluster residuals and baseline stats.
  *  Returns null if the underlying fit was too degenerate. */
@@ -124,7 +137,14 @@ export function assembleHoleFit(
   rows: FitRow[],
   clusterCentroids: Record<string, { x: number; y: number }>,
 ): HoleFit | null {
-  const fit = fitPerHole(rows);
+  // A venue with a single past edition has one pin per round, so 4 rows
+  // per hole: too few for the regression. Without a fit the hole drops
+  // out and the field forecast collapses to par (Baycurrent 2026: 71 vs
+  // a 72.05 historical round mean), so fall back to the hole's
+  // weighted historical mean with no yardage/wind slope.
+  const regression = fitPerHole(rows);
+  const meanOnly = !regression && rows.length >= 4;
+  const fit = regression ?? (meanOnly ? fitMeanOnly(rows) : null);
   if (!fit) return null;
 
   // Weighted mean residual per cluster + per-round baselines.
@@ -158,7 +178,9 @@ export function assembleHoleFit(
   }
   const clusterResiduals: Record<string, number> = {};
   for (const [letter, a] of Object.entries(clusterAgg)) {
-    clusterResiduals[letter] = a.s / a.w;
+    // With one pin per cluster the residual is just that round's
+    // conditions, not pin difficulty, so don't carry it forward.
+    clusterResiduals[letter] = meanOnly ? 0 : a.s / a.w;
   }
   const histMeanAvgVsParByRound: Partial<Record<1 | 2 | 3 | 4, number>> = {};
   const histMeanYardsByRound: Partial<Record<1 | 2 | 3 | 4, number>> = {};
@@ -181,7 +203,8 @@ export function assembleHoleFit(
   // shift calc) can weight by `total` and average across nearby
   // historical pins to get a pin-specific expected residual.
   const historicalPins: HoleFit["historicalPins"] = [];
-  for (const r of rows) {
+  // Same reasoning as the cluster residuals: skip for mean-only fits.
+  for (const r of meanOnly ? [] : rows) {
     if (typeof r.pinX !== "number" || typeof r.pinY !== "number") continue;
     const roundBase =
       perRoundAgg[r.round]?.rows && perRoundAgg[r.round]!.rows >= 3
