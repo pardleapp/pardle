@@ -18,11 +18,26 @@
  * Re-run weekly (Tuesdays after the previous event is settled).
  * Output is idempotent — same input = same JSON byte-for-byte.
  */
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, readdir } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// SG categories computed from ShotLink shots for events DataGolf only
+// has SG: Total for (scripts/compute-shot-sg.mjs). Same overlay as
+// lib/golf-api/computed-sg.ts: fills nulls only.
+const COMPUTED_SG = new Map();
+try {
+  const dir = resolve(__dirname, "../data/sg-computed");
+  for (const f of await readdir(dir)) {
+    if (!f.endsWith(".json")) continue;
+    const j = JSON.parse(await readFile(resolve(dir, f), "utf-8"));
+    COMPUTED_SG.set(`${j.eventId}:${j.year}`, j.players);
+  }
+} catch {
+  /* no computed events */
+}
 
 // Load .env.local — same pattern the other scripts use.
 async function loadEnvFile(path) {
@@ -124,7 +139,11 @@ async function main() {
     console.log(`[build-season-rounds] fetching event list for ${season}…`);
     const events = await dg(`/historical-raw-data/event-list?tour=${TOUR}`);
     const inSeason = events
-      .filter((e) => e.calendar_year === season && e.sg_categories === "yes")
+      .filter(
+        (e) =>
+          e.calendar_year === season &&
+          (e.sg_categories === "yes" || COMPUTED_SG.has(`${e.event_id}:${season}`)),
+      )
       .sort((a, b) => (a.date < b.date ? 1 : -1));
     console.log(
       `[build-season-rounds] ${season}: ${inSeason.length} events with SG data`,
@@ -151,7 +170,17 @@ async function main() {
         continue;
       }
       if (!payload || !Array.isArray(payload.scores)) continue;
+      const computed = COMPUTED_SG.get(`${ev.event_id}:${season}`);
       for (const row of payload.scores) {
+        const cp = computed?.[String(row.dg_id)];
+        if (cp) {
+          for (let r = 1; r <= 4; r++) {
+            const rd = row[`round_${r}`];
+            const c = cp[String(r)];
+            if (!rd || !c) continue;
+            for (const k of ["sg_ott", "sg_app", "sg_arg", "sg_putt", "sg_t2g"]) rd[k] ??= c[k];
+          }
+        }
         const displayName = flipName(row.player_name);
         const key = normaliseName(displayName);
         if (!key) continue;

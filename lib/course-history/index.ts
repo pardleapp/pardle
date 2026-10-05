@@ -32,6 +32,7 @@ import {
   type DGHistoricalEvent,
   type DGHistoricalRound,
 } from "@/lib/golf-api/datagolf";
+import { withComputedSgEvents } from "@/lib/golf-api/computed-sg";
 import {
   computePersistence,
   reliabilityFor,
@@ -115,10 +116,13 @@ const SKILL_DRIFT_THRESHOLD = 1.0;
 // default sort to the adjusted number. Bumped so cached v17 blobs —
 // which have neither field — don't get served to a client that now
 // expects them.
+// v19 / year-baseline v2: events with SG computed from ShotLink shots
+// (lib/golf-api/computed-sg) now count, so cached aggregates and
+// per-year baselines built without them are dropped.
 const KEY_AGGREGATE_COURSE = (courseName: string) =>
-  `course-history:agg-course:v18:${slugify(courseName)}`;
+  `course-history:agg-course:v19:${slugify(courseName)}`;
 const KEY_YEAR_BASELINE = (year: number) =>
-  `course-history:year-baseline:${year}`;
+  `course-history:year-baseline:v2:${year}`;
 /** Course index mapping course_name → occurrences (event, year, round
  *  count). Populated incrementally as we fetch event data.
  *  v10 = added second-round aliases for Bay Hill, Torrey Pines,
@@ -126,8 +130,10 @@ const KEY_YEAR_BASELINE = (year: number) =>
  *  v11 = rebuild to pick up 2026 events after HISTORICAL_YEARS bump
  *  (previously-cached index blob was built pre-2026 and never
  *  self-refreshed, so 2026 events like Truist at Quail Hollow were
- *  missing entirely from the course-fit archive). */
-const KEY_COURSE_INDEX = "course-history:course-index:v11";
+ *  missing entirely from the course-fit archive).
+ *  v12 = rebuild to add events with computed SG (Baycurrent 2025 at
+ *  Yokohama CC). */
+const KEY_COURSE_INDEX = "course-history:course-index:v12";
 
 function slugify(s: string): string {
   return s
@@ -312,7 +318,9 @@ export async function getCachedEventList(): Promise<DGHistoricalEvent[]> {
     const cached = await redis
       .get<DGHistoricalEvent[]>(KEY_EVENT_LIST)
       .catch(() => null);
-    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    if (cached && Array.isArray(cached) && cached.length > 0) {
+      return withComputedSgEvents(cached);
+    }
   }
   const list = await getHistoricalEventList("pga");
   if (redis) {

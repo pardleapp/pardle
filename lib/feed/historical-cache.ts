@@ -19,6 +19,10 @@ import {
   type DGHistoricalEvent,
   type DGHistoricalRoundsPayload,
 } from "@/lib/golf-api/datagolf";
+import {
+  withComputedSgEvents,
+  withComputedSgRounds,
+} from "@/lib/golf-api/computed-sg";
 
 const redis = Redis.fromEnv();
 
@@ -37,7 +41,8 @@ export async function getCachedHistoricalEventList(
 ): Promise<DGHistoricalEvent[]> {
   const k = eventListKey(tour);
   const cached = await redis.get<DGHistoricalEvent[]>(k);
-  if (cached) return cached;
+  // Payloads cached before an event's computed SG shipped lack it.
+  if (cached) return withComputedSgEvents(cached);
   let fresh: DGHistoricalEvent[] = [];
   try {
     fresh = await getHistoricalEventList(tour);
@@ -56,7 +61,7 @@ export async function getCachedHistoricalRounds(
 ): Promise<DGHistoricalRoundsPayload | null> {
   const k = roundsKey(tour, eventId, year);
   const cached = await redis.get<DGHistoricalRoundsPayload>(k);
-  if (cached) return cached;
+  if (cached) return withComputedSgRounds(cached, eventId, year);
   try {
     const fresh = await getHistoricalRounds(eventId, year, tour);
     await redis.set(k, fresh, { ex: ROUNDS_TTL_S });

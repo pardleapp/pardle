@@ -18,6 +18,7 @@
 
 import "server-only";
 import type { FieldGolfer, GolferRoundScore } from "@/lib/fantasy/types";
+import { withComputedSgEvents, withComputedSgRounds } from "./computed-sg";
 
 const BASE = "https://feeds.datagolf.com";
 
@@ -630,8 +631,10 @@ export interface DGHistoricalEvent {
 export async function getHistoricalEventList(
   tour: string = "pga",
 ): Promise<DGHistoricalEvent[]> {
-  return await fetchJson<DGHistoricalEvent[]>(
-    `/historical-raw-data/event-list?tour=${encodeURIComponent(tour)}`,
+  return withComputedSgEvents(
+    await fetchJson<DGHistoricalEvent[]>(
+      `/historical-raw-data/event-list?tour=${encodeURIComponent(tour)}`,
+    ),
   );
 }
 
@@ -693,7 +696,11 @@ export async function getHistoricalRounds(
   year: number,
   tour: string = "pga",
 ): Promise<DGHistoricalRoundsPayload> {
-  return await fetchJson<DGHistoricalRoundsPayload>(
-    `/historical-raw-data/rounds?tour=${encodeURIComponent(tour)}&event_id=${eventId}&year=${year}`,
+  return withComputedSgRounds(
+    await fetchJson<DGHistoricalRoundsPayload>(
+      `/historical-raw-data/rounds?tour=${encodeURIComponent(tour)}&event_id=${eventId}&year=${year}`,
+    ),
+    eventId,
+    year,
   );
 }
