@@ -40,7 +40,11 @@ const BASELINE_ROUNDS = 50;
 const BASELINE_SHRINKAGE_K = 20;
 const SKILL_DRIFT_THRESHOLD = 1.0;
 
-const normCourse = (s: string | null | undefined) => (s ?? "").trim();
+// DataGolf's euro course names come lower-case; match case-insensitively
+// and display title-cased.
+const normCourse = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
+const displayCourse = (s: string) =>
+  s.replace(/(^|[\s'-])([a-zà-ÿ])/g, (_m, a: string, b: string) => a + b.toUpperCase()).replace(/\b(De|Del|La|Las|Los|Y|Of|The|At)\b/g, (w, _x, i) => (i === 0 ? w : w.toLowerCase()));
 const yearOf = (d: string) => Number(d.slice(0, 4));
 const dayNum = (d: string) => {
   const [y, m, dd] = d.split("-").map(Number);
@@ -124,7 +128,7 @@ export function getDpwtCourses(): CuratedCourse[] {
   });
   return [...by]
     .map(([courseName, b]) => ({
-      courseName,
+      courseName: displayCourse(courseName),
       totalRounds: b.rounds,
       yearsPresent: b.years.size,
       hostingEvents: [...b.events].sort(),
@@ -244,7 +248,7 @@ export async function getDpwtCourseHistory(course: string): Promise<CourseHistor
       name: H.players[b.key]?.name ?? b.key,
       roundsPlayed: b.rounds,
       yearsPlayed: b.years.size,
-      courseName: clean,
+      courseName: displayCourse(clean),
       atCourseSgOtt: atOtt,
       atCourseSgApp: atApp,
       atCourseCombined: atOtt + atApp,
@@ -268,7 +272,7 @@ export async function getDpwtCourseHistory(course: string): Promise<CourseHistor
   return {
     eventId: -1,
     eventName: hosting.length > 1 ? `${hosting[0]} + ${hosting.length - 1} more` : hosting[0],
-    courseName: clean,
+    courseName: displayCourse(clean),
     yearsCovered: [...new Set([...atEvents].map((i) => yearOf(H.events[i].date)))].sort(),
     players: out,
     cachedAt: new Date().toISOString(),

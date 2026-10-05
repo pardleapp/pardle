@@ -11,6 +11,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { dpwtHoleByHole, dpwtLeaderboard, dpwtTeeMap, getDpwtActive, loadDpwtMeta } from "@/lib/dpwt/data";
 import { getDpwtField } from "@/lib/dpwt/live";
+import { listTournamentConfigs } from "@/lib/scoring-model/tournament-config";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -138,10 +139,13 @@ export async function GET() {
         : undefined,
     };
   });
+  // Full event name, as course history's hostingEvents carry it: the
+  // course-history tool auto-selects this week's venue by exact match.
+  const cfg = (await listTournamentConfigs("dpwt")).find((c) => c.slug === active.slug);
   return NextResponse.json({
     ok: true,
     tournamentId: active.tournamentId,
-    tournamentName: meta?.eventName ?? null,
+    tournamentName: cfg?.eventName ?? meta?.eventName ?? null,
     players: players.sort((a, b) => a.name.localeCompare(b.name)),
   });
 }

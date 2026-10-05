@@ -88,7 +88,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
           {tour === "dpwt" ? (
             <>
               Ballstriking course fit for every DP World Tour venue with
-              shot-by-shot tracking since 2022. Rounds are grouped by{" "}
+              shot-by-shot strokes gained (2024 onward). Rounds are grouped by{" "}
               <strong>course</strong>, not event, so a tournament that
               moves venue is split cleanly by course.
             </>
