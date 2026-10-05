@@ -1,0 +1,5 @@
+{
+ "query": "\n  query StatsGetGolfTournamentStats($input: GetGolfTournamentStatsInput!) {\n    getGolfTournamentStats(input: $input) {\n      category\n      fieldAvgs {\n        subCat\n        total\n        rounds {\n          average\n          percentage\n          round\n        }\n      }\n      subCats {\n        subCat\n        ...GolfStatRanking\n      }\n    }\n  }\n\n  fragment GolfStatRanking on GolfStatSubCatDetails {\n    rankings {\n      teamId\n      players {\n        id\n        lastName\n        firstName\n        country\n      }\n      rounds {\n        round\n        rank\n        total\n        divisor\n        average\n        percentile\n      }\n      total {\n        total\n        divisor\n        rank\n        average\n        percentile\n      }\n    }\n  }\n",
+ "operationName": "StatsGetGolfTournamentStats",
+ "queryHash": "2754409400"
+}
