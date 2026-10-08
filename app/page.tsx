@@ -30,6 +30,13 @@ interface Article {
 // now lives at /).
 const ARTICLES: Article[] = [
   {
+    slug: "open-de-espana-r2-forecast",
+    title: "Why Club de Campo bit back — and what it means for round 2",
+    dek: "A soft course was supposed to mean birdies. Instead the field averaged 72.34. We took the round apart — player interviews, shot-level numbers and the wind — and rebuilt Friday's forecast from what actually happened.",
+    date: "2026-10-08",
+    tag: "R2 forecast",
+  },
+  {
     slug: "six-percent-rule",
     title: "The six percent rule",
     dek: "Jeremy Paul is tied second at 11 under and rated 65th of the 70 players left. Across 14,575 player-events, almost none of a hot 36 holes carries into Saturday — which makes his round-3 line the biggest edge on the board.",

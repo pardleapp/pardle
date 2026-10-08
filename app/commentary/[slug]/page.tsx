@@ -10,6 +10,7 @@ import ArticleR2ScoringForecast from "./_articles/ArticleR2ScoringForecast";
 import ArticleSchefflerR3Dynamics from "./_articles/ArticleSchefflerR3Dynamics";
 import ArticleLebiodaBet from "./_articles/ArticleLebiodaBet";
 import ArticleSixPercentRule from "./_articles/ArticleSixPercentRule";
+import ArticleEspanaR2 from "./_articles/ArticleEspanaR2";
 
 interface Article {
   slug: string;
@@ -30,6 +31,14 @@ const LEBIODA_ARTICLE: Article = {
 };
 
 const ARTICLES: Record<string, Article> = {
+  "open-de-espana-r2-forecast": {
+    slug: "open-de-espana-r2-forecast",
+    title: "Why Club de Campo bit back — and what it means for round 2",
+    dek: "A soft course was supposed to mean birdies. Instead the field averaged 72.34. We took the round apart — player interviews, shot-level numbers and the wind — and rebuilt Friday's forecast from what actually happened.",
+    date: "2026-10-08",
+    tag: "R2 forecast",
+    Body: ArticleEspanaR2,
+  },
   "six-percent-rule": {
     slug: "six-percent-rule",
     title: "The six percent rule",
