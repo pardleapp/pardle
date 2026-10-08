@@ -76,45 +76,58 @@ export const RAIN = `<svg viewBox="0 0 780 330" xmlns="http://www.w3.org/2000/sv
 <text x="760" y="322" text-anchor="end" font-size="11" fill="var(--dim)">Same rain gauge 2 km from the course every year</text>
 </svg>`;
 
-export const SPLIT = `<svg viewBox="0 0 780 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Where the extra shots went">
-<line x1="210.0" y1="30" x2="210.0" y2="204" stroke="var(--grid)" stroke-width="1"/>
-<text x="210.0" y="220" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">-1</text>
-<line x1="287.1" y1="30" x2="287.1" y2="204" stroke="var(--grid)" stroke-width="1"/>
-<text x="287.1" y="220" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">-0.5</text>
-<line x1="364.3" y1="30" x2="364.3" y2="204" stroke="var(--grid)" stroke-width="1"/>
-<text x="364.3" y="220" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">+0</text>
-<line x1="441.4" y1="30" x2="441.4" y2="204" stroke="var(--grid)" stroke-width="1"/>
-<text x="441.4" y="220" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">+0.5</text>
-<line x1="518.6" y1="30" x2="518.6" y2="204" stroke="var(--grid)" stroke-width="1"/>
-<text x="518.6" y="220" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">+1</text>
-<line x1="595.7" y1="30" x2="595.7" y2="204" stroke="var(--grid)" stroke-width="1"/>
-<text x="595.7" y="220" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">+1.5</text>
-<line x1="672.9" y1="30" x2="672.9" y2="204" stroke="var(--grid)" stroke-width="1"/>
-<text x="672.9" y="220" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">+2</text>
-<line x1="750.0" y1="30" x2="750.0" y2="204" stroke="var(--grid)" stroke-width="1"/>
-<text x="750.0" y="220" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">+2.5</text>
-<line x1="364.3" y1="30" x2="364.3" y2="204" stroke="var(--line)" stroke-width="1.5"/>
-<text x="198" y="77.5" text-anchor="end" font-size="12.5" font-weight="700" fill="var(--ink)">vs 2025 round 1</text>
-<rect x="364.3" y="43.0" width="106.5" height="17.3" rx="3" fill="var(--tang)"/>
-<text x="476.7" y="55.2" text-anchor="start" font-size="11.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono,monospace">+0.69</text>
-<rect x="364.3" y="63.3" width="47.8" height="17.3" rx="3" fill="var(--emerald)"/>
-<text x="418.1" y="75.5" text-anchor="start" font-size="11.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono,monospace">+0.31</text>
-<rect x="364.3" y="83.7" width="154.3" height="17.3" rx="3" fill="var(--ink)"/>
-<text x="524.6" y="95.8" text-anchor="start" font-size="11.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono,monospace">+1.00</text>
-<text x="198" y="164.5" text-anchor="end" font-size="12.5" font-weight="700" fill="var(--ink)">vs 2025 round 2</text>
-<rect x="364.3" y="130.1" width="344.1" height="17.3" rx="3" fill="var(--tang)"/>
-<text x="714.3" y="142.2" text-anchor="start" font-size="11.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono,monospace">+2.23</text>
-<rect x="285.6" y="150.4" width="78.7" height="17.3" rx="3" fill="var(--emerald)"/>
-<text x="279.6" y="162.5" text-anchor="end" font-size="11.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono,monospace">-0.51</text>
-<rect x="364.3" y="170.7" width="265.4" height="17.3" rx="3" fill="var(--ink)"/>
-<text x="635.7" y="182.8" text-anchor="start" font-size="11.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono,monospace">+1.72</text>
+export const CHANGES = `<svg viewBox="0 0 780 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="What changed per round for the same players">
+<line x1="210.0" y1="30" x2="210.0" y2="214" stroke="var(--grid)" stroke-width="1"/>
+<text x="210.0" y="230" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">-1</text>
+<line x1="345.0" y1="30" x2="345.0" y2="214" stroke="var(--grid)" stroke-width="1"/>
+<text x="345.0" y="230" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">-0.5</text>
+<line x1="480.0" y1="30" x2="480.0" y2="214" stroke="var(--grid)" stroke-width="1"/>
+<text x="480.0" y="230" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">+0</text>
+<line x1="615.0" y1="30" x2="615.0" y2="214" stroke="var(--grid)" stroke-width="1"/>
+<text x="615.0" y="230" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">+0.5</text>
+<line x1="750.0" y1="30" x2="750.0" y2="214" stroke="var(--grid)" stroke-width="1"/>
+<text x="750.0" y="230" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">+1</text>
+<line x1="480.0" y1="30" x2="480.0" y2="214" stroke="var(--line)" stroke-width="1.5"/>
+<text x="198" y="57.0" text-anchor="end" font-size="12.5" font-weight="700" fill="var(--ink)">Chances inside 20 ft</text>
+<rect x="299.1" y="36.9" width="180.9" height="29.2" rx="3" fill="var(--tang)"/>
+<text x="293.1" y="55.0" text-anchor="end" font-size="11.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono,monospace">-0.67</text>
+<text x="198" y="103.0" text-anchor="end" font-size="12.5" font-weight="700" fill="var(--ink)">Birdies or better</text>
+<rect x="326.1" y="82.9" width="153.9" height="29.2" rx="3" fill="var(--tang)"/>
+<text x="320.1" y="101.0" text-anchor="end" font-size="11.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono,monospace">-0.57</text>
+<text x="198" y="149.0" text-anchor="end" font-size="12.5" font-weight="700" fill="var(--ink)">Bogeys or worse</text>
+<rect x="480.0" y="128.9" width="243.0" height="29.2" rx="3" fill="var(--tang)"/>
+<text x="729.0" y="147.0" text-anchor="start" font-size="11.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono,monospace">+0.90</text>
+<text x="198" y="195.0" text-anchor="end" font-size="12.5" font-weight="700" fill="var(--ink)">Three-putts</text>
+<rect x="480.0" y="174.9" width="110.7" height="29.2" rx="3" fill="var(--tang)"/>
+<text x="596.7" y="193.0" text-anchor="start" font-size="11.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono,monospace">+0.41</text>
 <rect x="420" y="4" width="12" height="12" rx="3" fill="var(--tang)"/>
-<text x="437" y="14" font-size="11.5" font-weight="700" fill="var(--ink)">Putts</text>
-<rect x="532" y="4" width="12" height="12" rx="3" fill="var(--emerald)"/>
-<text x="549" y="14" font-size="11.5" font-weight="700" fill="var(--ink)">Everything else</text>
-<rect x="644" y="4" width="12" height="12" rx="3" fill="var(--ink)"/>
-<text x="661" y="14" font-size="11.5" font-weight="700" fill="var(--ink)">Total</text>
-<text x="480.0" y="242" text-anchor="middle" font-size="11" font-weight="700" fill="var(--dim)" letter-spacing=".08em">STROKES PER ROUND, SAME 39 PLAYERS</text>
+<text x="437" y="14" font-size="11.5" font-weight="700" fill="var(--ink)">Change per round vs 2025 round 1</text>
+<text x="480.0" y="252" text-anchor="middle" font-size="11" font-weight="700" fill="var(--dim)" letter-spacing=".08em">PER ROUND, SAME 85 PLAYERS</text>
+</svg>`;
+
+export const PUTTS = `<svg viewBox="0 0 780 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Extra putts on greens hit: distance left versus putting">
+<line x1="210.0" y1="30" x2="210.0" y2="184" stroke="var(--grid)" stroke-width="1"/>
+<text x="210.0" y="200" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">+0</text>
+<line x1="480.0" y1="30" x2="480.0" y2="184" stroke="var(--grid)" stroke-width="1"/>
+<text x="480.0" y="200" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">+0.5</text>
+<line x1="750.0" y1="30" x2="750.0" y2="184" stroke="var(--grid)" stroke-width="1"/>
+<text x="750.0" y="200" text-anchor="middle" font-size="11" fill="var(--dim)" font-family="IBM Plex Mono,monospace">+1</text>
+<line x1="210.0" y1="30" x2="210.0" y2="184" stroke="var(--line)" stroke-width="1.5"/>
+<text x="198" y="72.5" text-anchor="end" font-size="12.5" font-weight="700" fill="var(--ink)">vs 2025 round 1</text>
+<rect x="210.0" y="41.5" width="91.8" height="23.9" rx="3" fill="var(--tang)"/>
+<text x="307.8" y="57.0" text-anchor="start" font-size="11.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono,monospace">+0.17</text>
+<rect x="210.0" y="68.5" width="27.0" height="23.9" rx="3" fill="var(--emerald)"/>
+<text x="243.0" y="84.0" text-anchor="start" font-size="11.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono,monospace">+0.05</text>
+<text x="198" y="149.5" text-anchor="end" font-size="12.5" font-weight="700" fill="var(--ink)">vs 2025 round 2</text>
+<rect x="210.0" y="118.5" width="81.0" height="23.9" rx="3" fill="var(--tang)"/>
+<text x="297.0" y="134.0" text-anchor="start" font-size="11.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono,monospace">+0.15</text>
+<rect x="210.0" y="145.5" width="356.4" height="23.9" rx="3" fill="var(--emerald)"/>
+<text x="572.4" y="161.0" text-anchor="start" font-size="11.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono,monospace">+0.66</text>
+<rect x="420" y="4" width="12" height="12" rx="3" fill="var(--tang)"/>
+<text x="437" y="14" font-size="11.5" font-weight="700" fill="var(--ink)">Longer first putts</text>
+<rect x="570" y="4" width="12" height="12" rx="3" fill="var(--emerald)"/>
+<text x="587" y="14" font-size="11.5" font-weight="700" fill="var(--ink)">Putting itself</text>
+<text x="480.0" y="222" text-anchor="middle" font-size="11" font-weight="700" fill="var(--dim)" letter-spacing=".08em">EXTRA PUTTS PER ROUND, WHOLE FIELD</text>
 </svg>`;
 
 export const THREEPUTT = `<svg viewBox="0 0 780 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three-putt rate by round">

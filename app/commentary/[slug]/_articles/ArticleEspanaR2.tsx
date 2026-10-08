@@ -1,5 +1,5 @@
 import styles from "./six-percent/article.module.css";
-import { DIST, R1HIST, RAIN, SPLIT, THREEPUTT, WATERFALL, WIND } from "./espana-r2/charts";
+import { CHANGES, DIST, PUTTS, R1HIST, RAIN, THREEPUTT, WATERFALL, WIND } from "./espana-r2/charts";
 import { TOP20 } from "./espana-r2/data";
 
 /**
@@ -58,9 +58,11 @@ export default function ArticleEspanaR2() {
             </div>
           </div>
           <div className="stat">
-            <div className="v bad">5.9%</div>
-            <div className="l">Holes three-putted</div>
-            <div className="s">Against 2.5% in last year&rsquo;s round 2 and 3.5% in round 1.</div>
+            <div className="v bad">−0.7</div>
+            <div className="l">Close birdie looks per round</div>
+            <div className="s">
+              Greens hit inside 20 feet, same players as last year&rsquo;s round 1. Soft greens spun the ball away.
+            </div>
           </div>
           <div className="stat">
             <div className="v good">70.9</div>
@@ -172,12 +174,12 @@ export default function ArticleEspanaR2() {
 
       <section className="wrap">
         <h2>
-          <span className="num">04 &mdash; THE NUMBERS</span>Same greens hit. More putts. Most of it on the greens.
+          <span className="num">04 &mdash; THE NUMBERS</span>Same greens hit. Fewer close looks.
         </h2>
         <p>
           Quotes tell you what players felt. To see where the shots actually went, we compared the 85
-          players who played both this year and last on the shot-tracking data, and split each finished
-          player&rsquo;s round into putts and everything else.
+          players who played both this year and last on the shot-tracking data. Last year&rsquo;s round 1
+          is the fair comparison: same long setup, same par-3 yardages, almost to the yard.
         </p>
         <div className="tablebox">
           <table>
@@ -215,40 +217,75 @@ export default function ArticleEspanaR2() {
                 <td>61.4%</td>
                 <td>−1.6 pts</td>
               </tr>
-              <tr>
-                <td>Avg first-putt distance on greens hit</td>
-                <td>~23 ft</td>
-                <td>~22 ft</td>
-                <td>~+1 ft</td>
-              </tr>
               <tr className="flag">
-                <td>Three-putts, whole field (share of holes)</td>
-                <td>5.9%</td>
-                <td>3.5%</td>
-                <td className="bad">+2.4 pts</td>
+                <td>Greens hit inside 20 ft (share of holes)</td>
+                <td>30.9%</td>
+                <td>34.6%</td>
+                <td className="bad">−3.7 pts</td>
+              </tr>
+              <tr>
+                <td>Birdies or better (per round)</td>
+                <td>3.04</td>
+                <td>3.61</td>
+                <td className="bad">−0.57</td>
+              </tr>
+              <tr>
+                <td>Bogeys or worse (per round)</td>
+                <td>4.27</td>
+                <td>3.36</td>
+                <td className="bad">+0.90</td>
+              </tr>
+              <tr>
+                <td>Three-putts (share of holes)</td>
+                <td>5.5%</td>
+                <td>3.3%</td>
+                <td className="bad">+2.2 pts</td>
               </tr>
             </tbody>
           </table>
         </div>
         <p>
           Drives went about eight yards shorter &mdash; the ball simply stopped where it landed &mdash; and
-          players hit fewer drivers. But they found as many fairways and as many greens as a year ago, and
-          finished only about a foot further from the hole when they did. Tee to green, the course
-          wasn&rsquo;t measurably harder. The difference shows up once the ball is on the green.
+          players hit fewer drivers. They still found as many fairways and nearly as many greens as a year
+          ago. The damage is in <em>where</em> those greens were hit. The share of greens hit inside 20 feet
+          fell by almost four points, which is about two-thirds of a realistic birdie chance lost per
+          round, and birdies fell by more than half a shot while bogeys rose by nearly a full shot.
         </p>
         <Chart
-          svg={SPLIT}
-          caption="Extra strokes per round for the same 39 players who finished, split into putts and everything else. Against last year's easier round 2, putting accounts for all of it."
-        />
-        <Chart
-          svg={THREEPUTT}
-          caption="Share of holes three-putted across the whole field. Thursday's rate is 2.4 times last year's round 2."
+          svg={CHANGES}
+          caption="Change per round against last year's round 1, same 85 players. The close birdie looks disappeared and the bogeys went up."
         />
         <p>
-          That fits the players&rsquo; account exactly. Approaches spun back off soft greens and left long,
-          awkward lags, and as the day went on those lags were being hit across surfaces covered in
-          footprints. The extra long putts on their own explain only a fraction of the extra three-putts;
-          the rest is the greens themselves.
+          The average first-putt distance on greens hit barely moved &mdash; about a foot &mdash; because
+          the change sits at the ends: fewer greens were hit inside 10 feet, where birdies are likely, and
+          more were hit with 30 feet or more still to go.
+          That is exactly what Ayora and Garc&iacute;a described: approaches spinning back off soft greens,
+          and players taking an extra club and still not being able to get the ball close.
+        </p>
+        <h3>So was it the putting?</h3>
+        <p>
+          Less than it looks. Three-putts did jump, but longer first putts produce more putts from any
+          golfer. So we split the extra putts on greens hit into two parts: what the longer distances alone
+          would cause on a normal tour putting curve, and what&rsquo;s left over &mdash; the putting itself.
+        </p>
+        <Chart
+          svg={PUTTS}
+          caption="Extra putts per round on greens hit, whole field. Against last year's round 1 almost all of it is the longer first putts; the big putting gap only appears against last year's round 2, which was an unusually good putting day."
+        />
+        <p>
+          Against the like-for-like round, the field putted no worse than a year ago once you allow for
+          the extra distance &mdash; about 0.05 of a putt per round. The extra three-putts are mostly a
+          consequence of where the approaches finished, plus the trampled greens late in the day. Against
+          last year&rsquo;s round 2 putting looks far worse, but that round was the outlier: the field holed
+          everything its distances said it should.
+        </p>
+        <Chart
+          svg={THREEPUTT}
+          caption="Share of holes three-putted across the whole field. Much of Thursday's rise follows from the longer first putts."
+        />
+        <p className="pull">
+          Thursday was lost on the approach, not on the greens: soft surfaces that spun the ball back took
+          away the close birdie looks, and the wet rough and gusting wind added the bogeys.
         </p>
         <div className="tablebox">
           <table>
