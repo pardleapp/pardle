@@ -304,9 +304,13 @@ export function deriveTakeaways(
     // 3. Very quiet setup, loud scoring move — nothing physical
     //    changed but the number did. Highlights pin difficulty as
     //    the driver.
+    // Needs measured length and wind: a hole with no bearing has no
+    // wind reading, which is not the same as wind unchanged.
     if (
-      Math.abs(row.dYards ?? 0) < 8 &&
-      Math.abs(row.head ?? 0) < 3 &&
+      row.dYards != null &&
+      row.head != null &&
+      Math.abs(row.dYards) < 8 &&
+      Math.abs(row.head) < 3 &&
       (row.cross == null || row.cross < 3) &&
       Math.abs(row.dScore) > 0.22
     ) {

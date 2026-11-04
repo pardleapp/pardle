@@ -266,6 +266,12 @@ export default function ForecastTool({ tour = "pga" }: { tour?: AnalysisTour }) 
         const res = await fetch(apiFor(tour, "/api/scoring-model/field"));
         const json = (await res.json()) as FieldResp;
         setField(json);
+        // Open on the next round to be played, not always Sunday's.
+        const played = Math.max(
+          0,
+          ...(json.players ?? []).map((p) => p.weekRounds?.length ?? 0),
+        );
+        setTargetRound(Math.min(4, played + 1) as Round);
       } catch {
         /* no field — user can still enter SG manually */
       }

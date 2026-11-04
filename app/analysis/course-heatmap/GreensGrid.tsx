@@ -366,7 +366,7 @@ export default function GreensGrid({
                   fontSize: 11,
                 }}
               >
-                Green image loading…
+                {pin ? "No green image for this event" : "Green image loading…"}
               </div>
             )}
           </button>

@@ -92,6 +92,11 @@ describe("deriveTakeaways", () => {
     expect(out[0].kind).toBe("quiet-setup-loud-scoring");
   });
 
+  it("does not call a hole pin-driven when its wind is unknown", () => {
+    const rows = [row({ hole: 10, dYards: 0, head: null, cross: null, windKind: null, dScore: 0.45 })];
+    expect(deriveTakeaways(rows).map((t) => t.kind)).not.toContain("quiet-setup-loud-scoring");
+  });
+
   it("flags a loud-setup / quiet-scoring hole", () => {
     const rows = [
       row({
