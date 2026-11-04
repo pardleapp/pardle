@@ -324,18 +324,28 @@ export default function CompareTool() {
               width: "100%",
               borderCollapse: "collapse",
               fontFamily: T.fontUi,
-              minWidth: 800,
+              minWidth: 128 + tableBooks.length * 118,
             }}
           >
             <thead>
               <tr style={{ background: T.soft }}>
-                <th style={th("left", 220)}>Player · line</th>
+                <th
+                  style={{
+                    ...th("left", 128),
+                    position: "sticky",
+                    left: 0,
+                    zIndex: 1,
+                    background: T.soft,
+                  }}
+                >
+                  Player · line
+                </th>
                 {tableBooks.map((b) => (
                   <th key={b.key} style={th("right")}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
                       <span>{b.label}</span>
                       <span style={{ fontSize: 9, fontWeight: 600, color: T.dim, letterSpacing: 0.4 }}>
-                        {b.kindLabel}
+                        {b.kindLabel} · Over / Under
                       </span>
                     </div>
                   </th>
@@ -348,11 +358,21 @@ export default function CompareTool() {
                   key={`${row.playerName}-${row.line}`}
                   style={{ background: i % 2 === 0 ? "white" : T.soft }}
                 >
-                  <td style={{ ...tdBase, textAlign: "left" }}>
-                    <span style={{ fontWeight: 800, color: T.ink }}>
+                  <td
+                    style={{
+                      ...tdBase,
+                      textAlign: "left",
+                      whiteSpace: "normal",
+                      position: "sticky",
+                      left: 0,
+                      zIndex: 1,
+                      background: i % 2 === 0 ? "white" : T.soft,
+                    }}
+                  >
+                    <span style={{ display: "block", fontWeight: 800, color: T.ink, lineHeight: 1.2 }}>
                       {row.playerName}
                     </span>
-                    <span style={{ marginLeft: 8, color: T.muted, fontFamily: T.fontMono, fontWeight: 700 }}>
+                    <span style={{ display: "block", color: T.muted, fontFamily: T.fontMono, fontWeight: 700 }}>
                       {row.line.toFixed(1)}
                     </span>
                   </td>
