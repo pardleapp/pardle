@@ -128,6 +128,13 @@ export default function CompareTool() {
     });
   }, [data]);
 
+  // Only books with lines get a column: on a phone an empty column
+  // pushes the books that do have prices off-screen. The chips above
+  // still show every book.
+  const tableBooks = BOOKS.filter(
+    (b) => (data?.bookStatus?.[b.key]?.playerCount ?? 0) > 0,
+  );
+
   return (
     <div style={{ display: "grid", gap: 16 }}>
       {/* Header row: tournament, round tabs, book health */}
@@ -323,7 +330,7 @@ export default function CompareTool() {
             <thead>
               <tr style={{ background: T.soft }}>
                 <th style={th("left", 220)}>Player · line</th>
-                {BOOKS.map((b) => (
+                {tableBooks.map((b) => (
                   <th key={b.key} style={th("right")}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
                       <span>{b.label}</span>
@@ -349,7 +356,7 @@ export default function CompareTool() {
                       {row.line.toFixed(1)}
                     </span>
                   </td>
-                  {BOOKS.map((b) => {
+                  {tableBooks.map((b) => {
                     const q = row.quotes.find((x) => x.book === b.key);
                     return (
                       <td key={b.key} style={tdBase}>
@@ -392,7 +399,6 @@ export default function CompareTool() {
           }}
         >
           Last update {new Date(data.generatedAt).toLocaleTimeString()}
-          {" · refreshes every minute"}
         </div>
       )}
     </div>
