@@ -4,8 +4,28 @@
  * every projection eventually flows through them.
  */
 import { describe, expect, it } from "vitest";
-import { fitPerHole, assembleHoleFit } from "./coefficients";
+import { fitPerHole, assembleHoleFit, pooledHeadSlope } from "./coefficients";
 import type { FitRow } from "./types";
+
+describe("pooledHeadSlope", () => {
+  it("recovers wind and ignores days that scored low everywhere", () => {
+    // Two holes playing opposite ways, four days with big day effects.
+    const days = [{ d: "a", w: 10, e: -1 }, { d: "b", w: -8, e: 0.8 }, { d: "c", w: 4, e: 0.3 }, { d: "e", w: -2, e: -0.4 }];
+    const rows = days.flatMap(({ d, w, e }) => [
+      { hole: 1, day: d, headwind: w, avgVsPar: 0.1 + e + 0.02 * w },
+      { hole: 2, day: d, headwind: -w, avgVsPar: -0.2 + e - 0.02 * w },
+    ]);
+    expect(pooledHeadSlope(rows)).toBeCloseTo(0.02, 6);
+  });
+
+  it("never returns a negative slope", () => {
+    const rows = [1, -1, 2, -2].flatMap((w, i) => [
+      { hole: 1, day: String(i), headwind: w, avgVsPar: -0.05 * w },
+      { hole: 2, day: String(i), headwind: -w, avgVsPar: 0.05 * w },
+    ]);
+    expect(pooledHeadSlope(rows)).toBe(0);
+  });
+});
 
 describe("fitPerHole", () => {
   it("returns null when there are fewer than 6 rows", () => {

@@ -14,7 +14,7 @@
 import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { assembleHoleFit } from "./coefficients";
+import { assembleHoleFit, pooledHeadSlope } from "./coefficients";
 import { getTournamentConfig, tourOfTournamentId, type Tour } from "./tournament-config";
 import type {
   FitRow,
@@ -158,8 +158,8 @@ function rowsFromHoleScores(
   ctx: Record<string, RoundContext>,
   hole: number,
   bearing: number | null,
-): FitRow[] {
-  const rows: FitRow[] = [];
+): Array<FitRow & { day: string }> {
+  const rows: Array<FitRow & { day: string }> = [];
   for (const ev of events) {
     for (const round of [1, 2, 3, 4]) {
       const context = ctx[`${ev.year}:${round}`];
@@ -175,6 +175,7 @@ function rowsFromHoleScores(
       }
       if (total === 0) continue;
       rows.push({
+        day: `${ev.year}:${round}`,
         clusterIdx: 0,
         round,
         yards,
@@ -280,6 +281,11 @@ export async function getScoringModel(
   const holes = birdies.holes ?? {};
 
   const perHoleFit: Record<number, HoleFit | null> = {};
+  const scoreFitHoles: number[] = [];
+  const fitFromScores = (h: number, bearing: number | null) => {
+    scoreFitHoles.push(h);
+    return assembleHoleFit(rowsFromHoleScores(events, ctx, h, bearing), {});
+  };
   for (let h = 1; h <= 18; h++) {
     // Unknown bearing → treat headwind as 0 for every row on this
     // hole. Keeps the per-pin fit alive when a freshly-onboarded
@@ -288,7 +294,7 @@ export async function getScoringModel(
       typeof bearings[h] === "number" ? (bearings[h] as number) : null;
     const hData = holes[String(h)];
     if (!hData) {
-      perHoleFit[h] = assembleHoleFit(rowsFromHoleScores(events, ctx, h, bearing), {});
+      perHoleFit[h] = fitFromScores(h, bearing);
       continue;
     }
     const rows: FitRow[] = [];
@@ -334,10 +340,30 @@ export async function getScoringModel(
       clusterCentroids[letter] = { x: c.x / c.n, y: c.y / c.n };
     }
     perHoleFit[h] =
-      assembleHoleFit(rows, clusterCentroids) ??
-      assembleHoleFit(rowsFromHoleScores(events, ctx, h, bearing), {});
+      assembleHoleFit(rows, clusterCentroids) ?? fitFromScores(h, bearing);
   }
   if (!Object.values(perHoleFit).some(Boolean)) return null;
+
+  // Score-based holes have ~12 days each, too few for their own wind
+  // slope (at El Cardonal those fits read low-scoring days as wind and
+  // moved the field 3 strokes on a north wind). They share one slope,
+  // measured across all 18 holes within each day.
+  if (scoreFitHoles.length > 0) {
+    const slope = pooledHeadSlope(
+      Array.from({ length: 18 }, (_, i) => i + 1).flatMap((h) =>
+        rowsFromHoleScores(
+          events,
+          ctx,
+          h,
+          typeof bearings[h] === "number" ? (bearings[h] as number) : null,
+        ).map((r) => ({ ...r, hole: h })),
+      ),
+    );
+    for (const h of scoreFitHoles) {
+      const fit = perHoleFit[h];
+      if (fit) perHoleFit[h] = { ...fit, bHead: slope, bYards: 0 };
+    }
+  }
 
   const coeffs: ScoringModelCoefficients = {
     tournamentId,

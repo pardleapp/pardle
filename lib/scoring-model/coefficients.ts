@@ -151,6 +151,41 @@ function fitPerHoleYardsOnly(
   };
 }
 
+/** One wind slope for a whole course, from rows grouped by hole with a
+ *  `day` key. Hole and day means are removed from both sides first, so
+ *  a day that scored low everywhere can't pose as a wind effect: with
+ *  only ~12 days per hole, per-hole slopes mostly fit exactly that.
+ *  Clamped to a physical range (into the wind can't help). */
+export function pooledHeadSlope(
+  rows: Array<{ hole: number; day: string; headwind: number; avgVsPar: number }>,
+): number {
+  const mean = (a: number[]) => a.reduce((s, v) => s + v, 0) / a.length;
+  const by = (key: (r: (typeof rows)[number]) => string | number) => {
+    const m = new Map<string | number, typeof rows>();
+    for (const r of rows) m.set(key(r), [...(m.get(key(r)) ?? []), r]);
+    return m;
+  };
+  const holes = by((r) => r.hole);
+  const days = by((r) => r.day);
+  const centred = (r: (typeof rows)[number], f: "headwind" | "avgVsPar") =>
+    r[f] -
+    mean(holes.get(r.hole)!.map((x) => x[f])) -
+    mean(days.get(r.day)!.map((x) => x[f])) +
+    mean(rows.map((x) => x[f]));
+  const hx = new Map<string, number>();
+  let sxx = 0;
+  let sxy = 0;
+  for (const r of rows) {
+    const k = `${r.hole}:${r.day}`;
+    const x = hx.get(k) ?? centred(r, "headwind");
+    hx.set(k, x);
+    sxx += x * x;
+    sxy += x * centred(r, "avgVsPar");
+  }
+  if (sxx < 1e-6) return 0;
+  return Math.min(0.05, Math.max(0, sxy / sxx));
+}
+
 function fitMeanOnly(
   rows: FitRow[],
 ): { bYards: number; bHead: number; intercept: number } {
