@@ -124,7 +124,14 @@ export default function CompareTool() {
           bestUnder = q.under;
         }
       }
-      return { ...row, bestOver, bestUnder };
+      // "Best" needs a rival: a lone price on a line isn't beating anyone.
+      const priced = (side: "over" | "under") =>
+        row.quotes.filter((q) => q[side] != null).length;
+      return {
+        ...row,
+        bestOver: priced("over") > 1 ? bestOver : null,
+        bestUnder: priced("under") > 1 ? bestUnder : null,
+      };
     });
   }, [data]);
 
@@ -345,7 +352,7 @@ export default function CompareTool() {
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
                       <span>{b.label}</span>
                       <span style={{ fontSize: 9, fontWeight: 600, color: T.dim, letterSpacing: 0.4 }}>
-                        {b.kindLabel} · Over / Under
+                        {b.kindLabel}
                       </span>
                     </div>
                   </th>
@@ -454,77 +461,67 @@ function OddsPill({
       </span>
     );
   }
-  if (q.masked) {
-    return (
-      <div
-        aria-hidden
-        style={{ display: "flex", gap: 4, justifyContent: "flex-end", userSelect: "none" }}
-      >
-        {[0, 1].map((i) => (
-          <span
-            key={i}
-            style={{
-              display: "inline-block",
-              padding: "4px 8px",
-              borderRadius: 4,
-              border: `1px solid ${T.line}`,
-              background: "white",
-              color: T.ink,
-              fontFamily: T.fontMono,
-              fontWeight: 700,
-              fontSize: 12,
-              minWidth: 44,
-              textAlign: "center",
-              filter: "blur(4px)",
-            }}
-          >
-            −000
-          </span>
-        ))}
-      </div>
-    );
-  }
-  const overStr =
-    q.over != null ? americanFromDecimal(q.over) : "—";
-  const underStr =
-    q.under != null ? americanFromDecimal(q.under) : "—";
+  const price = (dec: number | null) =>
+    q.masked ? "−000" : dec != null ? americanFromDecimal(dec) : "—";
   return (
     <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-      <span
-        style={{
-          display: "inline-block",
-          padding: "4px 8px",
-          borderRadius: 4,
-          border: isBestOver ? `1.5px solid ${T.emerald}` : `1px solid ${T.line}`,
-          background: isBestOver ? T.emeraldTint : "white",
-          color: isBestOver ? T.emeraldD : T.ink,
-          fontFamily: T.fontMono,
-          fontWeight: isBestOver ? 800 : 700,
-          fontSize: 12,
-          minWidth: 44,
-          textAlign: "center",
-        }}
-      >
-        {overStr}
-      </span>
-      <span
-        style={{
-          display: "inline-block",
-          padding: "4px 8px",
-          borderRadius: 4,
-          border: isBestUnder ? `1.5px solid ${T.emerald}` : `1px solid ${T.line}`,
-          background: isBestUnder ? T.emeraldTint : "white",
-          color: isBestUnder ? T.emeraldD : T.ink,
-          fontFamily: T.fontMono,
-          fontWeight: isBestUnder ? 800 : 700,
-          fontSize: 12,
-          minWidth: 44,
-          textAlign: "center",
-        }}
-      >
-        {underStr}
-      </span>
+      <SidePrice label="Over" price={price(q.over)} best={isBestOver} masked={q.masked} />
+      <SidePrice label="Under" price={price(q.under)} best={isBestUnder} masked={q.masked} />
     </div>
+  );
+}
+
+/** One side of a quote, named on the pill so no one has to remember
+ *  which column is which. */
+function SidePrice({
+  label,
+  price,
+  best,
+  masked,
+}: {
+  label: "Over" | "Under";
+  price: string;
+  best: boolean;
+  masked?: boolean;
+}) {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "3px 6px 4px",
+        borderRadius: 4,
+        border: best ? `1.5px solid ${T.emerald}` : `1px solid ${T.line}`,
+        background: best ? T.emeraldTint : "white",
+        minWidth: 48,
+        textAlign: "center",
+      }}
+    >
+      <span
+        style={{
+          display: "block",
+          fontFamily: T.fontUi,
+          fontSize: 9,
+          fontWeight: 700,
+          letterSpacing: 0.3,
+          color: best ? T.emeraldD : T.muted,
+        }}
+      >
+        {label}
+      </span>
+      <span
+        aria-hidden={masked}
+        style={{
+          display: "block",
+          fontFamily: T.fontMono,
+          fontWeight: best ? 800 : 700,
+          fontSize: 12,
+          color: best ? T.emeraldD : T.ink,
+          ...(masked ? { filter: "blur(4px)", userSelect: "none" as const } : null),
+        }}
+      >
+        {price}
+      </span>
+    </span>
   );
 }
 
