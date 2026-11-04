@@ -22,7 +22,6 @@ import { Redis } from "@upstash/redis";
 import {
   getActiveTournament,
   getCurrentRound,
-  getLeaderboard,
 } from "@/lib/golf-api/pgatour";
 import type {
   BookKey,
@@ -75,13 +74,23 @@ function normalisePlayerName(name: string): string {
     .trim();
 }
 
+/** Row key: surname plus the first three letters of the first name, so
+ *  one book's "Zach Bauchou" lands with another's "Zachary Bauchou". */
+function playerKey(name: string): string {
+  const parts = normalisePlayerName(name)
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .split(" ");
+  return `${parts[parts.length - 1]}|${parts[0].slice(0, 3)}`;
+}
+
 /** Bucket quotes into (player, line) groups so the UI can render
  *  one row per line with a column per book. Round is already
  *  scoped by the request. */
 function bucketQuotes(quotes: RoundScoreQuote[]): CompareRow[] {
   const byKey = new Map<string, CompareRow>();
   for (const q of quotes) {
-    const key = `${normalisePlayerName(q.playerName)}|${q.line.toFixed(1)}`;
+    const key = `${playerKey(q.playerName)}|${q.line.toFixed(1)}`;
     let row = byKey.get(key);
     if (!row) {
       row = {
@@ -252,7 +261,7 @@ export async function GET(req: Request) {
         (await callWithCooldown("underdog", () => fetchUnderdogRoundScoreQuotes(round))).quotes,
       ),
       safeFetch(async () =>
-        (await callWithCooldown("kalshi", () => fetchKalshiRoundScoreQuotes(tournamentName, round))).quotes,
+        (await callWithCooldown("kalshi", () => fetchKalshiRoundScoreQuotes(round))).quotes,
       ),
       ingestReads,
     ]);
@@ -269,18 +278,6 @@ export async function GET(req: Request) {
         quotes,
         receivedAt: payload?.receivedAt ?? null,
       });
-    }
-
-    // Trim to the top-30 by outright — matches the "contenders only"
-    // decision. If leaderboard is unavailable, keep everyone (rare —
-    // leaderboard cache is very warm).
-    let filterNames: Set<string> | null = null;
-    try {
-      const lb = await getLeaderboard(tournamentId);
-      const top = lb.slice(0, 30);
-      filterNames = new Set(top.map((p) => normalisePlayerName(p.displayName)));
-    } catch {
-      /* graceful */
     }
 
     const countPlayers = (qs: RoundScoreQuote[]) =>
@@ -369,12 +366,10 @@ export async function GET(req: Request) {
       },
     };
 
-    // Flatten + optionally filter to top-30 by leaderboard.
+    // Every quoted player: books only price a dozen or so per round, and
+    // a leaderboard cut before play starts is alphabetical, not contenders.
     const all: RoundScoreQuote[] = Object.values(bookQuotes).flat();
-    const filtered = filterNames
-      ? all.filter((q) => filterNames!.has(normalisePlayerName(q.playerName)))
-      : all;
-    const rows = bucketQuotes(filtered).sort((a, b) =>
+    const rows = bucketQuotes(all).sort((a, b) =>
       a.playerName.localeCompare(b.playerName),
     );
 

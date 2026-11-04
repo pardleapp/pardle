@@ -43,14 +43,12 @@ function leagueIdCacheKey(tournamentName: string): string {
 
 const BASE = "https://sportsbook-nash.draftkings.com/api/sportscontent/dkuswv";
 const GOLF_SPORT_ID = "12";
-/** Category id for "Round Props" — parent of the round-score O/U
- *  subcategory. Constants pinned to what the discovery pass on
- *  2026-08 returned; if DK reshuffles their taxonomy the fetch
- *  will surface as zero-quotes and the debug endpoint reveals the
- *  new tree. */
+/** Category id for "Round Props", parent of the round-score O/U tab. */
 const ROUND_PROPS_CATEGORY_ID = "1129";
-/** Subcategory id for "Player Round Score" O/U. */
-const PLAYER_ROUND_SCORE_SUBCATEGORY_ID = 11786;
+/** Markets and the tab are found by name: DK renumbered the tab from
+ *  11786 to 11015 in 2026 and a pinned id silently read as "no lines". */
+const ROUND_SCORE_MARKET = /round score\s*-\s*round\s*\d/i;
+const ROUND_SCORE_TAB = /round scores?$/i;
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
@@ -101,6 +99,7 @@ interface DKCategoryPayload {
   markets?: DKMarket[];
   selections?: DKSelection[];
   events?: DKEvent[];
+  subcategories?: Array<{ id: number; categoryId: number; name: string }>;
 }
 
 /** Discover the current DK leagueId for a tournament by scraping
@@ -181,7 +180,7 @@ function roundFromMarketName(name: string): number | null {
 function playerFromMarketName(name: string): string | null {
   const cleaned = name
     .replace(/\s*-\s*Round\s*\d\s*(?:O\/?U)?\s*$/i, "")
-    .replace(/\s*Player\s+Round\s+Score\s*$/i, "")
+    .replace(/\s*(?:Player\s+)?Round\s+Score\s*$/i, "")
     .replace(/\s*Birdies\s+or\s+Better\s*$/i, "")
     .replace(/\s*O\/?U\s*$/i, "")
     .trim();
@@ -210,13 +209,23 @@ export async function fetchDkRoundScoreQuotes(
   leagueId: number,
   round: number,
 ): Promise<RoundScoreQuote[]> {
-  // Hitting /categories/1129 alone returns whatever DK's default
-  // subcategory tab is (usually Birdies-or-Better). To get the
-  // Player Round Score markets we have to specify the subcategory
-  // explicitly in the URL path.
-  const data = await dkFetch<DKCategoryPayload>(
-    `/v1/leagues/${leagueId}/categories/${ROUND_PROPS_CATEGORY_ID}/subcategories/${PLAYER_ROUND_SCORE_SUBCATEGORY_ID}`,
+  // /categories/1129 returns DK's default tab, which is the round
+  // scores on some weeks and Birdies-or-Better on others. When it's the
+  // wrong tab, the payload still lists the tabs, so ask for ours by name.
+  let data = await dkFetch<DKCategoryPayload>(
+    `/v1/leagues/${leagueId}/categories/${ROUND_PROPS_CATEGORY_ID}`,
   );
+  if (!(data.markets ?? []).some((m) => ROUND_SCORE_MARKET.test(m.name))) {
+    const tab = (data.subcategories ?? []).find(
+      (s) =>
+        String(s.categoryId) === ROUND_PROPS_CATEGORY_ID &&
+        ROUND_SCORE_TAB.test(s.name),
+    );
+    if (!tab) return [];
+    data = await dkFetch<DKCategoryPayload>(
+      `/v1/leagues/${leagueId}/categories/${ROUND_PROPS_CATEGORY_ID}/subcategories/${tab.id}`,
+    );
+  }
   const markets = data.markets ?? [];
   const selections = data.selections ?? [];
   const BOOK: BookKey = "draftkings";
@@ -225,7 +234,7 @@ export async function fetchDkRoundScoreQuotes(
   // Filter markets to Player Round Score for the requested round.
   const targetMarkets = new Map<string, { player: string }>();
   for (const m of markets) {
-    if (m.subcategoryId !== PLAYER_ROUND_SCORE_SUBCATEGORY_ID) continue;
+    if (!ROUND_SCORE_MARKET.test(m.name)) continue;
     if (m.isSuspended) continue;
     const r = roundFromMarketName(m.name);
     if (r !== round) continue;
