@@ -110,7 +110,13 @@ export async function GET(req: Request) {
   // A no-op for years already carrying yardsByRound.
   fresh = await augmentYardsFromHistorical(fresh, tournamentId);
   try {
-    await redis.set(cacheKey(tournamentId), fresh, { ex: TTL_SECONDS });
+    // Pins can post at any moment on day one, so "none yet" must not stick.
+    const hasPins = fresh.holes.some(
+      (h) => Object.keys(h.pinByRound ?? {}).length > 0,
+    );
+    await redis.set(cacheKey(tournamentId), fresh, {
+      ex: hasPins ? TTL_SECONDS : 5 * 60,
+    });
   } catch {
     /* write-through failure is not fatal */
   }

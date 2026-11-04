@@ -47,6 +47,10 @@ export const revalidate = 0;
 
 const redis = Redis.fromEnv();
 const CACHE_TTL = 6 * 60 * 60;
+// Pins can post at any moment on day one, so "none yet" must not stick.
+const EMPTY_TTL = 5 * 60;
+const pinsPublished = (sheet: CoursePinSheet) =>
+  sheet.holes.some((h) => Object.keys(h.pinByRound ?? {}).length > 0);
 
 /** Pull shot-details for 20 finishers × 4 rounds of a modern
  *  tournament and extract (rawX, rawY, enhX, enhY) pairs from every
@@ -340,7 +344,9 @@ export async function GET(req: Request) {
           // modal's four round dots stack on top of each other.
           pins = await augmentYardsFromHistorical(pins, ev.tournamentId);
           try {
-            await redis.set(cacheKey, pins, { ex: CACHE_TTL });
+            await redis.set(cacheKey, pins, {
+              ex: pinsPublished(pins) ? CACHE_TTL : EMPTY_TTL,
+            });
           } catch {
             /* cache write failure not fatal */
           }
@@ -419,7 +425,9 @@ export async function GET(req: Request) {
     holes,
   };
   try {
-    await redis.set(cacheKey(tournamentId), payload, { ex: CACHE_TTL });
+    await redis.set(cacheKey(tournamentId), payload, {
+      ex: Object.keys(holes).length > 0 ? CACHE_TTL : EMPTY_TTL,
+    });
   } catch {
     /* write-through not fatal */
   }
