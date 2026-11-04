@@ -260,9 +260,9 @@ export async function GET(req: Request) {
       safeFetch(async () =>
         (await callWithCooldown("underdog", () => fetchUnderdogRoundScoreQuotes(round))).quotes,
       ),
-      safeFetch(async () =>
-        (await callWithCooldown("kalshi", () => fetchKalshiRoundScoreQuotes(round))).quotes,
-      ),
+      // Free public API, so no credits to protect; the cooldown would
+      // only hide lines for up to 30 minutes after they post.
+      safeFetch(() => fetchKalshiRoundScoreQuotes(round)),
       ingestReads,
     ]);
     // Bucket ingested payloads per book. Filter to the requested
