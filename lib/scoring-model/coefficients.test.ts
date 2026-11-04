@@ -19,6 +19,22 @@ describe("fitPerHole", () => {
     expect(fitPerHole(rows)).toBeNull();
   });
 
+  it("falls back to the hole mean when every round has the same yardage", () => {
+    const rows: FitRow[] = [0.11, 0.21, -0.07, 0.3, 0.02, 0.16, 0.09, 0.25].map((avgVsPar, i) => ({
+      clusterIdx: 0, round: (i % 4) + 1,
+      yards: 462.37,
+      headwind: 0,
+      avgVsPar,
+      total: 90 + i * 7,
+    }));
+    expect(fitPerHole(rows)).toBeNull();
+    const fit = assembleHoleFit(rows, {});
+    expect(fit).not.toBeNull();
+    expect(fit!.bYards).toBe(0);
+    expect(fit!.bHead).toBe(0);
+    expect(fit!.clusterResiduals.A).toBe(0);
+  });
+
   it("recovers coefficients from a synthetic linear system", () => {
     // Ground truth: avgVsPar = 0.002 × yards + 0.02 × headwind + (-0.85)
     const yardsList = [380, 400, 420, 440, 460, 380, 420, 460];

@@ -26,6 +26,14 @@ export function fitPerHole(
 ): { bYards: number; bHead: number; intercept: number } | null {
   if (rows.length < 6) return null;
 
+  // Constant yardage (a venue that only publishes one card, e.g. El
+  // Cardonal) makes the normal equations exactly singular, but rounding
+  // can leave det above the guards below and yield a garbage slope.
+  // Returning null sends the hole to the mean-only fit.
+  if (Math.max(...rows.map((r) => r.yards)) - Math.min(...rows.map((r) => r.yards)) < 1e-6) {
+    return null;
+  }
+
   // Detect degenerate headwind: when the course's meta file hasn't
   // had hole bearings filled in yet, every row's headwind is 0 by
   // construction (see loader.ts). The 3-var Gram matrix then has a

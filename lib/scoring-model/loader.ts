@@ -28,6 +28,8 @@ const cache = new Map<string, { ts: number; data: ScoringModelCoefficients }>();
 interface HistoricalHole {
   yards?: number;
   score?: number;
+  strokes?: number;
+  par?: number;
 }
 interface HistoricalRound {
   score?: number;
@@ -146,6 +148,49 @@ function buildHistoricalContext(
   return { ctx, yardsMeanByHole: yardsMean, headMeanByHole: headMean };
 }
 
+/** One fit row per (year, round) from the hole's raw scores, for holes
+ *  with no usable pin history. Some venues have no pin positions at all
+ *  (El Cardonal: no shot tracking), and a live event's pins have no
+ *  historical context row, so without this the hole drops out and the
+ *  field forecast collapses to par. */
+function rowsFromHoleScores(
+  events: HistoricalEvent[],
+  ctx: Record<string, RoundContext>,
+  hole: number,
+  bearing: number | null,
+): FitRow[] {
+  const rows: FitRow[] = [];
+  for (const ev of events) {
+    for (const round of [1, 2, 3, 4]) {
+      const context = ctx[`${ev.year}:${round}`];
+      const yards = context?.yardsByHole[hole];
+      if (!context || typeof yards !== "number") continue;
+      let total = 0;
+      let sumVsPar = 0;
+      for (const pl of ev.players ?? []) {
+        const h = pl.rounds?.[String(round)]?.holes?.[String(hole)];
+        if (typeof h?.strokes !== "number" || typeof h?.par !== "number") continue;
+        total += 1;
+        sumVsPar += h.strokes - h.par;
+      }
+      if (total === 0) continue;
+      rows.push({
+        clusterIdx: 0,
+        round,
+        yards,
+        headwind:
+          bearing != null
+            ? context.wind *
+              Math.cos(((context.windDirDeg - bearing) * Math.PI) / 180)
+            : 0,
+        avgVsPar: sumVsPar / total,
+        total,
+      });
+    }
+  }
+  return rows;
+}
+
 /** Shape of the birdies API response we need. Only fields we read
  *  are typed — the response has many more. The route returns holes
  *  as an OBJECT keyed by hole number string ("1", "2", ...), not
@@ -228,21 +273,24 @@ export async function getScoringModel(
 
   // Fetch birdies aggregate — the per-pin, per-cluster data we fit against.
   const birdies = await fetchBirdies(tournamentId, originUrl);
-  const holes = birdies?.holes ?? {};
-  if (Object.keys(holes).length === 0) return null;
+  // A failed fetch stays null so a transient outage isn't cached as a
+  // pin-less venue for 24h. An ok response with no holes is a real
+  // answer: the Tour has no pins here.
+  if (!birdies) return null;
+  const holes = birdies.holes ?? {};
 
   const perHoleFit: Record<number, HoleFit | null> = {};
   for (let h = 1; h <= 18; h++) {
-    const hData = holes[String(h)];
-    if (!hData) {
-      perHoleFit[h] = null;
-      continue;
-    }
     // Unknown bearing → treat headwind as 0 for every row on this
     // hole. Keeps the per-pin fit alive when a freshly-onboarded
     // venue has no OSM bearings yet.
     const bearing =
       typeof bearings[h] === "number" ? (bearings[h] as number) : null;
+    const hData = holes[String(h)];
+    if (!hData) {
+      perHoleFit[h] = assembleHoleFit(rowsFromHoleScores(events, ctx, h, bearing), {});
+      continue;
+    }
     const rows: FitRow[] = [];
     const centroidAccum: Record<string, { x: number; y: number; n: number }> = {};
     for (let ci = 0; ci < (hData.clusters ?? []).length; ci++) {
@@ -285,8 +333,11 @@ export async function getScoringModel(
     for (const [letter, c] of Object.entries(centroidAccum)) {
       clusterCentroids[letter] = { x: c.x / c.n, y: c.y / c.n };
     }
-    perHoleFit[h] = assembleHoleFit(rows, clusterCentroids);
+    perHoleFit[h] =
+      assembleHoleFit(rows, clusterCentroids) ??
+      assembleHoleFit(rowsFromHoleScores(events, ctx, h, bearing), {});
   }
+  if (!Object.values(perHoleFit).some(Boolean)) return null;
 
   const coeffs: ScoringModelCoefficients = {
     tournamentId,
