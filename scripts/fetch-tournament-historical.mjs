@@ -223,9 +223,23 @@ async function findDgEventIds() {
   return out;
 }
 
+// --pga-ids 2023:R2023547 pins a year's tournament id. The 2023 schedule
+// lists two WWT events (R2023457 is the Nov 2022 Mayakoba edition), and a
+// first-name-match would merge the wrong course's holes into that year.
+const PGA_ID_OVERRIDES = Object.fromEntries(
+  (typeof ARGS["pga-ids"] === "string" ? ARGS["pga-ids"] : "")
+    .split(",")
+    .filter(Boolean)
+    .map((pair) => pair.split(":")),
+);
+
 async function findPgaTournamentIds(years) {
   const out = {};
   for (const year of years) {
+    if (PGA_ID_OVERRIDES[year]) {
+      out[year] = { id: PGA_ID_OVERRIDES[year], name: "(--pga-ids override)" };
+      continue;
+    }
     console.log(`[pga] schedule ${year}…`);
     const data = await pga(`{
       schedule(tourCode: "R", year: "${year}") {

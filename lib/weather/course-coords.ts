@@ -64,13 +64,20 @@ const BY_COURSE: Record<string, CourseCoords> = {
     tz: "Asia/Tokyo",
     displayName: "Yokohama Country Club",
   },
+  "El Cardonal at Diamante": {
+    lat: 22.901,
+    lon: -109.985,
+    tz: "America/Mazatlan",
+    displayName: "El Cardonal at Diamante",
+  },
 };
 
 /** By PGA orchestrator tournament id (e.g. R2026525). Same coords
  *  as the course entry above but keyed for the live path. Suffix
  *  525 = 3M Open, 524 = Rocket Classic, 013 = Wyndham Championship,
  *  027 = FedEx St. Jude Championship, 060 = TOUR Championship,
- *  554 = Bank of Utah Championship, 527 = Baycurrent Classic. */
+ *  554 = Bank of Utah Championship, 527 = Baycurrent Classic,
+ *  457 = World Wide Technology Championship. */
 const BY_TOURNAMENT_ID: Record<string, CourseCoords> = {
   // 3M Open — TPC Twin Cities
   R2023525: BY_COURSE["TPC Twin Cities"],
@@ -105,6 +112,13 @@ const BY_TOURNAMENT_ID: Record<string, CourseCoords> = {
   // through 2024, so only 2025 onward map here.
   R2025527: BY_COURSE["Yokohama Country Club"],
   R2026527: BY_COURSE["Yokohama Country Club"],
+  // World Wide Technology Championship — El Cardonal since Nov 2023.
+  // That first edition was id 547; R2023457 is the Nov 2022 Mayakoba
+  // event, so it deliberately has no entry here.
+  R2023547: BY_COURSE["El Cardonal at Diamante"],
+  R2024457: BY_COURSE["El Cardonal at Diamante"],
+  R2025457: BY_COURSE["El Cardonal at Diamante"],
+  R2026457: BY_COURSE["El Cardonal at Diamante"],
 };
 
 export function coordsForCourse(name: string | null | undefined): CourseCoords | null {
