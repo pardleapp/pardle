@@ -55,7 +55,7 @@ const CACHE_TTL = 90;
 const EMPTY_BOOK_COOLDOWN_SECONDS = 30 * 60;
 
 function cacheKey(tournamentId: string, round: number): string {
-  return `feed:odds-compare:v1:${tournamentId}:r${round}`;
+  return `feed:odds-compare:v2:${tournamentId}:r${round}`;
 }
 
 function emptyCooldownKey(book: BookKey, tournamentId: string, round: number): string {
@@ -311,7 +311,14 @@ export async function GET(req: Request) {
       betmgm: ingestedByBook.get("betmgm")?.quotes ?? [],
       prizepicks: pp.quotes,
       underdog: ud.quotes,
-      kalshi: ks.quotes,
+      // Prices are stripped here, not just blurred in the page, so they
+      // never reach the browser and can't win "best price".
+      kalshi: ks.quotes.map((q) => ({
+        ...q,
+        over: null,
+        under: null,
+        masked: true,
+      })),
     };
     const bookStatus: Record<
       BookKey,

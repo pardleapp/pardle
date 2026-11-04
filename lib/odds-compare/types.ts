@@ -67,6 +67,9 @@ export interface RoundScoreQuote {
   /** When the book last updated this line (ISO 8601). Powers the
    *  "changed just now" pulse on the table. */
   lastUpdatedAt: string;
+  /** Prices withheld by the server: over/under arrive null and the
+   *  table shows a blurred placeholder. */
+  masked?: boolean;
 }
 
 /** Aggregator-level record: one player + one line, all books that

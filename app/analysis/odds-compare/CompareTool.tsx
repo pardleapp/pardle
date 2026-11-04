@@ -454,6 +454,36 @@ function OddsPill({
       </span>
     );
   }
+  if (q.masked) {
+    return (
+      <div
+        aria-hidden
+        style={{ display: "flex", gap: 4, justifyContent: "flex-end", userSelect: "none" }}
+      >
+        {[0, 1].map((i) => (
+          <span
+            key={i}
+            style={{
+              display: "inline-block",
+              padding: "4px 8px",
+              borderRadius: 4,
+              border: `1px solid ${T.line}`,
+              background: "white",
+              color: T.ink,
+              fontFamily: T.fontMono,
+              fontWeight: 700,
+              fontSize: 12,
+              minWidth: 44,
+              textAlign: "center",
+              filter: "blur(4px)",
+            }}
+          >
+            −000
+          </span>
+        ))}
+      </div>
+    );
+  }
   const overStr =
     q.over != null ? americanFromDecimal(q.over) : "—";
   const underStr =
