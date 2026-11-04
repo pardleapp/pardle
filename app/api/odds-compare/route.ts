@@ -59,7 +59,7 @@ function cacheKey(tournamentId: string, round: number): string {
 }
 
 function emptyCooldownKey(book: BookKey, tournamentId: string, round: number): string {
-  return `feed:odds-compare:empty-cooldown:v1:${book}:${tournamentId}:r${round}`;
+  return `feed:odds-compare:empty-cooldown:v2:${book}:${tournamentId}:r${round}`;
 }
 
 /** Normalise a player name so DK's "R. McIlroy" and PGA Tour's
@@ -293,7 +293,7 @@ export async function GET(req: Request) {
       if (!rec || rec.receivedAt == null) {
         return {
           ok: false,
-          error: "home scraper offline",
+          error: "Not available right now",
           playerCount: 0,
         };
       }

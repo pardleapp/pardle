@@ -144,7 +144,12 @@ export async function fetchPrizePicksRoundScoreQuotes(
       attr.stat_type ??
       "";
     if (!isRoundScoreStat(statTypeName)) continue;
-    const r = roundFromStatType(statTypeName);
+    // Goblin and demon lines are moved off the real number for a
+    // different payout, so they can't be compared with a book's line.
+    if (attr.odds_type && attr.odds_type !== "standard") continue;
+    // The round sits in the description ("El Cardonal Golf Course - RD
+    // 1"). "Strokes" with no round is the tournament total.
+    const r = roundFromStatType(`${statTypeName} ${attr.description ?? ""}`);
     if (r !== round) continue;
     const line = attr.line_score;
     if (line == null) continue;
