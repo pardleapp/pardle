@@ -97,6 +97,13 @@ describe("deriveTakeaways", () => {
     expect(deriveTakeaways(rows).map((t) => t.kind)).not.toContain("quiet-setup-loud-scoring");
   });
 
+  it("does not blame the pin when the sheet has no pin for the round", () => {
+    const rows = [row({ hole: 10, dYards: 0, head: 1, cross: 1, windKind: "cross", dScore: 0.45 })];
+    const pinsByHole = { 10: { holeNumber: 10, pinByRound: {} } } as unknown as Parameters<typeof deriveTakeaways>[1] extends infer O ? O extends { pinsByHole?: infer P } ? P : never : never;
+    const kinds = deriveTakeaways(rows, { round: 1, pinsByHole }).map((t) => t.kind);
+    expect(kinds).not.toContain("quiet-setup-loud-scoring");
+  });
+
   it("flags a loud-setup / quiet-scoring hole", () => {
     const rows = [
       row({

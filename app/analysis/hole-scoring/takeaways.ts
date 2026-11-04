@@ -305,8 +305,13 @@ export function deriveTakeaways(
     //    changed but the number did. Highlights pin difficulty as
     //    the driver.
     // Needs measured length and wind: a hole with no bearing has no
-    // wind reading, which is not the same as wind unchanged.
+    // wind reading, which is not the same as wind unchanged. And it
+    // blames the pin, so a sheet with no pin for this round can't say so.
+    const pinUnknown =
+      pinsByHole != null &&
+      pinsByHole[row.hole]?.pinByRound?.[round ?? -1] == null;
     if (
+      !pinUnknown &&
       row.dYards != null &&
       row.head != null &&
       Math.abs(row.dYards) < 8 &&

@@ -35,6 +35,20 @@ describe("fitPerHole", () => {
     expect(fit!.clusterResiduals.A).toBe(0);
   });
 
+  it("fits wind alone when yardage is constant but headwind varies", () => {
+    const rows: FitRow[] = [-8, -4, 0, 3, 6, 10].map((headwind) => ({
+      clusterIdx: 0, round: 1,
+      yards: 462,
+      headwind,
+      avgVsPar: 0.1 + 0.02 * headwind,
+      total: 100,
+    }));
+    const fit = fitPerHole(rows);
+    expect(fit!.bYards).toBe(0);
+    expect(fit!.bHead).toBeCloseTo(0.02, 6);
+    expect(fit!.intercept).toBeCloseTo(0.1, 6);
+  });
+
   it("recovers coefficients from a synthetic linear system", () => {
     // Ground truth: avgVsPar = 0.002 × yards + 0.02 × headwind + (-0.85)
     const yardsList = [380, 400, 420, 440, 460, 380, 420, 460];

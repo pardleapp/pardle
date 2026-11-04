@@ -29,9 +29,10 @@ export function fitPerHole(
   // Constant yardage (a venue that only publishes one card, e.g. El
   // Cardonal) makes the normal equations exactly singular, but rounding
   // can leave det above the guards below and yield a garbage slope.
-  // Returning null sends the hole to the mean-only fit.
+  // Fit wind alone there, or return null for the mean-only fit if the
+  // hole has no wind variation either.
   if (Math.max(...rows.map((r) => r.yards)) - Math.min(...rows.map((r) => r.yards)) < 1e-6) {
-    return null;
+    return fitPerHoleHeadOnly(rows);
   }
 
   // Detect degenerate headwind: when the course's meta file hasn't
@@ -92,6 +93,31 @@ export function fitPerHole(
     bHead: i12 * bx1 + i22 * bx2 + i23 * bx3,
     intercept: i13 * bx1 + i23 * bx2 + i33 * bx3,
   };
+}
+
+/** Reduced 2-var WLS: `[headwind, 1] → avgVsPar`, for holes whose
+ *  yardage never varies. Null when headwind doesn't vary either. */
+function fitPerHoleHeadOnly(
+  rows: FitRow[],
+): { bYards: number; bHead: number; intercept: number } | null {
+  let sw = 0, sx = 0, sy = 0;
+  for (const r of rows) {
+    const wi = Math.max(1, r.total);
+    sw += wi;
+    sx += wi * r.headwind;
+    sy += wi * r.avgVsPar;
+  }
+  const mx = sx / sw;
+  const my = sy / sw;
+  let sxx = 0, sxy = 0;
+  for (const r of rows) {
+    const wi = Math.max(1, r.total);
+    sxx += wi * (r.headwind - mx) ** 2;
+    sxy += wi * (r.headwind - mx) * (r.avgVsPar - my);
+  }
+  if (sxx / sw < 1e-6) return null;
+  const bHead = sxy / sxx;
+  return { bYards: 0, bHead, intercept: my - bHead * mx };
 }
 
 /** Reduced 2-var WLS: `[yards, 1] → avgVsPar`. Used when the
