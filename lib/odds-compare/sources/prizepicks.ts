@@ -23,6 +23,9 @@ import { proxiedFetch } from "../proxied-fetch";
 
 const BASE = "https://partner-api.prizepicks.com";
 const PGA_LEAGUE_ID = 1;
+/** A single round's strokes. Keeps a four-round total out of the table. */
+const MIN_ROUND_LINE = 55;
+const MAX_ROUND_LINE = 85;
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
@@ -34,6 +37,7 @@ interface PPProjectionAttrs {
   stat_type?: string;
   description?: string; // player name for goals/etc; sometimes leg text
   odds_type?: string;
+  game_id?: string;
   start_time?: string;
   updated_at?: string;
 }
@@ -123,8 +127,8 @@ export async function fetchPrizePicksRoundScoreQuotes(
       const p = inc as PPPlayer;
       players.set(
         p.id,
-        p.attributes?.display_name ??
-          p.attributes?.name ??
+        p.attributes?.display_name ||
+          p.attributes?.name ||
           `${p.attributes?.first_name ?? ""} ${p.attributes?.last_name ?? ""}`.trim(),
       );
     }
@@ -132,6 +136,13 @@ export async function fetchPrizePicksRoundScoreQuotes(
       const s = inc as PPStatType;
       statTypes.set(s.id, s.attributes?.name ?? "");
     }
+  }
+
+  const roundByGame = new Map<string, number>();
+  for (const proj of rows) {
+    const a = proj.attributes;
+    const r = roundFromStatType(a?.description ?? "");
+    if (r != null && a?.game_id) roundByGame.set(a.game_id, r);
   }
 
   const BOOK: BookKey = "prizepicks";
@@ -147,12 +158,15 @@ export async function fetchPrizePicksRoundScoreQuotes(
     // Goblin and demon lines are moved off the real number for a
     // different payout, so they can't be compared with a book's line.
     if (attr.odds_type && attr.odds_type !== "standard") continue;
-    // The round sits in the description ("El Cardonal Golf Course - RD
-    // 1"). "Strokes" with no round is the tournament total.
-    const r = roundFromStatType(`${statTypeName} ${attr.description ?? ""}`);
+    // Only some lines say "- RD 1" in the description; PrizePicks leaves
+    // it off its bigger names. Every line in a round shares a game id,
+    // so one labelled line dates the rest.
+    const r =
+      roundFromStatType(`${statTypeName} ${attr.description ?? ""}`) ??
+      roundByGame.get(attr.game_id ?? "");
     if (r !== round) continue;
     const line = attr.line_score;
-    if (line == null) continue;
+    if (line == null || line < MIN_ROUND_LINE || line > MAX_ROUND_LINE) continue;
     const playerId = proj.relationships?.new_player?.data?.id;
     const playerName = playerId ? players.get(playerId) : null;
     if (!playerName) continue;

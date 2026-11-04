@@ -331,12 +331,13 @@ export default function CompareTool() {
               width: "100%",
               borderCollapse: "collapse",
               fontFamily: T.fontUi,
-              minWidth: 128 + tableBooks.length * 118,
+              minWidth: 128 + tableBooks.length * 124,
             }}
           >
             <thead>
               <tr style={{ background: T.soft }}>
                 <th
+                  rowSpan={2}
                   style={{
                     ...th("left", 128),
                     position: "sticky",
@@ -348,8 +349,18 @@ export default function CompareTool() {
                   Player · line
                 </th>
                 {tableBooks.map((b) => (
-                  <th key={b.key} style={th("right")}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                  <th
+                    key={b.key}
+                    colSpan={2}
+                    style={{
+                      ...th("right"),
+                      textAlign: "center",
+                      borderBottom: "none",
+                      borderLeft: `1px solid ${T.line}`,
+                      paddingBottom: 2,
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
                       <span>{b.label}</span>
                       <span style={{ fontSize: 9, fontWeight: 600, color: T.dim, letterSpacing: 0.4 }}>
                         {b.kindLabel}
@@ -357,6 +368,25 @@ export default function CompareTool() {
                     </div>
                   </th>
                 ))}
+              </tr>
+              <tr style={{ background: T.soft }}>
+                {tableBooks.flatMap((b) =>
+                  (["Over", "Under"] as const).map((side) => (
+                    <th
+                      key={`${b.key}-${side}`}
+                      style={{
+                        ...th("right"),
+                        textAlign: "center",
+                        padding: "2px 3px 8px",
+                        fontSize: 12,
+                        color: T.ink,
+                        borderLeft: side === "Over" ? `1px solid ${T.line}` : undefined,
+                      }}
+                    >
+                      {side}
+                    </th>
+                  )),
+                )}
               </tr>
             </thead>
             <tbody>
@@ -383,17 +413,25 @@ export default function CompareTool() {
                       {row.line.toFixed(1)}
                     </span>
                   </td>
-                  {tableBooks.map((b) => {
+                  {tableBooks.flatMap((b) => {
                     const q = row.quotes.find((x) => x.book === b.key);
-                    return (
-                      <td key={b.key} style={tdBase}>
-                        <OddsPill
+                    const cell = { ...tdBase, padding: "8px 3px", textAlign: "center" as const };
+                    return [
+                      <td key={`${b.key}-o`} style={{ ...cell, borderLeft: `1px solid ${T.lineSoft}` }}>
+                        <PriceCell
                           q={q ?? null}
-                          isBestOver={q?.over != null && q.over === row.bestOver}
-                          isBestUnder={q?.under != null && q.under === row.bestUnder}
+                          dec={q?.over ?? null}
+                          best={q?.over != null && q.over === row.bestOver}
                         />
-                      </td>
-                    );
+                      </td>,
+                      <td key={`${b.key}-u`} style={cell}>
+                        <PriceCell
+                          q={q ?? null}
+                          dec={q?.under ?? null}
+                          best={q?.under != null && q.under === row.bestUnder}
+                        />
+                      </td>,
+                    ];
                   })}
                 </tr>
               ))}
@@ -432,95 +470,40 @@ export default function CompareTool() {
   );
 }
 
-/** One book's over/under pair for one row. Emerald border on the
- *  side that's the best price across books. Dashed placeholder
- *  when the book didn't quote this line. */
-function OddsPill({
+/** One price under a book's Over or Under heading. Emerald border when
+ *  it's the best across books; a plain dash when the book doesn't
+ *  quote this line. */
+function PriceCell({
   q,
-  isBestOver,
-  isBestUnder,
+  dec,
+  best,
 }: {
   q: RoundScoreQuote | null;
-  isBestOver: boolean;
-  isBestUnder: boolean;
-}) {
-  if (!q) {
-    return (
-      <span
-        style={{
-          display: "inline-block",
-          padding: "6px 10px",
-          borderRadius: 6,
-          border: `1px dashed ${T.line}`,
-          color: T.dim,
-          fontSize: 12,
-          fontFamily: T.fontMono,
-        }}
-      >
-        —
-      </span>
-    );
-  }
-  const price = (dec: number | null) =>
-    q.masked ? "−000" : dec != null ? americanFromDecimal(dec) : "—";
-  return (
-    <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-      <SidePrice label="Over" price={price(q.over)} best={isBestOver} masked={q.masked} />
-      <SidePrice label="Under" price={price(q.under)} best={isBestUnder} masked={q.masked} />
-    </div>
-  );
-}
-
-/** One side of a quote, named on the pill so no one has to remember
- *  which column is which. */
-function SidePrice({
-  label,
-  price,
-  best,
-  masked,
-}: {
-  label: "Over" | "Under";
-  price: string;
+  dec: number | null;
   best: boolean;
-  masked?: boolean;
 }) {
+  if (!q || (!q.masked && dec == null)) {
+    return <span style={{ color: T.dim, fontSize: 12, fontFamily: T.fontMono }}>—</span>;
+  }
   return (
     <span
+      aria-hidden={q.masked}
       style={{
         display: "inline-block",
-        padding: "3px 6px 4px",
+        padding: "4px 6px",
         borderRadius: 4,
         border: best ? `1.5px solid ${T.emerald}` : `1px solid ${T.line}`,
         background: best ? T.emeraldTint : "white",
-        minWidth: 48,
+        color: best ? T.emeraldD : T.ink,
+        fontFamily: T.fontMono,
+        fontWeight: best ? 800 : 700,
+        fontSize: 12,
+        minWidth: 46,
         textAlign: "center",
+        ...(q.masked ? { filter: "blur(4px)", userSelect: "none" as const } : null),
       }}
     >
-      <span
-        style={{
-          display: "block",
-          fontFamily: T.fontUi,
-          fontSize: 9,
-          fontWeight: 700,
-          letterSpacing: 0.3,
-          color: best ? T.emeraldD : T.muted,
-        }}
-      >
-        {label}
-      </span>
-      <span
-        aria-hidden={masked}
-        style={{
-          display: "block",
-          fontFamily: T.fontMono,
-          fontWeight: best ? 800 : 700,
-          fontSize: 12,
-          color: best ? T.emeraldD : T.ink,
-          ...(masked ? { filter: "blur(4px)", userSelect: "none" as const } : null),
-        }}
-      >
-        {price}
-      </span>
+      {q.masked ? "−000" : americanFromDecimal(dec as number)}
     </span>
   );
 }
