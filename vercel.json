@@ -1,17 +1,3 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "crons": [
-    {
-      "path": "/api/feed/notify-poll",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/feed",
-      "schedule": "*/2 * * * *"
-    },
-    {
-      "path": "/api/sharpsports/reconcile",
-      "schedule": "0 9 * * *"
-    }
-  ]
+  "$schema": "https://openapi.vercel.sh/vercel.json"
 }

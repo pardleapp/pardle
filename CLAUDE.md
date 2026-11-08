@@ -86,6 +86,20 @@ The original Pardle is a daily golf-attribute guessing game (6 guesses to identi
 - Domain `pardle.app` (Namecheap).
 - Production deploys from `main` → Vercel auto-deploy. Preview deploys from other branches → Vercel preview URL (use for sharing builds with Tom).
 
+## PAUSED since 2026-11-08 (cost cut, Tom's call)
+
+Pardle is parked to stop running costs; the site stays up as a static/on-demand app on Vercel Hobby.
+- Vercel crons removed from `vercel.json` (Hobby only allows daily crons; the */2 feed cron forced Pro). To relaunch, upgrade Vercel to Pro and restore:
+  ```json
+  "crons": [
+    { "path": "/api/feed/notify-poll", "schedule": "*/5 * * * *" },
+    { "path": "/api/feed", "schedule": "*/2 * * * *" },
+    { "path": "/api/sharpsports/reconcile", "schedule": "0 9 * * *" }
+  ]
+  ```
+- Fly app `pardle-img-collector` to be destroyed; redeploy from `collectors/img-shotlink/` via its DEPLOY.md.
+- ScraperAPI paid plan (odds compare) to be cancelled; Redis store to be checked/downsized.
+
 ## Daily commands
 
 ```bash
