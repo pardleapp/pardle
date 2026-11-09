@@ -24,6 +24,11 @@ const nextConfig = {
     // texts — all read with fs at request time.
     "/api/dpwt/**": ["./data/dpwt/**/*.json"],
   },
+  // Standalone data-preview articles live as single HTML files in public/;
+  // give them clean, shareable URLs.
+  async rewrites() {
+    return [{ source: "/earth-course", destination: "/earth-course.html" }];
+  },
 };
 
 export default nextConfig;
